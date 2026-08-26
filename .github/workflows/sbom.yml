@@ -45,7 +45,7 @@ jobs:
             printf 'Expected patchpilot-sbom.cdx.json was not created.\n'
             exit 1
           fi
-          if grep -Eiq 'BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}' patchpilot-sbom.cdx.json; then
+          if grep -Eiq 'BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|DATABASE_URL=|REDIS_URL=|MINIO_ROOT_PASSWORD|OBJECT_STORAGE_SECRET_KEY|patchpilot-dev-secret-not-for-production|\.env' patchpilot-sbom.cdx.json; then
             printf 'Generated SBOM matched a credential-like pattern. Do not publish it.\n'
             exit 1
           fi
