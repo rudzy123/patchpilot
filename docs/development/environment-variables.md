@@ -4,6 +4,8 @@ All server configuration is read in `@patchpilot/config`. Application, domain, a
 
 Copy [`.env.example`](../../.env.example) to `.env`. Example values are **development placeholders and are unfit for production**.
 
+`pnpm dev` for the API and worker calls `loadServerConfig()`, which loads the repository-root `.env` only when neither `NODE_ENV` nor `PATCHPILOT_DEPLOYMENT_ENVIRONMENT` is already `production`. Existing process environment values are never overridden. Production `start` scripts set `NODE_ENV=production` and do **not** read `.env` files; operators must inject runtime secrets. Next.js still loads `apps/web/.env.local` itself for public `NEXT_PUBLIC_*` values.
+
 ## Server (required unless noted)
 
 | Variable | Purpose |

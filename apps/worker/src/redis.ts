@@ -4,6 +4,14 @@ import { type RedisConnectionPort } from '@patchpilot/integrations';
 
 export const MAX_REDIS_RECONNECT_ATTEMPTS = 3;
 
+export function redisRetryStrategy(attempt: number): number | null {
+  if (attempt > MAX_REDIS_RECONNECT_ATTEMPTS) {
+    return null;
+  }
+
+  return Math.min(attempt * 50, 200);
+}
+
 export function createIoredisOptions(): {
   maxRetriesPerRequest: number;
   connectTimeout: number;
@@ -16,14 +24,31 @@ export function createIoredisOptions(): {
     connectTimeout: 1000,
     lazyConnect: true,
     enableOfflineQueue: false,
-    retryStrategy(attempt: number): number | null {
-      if (attempt > MAX_REDIS_RECONNECT_ATTEMPTS) {
-        return null;
-      }
-
-      return Math.min(attempt * 50, 200);
-    },
+    retryStrategy: redisRetryStrategy,
   };
+}
+
+async function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(message));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
 }
 
 export function createRedisConnection(url: string): RedisConnectionPort {
@@ -32,31 +57,40 @@ export function createRedisConnection(url: string): RedisConnectionPort {
   return {
     async ping(timeoutMs: number): Promise<boolean> {
       try {
-        await Promise.race([
+        await withTimeout(
           (async () => {
             if (client.status === 'wait') {
               await client.connect();
             }
             await client.ping();
           })(),
-          new Promise<never>((_resolve, reject) => {
-            setTimeout(() => {
-              reject(new Error('redis ping timed out'));
-            }, timeoutMs);
-          }),
-        ]);
+          timeoutMs,
+          'redis ping timed out',
+        );
         return true;
       } catch {
+        if (client.status === 'connecting' || client.status === 'connect') {
+          client.disconnect();
+        }
         return false;
       }
     },
     async quit(): Promise<void> {
-      if (client.status === 'wait' || client.status === 'end') {
+      if (
+        client.status === 'wait' ||
+        client.status === 'end' ||
+        client.status === 'close' ||
+        client.status === 'reconnecting'
+      ) {
         client.disconnect();
         return;
       }
 
-      await client.quit();
+      try {
+        await client.quit();
+      } catch {
+        client.disconnect();
+      }
     },
   };
 }

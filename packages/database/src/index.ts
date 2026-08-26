@@ -46,6 +46,29 @@ export async function disconnectPrisma(): Promise<void> {
   await client.$disconnect();
 }
 
+async function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(message));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
 export async function checkDatabaseReady(
   timeoutMs: number,
   options?: { databaseUrl?: string },
@@ -53,14 +76,7 @@ export async function checkDatabaseReady(
   const client = getPrismaClient(options);
 
   try {
-    await Promise.race([
-      client.$queryRaw`SELECT 1`,
-      new Promise<never>((_resolve, reject) => {
-        setTimeout(() => {
-          reject(new Error('database readiness timed out'));
-        }, timeoutMs);
-      }),
-    ]);
+    await withTimeout(client.$queryRaw`SELECT 1`, timeoutMs, 'database readiness timed out');
     return { ok: true };
   } catch {
     return { ok: false };

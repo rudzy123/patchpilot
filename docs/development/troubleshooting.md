@@ -46,7 +46,7 @@ If `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`, placeholder credentials, pret
 
 ## Prisma commands fail
 
-`pnpm db:*` runs in `@patchpilot/database`. `db:migrate` and `db:reset` need a reachable `DATABASE_URL`. `db:generate` and `db:validate` do not need a live database. The only model is the technical `SchemaFoundation` placeholder.
+`pnpm db:*` runs in `@patchpilot/database`. `db:migrate`, `db:migrate:deploy`, and `db:reset` need a reachable `DATABASE_URL`. `db:generate` and `db:validate` do not need a live database. The only model is the technical `SchemaFoundation` placeholder. `db:reset` exits without running when `PATCHPILOT_DEPLOYMENT_ENVIRONMENT` or `NODE_ENV` is `production`. Use `pnpm db:migrate:deploy` in CI; `pnpm db:migrate` is interactive.
 
 ## Ports already in use
 

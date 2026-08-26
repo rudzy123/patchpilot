@@ -26,5 +26,7 @@ export function loadPublicConfigFrom(
 }
 
 export function loadPublicConfig(): PublicConfig {
-  return loadPublicConfigFrom(process.env);
+  return loadPublicConfigFrom({
+    NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: process.env['NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT'],
+  });
 }

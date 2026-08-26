@@ -7,10 +7,6 @@ import { buildApi } from './app.js';
 
 async function main(): Promise<void> {
   const config = loadServerConfig();
-  if (config.deploymentEnvironment === 'production' && config.prettyLogs) {
-    throw new Error('Pretty logs cannot be enabled in production.');
-  }
-
   const logger = createLogger({
     service: 'api',
     level: config.logLevel,
@@ -30,7 +26,13 @@ async function main(): Promise<void> {
     checkDatabaseReady: (timeoutMs) => checkDatabaseReady(timeoutMs),
   });
 
+  let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) {
+      return;
+    }
+
+    shuttingDown = true;
     logger.info({ signal }, 'shutting down');
     const timer = setTimeout(() => {
       logger.error('shutdown timed out');
@@ -46,10 +48,16 @@ async function main(): Promise<void> {
   };
 
   process.once('SIGTERM', () => {
-    void shutdown('SIGTERM');
+    void shutdown('SIGTERM').then(
+      () => process.exit(0),
+      () => process.exit(1),
+    );
   });
   process.once('SIGINT', () => {
-    void shutdown('SIGINT');
+    void shutdown('SIGINT').then(
+      () => process.exit(0),
+      () => process.exit(1),
+    );
   });
 
   await app.listen({ host: config.apiHost, port: config.apiPort });

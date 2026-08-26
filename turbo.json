@@ -1,9 +1,11 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": ["CI", "NODE_ENV", "NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": ["NODE_ENV", "NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT"]
     },
     "lint": {
       "dependsOn": ["^build"],

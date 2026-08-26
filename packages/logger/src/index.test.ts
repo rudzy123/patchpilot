@@ -54,7 +54,12 @@ describe('logger redaction', () => {
         apiKey: 'api-key-value',
         githubToken: 'ghs_exampletoken',
         secretAccessKey: 'minio-secret-key',
+        secretKey: 'object-storage-secret',
         signedUrl: 'https://minio.example/object?X-Amz-Signature=abc',
+        password: 'plaintext-db-password',
+        databaseUrl: 'postgresql://patchpilot:operator-secret@db.internal:5432/patchpilot',
+        DATABASE_URL: 'postgresql://patchpilot:operator-secret@db.internal:5432/patchpilot',
+        redisUrl: 'redis://:operator-redis-secret@redis.internal:6379',
       },
       'request',
     );
@@ -71,7 +76,12 @@ describe('logger redaction', () => {
     expect(output).not.toContain('api-key-value');
     expect(output).not.toContain('ghs_exampletoken');
     expect(output).not.toContain('minio-secret-key');
+    expect(output).not.toContain('object-storage-secret');
     expect(output).not.toContain('X-Amz-Signature=abc');
+    expect(output).not.toContain('plaintext-db-password');
+    expect(output).not.toContain('operator-secret');
+    expect(output).not.toContain('operator-redis-secret');
+    expect(output).not.toContain('postgresql://');
     expect(output).not.toContain('shouldNotAppearIfSerialized');
   });
 

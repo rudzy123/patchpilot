@@ -1,6 +1,6 @@
 # Architecture
 
-This directory is the v0.1 architecture design for PatchPilot. Application packages are not scaffolded yet. These documents are the intended shape of the modular monolith; they do not claim that runtime code exists.
+This directory is the v0.1 architecture design for PatchPilot. Session 3 scaffolded the application shells and package boundaries; the product behavior described here is **not** implemented yet. These documents remain the intended shape of the modular monolith.
 
 Decisions in this directory follow the Architecture Decision Records under [docs/adr/](../adr/README.md). ADRs 0001–0018 are **Accepted** for v0.1. Remaining gaps are listed in [open-decisions.md](open-decisions.md).
 
@@ -37,12 +37,10 @@ When two documents describe the same rule, treat this table as the source of tru
 | Classification labels | [data-classification.md](data-classification.md) |
 | Purge and legal-hold-like holds | [retention-and-deletion.md](retention-and-deletion.md) |
 
-## What this phase does not do
+## What this design set does not claim
 
-- Scaffold `apps/` or `packages/` runtime code.
-- Install dependencies or generate Prisma migrations.
-- Implement product functionality.
-- Claim SOC 2, ISO 27001, FedRAMP, PCI, HIPAA, or any other compliance status.
+- Product workflows (authentication, SBOM processing, scoring, remediation) are specified here and are **not** implemented in the Session 3 foundation.
+- The foundation does not claim SOC 2, ISO 27001, FedRAMP, PCI, HIPAA, or any other compliance status.
 
 ## Open decisions
 

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { hydrateProcessEnvFromDevelopmentFiles } from './load-env-files.js';
 import { parseBoolean, parseInteger, readOptional, readRequired } from './read-env.js';
 
 const deploymentEnvironmentSchema = z.enum(['development', 'test', 'production']);
@@ -172,6 +173,7 @@ export function loadServerConfigFrom(
 }
 
 export function loadServerConfig(): ServerConfig {
+  hydrateProcessEnvFromDevelopmentFiles(process.env, { moduleUrl: import.meta.url });
   return loadServerConfigFrom(process.env);
 }
 

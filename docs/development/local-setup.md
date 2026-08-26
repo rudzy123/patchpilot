@@ -24,7 +24,7 @@ nvm use        # or install Node 24 another way
    cp apps/web/.env.example apps/web/.env.local
    ```
 
-   Values in these files are **development placeholders and are unfit for production**. `packages/config` rejects them when `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`.
+   Values in these files are **development placeholders and are unfit for production**. `packages/config` rejects them when `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`. API and worker `dev` processes load the repository-root `.env` through `loadServerConfig()` when production is not already selected. `pnpm start` does not load `.env` files.
 
 2. Install workspace dependencies.
 
@@ -71,8 +71,9 @@ nvm use        # or install Node 24 another way
 | `pnpm infrastructure:logs` | Follow Compose logs |
 | `pnpm db:validate` | Prisma schema validate |
 | `pnpm db:generate` | Generate Prisma Client |
-| `pnpm db:migrate` | Create/apply migrations (interactive) |
-| `pnpm db:reset` | Reset the local database (destructive) |
+| `pnpm db:migrate` | Create/apply migrations locally (`prisma migrate dev`, interactive) |
+| `pnpm db:migrate:deploy` | Apply existing migrations non-interactively (`prisma migrate deploy`) |
+| `pnpm db:reset` | Reset the local database (destructive; refused when `NODE_ENV` or `PATCHPILOT_DEPLOYMENT_ENVIRONMENT` is `production`) |
 
 Environment variables are documented in [environment-variables.md](environment-variables.md). Test labels are in [testing.md](testing.md). Failures: [troubleshooting.md](troubleshooting.md) and [local infrastructure runbook](../runbooks/local-infrastructure-failure.md).
 

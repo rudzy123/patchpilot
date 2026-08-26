@@ -32,7 +32,13 @@ async function main(): Promise<void> {
     readinessTimeoutMs: config.readinessTimeoutMs,
   });
 
+  let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) {
+      return;
+    }
+
+    shuttingDown = true;
     logger.info({ signal }, 'worker shutting down');
     const timer = setTimeout(() => {
       logger.error('worker shutdown timed out');
@@ -47,10 +53,16 @@ async function main(): Promise<void> {
   };
 
   process.once('SIGTERM', () => {
-    void shutdown('SIGTERM');
+    void shutdown('SIGTERM').then(
+      () => process.exit(0),
+      () => process.exit(1),
+    );
   });
   process.once('SIGINT', () => {
-    void shutdown('SIGINT');
+    void shutdown('SIGINT').then(
+      () => process.exit(0),
+      () => process.exit(1),
+    );
   });
 
   try {

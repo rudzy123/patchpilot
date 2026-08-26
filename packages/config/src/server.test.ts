@@ -133,4 +133,14 @@ describe('loadPublicConfigFrom', () => {
   it('does not default the public environment label to development', () => {
     expect(() => loadPublicConfigFrom({})).toThrow(/Public configuration is invalid/);
   });
+
+  it('does not pass the process environment object through as public config input', () => {
+    const publicConfig = loadPublicConfigFrom({
+      NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'test',
+      DATABASE_URL: 'postgresql://should-not-appear',
+      OBJECT_STORAGE_SECRET_KEY: 'should-not-appear',
+    });
+
+    expect(Object.keys(publicConfig).sort()).toEqual(['appName', 'deploymentEnvironment']);
+  });
 });

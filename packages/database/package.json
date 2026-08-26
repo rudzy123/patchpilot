@@ -26,6 +26,7 @@
     "generate": "prisma generate",
     "validate": "node ../../scripts/run-with-database-url.mjs prisma validate",
     "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
     "reset": "prisma migrate reset --force",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },

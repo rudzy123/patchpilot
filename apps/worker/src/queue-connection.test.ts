@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createBullmqConnectionOptions } from './queue-connection.js';
+import { MAX_REDIS_RECONNECT_ATTEMPTS, redisRetryStrategy } from './redis.js';
 
 describe('bullmq connection boundary', () => {
   it('prepares connection options without registering product queues', () => {
@@ -12,6 +13,8 @@ describe('bullmq connection boundary', () => {
       connectTimeout: 1000,
     });
     expect(options).not.toHaveProperty('password');
+    expect(options).not.toHaveProperty('tls');
+    expect(Object.hasOwn(options, 'retryStrategy')).toBe(true);
   });
 
   it('forwards Redis credentials from the URL', () => {
@@ -25,5 +28,19 @@ describe('bullmq connection boundary', () => {
       password: 'operator-redis-secret',
       maxRetriesPerRequest: null,
     });
+  });
+
+  it('enables TLS for rediss URLs without dropping the reconnect bound', () => {
+    const options = createBullmqConnectionOptions(
+      'rediss://:operator-redis-secret@redis.internal:6379',
+    );
+    expect(options).toMatchObject({
+      host: 'redis.internal',
+      port: 6379,
+      password: 'operator-redis-secret',
+      tls: {},
+    });
+    expect(Object.hasOwn(options, 'retryStrategy')).toBe(true);
+    expect(redisRetryStrategy(MAX_REDIS_RECONNECT_ATTEMPTS + 1)).toBeNull();
   });
 });

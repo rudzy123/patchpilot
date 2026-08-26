@@ -25,6 +25,7 @@
     "db:generate": "node scripts/run-database-command.mjs generate",
     "db:validate": "node scripts/run-database-command.mjs validate",
     "db:migrate": "node scripts/run-database-command.mjs migrate",
+    "db:migrate:deploy": "node scripts/run-database-command.mjs migrate:deploy",
     "db:reset": "node scripts/run-database-command.mjs reset",
     "infrastructure:up": "node scripts/run-infrastructure.mjs up",
     "infrastructure:down": "node scripts/run-infrastructure.mjs down",
