@@ -16,7 +16,7 @@ Compose file: `deploy/compose/compose.yaml`. Apps are not in Compose; start them
 
 1. Confirm Docker is running: `docker info`.
 2. Confirm Compose v2: `docker compose version`.
-3. From the repository root: `pnpm infrastructure:logs` (or `docker compose -f deploy/compose/compose.yaml ps`).
+3. From the repository root: `pnpm infrastructure:status` (container names, ports, and health). Then `pnpm infrastructure:logs` if a service is not healthy.
 4. Do not paste connection strings, MinIO root credentials, or `.env` contents into tickets or logs.
 
 ## Classify

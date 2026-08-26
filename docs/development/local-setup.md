@@ -86,7 +86,8 @@ pnpm build
 | `pnpm test:unit` | Vitest unit tests (no Compose) |
 | `pnpm test:integration` | Compose-backed PostgreSQL, Redis, and MinIO checks |
 | `pnpm build` | Production build of packages and apps |
-| `pnpm infrastructure:up` | Start local PostgreSQL, Redis, MinIO |
+| `pnpm infrastructure:up` | Start local PostgreSQL, Redis, MinIO and wait until healthchecks pass |
+| `pnpm infrastructure:status` | Show Compose container status and health |
 | `pnpm infrastructure:down` | Stop Compose services. Named volumes persist; this is not a data reset |
 | `pnpm infrastructure:logs` | Follow Compose logs |
 | `pnpm db:validate` | Prisma schema validate |

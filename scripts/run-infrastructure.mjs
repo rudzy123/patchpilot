@@ -10,9 +10,9 @@ const composeFile = path.join(rootDirectory, 'deploy', 'compose', 'compose.yaml'
 
 const command = process.argv[2];
 
-if (command !== 'up' && command !== 'down' && command !== 'logs') {
+if (command !== 'up' && command !== 'down' && command !== 'logs' && command !== 'status') {
   process.stderr.write(
-    'Usage: pnpm infrastructure:up | pnpm infrastructure:down | pnpm infrastructure:logs\n',
+    'Usage: pnpm infrastructure:up | pnpm infrastructure:down | pnpm infrastructure:status | pnpm infrastructure:logs\n',
   );
   process.exit(1);
 }
@@ -40,7 +40,9 @@ const dockerArguments =
     ? ['compose', '-f', composeFile, ...envFileArguments(), 'up', '-d', '--wait']
     : command === 'down'
       ? ['compose', '-f', composeFile, ...envFileArguments(), 'down']
-      : ['compose', '-f', composeFile, ...envFileArguments(), 'logs', '--follow'];
+      : command === 'status'
+        ? ['compose', '-f', composeFile, ...envFileArguments(), 'ps']
+        : ['compose', '-f', composeFile, ...envFileArguments(), 'logs', '--follow'];
 
 const child = spawn('docker', dockerArguments, {
   stdio: 'inherit',

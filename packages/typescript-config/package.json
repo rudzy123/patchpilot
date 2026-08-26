@@ -10,5 +10,8 @@
     "./node.json": "./node.json",
     "./library.json": "./library.json",
     "./nextjs.json": "./nextjs.json"
+  },
+  "scripts": {
+    "typecheck": "node validate-json.mjs"
   }
 }
