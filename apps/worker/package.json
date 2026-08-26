@@ -21,7 +21,7 @@
     "@patchpilot/integrations": "workspace:*",
     "@patchpilot/logger": "workspace:*",
     "@patchpilot/observability": "workspace:*",
-    "bullmq": "^5.66.4",
+    "bullmq": "^6.2.0",
     "ioredis": "^5.8.2"
   },
   "devDependencies": {
