@@ -10,10 +10,12 @@ The web app is Next.js App Router and React. It is a presentation layer over the
 
 ## Security
 
-- Do not make authorization, tenancy, or risk-score decisions solely in the browser.
+- Do not make authorization, tenancy, or priority decisions solely in the browser.
 - Do not treat a client-supplied organization identifier as authorization.
 - Do not embed API keys, provider tokens, or private URLs in client bundles.
-- Server components and route handlers still follow [security.mdc](security.mdc). They must not import Prisma or call object storage directly.
+- Next.js route handlers are not a substitute for `apps/api`. They must not import Prisma, object-storage SDKs, or use cases that skip the API.
+- Treat SBOM component names and versions as untrusted text (XSS). Do not render raw SBOM JSON to operators unless the API explicitly provides a sanitized view.
+- Server components still follow [security.mdc](security.mdc).
 
 ## UX and accessibility
 

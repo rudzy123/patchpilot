@@ -11,8 +11,9 @@ Prisma is an infrastructure concern. Do not use Prisma from domain, application 
 ## Schema and migrations
 
 - Create new migrations. Never edit a migration that has been applied to shared environments.
-- Use UUIDs or another opaque identifier. Persist timestamps in UTC.
-- Every tenant-owned row must include an organization scope that queries always apply.
+- Opaque IDs are UUIDs until an accepted ADR says otherwise. Persist timestamps in UTC.
+- Every tenant-owned row must include an organization scope that queries always apply. Shared intelligence catalogs may omit organization; findings that reference them must not.
+- Idempotency for tenant-owned jobs and uploads should be enforced with constraints that include organization, not a global natural key alone.
 - Avoid cascading deletion of evidentiary data (SBOMs, findings, audit events, remediation records). Use explicit retention and deletion policies.
 
 ## Transactions
@@ -23,7 +24,7 @@ Prisma is an infrastructure concern. Do not use Prisma from domain, application 
 
 ## Integrity
 
-- Do not silently overwrite vulnerability-intelligence records. Preserve source provenance.
+- Intelligence persistence follows [security.mdc](security.mdc): versioned or additive writes, recorded provenance, no in-place silent overwrite.
 - Store policy version and contributing factors with each calculated priority.
 - Separate observed facts from calculated conclusions in the model.
 - Access control is not a `WHERE organization_id = $clientInput` check alone; the organization comes from authorized context.

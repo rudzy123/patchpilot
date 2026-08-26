@@ -12,24 +12,15 @@ Full policy: [docs/development/branching-strategy.md](../../docs/development/bra
 - Branch from up-to-date `main`.
 - Use short-lived branches: `feat/`, `fix/`, `docs/`, `chore/`, `test/`, `refactor/`, `ci/`, `security/`.
 - Delete the branch after merge. Do not accumulate long-lived feature branches.
-- Never force-push `main`. Do not skip git hooks unless the user explicitly requests it.
+- Never force-push `main`. Do not skip git hooks unless a maintainer or the user explicitly requests it and documents why.
 
 ## Commits
 
-- Conventional Commits: `type(scope): summary` in imperative mood.
-- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
-- Scopes when useful: `web`, `api`, `worker`, `db`, `auth`, `sbom`, `policy`, `intel`, `security`, `docs`.
-- Breaking changes use `!` after the type/scope and a `BREAKING CHANGE:` footer.
+- Conventional Commits as specified in [docs/development/commit-guidelines.md](../../docs/development/commit-guidelines.md).
 - Do not commit secrets, `.env` files, or real SBOMs. Do not rewrite unrelated files.
 
 ## Pull requests
 
-Required before merge (once CI exists; until then, run the equivalent locally and report actual results):
-
-- Lint and TypeScript check
-- Unit and integration tests for touched behavior
-- Relevant Playwright coverage for user-visible web changes
-- Review against [docs/development/review-checklist.md](../../docs/development/review-checklist.md)
-- ADR when the change is an architecture decision
+Required checks live in [docs/development/branching-strategy.md](../../docs/development/branching-strategy.md). Until CI exists, run the equivalent locally and report actual results. Complete [docs/development/review-checklist.md](../../docs/development/review-checklist.md). Add an ADR when the change is an architecture decision.
 
 Do not merge with skipped tests unless a tracked reason is documented. Do not describe the tree as production-ready merely because checks passed.

@@ -1,42 +1,65 @@
 ---
-description: Deny-by-default security, tenancy, secrets, validation, and logging rules. May not be weakened by closer instructions.
+description: Deny-by-default security, tenancy, SBOM trust, provenance, webhooks, secrets, and logging. May not be weakened by closer instructions.
 alwaysApply: true
 ---
 
 # Security
 
-These rules always apply. Directory-level guidance may add controls. It must not silently weaken tenancy, authorization, secret handling, or audit requirements.
+These rules always apply, including when editing API, worker, web, or package files. Directory-level guidance may add controls. It must not silently weaken tenancy, authorization, secret handling, or audit requirements.
 
-## Tenancy and authorization
+Canonical redaction: never log authorization headers, cookies, API tokens, GitHub tokens, raw SBOMs, private source code, plaintext credentials, or complete vulnerability-feed payloads.
 
-- Deny access by default. Every tenant-owned operation must be scoped to the authenticated organization.
-- Never treat a client-supplied `organizationId` as sufficient authorization.
+## Tenant isolation
+
+- Deny access by default. Every tenant-owned operation must be scoped to the **authorized** organization from session/membership context.
+- Never treat a client-supplied `organizationId`, GitHub account, or webhook field as sufficient authorization.
+- Looking up by resource ID is not authorization. Assets, SBOMs, findings, assignments, exports, credentials, and audit events require an organization predicate from trusted context.
+- Object-storage keys for tenant artifacts must include the organization (and a content hash where appropriate) so objects are not reachable by guessing an ID or digest.
+- Shared catalogs (vulnerability intelligence, KEV snapshots) are not tenant-owned. Findings and evidence derived from them are. Never return another organization's findings, SBOMs, or credentials.
+- Job payloads and webhook bodies are not proof of organization. Reload the org binding from persistence before mutating tenant data.
+- Do not add a cross-organization operator bypass unless an accepted ADR defines it.
 - Do not make security decisions solely in the browser.
-- Protect against IDOR and confused-deputy behavior in integrations.
+- Protect against IDOR and confused-deputy behavior.
 
-## Untrusted input
+## Untrusted SBOM processing
 
-- Validate all untrusted input with Zod at system boundaries.
-- Treat SBOMs, archives, webhooks, vulnerability feeds, headers, URLs, files, and external API responses as untrusted.
-- Validate CycloneDX documents before parsing. Enforce upload and body-size limits.
-- Generate SHA-256 hashes for uploaded evidence. Store private artifacts in private object storage.
-- Guard any remote fetch against SSRF (allowlists, blocked link-local/metadata ranges, no user-controlled internal URLs).
+- MVP accepts CycloneDX **JSON** only. Reject other media types and archives until an ADR expands formats.
+- Validate against an allowlisted CycloneDX spec version **before** parse. Enforce upload and body-size limits.
+- Do not execute SBOM content. Do not fetch `externalReferences`, license URLs, bom-links, or other document URLs by default. Any later fetch needs SSRF controls and an ADR.
+- Treat component names, versions, and metadata as untrusted in logs and UI (injection/XSS).
+- Persist original bytes (SHA-256, private object storage). Parse a copy. The parsed graph is derived data and must not replace the original.
+- Record the upload, then parse/correlate via the outbox. No parser, feed, or object-storage I/O inside the upload's database transaction.
 
-## Secrets and configuration
+## Vulnerability-intelligence provenance
 
-- Never hardcode secrets, credentials, tokens, API keys, private URLs, or environment-specific values.
+- Record source, retrieved-at (UTC), and source identity on every intelligence record.
+- Updates are versioned or additive. Never silently overwrite an intelligence record in place.
+- If sources conflict, retain both. Do not pick a winner except via a versioned policy.
+- Correlation stores match method plus the intelligence record identity. Do not strip provenance when denormalizing display fields.
+
+## Webhooks and external credentials
+
+- GitHub and other source-control integrations are **not** MVP. Do not implement them unless the task and an ADR say so.
+- When inbound webhooks exist: require signature verification, reject replay (delivery ID + timestamp window), validate payload shape, and deny unsigned deliveries.
+- If GitHub is added later: map one installation to exactly one PatchPilot organization; never use a token across organizations; treat repo/org IDs in the payload as untrusted until they match the stored installation.
+- Encrypt stored external credentials at rest. Decrypt only inside the integration adapter. Credentials are tenant-owned. Never hardcode them, log them, ship them in client bundles, or enable them via development defaults in production.
+
+## Secrets, config, and logging
+
+- Never hardcode secrets, tokens, API keys, private URLs, or environment-specific values.
 - Read `process.env` only in the typed config package.
-- Encrypt stored external credentials. Prefer short-lived provider tokens.
-- Keep development adapters disabled in production.
-- Users may later supply their own AI key or local endpoint. Keys must never be hardcoded. AI is optional and must not be required.
-
-## Logging, evidence, and disclosure
-
+- Keep development adapters disabled in production (see glossary: fake auth, unsigned webhooks, in-memory stand-ins).
+- Any outbound fetch must apply SSRF controls: allowlists, blocked link-local/metadata ranges, timeouts, and size limits. No user-controlled internal URLs.
 - Add request and correlation identifiers.
-- Never log authorization headers, cookies, API tokens, GitHub tokens, raw SBOMs, private source code, or complete feed payloads.
+- Follow the canonical redaction list above. Narrower rules must not log a field this list forbids.
 - Do not claim compliance, certification, exploitability, or remediation without supporting evidence.
-- Report vulnerabilities privately per [SECURITY.md](../../SECURITY.md). Do not open public issues that disclose exploits.
+- Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md).
+
+## Audit integrity
+
+- Append-only audit events for membership changes, SBOM upload/replace, intelligence import, priority calculation, assignment, remediation activity, risk acceptance, compensating controls, exports, credential create/rotate, and webhook acceptance.
+- Do not update or delete audit rows in place. Do not cascade-delete evidentiary data to satisfy a foreign key.
 
 ## Tests
 
-Security-sensitive changes require regression tests. Do not add exploit payloads or attack scripts.
+Security-sensitive changes require regression tests without exploit payloads. Tenant-isolation and job-replay tests are required for those features even if a testing glob did not attach.

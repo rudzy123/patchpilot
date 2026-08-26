@@ -74,7 +74,7 @@ Begin as a modular monolith with separately deployable `web`, `api`, and `worker
 | Rule | When it applies |
 | --- | --- |
 | [architecture.mdc](.cursor/rules/architecture.mdc) | Always: layering, dependencies, identifiers, time, transactions |
-| [security.mdc](.cursor/rules/security.mdc) | Always: tenancy, authz, secrets, untrusted input, logging redaction |
+| [security.mdc](.cursor/rules/security.mdc) | Always: the ten security-sensitive areas (canonical) |
 | [git-workflow.mdc](.cursor/rules/git-workflow.mdc) | Always: branches, commits, pull requests |
 | [testing.mdc](.cursor/rules/testing.mdc) | Tests and fixtures |
 | [database.mdc](.cursor/rules/database.mdc) | Prisma, migrations, persistence |
@@ -84,28 +84,35 @@ Begin as a modular monolith with separately deployable `web`, `api`, and `worker
 | [integrations.mdc](.cursor/rules/integrations.mdc) | External providers and feeds |
 | [documentation.mdc](.cursor/rules/documentation.mdc) | Docs, ADRs, runbooks |
 
+## Security-sensitive areas
+
+Treat these as in-scope for threat modeling and review on every related change. Canonical rules: [architecture.mdc](.cursor/rules/architecture.mdc) and [security.mdc](.cursor/rules/security.mdc). Terms: [docs/product/glossary.md](docs/product/glossary.md).
+
+1. Tenant isolation
+2. SBOM handling
+3. Vulnerability-intelligence provenance
+4. External integrations
+5. Background-job idempotency
+6. Sensitive log redaction
+7. Credential storage
+8. Risk-score explainability
+9. Audit integrity
+10. Development versus production configurations
+
 ## Architectural invariants
 
-- Separate presentation, application, domain, and infrastructure.
-- Domain and application code must not depend on Fastify, Next.js, Prisma, Redis, BullMQ, MinIO, or vendor SDKs.
-- Fastify route handlers may parse input and invoke application use cases. They may not contain business logic. The Next.js app talks to the API and must not embed domain logic or persistence.
-- Access external providers only through interfaces and adapters.
-- Scope every tenant-owned operation to an organization. Never treat a client-supplied `organizationId` as sufficient authorization.
-- Deny access by default.
-- Validate untrusted input with Zod at system boundaries.
-- Treat SBOMs, archives, webhook payloads, vulnerability feeds, headers, URLs, files, and external API responses as untrusted.
-- Read `process.env` only inside the typed configuration package.
-- Never hardcode secrets, credentials, tokens, API keys, private URLs, or environment-specific values.
-- Never log authorization headers, cookies, API tokens, GitHub tokens, raw SBOMs, private source code, or complete vulnerability feed payloads.
-- Persist timestamps in UTC. Use UUIDs or another opaque identifier.
-- Use database transactions for state transitions. Do not perform network, queue, or object-storage calls inside those transactions.
-- Use a transactional outbox for reliable background work. Assume at-least-once delivery. Make every job handler idempotent.
-- Preserve vulnerability-intelligence provenance. Do not silently overwrite intelligence records.
-- Version the risk-scoring policy. Persist the policy version and contributing factors for each calculated priority. Risk scores must be explainable. AI must not determine authoritative risk scores.
-- Separate observed facts from calculated conclusions. Do not claim compliance, certification, exploitability, or remediation without supporting evidence.
-- Use append-only audit events for security-sensitive and remediation-sensitive operations. Avoid cascading deletion of evidentiary data.
+Do not copy or weakly restate `security.mdc` here. If this file and a rule disagree, keep the stricter security and tenancy interpretation.
 
-AI features, if added later, are optional explanation and drafting aids. Users must supply their own API key or local compatible endpoint at runtime. API keys must never be hardcoded. The first usable release must work with AI disabled.
+- Modular monolith only (`web`, `api`, `worker` share packages/schema). No microservices without an accepted ADR.
+- Application **layer** (use cases) lives in `packages/`. Fastify handlers and Next.js are presentation. Next.js is not a second API.
+- Deny by default. Tenant-owned data is scoped to the authorized organization, not a client-supplied id.
+- Untrusted: SBOMs, archives, webhooks, feeds, headers, URLs, files, external API responses. Validate with Zod at boundaries.
+- `process.env` only in `packages/config`. No hardcoded secrets. Canonical log redaction is in `security.mdc`.
+- Outbox for durable work; at-least-once; idempotent handlers and relays, org-scoped for tenant work.
+- Intelligence is versioned with provenance. Priorities are explainable and policy-versioned. AI must not set authoritative scores.
+- Append-only audit for security- and remediation-sensitive operations. No cascade-delete of evidence.
+
+AI features, if added later, are optional explanation and drafting aids. Users must supply their own API key or local compatible endpoint at runtime. API keys must never be hardcoded. The first usable release must work with AI disabled. GitHub and other source-control integrations are not MVP.
 
 ## Agent workflow
 

@@ -15,7 +15,8 @@ Unit and integration tests use Vitest. Browser end-to-end tests use Playwright.
 - Do not skip tests without a tracked ticket or documented reason in the test.
 - Do not claim commands passed unless they were executed.
 - Prefer fakes and fixtures over live network. Mark true integration tests explicitly.
-- Tenant tests must prove organization isolation, not only the happy path.
+- Tenant tests must prove organization isolation (ID lookup without org context fails; org A cannot read org B), not only the happy path.
+- Job handlers and outbox relays need a replay test: the same job twice produces one tenant-visible effect.
 - Security fixes need regression tests without exploit payloads.
 
 ## Boundaries

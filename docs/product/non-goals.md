@@ -36,5 +36,5 @@ Items that might be revisited after MVP, each requiring product agreement and us
 - Optional AI drafting with user-supplied keys.
 - Additional feed providers.
 - Broader SBOM formats.
-- CLI, CI upload helpers, or webhooks into customer pipelines.
+- CLI, CI upload helpers, GitHub App/OAuth integration, or webhooks into customer pipelines.
 - Split of worker or API into separately scaled services.

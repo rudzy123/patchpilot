@@ -37,4 +37,4 @@ Closer implementation notes may add detail. They must not silently weaken accept
 
 ## Index
 
-List accepted ADRs here as they land. None exist yet. Decisions that still need an ADR before implementation include authn/authz, tenancy/RBAC, intelligence sources and matching, scoring policy structure, object-storage port, outbox/queue topology, and credential encryption.
+List accepted ADRs here as they land. None exist yet. Decisions that still need an ADR before implementation include authn/authz, tenancy/RBAC, intelligence sources and matching, scoring policy structure, object-storage port, outbox/queue topology, credential encryption, and whether application use cases occupy a dedicated package versus `packages/domain`.

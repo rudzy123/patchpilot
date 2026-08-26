@@ -11,7 +11,7 @@ Authors complete this before requesting review. Reviewers verify it. Coding agen
 ## Architecture
 
 - [ ] Layering preserved: no domain/application dependency on Fastify, Next.js, Prisma, Redis, BullMQ, MinIO, or vendor SDKs.
-- [ ] Handlers and UI call use cases; business rules are not in routes.
+- [ ] Fastify handlers invoke use cases in `packages/`. The web app talks to the API; Next.js is not a second domain API. Business rules are not in routes or React.
 - [ ] Lasting decisions have an [ADR](../adr/README.md) when required.
 - [ ] `process.env` is not read outside the config package.
 
@@ -20,7 +20,7 @@ Authors complete this before requesting review. Reviewers verify it. Coding agen
 - [ ] Deny-by-default authorization from authenticated context.
 - [ ] Client-supplied `organizationId` is not sufficient authorization.
 - [ ] Untrusted input validated with Zod at the boundary.
-- [ ] Uploads hashed; private artifacts not logged in full.
+- [ ] Uploads hashed; object keys org-scoped; private artifacts not logged in full. Canonical redaction in `security.mdc`.
 - [ ] No secrets in source, examples, or logs.
 - [ ] SSRF, IDOR, webhook signature/replay, and confused-deputy risks considered for integrations.
 - [ ] Public PR does not disclose an unfixed vulnerability ([SECURITY.md](../../SECURITY.md)).

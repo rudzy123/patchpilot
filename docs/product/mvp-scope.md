@@ -46,6 +46,7 @@ Label these as future work if mentioned in code or docs:
 - Additional SBOM formats beyond CycloneDX JSON.
 - Go CLI after the web MVP functions.
 - Extra intelligence providers beyond the MVP correlation source plus CISA KEV.
+- GitHub and other source-control integrations (including GitHub webhooks).
 - Microservices split of the modular monolith.
 - Hosted multi-tenant SaaS offering.
 

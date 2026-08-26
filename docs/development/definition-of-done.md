@@ -6,6 +6,8 @@ Passing tests do not make a release production-ready.
 
 ## Required for significant features
 
+A **significant feature** is any change that affects tenant data, a trust boundary (upload, webhook, feed, authz), background jobs, scoring, evidence, or a user-visible workflow. Cosmetic copy-only changes are not significant.
+
 Every significant feature must include:
 
 1. **Behavior** that stays inside [MVP scope](../product/mvp-scope.md) or is labeled future work.

@@ -10,9 +10,11 @@ Workers consume durable jobs created through the transactional outbox. Assume at
 
 ## Idempotency
 
-- Every job handler must be idempotent. Use job identity, content hashes, or row version checks.
+Canonical rule: [architecture.mdc](architecture.mdc). This file adds worker-local detail.
+
+- Every job handler and outbox relay must be idempotent. Use job identity, content hashes, or unique constraints **including organization** for tenant-owned work.
 - Replaying a job must not duplicate findings, assignments, notifications, or audit events.
-- Failed handlers must fail in a way that can be retried or dead-lettered without partial silent corruption.
+- Failed handlers must fail in a way that can be retried or dead-lettered without partial silent corruption. Do not leave a second org's data mutated on retry.
 
 ## Isolation
 
@@ -22,6 +24,6 @@ Workers consume durable jobs created through the transactional outbox. Assume at
 
 ## Operations
 
-- Structured logs with correlation and job IDs. Redact SBOMs, tokens, and feed payloads.
+- Structured logs with correlation and job IDs. Follow canonical redaction in [security.mdc](security.mdc).
 - Record metrics for success, retry, poison messages, and lag.
 - Document the operational failure plan for each new job type (retry, backoff, DLQ, replay).
