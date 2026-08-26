@@ -33,7 +33,7 @@ jobs:
         with:
           install: 'false'
 
-      - name: Lint GitHub workflows
+      - name: Lint workflows and check GitHub governance files
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/lint-workflows.mjs

@@ -23,21 +23,21 @@ Protect `main` with a ruleset (preferred) or classic branch-protection rules. Th
 
 ## Required status checks
 
-Require these **exact** names after Session 4 workflows are on `main`:
+Require these **intended** names after Session 4 workflows have actually run on GitHub and the check names are confirmed. Do not copy a guessed pattern into a ruleset before that:
 
-- `CI / Quality`
 - `CI / Workflows`
+- `CI / Quality`
 - `Integration / Integration`
-- `E2E / End-to-end`
 - `CodeQL / Analyze`
 - `Dependency review / Dependency review`
-- `Container build / Deferred`
 
 Do **not** require:
 
-- `Scorecard / Scorecard analysis` (does not run on pull requests)
-- `SBOM / Generate` (does not run on pull requests)
-- `Release dry run / Dry run` (manual only)
+- Scorecard (does not run on pull requests; not a PR gate)
+- SBOM (does not run on pull requests; not a PR gate)
+- Release dry run (manual `workflow_dispatch` only)
+- E2E (no workflow until real Playwright tests exist)
+- Container build (no workflow until reviewed runtime Dockerfiles exist)
 
 Do not require checks that do not exist.
 

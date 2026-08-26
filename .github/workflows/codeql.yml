@@ -26,7 +26,9 @@ jobs:
     permissions:
       contents: read
       actions: read
-      packages: read
+      # packages: read is omitted. This job uses build-mode: none and the default
+      # CodeQL queries bundled with the action. GitHub's starter workflow grants
+      # packages: read only to fetch internal or private CodeQL packs.
       security-events: write
     steps:
       - name: Checkout

@@ -16,7 +16,7 @@ Repository: `rudzy123/patchpilot`.
 | Discussions | Off unless a maintainer enables them later | Not required for Session 4 |
 | Wiki | Off | Canonical docs live in `docs/` |
 
-Visibility is the maintainer's choice. Public repositories expose Scorecard publish-results and secret scanning differently from private ones. This document does not claim the current visibility.
+Visibility is the maintainer's choice. Scorecard `publish_results` is **false** in this repository regardless of visibility, and no OIDC permission is granted. Secret-scanning availability still depends on visibility and plan. This document does not claim the current visibility.
 
 ## Actions
 

@@ -16,7 +16,7 @@ A green Dependency Review or Dependabot alert state does not mean the repository
 ## Review process for dependency pull requests
 
 1. Confirm the update is from Dependabot or a known maintainer, not an unexpected lockfile rewrite.
-2. Require the normal CI, integration, and E2E checks. Do not auto-merge.
+2. Require the normal CI, Integration, CodeQL, and Dependency review checks. Do not auto-merge. Do not wait on an E2E or container-build check; those workflows are deferred.
 3. For high/critical advisories, prefer upgrading or replacing the package over ignoring.
 4. Do not add `continue-on-error` to hide a review failure.
 5. Licensing questions that are not obvious from SPDX identifiers need qualified review.

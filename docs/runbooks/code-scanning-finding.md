@@ -22,7 +22,7 @@ Use this for GitHub code scanning alerts from CodeQL or OpenSSF Scorecard SARIF.
 
 ## Scorecard
 
-Scorecard findings are repository-posture checks (branch protection, token permissions, pinning). They are not proof of application security. Improving the GitHub settings in [repository-settings.md](../development/repository-settings.md) is often the fix. A low Scorecard result is not a certification failure because Scorecard is not a certification.
+Scorecard findings are repository-posture checks (branch protection, token permissions, pinning). They are not proof of application security and are not certification or comprehensive assurance. This repository does not publish Scorecard results to the OpenSSF API. Improving the GitHub settings in [repository-settings.md](../development/repository-settings.md) is often the fix.
 
 ## Related
 

@@ -21,6 +21,22 @@ const ARCHIVE_CHECKSUMS = Object.freeze({
 const rootDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workflowsDirectory = path.join(rootDirectory, '.github', 'workflows');
 
+const REQUIRED_GOVERNANCE_FILES = Object.freeze([
+  '.github/CODEOWNERS',
+  '.github/dependabot.yml',
+  '.github/pull_request_template.md',
+  '.github/ISSUE_TEMPLATE/config.yml',
+  '.github/ISSUE_TEMPLATE/bug_report.yml',
+  '.github/ISSUE_TEMPLATE/feature_request.yml',
+  '.github/actions/setup-node-pnpm/action.yml',
+  '.github/codeql/codeql-config.yml',
+]);
+
+const FORBIDDEN_WORKFLOW_FILES = Object.freeze([
+  '.github/workflows/e2e.yml',
+  '.github/workflows/container-build.yml',
+]);
+
 /**
  * @param {string} message
  * @returns {never}
@@ -28,6 +44,43 @@ const workflowsDirectory = path.join(rootDirectory, '.github', 'workflows');
 function fail(message) {
   process.stderr.write(`${message}\n`);
   process.exit(1);
+}
+
+/**
+ * @returns {void}
+ */
+function checkGitHubGovernance() {
+  for (const relativePath of REQUIRED_GOVERNANCE_FILES) {
+    if (!existsSync(path.join(rootDirectory, relativePath))) {
+      fail(`Missing required GitHub governance file: ${relativePath}`);
+    }
+  }
+
+  for (const relativePath of FORBIDDEN_WORKFLOW_FILES) {
+    if (existsSync(path.join(rootDirectory, relativePath))) {
+      fail(
+        `Unexpected workflow ${relativePath}. GitHub-hosted E2E and container-build checks are deferred; do not add placeholder workflows.`,
+      );
+    }
+  }
+
+  const publicVulnerabilityTemplate = path.join(
+    rootDirectory,
+    '.github',
+    'ISSUE_TEMPLATE',
+    'security.yml',
+  );
+  if (existsSync(publicVulnerabilityTemplate)) {
+    fail(
+      'Do not add a public vulnerability issue template. Use SECURITY.md and private reporting.',
+    );
+  }
+
+  const dependabotPath = path.join(rootDirectory, '.github', 'dependabot.yml');
+  const dependabot = readFileSync(dependabotPath, 'utf8');
+  if (/auto-?merge/i.test(dependabot)) {
+    fail('dependabot.yml must not enable auto-merge.');
+  }
 }
 
 /**
@@ -139,6 +192,8 @@ function runActionlint(binaryPath) {
     process.exit(code ?? 1);
   });
 }
+
+checkGitHubGovernance();
 
 const archiveId = platformArchiveId();
 const expectedChecksum = ARCHIVE_CHECKSUMS[archiveId];

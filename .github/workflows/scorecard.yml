@@ -25,9 +25,9 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      # Scorecard inspects workflow files and Actions configuration (Token-Permissions, Pinned-Dependencies).
       actions: read
       security-events: write
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -40,9 +40,11 @@ jobs:
         with:
           results_file: results.sarif
           results_format: sarif
-          publish_results: ${{ github.event.repository.private != true }}
+          publish_results: false
 
       - name: Upload Scorecard artifact
+        # Privacy-reviewed: Scorecard SARIF contains check results, not secrets, tokens, or SBOM bodies.
+        # Retained so maintainers can inspect results if code scanning is not yet enabled.
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: scorecard-${{ github.run_id }}-${{ github.run_attempt }}

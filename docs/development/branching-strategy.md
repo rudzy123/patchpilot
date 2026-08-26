@@ -36,17 +36,15 @@ Every change lands through a pull request.
 
 ### Required checks
 
-These GitHub Actions check names are **required** to merge once branch protection is applied. They run on every pull request (no path filters):
+These are the **intended** required GitHub Actions check names once branch protection is applied. Confirm the names GitHub actually emits after the first hosted runs. They run on every pull request (no path filters):
 
-- `CI / Quality` — format, lint, typecheck, unit tests, Prisma validate/generate, production build
-- `CI / Workflows` — actionlint
+- `CI / Workflows` — actionlint and GitHub governance files
+- `CI / Quality` — frozen install, format, lint, typecheck, unit tests, Prisma validate/generate, production build
 - `Integration / Integration` — PostgreSQL, Redis, and MinIO plus `pnpm test:integration`
-- `E2E / End-to-end` — `pnpm test:e2e` (currently the reserved non-Playwright command; see [testing.md](testing.md))
 - `CodeQL / Analyze`
 - `Dependency review / Dependency review`
-- `Container build / Deferred`
 
-Exact names and jobs that must **not** be required are listed in [ci.md](ci.md) and [branch-protection.md](branch-protection.md).
+Do not require Scorecard, SBOM, Release dry run, E2E, or Container build. GitHub-hosted E2E and container validation are deferred; see [ci.md](ci.md).
 
 Authors should still run the equivalent local commands and report actual results when GitHub-hosted jobs have not finished. Do not claim checks passed if they were not run.
 

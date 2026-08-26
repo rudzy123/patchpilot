@@ -10,21 +10,34 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Verify toolchain files
+      shell: bash --noprofile --norc -eo pipefail {0}
+      run: |
+        if [[ ! -f .nvmrc ]]; then
+          printf 'Missing .nvmrc; cannot select the repository Node.js version.\n'
+          exit 1
+        fi
+        if [[ ! -f package.json ]]; then
+          printf 'Missing package.json; cannot activate the repository pnpm version through Corepack.\n'
+          exit 1
+        fi
+
     - name: Enable Corepack
-      shell: bash
+      shell: bash --noprofile --norc -eo pipefail {0}
       run: corepack enable
 
     - name: Setup Node.js
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version-file: .nvmrc
+        # Caches the pnpm store from the lockfile. Does not cache node_modules or .env files.
         package-manager-cache: true
 
     - name: Activate repository pnpm version
-      shell: bash
+      shell: bash --noprofile --norc -eo pipefail {0}
       run: corepack prepare --activate
 
     - name: Install dependencies
       if: ${{ inputs.install == 'true' }}
-      shell: bash
+      shell: bash --noprofile --norc -eo pipefail {0}
       run: pnpm install --frozen-lockfile

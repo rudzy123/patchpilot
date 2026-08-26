@@ -8,11 +8,11 @@ GitHub Actions artifacts are visible to users who can read Actions logs for the 
 | --- | --- | --- | --- | --- | --- | --- |
 | Unit coverage | Not uploaded in this session | n/a | Coverage can include paths and fixture names | n/a | Never, until a coverage report is designed | Do not upload secrets or `.env` |
 | Integration reports | Not uploaded in this session | Vitest writes to stdout | Low if logs stay redacted | n/a | Never | No connection strings |
-| Playwright traces | Future browser failures | Traces, screenshots, video | Can capture UI text; must not capture cookies, tokens, signed URLs, or SBOM bodies | 7 days | Failure only, when Playwright exists | Strip credentials before upload |
+| Playwright traces | Future browser failures | Traces, screenshots, video | Can capture UI text; must not capture cookies, tokens, signed URLs, or SBOM bodies | 7 days | Failure only, after a real E2E workflow exists ([CI-DEFER-1](ci.md#deferred-ci-work)) | Strip credentials before upload. Do not upload now; there are no Playwright tests |
 | CodeQL SARIF | Code scanning | Query results | Internal source paths | GitHub code-scanning retention | Always on CodeQL runs | No secrets in source |
-| Scorecard SARIF | Supply-chain posture | Check results | Internal | 5 days (Actions artifact); also code scanning | `main` and schedule | Not a certification |
-| Repository SBOM | PatchPilot dependency inventory | CycloneDX JSON | Internal package names and versions | 7 days | `main`, schedule, manual | Inspect for tokens; never include `.env` |
-| Container metadata | Deferred | n/a | n/a | n/a | Not until images exist | Do not log registry credentials |
+| Scorecard SARIF | Supply-chain posture | Check results; no secrets or SBOM bodies | Internal | 5 days (Actions artifact); also code scanning | `main`, schedule, `branch_protection_rule` | Not certification. External OpenSSF publication is disabled |
+| Repository SBOM | PatchPilot's own dependency inventory | CycloneDX JSON | Internal package names and versions | 7 days | `main`, schedule, manual | Inspect for tokens; never include `.env` or customer SBOMs |
+| Container metadata | Deferred until runtime Dockerfiles exist ([CI-DEFER-2](ci.md#deferred-ci-work)) | n/a | n/a | n/a | Not until a real container-build workflow exists | Do not log registry credentials |
 
 Artifact names include `github.run_id` and `github.run_attempt` so reruns do not collide.
 

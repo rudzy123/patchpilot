@@ -9,7 +9,7 @@ Threats that apply to GitHub Actions for this repository, and how Session 4 work
 - `persist-credentials: false` on checkout.
 - `fetch-depth: 1` unless a job needs history (none currently do).
 - No repository secrets in pull-request jobs. Integration credentials are development placeholders in job `env`.
-- Forks do not receive `id-token: write` jobs that execute their code. Scorecard and SBOM do not run on `pull_request`.
+- No workflow uses `id-token: write`. Scorecard and SBOM do not run on `pull_request`.
 
 ## Script injection
 
@@ -36,7 +36,7 @@ GitHub-hosted `ubuntu-latest` only. No self-hosted runners.
 
 ## OIDC and writes
 
-`id-token: write` is limited to the Scorecard job for publishing results on public repositories. There is no package or deployment write token.
+No workflow requests `id-token: write`. Scorecard sets `publish_results: false`, so OpenSSF OIDC publication is not used. There is no package or deployment write token.
 
 ## Workflow linting
 

@@ -50,7 +50,7 @@ Follow [testing strategy](../architecture/testing-strategy.md). Required securit
 
 ## Pipeline
 
-Required checks in [branching strategy](../development/branching-strategy.md) and [ci.md](../development/ci.md): `CI / Quality`, `CI / Workflows`, `Integration / Integration`, `E2E / End-to-end`, `CodeQL / Analyze`, `Dependency review / Dependency review`, and `Container build / Deferred`.
+Intended required checks (confirm names after GitHub has executed the workflows) are listed in [branching strategy](../development/branching-strategy.md) and [ci.md](../development/ci.md): `CI / Workflows`, `CI / Quality`, `Integration / Integration`, `CodeQL / Analyze`, and `Dependency review / Dependency review`. Do not require Scorecard, SBOM, Release dry run, E2E, or Container build.
 
 Report **actual** local command results when GitHub-hosted jobs have not run. Do not claim checks passed if they were not run.
 
