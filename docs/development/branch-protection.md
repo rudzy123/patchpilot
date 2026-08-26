@@ -2,6 +2,18 @@
 
 Protect `main` with a ruleset (preferred) or classic branch-protection rules. This is a recommendation. **It is not enabled by committing these files.**
 
+## Import the ruleset JSON
+
+[`.github/rulesets/protect-main.json`](../../.github/rulesets/protect-main.json) is the importable GitHub ruleset for this repository. GitHub does not apply it automatically.
+
+1. Open **Settings → Rules → Rulesets**.
+2. **New ruleset → Import a ruleset**.
+3. Choose `protect-main.json`.
+4. Confirm the five required check names match what GitHub has actually shown on a pull request. Edit any name that differs. Do not add Cursor, Scorecard, SBOM, Release dry run, E2E, or container checks.
+5. Enforcement starts as **Disabled** so a name mismatch cannot freeze merges. After the names match, set enforcement to **Active** and save.
+
+Repository admins can bypass on a **pull request only** (not a direct push to `main`). That is the recovery path if a required check never reports. After you have 2FA backup, you may remove that bypass so administrators are fully included.
+
 ## Recommended rules for `main`
 
 | Rule | Recommendation | Single-maintainer note |

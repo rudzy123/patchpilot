@@ -50,7 +50,7 @@ GitHub's default Actions artifact retention may be 90 days. Workflows that uploa
 
 ## Rulesets or classic branch protection
 
-Apply the settings in [branch-protection.md](branch-protection.md) to `main`. Rulesets are preferred on current GitHub; classic branch protection is acceptable if that is what the account provides.
+Apply the settings in [branch-protection.md](branch-protection.md) to `main`. Import [`.github/rulesets/protect-main.json`](../../.github/rulesets/protect-main.json) from **Settings → Rules → Rulesets → Import a ruleset**, then set enforcement to **Active** after confirming check names. Classic branch protection is acceptable if that is what the account provides.
 
 ## What files cannot do
 
