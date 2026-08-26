@@ -87,9 +87,9 @@ pnpm build
 | `pnpm test:integration` | Compose-backed PostgreSQL, Redis, and MinIO checks |
 | `pnpm build` | Production build of packages and apps |
 | `pnpm infrastructure:up` | Start local PostgreSQL, Redis, MinIO and wait until healthchecks pass |
-| `pnpm infrastructure:status` | Show Compose container status and health |
+| `pnpm infrastructure:status` | Show Compose container status and health. After `infrastructure:down`, this prints an empty table and exits 0; that means no PatchPilot containers are running, not a healthcheck failure |
 | `pnpm infrastructure:down` | Stop Compose services. Named volumes persist; this is not a data reset |
-| `pnpm infrastructure:logs` | Follow Compose logs |
+| `pnpm infrastructure:logs` | Follow Compose logs until interrupted |
 | `pnpm db:validate` | Prisma schema validate |
 | `pnpm db:generate` | Generate Prisma Client |
 | `pnpm db:migrate` | Create/apply migrations locally (`prisma migrate dev`, interactive) |
