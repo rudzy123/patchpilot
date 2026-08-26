@@ -44,6 +44,8 @@ jobs:
           build-mode: none
           config-file: .github/codeql/codeql-config.yml
 
+      # Requires CodeQL default setup to be disabled. GitHub rejects this
+      # upload if Settings → Code security still has default setup enabled.
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:

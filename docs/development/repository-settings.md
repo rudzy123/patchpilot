@@ -39,7 +39,7 @@ Do not add repository secrets for pull-request CI. Integration credentials are d
 | Secret scanning | Enable where the GitHub plan allows |
 | Push protection | Enable where the GitHub plan allows |
 | Private vulnerability reporting | Enable (already described in [SECURITY.md](../../SECURITY.md)) |
-| Code scanning | Enable so CodeQL and Scorecard SARIF can upload |
+| Code scanning | Enable code scanning **alerts**. Keep the advanced workflow (`.github/workflows/codeql.yml`). **Disable CodeQL default setup** — GitHub rejects the workflow SARIF if both are on. See [ci-failure.md](../runbooks/ci-failure.md) |
 | Vulnerability alerts (GitHub Advisory) | Enable |
 
 Exact availability depends on whether the repository is public and on the GitHub plan. See [secret-scanning.md](../security/secret-scanning.md).
@@ -50,8 +50,8 @@ GitHub's default Actions artifact retention may be 90 days. Workflows that uploa
 
 ## Rulesets or classic branch protection
 
-Apply the settings in [branch-protection.md](branch-protection.md) to `main`. Rulesets are preferred on current GitHub; classic branch protection is acceptable if that is what the account provides.
+Apply the settings in [branch-protection.md](branch-protection.md) to `main`. Import [`.github/rulesets/protect-main.json`](../../.github/rulesets/protect-main.json) from **Settings → Rules → Rulesets → Import a ruleset**, then set enforcement to **Active** after confirming check names. Classic branch protection is acceptable if that is what the account provides.
 
 ## What files cannot do
 
-CODEOWNERS, issue templates, Dependabot YAML, and workflows do **not** turn on secret scanning, push protection, private reporting, or required checks by themselves. A maintainer must click those settings.
+CODEOWNERS, issue templates, Dependabot YAML, and workflows do **not** turn on secret scanning, push protection, private reporting, or required checks by themselves. They also cannot disable CodeQL default setup. A maintainer must click those settings.
