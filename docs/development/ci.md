@@ -112,6 +112,8 @@ Landing copy and `/health` remain unit-tested. GitHub-hosted E2E coverage is def
 
 `build-mode: none` is used for this JavaScript/TypeScript monorepo so CodeQL does not require a second production build. Generated and dependency directories are excluded in `.github/codeql/codeql-config.yml`. Tests are not excluded. Maintainers inspect results in the repository **Security → Code scanning** view. False positives are handled per [code-scanning-finding.md](../runbooks/code-scanning-finding.md); they are not auto-dismissed.
 
+GitHub's **CodeQL default setup** must stay **off**. This repository uses the advanced workflow only. If default setup is enabled, `CodeQL / Analyze` fails at SARIF upload. That is a repository UI setting, not a YAML pin. Disable it under **Settings → Code security → Code scanning → CodeQL → Default**, then re-run the failed job. Do not add `continue-on-error` to hide the upload.
+
 ## Dependency review
 
 The workflow runs on every pull request (not only lockfile paths) so manifest edits cannot skip the check. Permissions are `contents: read` only. It fails on **high** or **critical** severity. License changes are reported (`license-check: true`) as review signals, not automated legal conclusions. There is no allow/deny license list in this session; Apache-2.0 is the project license, and licensing decisions that need interpretation require qualified review. The action does not rewrite `pnpm-lock.yaml` and does not comment on the pull request.
