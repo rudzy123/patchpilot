@@ -1,0 +1,15 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+engineStrict: true
+linkWorkspacePackages: true
+
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
+  protobufjs: true
+  esbuild: true
+  msgpackr-extract: true
+  unrs-resolver: true

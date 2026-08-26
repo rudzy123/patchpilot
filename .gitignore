@@ -13,6 +13,7 @@ out/
 .turbo/
 .cache/
 coverage/
+.tsc-check/
 *.tsbuildinfo
 
 # Environment and secrets

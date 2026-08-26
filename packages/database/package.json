@@ -1,0 +1,47 @@
+{
+  "name": "@patchpilot/database",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Prisma persistence foundation. Product models are deferred.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "prisma"
+  ],
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "typecheck": "prisma generate && tsc --noEmit -p tsconfig.json",
+    "test:unit": "prisma generate && vitest run --config vitest.config.ts",
+    "test:integration": "prisma generate && vitest run --config vitest.integration.config.ts",
+    "generate": "prisma generate",
+    "validate": "node ../../scripts/run-with-database-url.mjs prisma validate",
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "reset": "prisma migrate reset --force",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0"
+  },
+  "devDependencies": {
+    "@patchpilot/config": "workspace:*",
+    "@patchpilot/eslint-config": "workspace:*",
+    "@patchpilot/test-utils": "workspace:*",
+    "@patchpilot/typescript-config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "prisma": "^6.19.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

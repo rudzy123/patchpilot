@@ -1,0 +1,19 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Technical scaffolding only. Not a product entity and not used by application code.
+// Prisma 6.19 generate/validate succeed with zero models; this table exists so the
+// Session 3 migration history stays aligned (a drop-only follow-up would be unnecessary).
+// Delete or replace this model during the database-domain milestone. Product tables
+// (Organization, User, Asset, SBOM, Finding, AuditEvent, OutboxEvent, …) are deferred
+// to that milestone and must not be added here as disguised fields.
+model SchemaFoundation {
+  id        String   @id @default("patchpilot-foundation")
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+}
