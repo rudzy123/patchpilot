@@ -2,7 +2,7 @@
 
 Tests are part of the definition of done for significant features, not a follow-up wish. Unit and integration tests use **Vitest**. Browser end-to-end tests use **Playwright**. Rules: [testing.mdc](../../.cursor/rules/testing.mdc).
 
-This strategy is for v0.1 architecture. It does not claim a CI pipeline already exists. Until CI exists, authors run the equivalent locally and report actual results.
+This strategy is for v0.1 architecture. Session 4 wires GitHub Actions for the existing unit, integration, and reserved E2E commands. Playwright browser journeys are still not implemented. Authors run the equivalent locally as well and report actual results when hosted jobs have not finished.
 
 ## Layers
 

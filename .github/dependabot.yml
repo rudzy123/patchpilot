@@ -1,0 +1,52 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 8
+    labels:
+      - dependencies
+    groups:
+      eslint:
+        patterns:
+          - 'eslint'
+          - 'eslint-*'
+          - '@eslint/*'
+          - 'globals'
+          - 'typescript-eslint'
+      typescript:
+        patterns:
+          - 'typescript'
+          - '@types/node'
+          - '@types/react'
+          - '@types/react-dom'
+      prettier:
+        patterns:
+          - 'prettier'
+      vitest:
+        patterns:
+          - 'vitest'
+      turbo:
+        patterns:
+          - 'turbo'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    groups:
+      github-actions:
+        patterns:
+          - 'actions/*'
+          - 'ossf/scorecard-action'
+          - 'anchore/sbom-action'
+      codeql-action:
+        patterns:
+          - 'github/codeql-action'
+          - 'github/codeql-action/*'

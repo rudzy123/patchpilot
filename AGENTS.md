@@ -17,7 +17,7 @@ Do not treat product, styling, or convenience guidance as permission to bypass d
 
 ## Current repository state
 
-The Session 3 **development foundation** is in place: pnpm workspaces, Turborepo, application shells (`apps/web`, `apps/api`, `apps/worker`), shared packages, Prisma placeholder schema, and local Compose for PostgreSQL, Redis, and MinIO. Product functionality is **not** implemented. v0.1 architecture, security design, and operational runbooks exist under `docs/architecture/`, `docs/security/`, and `docs/runbooks/`. ADRs 0001–0018 are **Accepted**. The layout below is the modular monolith. Do not invent a different topology without an accepted ADR.
+The Session 3 **development foundation** is in place: pnpm workspaces, Turborepo, application shells (`apps/web`, `apps/api`, `apps/worker`), shared packages, Prisma placeholder schema, and local Compose for PostgreSQL, Redis, and MinIO. Session 4 adds GitHub Actions, Dependabot, CODEOWNERS, issue/PR templates, and CI/governance docs. Product functionality is **not** implemented. v0.1 architecture, security design, and operational runbooks exist under `docs/architecture/`, `docs/security/`, and `docs/runbooks/`. ADRs 0001–0018 are **Accepted**. The layout below is the modular monolith. Do not invent a different topology without an accepted ADR.
 
 ## Target repository layout
 
@@ -64,7 +64,8 @@ Begin as a modular monolith with separately deployable `web`, `api`, and `worker
 | Users and language | [docs/product/target-users.md](docs/product/target-users.md), [docs/product/glossary.md](docs/product/glossary.md) |
 | Definition of done | [docs/development/definition-of-done.md](docs/development/definition-of-done.md) |
 | Local setup | [docs/development/local-setup.md](docs/development/local-setup.md), [environment variables](docs/development/environment-variables.md), [testing](docs/development/testing.md), [troubleshooting](docs/development/troubleshooting.md) |
-| Git, reviews, releases | [docs/development/branching-strategy.md](docs/development/branching-strategy.md), [docs/development/commit-guidelines.md](docs/development/commit-guidelines.md), [docs/development/review-checklist.md](docs/development/review-checklist.md), [docs/development/release-principles.md](docs/development/release-principles.md) |
+| Git, reviews, releases | [docs/development/branching-strategy.md](docs/development/branching-strategy.md), [docs/development/commit-guidelines.md](docs/development/commit-guidelines.md), [docs/development/review-checklist.md](docs/development/review-checklist.md), [docs/development/pull-request-process.md](docs/development/pull-request-process.md), [docs/development/release-principles.md](docs/development/release-principles.md), [docs/development/release-strategy.md](docs/development/release-strategy.md) |
+| CI and repository governance | [docs/development/ci.md](docs/development/ci.md), [docs/development/dependency-management.md](docs/development/dependency-management.md), [docs/development/branch-protection.md](docs/development/branch-protection.md), [docs/development/repository-settings.md](docs/development/repository-settings.md), [docs/development/artifact-retention.md](docs/development/artifact-retention.md) |
 | Architecture | [docs/architecture/README.md](docs/architecture/README.md) |
 | Security design | [docs/security/README.md](docs/security/README.md) |
 | Operational runbooks | [docs/runbooks/README.md](docs/runbooks/README.md) |
@@ -150,6 +151,6 @@ After implementation:
 
 ## Git and reviews
 
-Use short-lived feature branches and [Conventional Commits](docs/development/commit-guidelines.md). Open a pull request. Do not push directly to `main`. Required checks and review expectations are defined in [docs/development/branching-strategy.md](docs/development/branching-strategy.md) and [docs/development/review-checklist.md](docs/development/review-checklist.md).
+Use short-lived feature branches and [Conventional Commits](docs/development/commit-guidelines.md). Open a pull request. Do not push directly to `main`. Required checks and review expectations are defined in [docs/development/branching-strategy.md](docs/development/branching-strategy.md), [docs/development/ci.md](docs/development/ci.md), and [docs/development/review-checklist.md](docs/development/review-checklist.md).
 
 Do not file security vulnerabilities as public issues. Follow [SECURITY.md](SECURITY.md).

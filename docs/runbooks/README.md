@@ -12,5 +12,9 @@ They do not include exploit payloads. They do not claim compliance.
 | [Tenant isolation incident](tenant-isolation-incident.md) | Suspected cross-organization read or write |
 | [Audit integrity failure](audit-integrity-failure.md) | Missing, altered, or cascade-deleted audit or evidence |
 | [Local infrastructure failure](local-infrastructure-failure.md) | PostgreSQL, Redis, or MinIO Compose will not start or stay healthy |
+| [CI failure](ci-failure.md) | GitHub Actions or local quality gates fail |
+| [Dependency alert](dependency-alert.md) | Dependabot or Dependency Review flags a package |
+| [Secret exposure](secret-exposure.md) | Credential in git, logs, or artifacts |
+| [Code scanning finding](code-scanning-finding.md) | CodeQL or Scorecard alert |
 
 Related architecture: [reliability](../architecture/reliability-model.md), [tenant isolation](../architecture/tenant-isolation.md), [audit](../architecture/audit-model.md).

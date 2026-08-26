@@ -1,0 +1,88 @@
+name: Bug report
+description: Report a defect in PatchPilot software or documentation.
+title: '[bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for functional defects. **Do not** file a suspected security vulnerability here. Report those privately using [SECURITY.md](https://github.com/rudzy123/patchpilot/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Release tag, or the Git commit SHA you are running.
+      placeholder: ae592f2 or unreleased main
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment method
+      options:
+        - Local pnpm development
+        - Docker Compose (data plane only)
+        - Other (describe in Environment)
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node.js version, pnpm version, and whether Compose was running. Do not paste secrets.
+      placeholder: Ubuntu, Node 24, pnpm 11.24.0, Compose up
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Minimal steps maintainers can follow. Do not attach exploit payloads or real customer SBOMs.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant sanitized logs
+      description: Redact authorization headers, cookies, tokens, connection strings, and raw SBOM contents.
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Who is blocked and how severe the issue is for local development or a future operator.
+    validations:
+      required: true
+  - type: dropdown
+    id: regression
+    attributes:
+      label: Regression status
+      options:
+        - New issue
+        - Regression from a known-good commit
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround
+      description: What you tried, even if it failed.
+  - type: checkboxes
+    id: security
+    attributes:
+      label: Security-sensitive
+      options:
+        - label: This report is not a vulnerability disclosure. I will use SECURITY.md for suspected security issues instead of a public bug.
+          required: true

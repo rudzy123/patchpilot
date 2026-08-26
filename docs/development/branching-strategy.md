@@ -36,16 +36,19 @@ Every change lands through a pull request.
 
 ### Required checks
 
-When GitHub Actions is configured, these checks are **required** to merge:
+These GitHub Actions check names are **required** to merge once branch protection is applied. They run on every pull request (no path filters):
 
-- Lint (including Markdown/link checks if configured)
-- TypeScript (`strict` pipeline)
-- Unit and integration tests (Vitest)
-- Playwright for changes that affect `apps/web` user-visible behavior (may be `paths`-filtered but must not be skippable without a documented reason)
-- Secret scanning / dependency review when those workflows exist
-- Build of the touched applications
+- `CI / Quality` — format, lint, typecheck, unit tests, Prisma validate/generate, production build
+- `CI / Workflows` — actionlint
+- `Integration / Integration` — PostgreSQL, Redis, and MinIO plus `pnpm test:integration`
+- `E2E / End-to-end` — `pnpm test:e2e` (currently the reserved non-Playwright command; see [testing.md](testing.md))
+- `CodeQL / Analyze`
+- `Dependency review / Dependency review`
+- `Container build / Deferred`
 
-Until CI exists, authors must run the equivalent local commands and report actual results in the pull request. Do not claim checks passed if they were not run.
+Exact names and jobs that must **not** be required are listed in [ci.md](ci.md) and [branch-protection.md](branch-protection.md).
+
+Authors should still run the equivalent local commands and report actual results when GitHub-hosted jobs have not finished. Do not claim checks passed if they were not run.
 
 Human review must complete the [review checklist](review-checklist.md). Architecture changes need an [ADR](../adr/README.md) in the same or a preceding pull request.
 

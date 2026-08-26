@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a vulnerability privately
+    url: https://github.com/rudzy123/patchpilot/security/advisories/new
+    about: Do not file a public issue for a suspected vulnerability. Follow SECURITY.md and use private reporting.
+  - name: Security policy
+    url: https://github.com/rudzy123/patchpilot/blob/main/SECURITY.md
+    about: Read how to report product and supply-chain vulnerabilities without public exploit detail.

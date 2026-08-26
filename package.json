@@ -27,10 +27,11 @@
     "lint:fix": "eslint . --fix && turbo run lint -- --fix",
     "typecheck": "tsc --noEmit -p tsconfig.json && turbo run typecheck",
     "test": "pnpm test:unit",
-    "test:unit": "turbo run test:unit",
+    "test:unit": "turbo run test:unit && node --test scripts/*.test.mjs",
     "test:integration": "turbo run test:integration",
     "test:e2e": "turbo run test:e2e",
     "build": "turbo run build",
+    "workflows:lint": "node scripts/lint-workflows.mjs",
     "clean": "turbo run clean && node scripts/clean-root.mjs"
   },
   "devDependencies": {
