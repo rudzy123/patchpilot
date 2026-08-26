@@ -22,8 +22,11 @@ Quick start after installing Node 24 and pnpm 11:
 cp .env.example .env
 pnpm install
 pnpm infrastructure:up
+pnpm db:generate
 pnpm dev
 ```
+
+In another terminal, the quality gates are `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:integration`, and `pnpm build`.
 
 `.env.example` values are development placeholders and are unfit for production.
 

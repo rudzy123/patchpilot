@@ -10,11 +10,5 @@
     "./node.json": "./node.json",
     "./library.json": "./library.json",
     "./nextjs.json": "./nextjs.json"
-  },
-  "scripts": {
-    "lint": "eslint --no-error-on-unmatched-pattern .",
-    "typecheck": "node --eval \"process.stdout.write('ok\\n')\"",
-    "test:unit": "node --eval \"process.stdout.write('no unit tests\\n')\"",
-    "clean": "node --eval \"process.exit(0)\""
   }
 }

@@ -49,13 +49,19 @@ async function main(): Promise<void> {
 
   process.once('SIGTERM', () => {
     void shutdown('SIGTERM').then(
-      () => process.exit(0),
+      () => {
+        // Intentional successful exit after resources are closed. Remaining
+        // handles must not keep the process alive past SIGTERM.
+        process.exit(0);
+      },
       () => process.exit(1),
     );
   });
   process.once('SIGINT', () => {
     void shutdown('SIGINT').then(
-      () => process.exit(0),
+      () => {
+        process.exit(0);
+      },
       () => process.exit(1),
     );
   });

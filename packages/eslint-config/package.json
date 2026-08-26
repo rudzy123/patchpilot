@@ -15,8 +15,7 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node --test library.test.js",
-    "clean": "node --eval \"process.exit(0)\""
+    "test:unit": "node --test library.test.js"
   },
   "dependencies": {
     "@eslint/js": "^9.39.1",

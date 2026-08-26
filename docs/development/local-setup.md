@@ -57,6 +57,26 @@ nvm use        # or install Node 24 another way
 
 ## Daily commands
 
+First terminal (apps):
+
+```bash
+pnpm install
+pnpm infrastructure:up
+pnpm db:generate
+pnpm dev
+```
+
+Second terminal (quality gates):
+
+```bash
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test:unit
+pnpm test:integration
+pnpm build
+```
+
 | Command | Purpose |
 | --- | --- |
 | `pnpm install` | Install or update the lockfile |
