@@ -68,13 +68,13 @@ Do **not** require on pull requests:
 
 ## CI / Workflows
 
-The `Workflows` job does not install application dependencies. It runs `pnpm workflows:lint`, which:
+The `Workflows` job does not install application dependencies. It runs `node scripts/lint-workflows.mjs` (same as `pnpm workflows:lint`), which:
 
 - Confirms required GitHub governance files exist (`CODEOWNERS`, Dependabot, PR and issue templates, the local setup action, CodeQL config)
 - Rejects a public vulnerability issue template
 - Rejects Dependabot auto-merge configuration
 - Rejects placeholder `.github/workflows/e2e.yml` and `.github/workflows/container-build.yml`
-- Downloads pinned `actionlint` 1.7.12, verifies the archive SHA-256, and lints workflow YAML
+- Downloads pinned `actionlint` 1.7.12, verifies the archive SHA-256 and the extracted binary SHA-256, and lints workflow YAML. A cached binary is hashed before it is executed; a mismatch is not executed. Tracked files under `.cache/actionlint` fail the job.
 
 ## CI / Quality
 
@@ -148,7 +148,7 @@ Inspect the file for secrets before sharing it. Do not commit generated SBOMs.
 
 ## Workflow linting
 
-`pnpm workflows:lint` downloads pinned `actionlint` 1.7.12, verifies the archive SHA-256, checks governance files, and lints `.github/workflows`. GitHub-hosted `ubuntu-latest` also has shellcheck, which actionlint uses when present. The binary is cached under `.cache/actionlint/` (gitignored).
+`pnpm workflows:lint` downloads pinned `actionlint` 1.7.12, verifies the archive SHA-256 and the extracted binary SHA-256, checks governance files, and lints `.github/workflows`. GitHub-hosted `ubuntu-latest` also has shellcheck, which actionlint uses when present. The binary is cached under `.cache/actionlint/` (gitignored). Cache hits still verify the binary digest before execution.
 
 ## Action pinning
 

@@ -50,4 +50,10 @@ If required checks or administrator enforcement lock out all maintainers:
 3. Restore the ruleset after the emergency.
 4. Record the incident without publishing secrets.
 
+### Required workflow never reports
+
+If a required workflow file is invalid, renamed, or deleted so the check never queues, GitHub treats the missing required check as blocking. That includes the pull request that would restore the workflow.
+
+Do not force-push `main`. An administrator should temporarily remove that check from the ruleset (or use the account's documented admin bypass), merge a pull request that restores a valid workflow, then restore the required-check list from [Required status checks](#required-status-checks). Keep a second recovery path (account 2FA backup, not only a single device) before applying "include administrators".
+
 There is currently one known maintainer (`rudzy123`). Keep recovery access (account 2FA backup, not only a single device) before applying "include administrators".

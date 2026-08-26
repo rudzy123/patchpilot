@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 const ACTIONLINT_VERSION = '1.7.12';
 
@@ -16,6 +16,13 @@ const ARCHIVE_CHECKSUMS = Object.freeze({
   darwin_arm64: 'aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f',
   linux_amd64: '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8',
   linux_arm64: '325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6',
+});
+
+const BINARY_CHECKSUMS = Object.freeze({
+  darwin_amd64: 'd1f7cee75ae2873609bd9567b4600bebc5315a5e733e73202987a44fafdd53b2',
+  darwin_arm64: '8db11704dc296f096216db4db65d86cd7f0ebfdf4c38453a1da276b137b88388',
+  linux_amd64: 'c872d6db8c6bf83a8eaa704fc93999f027d55dffbc63b8a6abdccb47df5f4cd4',
+  linux_arm64: 'ac0323433c2853ec3fb978c611430c5b3dc5d43c58d1a1ec031b00ab572beb60',
 });
 
 const rootDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -81,6 +88,34 @@ function checkGitHubGovernance() {
   if (/auto-?merge/i.test(dependabot)) {
     fail('dependabot.yml must not enable auto-merge.');
   }
+}
+
+/**
+ * @returns {void}
+ */
+function rejectTrackedActionlintCache() {
+  const listing = spawnSync(
+    'git',
+    ['-C', rootDirectory, 'ls-files', '-z', '--', '.cache/actionlint'],
+    { encoding: 'buffer' },
+  );
+
+  if (listing.error || listing.status !== 0) {
+    fail('Unable to check whether .cache/actionlint is tracked in git.');
+  }
+
+  if (listing.stdout.length > 0) {
+    fail(
+      'Tracked files under .cache/actionlint are forbidden. That path is a local tool cache, not source.',
+    );
+  }
+}
+
+/**
+ * @returns {boolean}
+ */
+function downloadsAllowed() {
+  return process.env['PATCHPILOT_ACTIONLINT_ALLOW_DOWNLOAD'] !== 'false';
 }
 
 /**
@@ -194,19 +229,35 @@ function runActionlint(binaryPath) {
 }
 
 checkGitHubGovernance();
+rejectTrackedActionlintCache();
 
 const archiveId = platformArchiveId();
 const expectedChecksum = ARCHIVE_CHECKSUMS[archiveId];
-if (expectedChecksum === undefined) {
+const expectedBinaryChecksum = BINARY_CHECKSUMS[archiveId];
+if (expectedChecksum === undefined || expectedBinaryChecksum === undefined) {
   fail(`Missing checksum for ${archiveId}.`);
 }
 
-const cacheDirectory = path.join(rootDirectory, '.cache', 'actionlint', ACTIONLINT_VERSION);
+const cacheRoot =
+  process.env['PATCHPILOT_ACTIONLINT_CACHE_DIR'] ??
+  path.join(rootDirectory, '.cache', 'actionlint');
+const cacheDirectory = path.join(cacheRoot, ACTIONLINT_VERSION);
 const binaryPath = path.join(cacheDirectory, 'actionlint');
 
-if (existsSync(binaryPath)) {
+if (existsSync(binaryPath) && sha256File(binaryPath) === expectedBinaryChecksum) {
   runActionlint(binaryPath);
 } else {
+  if (existsSync(binaryPath)) {
+    process.stderr.write(
+      'Cached actionlint binary failed SHA-256 verification. It will not be executed.\n',
+    );
+    await rm(cacheDirectory, { recursive: true, force: true });
+  }
+
+  if (!downloadsAllowed()) {
+    fail('Trusted actionlint binary is not available and downloads are disabled.');
+  }
+
   const archiveName = `actionlint_${ACTIONLINT_VERSION}_${archiveId}.tar.gz`;
   const url = `https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archiveName}`;
   const tempDirectory = path.join(os.tmpdir(), `patchpilot-actionlint-${process.pid}`);
@@ -228,9 +279,23 @@ if (existsSync(binaryPath)) {
     fail('actionlint binary was not present in the verified archive.');
   }
 
+  const extractedBinaryChecksum = sha256File(extractedBinary);
+  if (extractedBinaryChecksum !== expectedBinaryChecksum) {
+    await rm(tempDirectory, { recursive: true, force: true });
+    fail(
+      `Checksum mismatch for extracted actionlint. Expected ${expectedBinaryChecksum}, received ${extractedBinaryChecksum}.`,
+    );
+  }
+
   mkdirSync(cacheDirectory, { recursive: true });
   await copyFile(extractedBinary, binaryPath);
   await chmod(binaryPath, 0o755);
+
+  if (sha256File(binaryPath) !== expectedBinaryChecksum) {
+    await rm(tempDirectory, { recursive: true, force: true });
+    fail('Cached actionlint binary did not match the expected SHA-256 after copy.');
+  }
+
   await rm(tempDirectory, { recursive: true, force: true });
   runActionlint(binaryPath);
 }

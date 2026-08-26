@@ -19,6 +19,7 @@ Use this when a GitHub Actions workflow or a local quality gate fails. Do not pa
 | Integration | Service unhealthy or URL/port mismatch | Confirm health; keep ports `55432` / `16379` / `19000` |
 | Prisma | Schema invalid or migrate deploy failed | `pnpm db:validate`; inspect migration SQL without logging `DATABASE_URL` |
 | Workflows | actionlint error | Fix YAML; do not pin `main` action refs |
+| Required check missing | Workflow YAML is invalid or the workflow file was removed, so the check never queued | GitHub blocks merge while the required check is absent. Follow [branch-protection.md](../development/branch-protection.md#required-workflow-never-reports): temporarily relax that required check or use admin bypass, merge the workflow fix, restore the rule. Do not force-push `main` |
 | CodeQL / dependency review / Scorecard | New finding or advisory | Follow the security runbooks |
 | Fork permission | Missing secret on `pull_request` | Expected: PR CI must not need repository secrets |
 

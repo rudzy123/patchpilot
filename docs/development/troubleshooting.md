@@ -50,7 +50,7 @@ If `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`, placeholder credentials, pret
 
 ## `pnpm workflows:lint` fails
 
-The script downloads pinned `actionlint` 1.7.12 and verifies a SHA-256 checksum. Failures mean the archive changed, the network is blocked, or a workflow YAML error. Do not bypass the checksum. See [ci.md](ci.md).
+The script downloads pinned `actionlint` 1.7.12 and verifies SHA-256 checksums for the archive and the binary, including cached copies. Failures mean the archive or binary changed, the local cache is stale or untrusted, the network is blocked, or a workflow YAML error. Delete `.cache/actionlint/` and retry rather than bypassing the checksum. See [ci.md](ci.md).
 
 ## Ports already in use
 

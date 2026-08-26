@@ -40,7 +40,7 @@ No workflow requests `id-token: write`. Scorecard sets `publish_results: false`,
 
 ## Workflow linting
 
-`actionlint` 1.7.12 is checksum-verified before it runs. It does not execute repository application code.
+`actionlint` 1.7.12 is checksum-verified on every run, including cache hits: the script verifies the archive SHA-256 after download and the extracted binary SHA-256 before execution. A cache hit that fails the binary digest is not executed. Tracked files under `.cache/actionlint` are rejected. It does not execute repository application code.
 
 ## Related
 
