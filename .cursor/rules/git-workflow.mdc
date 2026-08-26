@@ -1,0 +1,26 @@
+---
+description: Conventional Commits, short-lived branches, and pull-request requirements.
+alwaysApply: true
+---
+
+# Git workflow
+
+Full policy: [docs/development/branching-strategy.md](../../docs/development/branching-strategy.md), [docs/development/commit-guidelines.md](../../docs/development/commit-guidelines.md).
+
+## Branches
+
+- Branch from up-to-date `main`.
+- Use short-lived branches: `feat/`, `fix/`, `docs/`, `chore/`, `test/`, `refactor/`, `ci/`, `security/`.
+- Delete the branch after merge. Do not accumulate long-lived feature branches.
+- Never force-push `main`. Do not skip git hooks unless a maintainer or the user explicitly requests it and documents why.
+
+## Commits
+
+- Conventional Commits as specified in [docs/development/commit-guidelines.md](../../docs/development/commit-guidelines.md).
+- Do not commit secrets, `.env` files, or real SBOMs. Do not rewrite unrelated files.
+
+## Pull requests
+
+Required checks live in [docs/development/branching-strategy.md](../../docs/development/branching-strategy.md). Until CI exists, run the equivalent locally and report actual results. Complete [docs/development/review-checklist.md](../../docs/development/review-checklist.md). Add an ADR when the change is an architecture decision.
+
+Do not merge with skipped tests unless a tracked reason is documented. Do not describe the tree as production-ready merely because checks passed.

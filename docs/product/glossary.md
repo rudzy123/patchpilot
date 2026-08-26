@@ -1,0 +1,41 @@
+# Glossary
+
+Terms below are used in product and engineering docs. Prefer these words in UI copy unless a user-facing label is decided separately.
+
+| Term | Meaning |
+| --- | --- |
+| **Organization** | The tenant boundary. Customer-owned assets, SBOMs, findings, credentials, assignments, and audit events belong to one organization. |
+| **Tenant** | Same as organization. Prefer **organization** in APIs and schema names (`organizationId`). |
+| **Authorized organization** | Organization taken from authenticated membership/session, never from an untrusted field alone. |
+| **Application (layer)** | Use cases that orchestrate domain ports. Lives in `packages/`, not in Fastify routes or Next.js. |
+| **App (deployable)** | `apps/web`, `apps/api`, or `apps/worker`. Presentation or wiring, not the application layer. |
+| **Port / adapter** | Port = interface; adapter = infrastructure implementation (Prisma, HTTP, queue, storage). |
+| **Development adapter** | An implementation unsafe for production (fake auth, unsigned webhooks, plaintext credential stubs, unrestricted HTTP). Must be config-gated off in production. |
+| **Asset** | A software system the organization tracks (application, service, or other inventoried target) that can receive SBOM uploads. |
+| **SBOM** | Software bill of materials. MVP accepts CycloneDX JSON. The original file is evidence and is stored, hashed, and not treated as trusted input. |
+| **CycloneDX** | The SBOM specification used for MVP JSON uploads. Validate before parse. |
+| **Component** | A package or library listed in an SBOM, including identifying coordinates used for correlation. |
+| **Dependency relationship** | An edge between components as recorded in the SBOM. Observed fact, not a risk score. |
+| **Vulnerability record** | Intelligence about a vulnerability (for example a CVE) from a named source, with provenance. |
+| **Finding** | The link between an asset’s observed component (from a specific SBOM) and a vulnerability record, plus later enrichment and scores. |
+| **Correlation** | Matching components to vulnerability records using defined identifiers and recorded method. |
+| **CISA KEV** | CISA Known Exploited Vulnerabilities catalog. Used to **enrich** applicable findings. KEV listing is not by itself proof of exploitation in the user’s environment. |
+| **Enrichment** | Additional observed or catalog data attached to a finding, with source and time. Distinct from the priority calculation. |
+| **Priority** | The stored, explainable ranking for a finding under a versioned policy. **Risk score** means the same until an ADR splits the terms. Not an exploit proof. |
+| **Environmental risk** | Product name for that calculated priority, including environment-specific factors. Still a calculated conclusion, not a fact. |
+| **Policy version** | Identifier of the scoring rules used. Stored with each calculated priority. |
+| **Contributing factors** | The inputs that produced a given priority, stored so the score can be explained later. |
+| **Remediation work** | Assigned work to reduce or resolve a finding. |
+| **Remediation activity** | A recorded action (fix, mitigate, verify) with actor and time. |
+| **Risk acceptance** | An explicit, auditable decision to accept a finding for a defined reason and period. |
+| **Compensating control** | A recorded control that reduces risk without removing the vulnerable component. It is evidence of a claim, not automatic score override unless policy says so. |
+| **Re-scan** | Processing a newer SBOM for an asset and comparing prior findings. |
+| **Resolved (on rescan)** | A calculated conclusion that a previous finding’s affected component is no longer observed. Requires evidence from the new SBOM; not implied by ticket status. |
+| **Audit event** | Append-only record of a security- or remediation-sensitive operation (see `security.mdc`). Never updated in place. |
+| **Shared catalog** | Non-tenant data such as vulnerability intelligence and KEV snapshots. May be global. Findings that use it remain tenant-owned. |
+| **Provenance** | Source, retrieved-at (UTC), and source identity for intelligence or evidence. Updates are versioned or additive, never a silent in-place replace. |
+| **Outbox** | Transactional outbox row used to schedule background work without I/O inside the same database transaction as the state change. |
+| **Idempotency** | Reprocessing the same job or retried mutation does not create duplicate side effects. For tenant-owned work, uniqueness is scoped to the organization. |
+| **Evidence** | Stored artifacts and records needed to reproduce a finding (SBOM hash, parsed identifiers, intel source, policy version). |
+
+When in doubt, label data as **observed fact** or **calculated conclusion**.

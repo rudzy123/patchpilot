@@ -1,0 +1,28 @@
+---
+description: Documentation, ADR, and product-claim rules for Markdown and runbooks.
+globs: "docs/**,**/*.md,AGENTS.md,CONTRIBUTING.md,SECURITY.md,CODE_OF_CONDUCT.md"
+alwaysApply: false
+---
+
+# Documentation
+
+[AGENTS.md](../../AGENTS.md) is the navigation hub. Keep closer docs additive. Do not weaken security policy in prose.
+
+## Accuracy
+
+- Do not claim compliance, certification, exploitability, or remediation without describing the supporting evidence.
+- Do not add aspirational features to MVP docs without labeling them as future work.
+- Do not describe work as production-ready merely because tests pass.
+- Separate observed facts from calculated conclusions.
+
+## ADRs
+
+- Lasting technical choices need an ADR using [docs/adr/template.md](../../docs/adr/template.md).
+- Status values: Proposed, Accepted, Superseded, Rejected.
+- Link superseded ADRs forward and back.
+
+## Ops and security docs
+
+- Significant features need an operational failure plan in a runbook when they are implemented.
+- Vulnerability reporting stays in [SECURITY.md](../../SECURITY.md). Do not document exploit steps in public issues or READMEs.
+- Keep internal Markdown links valid when files move.

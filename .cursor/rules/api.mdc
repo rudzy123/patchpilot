@@ -1,0 +1,30 @@
+---
+description: Fastify API boundaries, OpenAPI, validation, and use-case-only handlers.
+globs: apps/api/**
+alwaysApply: false
+---
+
+# API
+
+Handlers parse HTTP input, enforce authentication context, and invoke application use cases. They must not contain domain logic, Prisma calls, Redis/BullMQ calls, or object-storage SDK usage.
+
+## Boundaries
+
+- Validate untrusted input with Zod at the edge. Align request/response types with the OpenAPI specification.
+- Authorize from the authenticated principal and membership, not from a client-supplied `organizationId`. Webhook and job fields are not membership.
+- Apply rate limits by endpoint sensitivity (auth, upload, export, and webhook endpoints are stricter).
+- Enforce body and upload size limits. Reject invalid CycloneDX before parse-and-store. SBOM trust rules in [security.mdc](security.mdc) apply here even though this file is API-scoped.
+- Tenant-owned mutations that create evidence or jobs require an idempotency key or natural unique constraint, scoped to the organization. Retry must not duplicate SBOMs, findings, or audit events.
+- Inbound webhook routes, if added under an ADR, follow signature, replay, and credential rules in `security.mdc`. GitHub webhooks are not MVP.
+
+## Reliability and audit
+
+- Persist state changes in a transaction with an outbox row when background work is required.
+- Record append-only audit events for security-sensitive and remediation-sensitive mutations.
+- Propagate request and correlation identifiers into logs and downstream jobs.
+- Follow the canonical log redaction list in [security.mdc](security.mdc).
+
+## Errors
+
+- Use a stable error taxonomy (validation, unauthorized, forbidden, not found, conflict, rate limited, unprocessable evidence, internal).
+- Do not leak existence of other organizations' resources.

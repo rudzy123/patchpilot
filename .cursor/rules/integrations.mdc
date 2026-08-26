@@ -1,0 +1,22 @@
+---
+description: Provider adapters, feeds, and SSRF-safe outbound access. Webhooks and credentials are defined in security.mdc.
+globs: "packages/integrations/**,packages/vulnerability-intelligence/**,packages/sbom/**"
+alwaysApply: false
+---
+
+# Integrations
+
+External systems are reached only through ports and adapters. Domain code depends on ports, not vendor SDKs.
+
+Webhook signatures, replay rejection, GitHub installation mapping, credential encryption, SBOM URL non-fetch, and intelligence overwrite policy are canonical in [security.mdc](security.mdc). They apply even when the handler lives in `apps/api` or `apps/worker`.
+
+## Adapters
+
+- Treat feed payloads, package metadata, and remote API responses as untrusted. Validate with Zod at the adapter boundary.
+- Consider malicious package metadata and dependency compromise. Do not execute URLs from SBOM or feed fields.
+- Object storage is provider-neutral. Local development may use MinIO. Handlers and domain code must not call storage SDKs directly.
+- Development adapters (unsigned webhooks, plaintext credential stubs, unrestricted HTTP) must not be selectable in production config.
+
+## Claims
+
+- Do not assert exploitability, KEV applicability, or remediation solely because a feed mentioned a CVE. Record evidence and the matching method.

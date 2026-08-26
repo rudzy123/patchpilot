@@ -1,0 +1,43 @@
+---
+description: Layering, modular monolith defaults, TypeScript, transactions, and job idempotency.
+alwaysApply: true
+---
+
+# Architecture
+
+PatchPilot is a modular monolith with separately deployable `web`, `api`, and `worker` apps that **share packages and schema**. Separately deployable does not mean microservices. Do not split into independently owned services without an accepted ADR.
+
+Closer instructions may add constraints. They must not weaken [security.mdc](security.mdc).
+
+Canonical detail for tenancy, SBOMs, provenance, webhooks, and credentials is in `security.mdc`, not here.
+
+## Layers (defaults until an ADR)
+
+- **Port** = interface. **Adapter** = infrastructure implementation. Domain depends on ports, not vendor SDKs.
+- **Application (layer)** = use cases. Lives under `packages/`, not in React and not in Fastify route modules.
+- `apps/api` handlers parse HTTP, apply authn context, invoke use cases. No domain logic, Prisma, Redis/BullMQ, or object-storage SDKs in handlers.
+- `apps/web` talks to `apps/api`. Next.js route handlers are not a second domain API and must not import Prisma or use cases that skip the API.
+- `apps/worker` is job wiring plus adapters. Domain and use cases stay in `packages/`.
+- Apps may depend on packages. Packages must not depend on apps.
+- Domain and application (layer) code must not import Fastify, Next.js, Prisma, Redis, BullMQ, MinIO, or vendor SDKs.
+
+## TypeScript and config
+
+- Strict mode, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes` where the toolchain already enables them. Do not disable these to make a change compile.
+- No implicit `any`. Avoid explicit `any`. No `ts-ignore` without a narrow, documented justification.
+- Named exports except where a framework requires a default export.
+- Inject dependencies through constructors, functions, or factories. Read `process.env` only in `packages/config`.
+- Opaque IDs are **UUIDs** until an accepted ADR chooses another scheme. Persist timestamps in UTC.
+
+## Data, outbox, and idempotency
+
+- Transactions for state transitions only. No network, queue, or object-storage I/O inside a DB transaction.
+- Durable background work goes through a transactional outbox. Assume at-least-once delivery.
+- Every job handler **and** outbox relay must be idempotent (stable job identity, content hash, or unique constraint). For tenant-owned work, idempotency is scoped to the organization.
+- Prisma stays in `packages/database`. Domain and use cases never import Prisma.
+
+## Product constraints
+
+- Stay inside [docs/product/mvp-scope.md](../../docs/product/mvp-scope.md) unless the task labels work as future.
+- Version risk-scoring policy. Persist policy version and contributing factors with each **priority** (same meaning as risk score until an ADR splits them). AI must not set authoritative scores.
+- Append-only audit events for security-sensitive and remediation-sensitive operations. Do not cascade-delete evidence.

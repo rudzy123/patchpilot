@@ -1,0 +1,64 @@
+# Dependencies and package managers
+node_modules/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+.npm/
+
+# Build, cache, and generated output
+dist/
+build/
+out/
+.next/
+.turbo/
+.cache/
+coverage/
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.pub
+credentials.json
+secrets.json
+
+# Logs and debug
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test artifacts
+playwright-report/
+playwright/.cache/
+test-results/
+blob-report/
+vitest.config.ts.timestamp-*
+
+# Local infrastructure data
+.minio/
+data/postgres/
+data/redis/
+data/minio/
+*.sqlite
+*.sqlite3
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Optional local notes
+*.local.md
