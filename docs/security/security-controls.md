@@ -81,7 +81,7 @@ Canonical rules: [security.mdc](../../.cursor/rules/security.mdc). Threats: [thr
 
 ### C13 Jobs
 
-- Transactional outbox.
+- Transactional outbox. API writes outbox rows; the **worker relay** publishes to Redis/BullMQ.
 - At-least-once with idempotent handlers.
 - Reload org from persistence; poison quarantine; DLQ.
 

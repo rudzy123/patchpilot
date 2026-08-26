@@ -87,10 +87,11 @@ After `accepted`, the relay publishes `sbom.ingest`. The worker:
 2. Gets a copy from object storage **outside** any database transaction.
 3. Full CycloneDX schema validation for the allowlisted version.
 4. Enforces depth, component, and edge limits on the **logical** graph (not only JSON depth).
-5. Persists derived graph in a **database transaction that performs no HTTP, queue, or object-storage I/O**.
+5. Persists derived graph **keyed by this `sbomIngestionId`** in a **database transaction that performs no HTTP, queue, or object-storage I/O**.
 6. Correlates, enriches, scores in **separate** steps: feed HTTP (OSV) is always outside a DB transaction; finding/calculation writes are their own transactions with outbox rows as needed (see [data flow](data-flow.md)).
+7. Moves ingestion to `completed` **only after** correlate, enrich, and score have finished for this ingestion. Graph persist alone is not `completed` and must not become the asset's current observation source.
 
-A single worker **process** may run parse + correlate + enrich + score for one ingestion, but it **must not** combine feed or storage I/O with a state-transition transaction. Stage values remain `validate`, `parse`, `persist_graph`, `correlate`, `enrich`, `score`.
+A single worker **process** may run parse + correlate + enrich + score for one ingestion, but it **must not** combine feed or storage I/O with a state-transition transaction. Stage values remain `validate`, `parse`, `persist_graph`, `correlate`, `enrich`, `score`. Workers may claim jobs while ingestion is `accepted` or `queued` (relay lag must not strand `accepted` rows).
 
 ## Pipeline (text is canonical)
 
@@ -120,17 +121,17 @@ If the diagram is not rendered, the sentence above is complete.
 
 HTTP upload does not wait for correlation.
 
-Duplicate **components** (same bom-ref): reject. Duplicate identity (same purl+version) in one SBOM: persist one **ComponentOccurrence** and record a parse warning; do not explode rows.
+Duplicate **components** (same bom-ref): reject. Duplicate identity (same **versionless** identity + version) in one ingestion: persist one **ComponentOccurrence** and record a parse warning; do not explode rows.
 
 ## Processing leases
 
-When a worker moves ingestion to `processing`, it writes `leaseOwner`, `leaseExpiresAt` (initial recommendation: 15 minutes, configurable, must be validated under load). Heartbeats extend the lease. On expiry, another worker may claim. Handlers are idempotent so overlapping claims must not duplicate findings. Lease theft (forged owner) is mitigated by treating lease fields as worker-internal, not client-supplied.
+When a worker moves ingestion to `processing`, it writes `leaseOwner`, `leaseExpiresAt` on the **BackgroundJob** (and mirrors the same expiry on the ingestion row if useful for operators). This is **one** lease, not two independent locks. Initial recommendation: 15 minutes, configurable, must be validated under load. Heartbeats extend the lease. On expiry, another worker may claim. Handlers are idempotent so overlapping claims must not duplicate findings. Lease theft (forged owner) is mitigated by treating lease fields as worker-internal, not client-supplied.
 
 ## Transaction and rollback
 
 - Object storage put is **outside** the DB transaction. Failure before put: no row. Failure after put, before commit: orphan (cleanup job).
 - DB transaction: SBOM + ingestion + outbox + audit. Rollback drops those rows only; it does not delete the object (orphan path).
-- Worker graph persist: transactional for derived rows; on rollback the ingestion returns to `queued` or stays `processing` for retry. Completed correlation must not leave a second org mutated.
+- Worker graph persist: transactional for derived rows keyed by `sbomIngestionId`; on rollback the ingestion returns to `queued` or stays `processing` for retry. Do not mark `completed` until correlate, enrich, and score finish. Completed correlation must not leave a second org mutated.
 
 ## Observability
 
@@ -144,10 +145,11 @@ States: `accepted`, `queued`, `processing`, `completed`, `rejected`, `quarantine
 | --- | --- | --- |
 | (create after store) | `accepted` | Bytes stored; DB row written; original is evidence |
 | `accepted` | `duplicate` | Natural-key duplicate detected in the same transaction path |
-| `accepted` | `queued` | Outbox published to BullMQ |
+| `accepted` | `queued` | Outbox published to BullMQ (ingestion may already be claimed from `accepted` if the worker wins the race) |
+| `accepted` | `processing` | Worker acquired the job before the relay flipped `queued` |
 | `queued` | `processing` | Worker acquired the job |
 | `processing` | `queued` | Retryable release (transient storage/DB) |
-| `processing` | `completed` | Graph persisted; correlation/enrichment/scoring finished or explicitly continued by follow-on jobs that still complete this ingestion |
+| `processing` | `completed` | Correlate, enrich, and score finished for **this** ingestion (follow-on jobs are allowed internally, but `completed` is not set after persist_graph alone) |
 | `processing` | `rejected` | Deterministic validation failure (schema, limits, missing identity rules) |
 | `processing` | `quarantined` | Poison, parser crash, prototype-pollution attempt, unsafe structure |
 | `processing` | `failed` | Retryable errors exhausted |
@@ -176,7 +178,7 @@ Poison jobs go to the dead-letter path. The original object remains for forensic
 - No correlation against quarantined ingestions.
 - Object remains private.
 - Only `admin`/`owner` may release to `queued` or mark `failed`.
-- Audit: `sbom.quarantined`, `sbom.released_from_quarantine`.
+- Audit: `sbom.ingestion.quarantined`, `sbom.ingestion.released_from_quarantine` (same names as [audit-model.md](audit-model.md)).
 
 ## Retry behavior
 
@@ -212,9 +214,9 @@ Each derived component stores the `sbomId`. Correlation stores match method and 
 ## Parser-version retention and reprocessing
 
 - `parserVersion` is a semver-like identifier of the PatchPilot parser, not the CycloneDX spec version.
-- Reprocessing with a newer parser: new **SBOMIngestion**, same object key, new outbox job, `calculationReason` / observation method recorded.
+- Reprocessing with a newer parser: new **SBOMIngestion**, same object key, new occurrence/relationship/observation rows for that ingestion, new outbox job. Do not overwrite a previous ingestion's graph.
 - Previous derived graphs remain unless a retention job explicitly replaces **derived** data; originals are never replaced.
-- Findings may gain new observations; historical **RiskCalculation** rows remain.
+- Findings may gain new observations for the new ingestion; historical **RiskCalculation** rows remain. Finding state follows the **current** completed ingestion only.
 
 ## Related documents
 

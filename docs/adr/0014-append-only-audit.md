@@ -12,7 +12,7 @@ Reviewers need to see what was known, who decided, and which policy produced a s
 
 ## Decision
 
-Persist **AuditEvent** rows that are **insert-only**. No UPDATE or DELETE in v0.1. No cascade-delete of evidentiary data to satisfy FKs. Emit events for membership, SBOM upload/replace/reprocess, intelligence import, priority calculation, assignment, remediation, risk acceptance, compensating controls, exports, credential lifecycle, integration state, and (future) webhook acceptance. Payloads are redacted. Tenant events always include `organizationId`. Catalog: [audit-model.md](../architecture/audit-model.md).
+Persist **AuditEvent** rows that are **insert-only**. No UPDATE or DELETE in v0.1. No cascade-delete of evidentiary data to satisfy FKs. Emit events for membership, SBOM upload/replace/reprocess, intelligence import, priority calculation, assignment, remediation, risk acceptance, compensating controls, exports, credential lifecycle, integration state, and (future) webhook acceptance. Payloads are redacted. Tenant events always include `organizationId`. System events require a non-null `correlationId` for replay uniqueness. Catalog: [audit-model.md](../architecture/audit-model.md).
 
 ## Alternatives considered
 

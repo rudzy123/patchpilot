@@ -62,10 +62,15 @@ Even if a glob did not attach:
 10. **Development adapters** cannot be constructed when `deploymentEnvironment` is `production` or `allowDevelopmentAdapters` is false.
 11. **KEV absence** does not auto-close findings or present "not exploited."
 12. **Coverage:** a thinner SBOM does not yield `absent`/`resolved` (heuristic fixtures).
-13. **Out-of-range:** mixed in-range and out-of-range occurrences of the same identity do not `resolved`.
+13. **Out-of-range:** mixed in-range and out-of-range occurrences of the same **versionless** identity do not `resolved`.
 14. **Worker I/O:** tests or architecture-boundary checks that feed/storage adapters are not invoked inside a mocked DB transaction.
 15. **Export isolation:** org A cannot download org B export snapshots.
 16. **Policy replay:** stored factors + `policyDefinitionSha256` reproduce the same priority.
+17. **Versionless identity:** upgrading `foo@1.0.0` → `foo@2.0.0` updates observation, does not create a second finding for the same OSV id; a versioned PURL must not be used as the finding key.
+18. **Current ingestion race:** older SBOM completing after a newer `completed` upload does not change finding state or `lastSuccessfulSbomIngestionId`.
+19. **Workflow occupancy:** inconclusive observation does not move `risk_accepted` / `mitigated` / `false_positive` to `inconclusive`; task completion does not move those states to `verification_pending`.
+20. **Ingestion complete:** persist_graph alone does not mark `completed`.
+21. **CVE alias:** adding a CVE to an existing OSV vulnerability does not mint a duplicate finding.
 
 Do not commit working exploit payloads.
 
@@ -80,6 +85,7 @@ Do not commit working exploit payloads.
 | OSV hit / miss / wrong ecosystem / withdrawn | Matcher |
 | KEV snapshot with and without CVE | Enrichment change; absence must not auto-resolve |
 | Two versions of one package, one still in range | Must not `resolved` |
+| Older SBOM completes after newer | Must not become current |
 | Two orgs | Isolation |
 
 ## Coverage expectations for the MVP journey

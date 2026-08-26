@@ -14,6 +14,7 @@ Assigned **remediation work** inside one organization, pointing at one **Finding
 stateDiagram-v2
   [*] --> open
   open --> assigned: assignee set
+  open --> cancelled: cancelled
   assigned --> open: unassigned
   assigned --> in_progress: work started
   assigned --> cancelled: cancelled
@@ -30,6 +31,7 @@ stateDiagram-v2
 | --- | --- | --- | --- |
 | (create) | `open` | `member`+ | Finding in authorized org; finding not required to be `open` (may already be `risk_accepted`) |
 | `open` | `assigned` | `member`+ | Assignee is a non-revoked member of the same organization |
+| `open` | `cancelled` | `member`+ | Created in error; no assignee required |
 | `assigned` | `open` | `member`+ | Unassign |
 | `assigned` | `in_progress` | `member`+ | |
 | `assigned` | `cancelled` | `member`+ | |
@@ -49,7 +51,7 @@ stateDiagram-v2
 
 Each transition emits **AuditEvent** `remediation_task.transition` (or more specific names listed in [audit-model.md](audit-model.md)).
 
-Finding coupling: assignment lives on the **RemediationTask**. Completing a task moves the finding to `verification_pending` per [finding lifecycle](finding-lifecycle.md). `risk_accepted`, `mitigated`, and `false_positive` can coexist with tasks; UI shows both.
+Finding coupling: assignment lives on the **RemediationTask**. Completing a task moves the finding to `verification_pending` **only if the finding is `open`**. If the finding is `risk_accepted`, `mitigated`, or `false_positive`, the task may still complete; finding state does **not** change to `verification_pending`. UI shows both records.
 
 ## RiskAcceptance
 
@@ -91,7 +93,7 @@ Maximum duration is a **configurable initial recommendation**: 365 days. Operato
 ### Review and expiry jobs
 
 - **Review job:** `reviewAt <= now` and `state = active` → emit audit `risk_acceptance.review_due` and surface the finding in a review queue. It does **not** auto-`resolved` or extend `expiresAt`.
-- **Expiry job:** `expiresAt <= now` and `state = active` → `expired`, audit, finding state per [finding lifecycle](finding-lifecycle.md) (typically back to `open` if still `present`). Idempotent on acceptance id.
+- **Expiry job:** `expiresAt <= now` and `state = active` → `expired`, audit, finding state per [finding lifecycle](finding-lifecycle.md). Reopen to `open` only if the finding is still `risk_accepted` and the current observation is `present`. Do **not** reopen `resolved`. Idempotent on acceptance id. A scheduled **override-expiry** job (separate) inserts a non-override **RiskCalculation** when `manual_override` expires; it does not delete history.
 
 ## Compensating controls
 

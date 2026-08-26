@@ -20,9 +20,9 @@ Do not split these into independently owned microservices without an ADR.
 
 ```text
 web → api
-api → postgres, minio (S3 API), (outbox writes)
+api → postgres, minio (S3 API), (outbox writes; no job publish to Redis)
 worker → postgres, redis, minio, outbound OSV/KEV
-relay may run inside worker process
+relay runs inside worker process
 ```
 
 Production replaces Compose services with operator-managed PostgreSQL, Redis, and S3-compatible **private** storage ([OD-5](open-decisions.md)).
@@ -35,6 +35,7 @@ Only `packages/config` reads `process.env`. Production must:
 - Disable development adapters: `deploymentEnvironment=production` implies `allowDevelopmentAdapters=false`. Construction of fake auth, unrestricted HTTP, or unsigned webhooks must throw at boot.
 - Require secrets for DB, Redis, object storage, session material, and credential KEK ([OD-4](open-decisions.md)).
 - Set allowlists for OSV and KEV hosts.
+- First boot with empty intel catalogs is supported; correlation simply finds nothing until snapshots exist.
 
 Images and repos must not contain `.env` files with live secrets or default admin passwords.
 

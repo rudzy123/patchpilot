@@ -14,10 +14,10 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **Asset** | A software system the organization tracks (application, service, or other inventoried target) that can receive SBOM uploads. |
 | **SBOM** | Software bill of materials. MVP accepts CycloneDX JSON. The original file is evidence and is stored, hashed, and not treated as trusted input. |
 | **CycloneDX** | The SBOM specification used for MVP JSON uploads. Validate before parse. |
-| **Component** | A package or library listed in an SBOM, including identifying coordinates used for correlation. |
+| **Component** | A package or library listed in an SBOM. Domain **Component** is **versionless** identity (type/namespace/name or ecosystem/namespace/name). Version lives on **ComponentOccurrence**. |
 | **Dependency relationship** | An edge between components as recorded in the SBOM. Observed fact, not a risk score. |
 | **Vulnerability record** | Intelligence about a vulnerability (for example a CVE) from a named source, with provenance. |
-| **Finding** | Tenant-owned link between an **asset**'s component identity and a **vulnerability record**, spanning SBOMs. Per-SBOM presence is a **Finding observation**, not a new finding when identity matches. |
+| **Finding** | Tenant-owned link between an **asset**'s **versionless** component identity and a **vulnerability record** (OSV id). Spans ingestions. Per-ingestion presence is a **Finding observation**, not a new finding when identity matches. |
 | **Correlation** | Matching components to vulnerability records using defined identifiers and recorded method. |
 | **CISA KEV** | CISA Known Exploited Vulnerabilities catalog. Used to **enrich** applicable findings. KEV listing is not by itself proof of exploitation in the user’s environment. |
 | **Enrichment** | Additional observed or catalog data attached to a finding, with source and time. Distinct from the priority calculation. |
@@ -30,7 +30,7 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **Risk acceptance** | An explicit, auditable decision to accept a finding for a defined reason and period. |
 | **Compensating control** | A recorded control that reduces risk without removing the vulnerable component. It is evidence of a claim, not automatic score override unless policy says so. |
 | **Re-scan** | Processing a newer SBOM for an asset and comparing prior findings. |
-| **Resolved (on rescan)** | A calculated conclusion that the affected component is no longer observed **in range** on a newer SBOM with **adequate coverage**. Requires stored observation evidence; not implied by ticket status or KEV absence. |
+| **Resolved (on rescan)** | A calculated conclusion that the affected component is no longer observed **in range** on the **current** completed ingestion (greatest SBOM `uploadedAt`, not last worker to finish) with **adequate coverage**. Requires stored observation evidence; not implied by ticket status or KEV absence. |
 | **Audit event** | Append-only record of a security- or remediation-sensitive operation (see `security.mdc`). Never updated in place. |
 | **Shared catalog** | Non-tenant data such as vulnerability intelligence and KEV snapshots. May be global. Findings that use it remain tenant-owned. |
 | **Provenance** | Source, retrieved-at (UTC), and source identity for intelligence or evidence. Updates are versioned or additive, never a silent in-place replace. |
@@ -38,9 +38,9 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **Idempotency** | Reprocessing the same job or retried mutation does not create duplicate side effects. For tenant-owned work, uniqueness is scoped to the organization. |
 | **Evidence** | Stored artifacts and records needed to reproduce a finding (SBOM hash, parsed identifiers, intel source, policy version). |
 | **Priority band** | Calculated grouping of **priority** (for example P1–P4). Not vulnerability severity. |
-| **Finding observation** | Per-SBOM record of whether a finding's component identity was `present`, `absent`, or `inconclusive`. |
+| **Finding observation** | Per-**SBOMIngestion** **calculated** record of whether a finding's versionless component identity was `present`, `absent`, or `inconclusive`. |
 | **Incomplete SBOM coverage** | Calculated concern that a newer SBOM is too thin to treat missing components as remediated. |
-| **Processing lease** | Time-bounded claim a worker holds on a job or ingestion so another worker may take over after expiry. |
+| **Processing lease** | Time-bounded claim a worker holds on a **BackgroundJob** (mirrored on the ingestion row if useful). Ingestion and job processing share **one** lease, not two. |
 | **False positive (finding)** | Authorized decision that the *match* is wrong. Does not mean the advisory is invalid globally. |
 | **Mitigated (finding)** | Compensating control recorded while the component is still observed. Not **resolved**. |
 

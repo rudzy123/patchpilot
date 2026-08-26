@@ -33,10 +33,9 @@ flowchart LR
   Worker --> Obj
   Worker --> OSV
   Worker --> KEV
-  Api --> Redis
 ```
 
-If the diagram is not rendered: the browser talks to `apps/web` and `apps/api`. `apps/web` is presentation and calls `apps/api` for all domain operations. `apps/api` and `apps/worker` share PostgreSQL and the object-storage port. Durable jobs are written to PostgreSQL outbox rows, relayed to Redis/BullMQ, and executed by `apps/worker`. Only the worker performs outbound feed fetches.
+If the diagram is not rendered: the browser talks to `apps/web` and `apps/api`. `apps/web` is presentation and calls `apps/api` for all domain operations. `apps/api` and `apps/worker` share PostgreSQL and the object-storage port. Durable jobs are written to PostgreSQL outbox rows, **relayed by the worker** to Redis/BullMQ, and executed by `apps/worker`. The API must **not** publish jobs to Redis (handlers still must not import BullMQ). Inbound rate limiting, if it uses Redis later, is an adapter behind a port and is not a job-publish path. Only the worker performs outbound feed fetches.
 
 ## Deployable apps
 
@@ -75,7 +74,7 @@ Prisma is the persistence toolkit and stays in `packages/database`. Domain and u
 | Browser → API | HTTPS | Session cookie. CSRF protections on cookie-authenticated mutations. |
 | Web → API | HTTPS (server-side) | Same API the browser uses. No second domain API. |
 | API/worker → PostgreSQL | TLS in production | Application user with least privilege. |
-| API/worker → Redis | Authenticated Redis in production | Queue only; not a second source of truth. |
+| API/worker → Redis | Authenticated Redis in production | **Worker** (and outbox relay): queue only; not a second source of truth. API handlers do not publish jobs. |
 | API/worker → object storage | HTTPS + private bucket | No public-read ACLs. Keys include organization and content hash. |
 | Worker → OSV / KEV | HTTPS | Allowlisted hosts, timeouts, size limits. |
 

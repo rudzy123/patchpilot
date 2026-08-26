@@ -12,7 +12,7 @@ Parse, correlate, enrich, and intel refresh are too heavy for the request path. 
 
 ## Decision
 
-Use **Redis** and **BullMQ** as the job transport. Domain and use cases do not import BullMQ or Redis. Workers depend on queue adapters. Redis is not a second source of truth. Production Redis is authenticated and not browser-exposed. Sessions are **not** stored in Redis in the interim default ([OD-2](../architecture/open-decisions.md)).
+Use **Redis** and **BullMQ** as the job transport **after** the transactional outbox. Domain and use cases do not import BullMQ or Redis. Workers (including the relay) depend on queue adapters. `apps/api` handlers must not publish jobs to Redis. Redis is not a second source of truth. Production Redis is authenticated and not browser-exposed. Sessions are **not** stored in Redis in the interim default ([OD-2](../architecture/open-decisions.md)).
 
 ## Alternatives considered
 

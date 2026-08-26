@@ -289,11 +289,11 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 ### False remediation
 
-**Threat:** Task `completed` shown as fixed; missing component treated as resolved when compare was `inconclusive`.
+**Threat:** Task `completed` shown as fixed; missing component treated as resolved when compare was `inconclusive`; older SBOM finishing last treated as current; versioned PURL used as finding identity.
 
-**Impact:** Premature closure.
+**Impact:** Premature closure or duplicate findings that never resolve.
 
-**Mitigation:** Finding `resolved` only with stored evidence (adequate `absent` or out-of-range); UI separates workflow from rescan; incomplete coverage → `inconclusive`.
+**Mitigation:** Finding `resolved` only with stored evidence (adequate `absent` or out-of-range) on the **current** ingestion (max `uploadedAt` among `completed`); UI separates workflow from rescan; incomplete coverage → `inconclusive`; workflow states `risk_accepted`/`mitigated`/`false_positive` are not overwritten by inconclusive compare; identity is versionless + OSV id.
 
 ### AI data leakage (if optional AI is introduced later)
 
@@ -342,6 +342,14 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 **Impact:** False safety.
 
 **Mitigation:** Freshness display; no match ≠ proof of safety; KEV absence is not proof of non-exploitation.
+
+### Open instance registration
+
+**Threat:** Unauthenticated callers create organizations and upload SBOMs on an internet-exposed instance.
+
+**Impact:** Shared-catalog query abuse, disk fill, unintended multi-tenant hosting.
+
+**Mitigation:** First user on an empty instance only; later users invited ([OD-1](../architecture/open-decisions.md)). Residual until the authn ADR adds lockout.
 
 ### Incorrect vulnerability matching
 
@@ -397,8 +405,9 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 | Missing intel | Priority | Gap | False safety | Freshness UI | Stale alert | Retry sync | Fixture | Feeds incomplete | Intel |
 | Wrong matching | Findings | Adapter bug | False pos/neg | Adapters, tests | — | Recalc | Fixtures | Residual | Intel |
 | Wrong priority | Queue | Policy bug | Wrong work | Versioned policy | Factor UI | New version | Golden tests | Weights arbitrary | Policy |
-| False remediation | Finding state | Task complete | Premature close | Evidence rules | — | Reopen on present | State tests | Incomplete SBOMs | Findings |
+| False remediation | Finding state | Task complete; stale completion order | Premature close | Evidence rules; current=`uploadedAt` | — | Reopen on present | State + race tests | Incomplete SBOMs | Findings |
 | Incomplete coverage | Finding state | Sparse SBOM | False resolved | Coverage heuristic | Inconclusive | Re-upload | Coverage test | Heuristic | Findings |
+| Open registration | Instance | Unauthenticated org create | Abuse | First-user only | Auth metrics | Disable signup | Authn tests | OD-1 lockout | Authn |
 | AI leakage (later) | Restricted | Model API | Exfil | Disabled; ADR 0017 | — | Disable | — | If enabled later | Future |
 
 ## Related documents

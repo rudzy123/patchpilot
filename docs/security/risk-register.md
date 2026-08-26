@@ -33,7 +33,7 @@ Decision deadline: before the first implementing PR for that area, unless noted.
 | R21 | OSV rate limit blocks correlation | M | M | P2 | Intel | Backoff, cache, degraded | Delay | First intel PR | mitigated-in-design |
 | R22 | Org policy override mistakes ranking | M | M | P2 | Policy | Immutable versions; history | Operator error | First override PR | mitigated-in-design |
 | R23 | Duplicate SHA-256 across assets | L | M | P2 | Ingestion | Duplicate only same org+asset | Extra storage | First upload | mitigated-in-design |
-| R24 | Finding identity ignores version | M | M | P2 | Findings | Documented; ADR to change | Two versions one finding | Product review | accepted |
+| R24 | Finding identity includes version via full PURL or delayed CVE | M | H | P1 | Findings | Versionless identity + OSV id; CVE is alias ([finding-lifecycle.md](../architecture/finding-lifecycle.md)) | Product still may want version-scoped findings later | First correlate PR | mitigated-in-design |
 | R25 | Future webhook forgery | L | H | P2 | Integrations | No listeners; GitHub not MVP | When added | GitHub ADR | watch |
 | R26 | Optional AI leakage | L | H | P2 | AI | Disabled; ADR 0017 | If enabled | Before any AI PR | mitigated-in-design |
 | R27 | Teams unused → confused authz | L | L | P3 | Domain | Owners are not authz | Misuse | n/a | watch |
@@ -43,6 +43,11 @@ Decision deadline: before the first implementing PR for that area, unless noted.
 | R31 | Numeric ingestion limits unvalidated | H | M | P1 | Ingestion | Labelled proposals; perf tests | Too tight/loose | Before production-minded release | open |
 | R32 | Database-only audit not WORM | M | M | P1 | Audit | Document limitations; DB grants | Superuser | First audit table | mitigated-in-design |
 | R33 | Coverage heuristic false inconclusive/resolved | M | M | P2 | Findings | 50% drop proposal; tune | Heuristic | First rescan PR | watch |
+| R34 | Exclusive finding states clobber acceptance/mitigation/FP | M | H | P1 | Findings | Occupancy rules in [finding-lifecycle.md](../architecture/finding-lifecycle.md) | UI still must show both records | First finding state PR | mitigated-in-design |
+| R35 | Derived graph keyed only by SBOM (reprocess / observations) | M | H | P1 | Ingestion | Key occurrences and observations by `sbomIngestionId` | Extra rows | First parser persist PR | mitigated-in-design |
+| R36 | Older SBOM completing last becomes current | M | H | P1 | Findings | Current = max `uploadedAt` among `completed` | Clock skew on upload time (server sets `uploadedAt`) | First rescan PR | mitigated-in-design |
+| R37 | Divergent RiskCalculation idempotency keys | M | M | P1 | Jobs | Single `inputFingerprint` in [reliability-model.md](../architecture/reliability-model.md) | Fingerprint bugs | First score PR | mitigated-in-design |
+| R38 | Unauthenticated org signup on exposed instance | M | H | P1 | Authn | First-user only ([OD-1](../architecture/open-decisions.md)) | Lockout still open | Before implementing login | open |
 
 ## P0 meaning
 
@@ -50,7 +55,7 @@ P0 items must have tests and review on the first implementing PR for that area. 
 
 ## Open architecture decisions that drive risk
 
-See [open-decisions.md](../architecture/open-decisions.md). Highest coupling: **OD-1** (R10, R15), **OD-4** (R16), **OD-10** (R19), **OD-15** (R7).
+See [open-decisions.md](../architecture/open-decisions.md). Highest coupling: **OD-1** (R10, R15, R38), **OD-4** (R16), **OD-10** (R19), **OD-15** (R7).
 
 ## Related documents
 

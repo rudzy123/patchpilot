@@ -12,7 +12,7 @@ Correlation needs ecosystem-aware version ranges and an open dataset. Extra prov
 
 ## Decision
 
-Use **OSV** as the initial **correlation** source. Worker adapters query allowlisted HTTPS APIs. Persist **Vulnerability** and **VulnerabilitySourceRecord** with provenance (`retrievedAt`, payload hash, source identity). Matching uses PURL or ecosystem+name+version and OSV ranges. No fuzzy name match. Do not upload original SBOMs to OSV. Updates are additive. Withdrawn advisories do not delete findings.
+Use **OSV** as the initial **correlation** source. Worker adapters query allowlisted HTTPS APIs. Persist **Vulnerability** and **VulnerabilitySourceRecord** with provenance (`retrievedAt`, payload hash, source identity). Matching uses a **versioned** occurrence (versioned PURL or ecosystem+name+version) against OSV ranges; **Finding** identity stays **versionless** package identity + OSV id. No fuzzy name match. Do not upload original SBOMs to OSV. Updates are additive. Withdrawn advisories do not delete findings. Targeted package queries are org-scoped jobs and must not persist tenant names on the shared catalog.
 
 ## Alternatives considered
 

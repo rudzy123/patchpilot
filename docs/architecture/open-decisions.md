@@ -6,7 +6,7 @@ None of these defaults weaken [tenant isolation](tenant-isolation.md) or [securi
 
 | ID | Topic | Why it is open | Interim default for design and first implementation |
 | --- | --- | --- | --- |
-| OD-1 | Authentication mechanism | Local passwords, OIDC, magic links, and passkeys were not chosen in an ADR. | Local email-and-password accounts, Argon2id hashes, opaque server-side sessions in PostgreSQL, `HttpOnly` + `Secure` + `SameSite=Lax` cookies, synchronizer CSRF tokens on cookie-authenticated mutations. OIDC is future work. |
+| OD-1 | Authentication mechanism | Local passwords, OIDC, magic links, and passkeys were not chosen in an ADR. | Local email-and-password accounts, Argon2id hashes, opaque server-side sessions in PostgreSQL, `HttpOnly` + `Secure` + `SameSite=Lax` cookies, synchronizer CSRF tokens on cookie-authenticated mutations. **First user on an empty instance** may register. After that, no unauthenticated signup; users are invited. Account lockout/MFA remain unspecified until the authn ADR. OIDC is future work. |
 | OD-2 | Session store | PostgreSQL vs Redis for session rows. | PostgreSQL. Redis is reserved for BullMQ and ephemeral cache, not session authority. |
 | OD-3 | RBAC permission catalog | Product docs require assignment and least privilege but do not enumerate every permission. | Roles in [tenant-isolation.md](tenant-isolation.md): `owner`, `admin`, `member`, `viewer`. Refine with an ADR before expanding. |
 | OD-4 | Credential encryption key management | Envelope encryption needs an operator key, KMS, or Vault. | AES-256-GCM data keys wrapped by an operator-supplied key encryption key (KEK) loaded only through `packages/config`. No cloud KMS required for MVP. |

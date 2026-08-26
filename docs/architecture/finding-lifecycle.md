@@ -8,9 +8,13 @@ A **finding** is the tenant-owned link between an asset's observed component ide
 
 Stable identity:
 
-`organizationId` + `assetId` + component identity (PURL if parseable, else ecosystem + name) + vulnerability identity (OSV id, CVE when known).
+`organizationId` + `assetId` + **versionless** component identity + vulnerability identity (**OSV id**).
 
-Version is **not** part of finding identity. A newer SBOM that lists another version of the same package+vuln pair updates **FindingObservation** (`present` with a new occurrence) rather than always creating a second finding. If product later needs version-scoped findings, that requires an ADR.
+Versionless component identity is CycloneDX/PURL **type + namespace + name**, or ecosystem + namespace + name when no versionless PURL can be parsed. **Strip `@version`, qualifiers, and subpath** from a PURL before using it as identity. A versioned PURL (`pkg:npm/foo@1.2.3`) must not be the finding key — that would mint a new finding on every upgrade and break rescan.
+
+CVE and GHSA aliases are **not** part of the identity key. If a CVE is published after the finding exists, update the **Vulnerability** aliases; do not open a second finding.
+
+Version of the package is **not** part of finding identity. A newer ingestion that lists another version of the same package+vuln pair updates **FindingObservation** (`present` with a new occurrence) rather than always creating a second finding. If product later needs version-scoped findings, that requires an ADR.
 
 ## Evaluated states (recommended list)
 
@@ -42,28 +46,25 @@ Additional v0.1 state: `inconclusive` — latest compare cannot decide; must not
 stateDiagram-v2
   [*] --> open
   open --> verification_pending: task completed or verify requested
-  verification_pending --> open: still present on conclusive SBOM
+  verification_pending --> open: still present on current SBOM
   open --> risk_accepted: acceptance approved
   verification_pending --> risk_accepted: acceptance approved
   mitigated --> risk_accepted: acceptance approved
-  risk_accepted --> open: expired or revoked and still present
+  risk_accepted --> open: expired or revoked and still present and not resolved
   open --> mitigated: compensating control recorded
   open --> false_positive: authorized FP
   verification_pending --> false_positive: authorized FP
   verification_pending --> mitigated: compensating control
   inconclusive --> risk_accepted: acceptance approved
   false_positive --> resolved: evidence-backed absent or out of range
-  false_positive --> inconclusive: rescan inconclusive
   false_positive --> open: FP revoked
   open --> resolved: evidence-backed
   verification_pending --> resolved: evidence-backed
   risk_accepted --> resolved: evidence-backed
   mitigated --> resolved: evidence-backed
   inconclusive --> resolved: later evidence-backed
-  open --> inconclusive: rescan inconclusive
-  verification_pending --> inconclusive: rescan inconclusive
-  risk_accepted --> inconclusive: rescan inconclusive
-  mitigated --> inconclusive: rescan inconclusive
+  open --> inconclusive: current rescan inconclusive
+  verification_pending --> inconclusive: current rescan inconclusive
   resolved --> open: later present
   resolved --> inconclusive: later inconclusive
   inconclusive --> open: later present
@@ -76,13 +77,13 @@ If the diagram is not rendered, the transition table is authoritative.
 | Transition | Actor | Required fields |
 | --- | --- | --- |
 | Create `open` | system (correlation) | Observation `present`, vulnerability id, match method |
-| → `verification_pending` | system when task → `completed`, or `member`+ request verify | Task id or reason |
+| → `verification_pending` | system when task → `completed` **and** finding is `open`, or `member`+ request verify **from `open`** | Task id or reason. Must **not** run if finding is `risk_accepted`, `mitigated`, or `false_positive` |
 | → `risk_accepted` | system when **RiskAcceptance** becomes `active` | See [remediation-lifecycle.md](remediation-lifecycle.md) (requester, approver, expiry) |
 | → `mitigated` | `admin` or `owner` | Compensating-control **Evidence** id, reason |
 | → `false_positive` | `admin` or `owner` | Reason; optional evidence; does **not** delete intel |
 | → `resolved` | system only | Stored observation or verification record meeting evidence rules below |
-| → `inconclusive` | system | Observation `inconclusive` with method |
-| → `open` (reopen) | system on `present` after `resolved`/`inconclusive`; or `admin`/`owner` revoking FP/mitigated/acceptance | |
+| → `inconclusive` | system | Observation `inconclusive` with method, and occupancy rules (does not clobber `risk_accepted` / `mitigated` / `false_positive`) |
+| → `open` (reopen) | system on `present` after `resolved`/`inconclusive` (not from `risk_accepted`/`mitigated`/`false_positive` while those still apply); or `admin`/`owner` revoking FP/mitigated/acceptance | |
 
 Due dates are **calculated recommendations** on **RiskCalculation**, not a finding state. Overdue does not auto-transition.
 
@@ -92,22 +93,33 @@ Due dates are **calculated recommendations** on **RiskCalculation**, not a findi
 | --- | --- | --- | --- |
 | (create) | `open` | Correlation created the finding from a `present` observation | Calculated from intel + SBOM |
 | `open` | `verification_pending` | Remediation task `completed` or verify requested | Workflow |
-| `verification_pending` | `open` | Latest conclusive observation is `present` | Calculated |
+| `verification_pending` | `open` | Current ingestion's conclusive observation is `present` | Calculated |
 | `open` / `verification_pending` / `mitigated` / `inconclusive` | `risk_accepted` | Acceptance `active` | Workflow |
-| `risk_accepted` | `open` | Acceptance `expired`/`revoked`/`superseded` without replacement, and still `present` | Workflow |
+| `risk_accepted` | `open` | Acceptance `expired`/`revoked`/`superseded` without replacement, current observation `present`, and finding is not `resolved` | Workflow |
 | `open` / `verification_pending` | `mitigated` | Compensating control recorded | Workflow |
 | `open` / `verification_pending` | `false_positive` | Authorized FP | Workflow |
 | `false_positive` | `open` | FP revoked | Workflow |
 | `mitigated` | `open` | Control withdrawn | Workflow |
 | `open`, `verification_pending`, `risk_accepted`, `mitigated`, `inconclusive`, `false_positive` | `resolved` | Evidence-backed resolution (below) | Calculated / evidenced |
-| `open`, `verification_pending`, `risk_accepted`, `mitigated`, `false_positive` | `inconclusive` | Latest completed ingestion yields `inconclusive` | Calculated |
-| `resolved` | `open` | Later completed ingestion yields `present` | Calculated |
-| `resolved` | `inconclusive` | Later completed ingestion yields `inconclusive` | Calculated |
-| `inconclusive` | `open` | Later completed ingestion yields `present` | Calculated |
+| `open`, `verification_pending` | `inconclusive` | Current completed ingestion yields `inconclusive` | Calculated |
+| `resolved` | `open` | Later **current** ingestion yields `present` | Calculated |
+| `resolved` | `inconclusive` | Later **current** ingestion yields `inconclusive` | Calculated |
+| `inconclusive` | `open` | Later **current** ingestion yields `present` | Calculated |
 
-`false_positive` remains until revoked **or** evidence-backed `resolved` / `inconclusive` from a later completed ingestion. New **FindingObservation** rows are always written. UI must not label FP as remediated.
+### Workflow vs calculated occupancy
 
-When `risk_accepted` and evidence supports `resolved`, the finding becomes `resolved`. The acceptance row remains historical.
+A finding has one current state. **FindingObservation** rows are always inserted for the ingestion that just completed. Observation rows do **not** always change finding state.
+
+When applying the **current** completed ingestion (defined below):
+
+1. If resolution evidence rules are met → `resolved` (including from `risk_accepted`; the acceptance row stays until expiry/revoke and must **not** reopen a `resolved` finding).
+2. Else if observation is `inconclusive`: keep `risk_accepted`, `mitigated`, and `false_positive`. Only `open` and `verification_pending` (and `resolved`) may move to `inconclusive`.
+3. Else if observation is `present`: keep `risk_accepted` (while acceptance `active`), `mitigated` (while control not withdrawn), and `false_positive` (until revoked). Move `verification_pending` → `open`. Reopen `resolved` → `open`.
+4. Task `completed` or verify requested → `verification_pending` **only from `open`**. Do not displace `risk_accepted`, `mitigated`, or `false_positive`.
+
+`false_positive` remains until revoked **or** evidence-backed `resolved`. New **FindingObservation** rows are always written. UI must not label FP as remediated.
+
+When `risk_accepted` and evidence supports `resolved`, the finding becomes `resolved`. The acceptance row remains historical (`active` until expiry, then `expired` with **no** finding reopen if already `resolved`).
 
 ### Disallowed
 
@@ -119,7 +131,9 @@ When `risk_accepted` and evidence supports `resolved`, the finding becomes `reso
 
 ## FindingObservation
 
-Each completed SBOM ingestion for the asset produces an observation per existing finding (and creates findings for new present matches).
+Each **completed** SBOM ingestion for the asset produces an observation per existing finding (keyed by `sbomIngestionId`) and creates findings for new present matches.
+
+**Current ingestion:** among ingestions in state `completed` for the asset, the one whose SBOM `uploadedAt` is greatest (tie-break ingestion `createdAt`, then ingestion `id`). Completing an **older** upload still persists that ingestion's graph and observations; it must **not** update `lastSuccessfulSbomIngestionId`, `lastObservedAt`, or finding state. "Latest completed" never means last worker to finish.
 
 | `result` | Meaning |
 | --- | --- |
@@ -135,8 +149,8 @@ Inconclusive must not be displayed as "fixed."
 
 | Situation | May set `resolved`? | Evidence | Confidence |
 | --- | --- | --- | --- |
-| Component no longer present | yes, if coverage adequate | Observation `absent` **and** compare method shows identity could have been seen | `high` if PURL/ecosystem+name stable across SBOMs |
-| Component upgraded outside affected range | yes, if **every** occurrence of that identity on the latest completed SBOM is outside the affected range (or absent) | Observation method `version_out_of_affected_range`; if **any** occurrence remains in range → remain `present`, do not `resolved` | `high` when range parse succeeded for all occurrences; else `inconclusive` |
+| Component no longer present | yes, if coverage adequate | Observation `absent` on the **current** completed ingestion **and** compare method shows identity could have been seen | `high` if PURL/ecosystem+name stable across ingestions |
+| Component upgraded outside affected range | yes, if **every** occurrence of that **versionless** identity on the **current** completed ingestion is outside the affected range (or absent) | Observation method `version_out_of_affected_range`; if **any** occurrence remains in range → remain `present`, do not `resolved` | `high` when range parse succeeded for all occurrences; else `inconclusive` |
 | Advisory withdrawn | no by itself | New calculation with `advisory_withdrawn`; finding may remain `open` | Withdrawal is intel, not asset evidence |
 | VEX not-affected | **future** | Not MVP ([non-goals](../product/non-goals.md) extra formats) | — |
 | Compensating mitigation | no | State `mitigated` + **Evidence**; component still present | Claim only |

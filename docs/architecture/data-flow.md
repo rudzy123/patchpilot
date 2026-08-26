@@ -40,7 +40,7 @@ If the diagram is not rendered, the numbered flows below are complete.
 
 ## 1. Create an organization
 
-1. Unauthenticated or first-user path creates a **User** (interim local accounts, [OD-1](open-decisions.md)).
+1. Unauthenticated **first-user** path (empty instance: zero **User** rows) creates a **User** (interim local accounts, [OD-1](open-decisions.md)). There is **no** open self-service signup after that. Later users are invited into an organization by `admin`/`owner`. Creating additional organizations requires an authenticated user.
 2. Use case creates **Organization**, **Membership** (`owner`), default **Environment** options (optional), and an **AuditEvent** (`organization.created`, `membership.created`).
 3. Session is bound to that user. Subsequent commands use membership, not a client-supplied organization id as authority.
 
@@ -68,8 +68,8 @@ Asynchronous worker work:
 2. Worker reloads SBOM by id **and** `organizationId`.
 3. Get a **copy** of object bytes. Do not fetch `externalReferences`, license URLs, or bom-links.
 4. Schema, depth, component, and edge limits. Failures become `rejected` or `quarantined` as defined in ingestion design.
-5. Persist **Component**, **ComponentOccurrence**, **DependencyRelationship**.
-6. Ingestion stage advances through parse; state stays `processing` until a terminal ingestion state.
+5. Persist **Component**, **ComponentOccurrence**, **DependencyRelationship** keyed by **this** `sbomIngestionId`.
+6. Ingestion stage advances through parse; state stays `processing` until a terminal ingestion state. `completed` is allowed only after correlate, enrich, and score for this ingestion have finished (or failed terminal — then not `completed`).
 
 ## 6. Correlate
 
@@ -94,16 +94,16 @@ Asynchronous worker work:
 
 ## 9–10. Assign and record remediation
 
-1. Create **RemediationTask** (`open` → `assigned`). The finding stays `open` until a task completes (`verification_pending`) or an acceptance/mitigation/FP rule applies.
+1. Create **RemediationTask** (`open` → `assigned`). If the finding is `open`, completing a task moves it to `verification_pending`. `risk_accepted` / `mitigated` / `false_positive` are not displaced by task completion.
 2. Record activity as task state changes plus **AuditEvent**. Completing a task does **not** set finding `resolved`.
 3. **RiskAcceptance** (`active`) and compensating **Evidence** are explicit rows plus audit events.
 
 ## 11–12. Newer SBOM and compare
 
 1. Same upload pipeline; new **SBOM** (new hash) for the same asset.
-2. After parse, for each existing finding on the asset, write a new **FindingObservation**: `present`, `absent`, or `inconclusive` with method.
-3. Finding state updates per [finding lifecycle](finding-lifecycle.md). `resolved` is a **calculated conclusion** requiring evidence from the new SBOM.
-4. Recalculate priority with a **new** RiskCalculation (`calculationReason: rescan`). Previous calculations remain.
+2. After parse+correlate+enrich+score, the ingestion may become `completed`. For each existing finding on the asset, write a new **FindingObservation** keyed by this `sbomIngestionId`: `present`, `absent`, or `inconclusive` with method.
+3. Finding state updates per [finding lifecycle](finding-lifecycle.md) **only if this ingestion is current** (greatest SBOM `uploadedAt` among `completed`). `resolved` is a **calculated conclusion** requiring evidence from that current ingestion. An older SBOM that finishes later persists observations and must not change finding state.
+4. Recalculate priority with a **new** RiskCalculation (`calculationReason: rescan`, `sbomIngestionId` set). Previous calculations remain.
 
 ## 13. Export
 

@@ -20,7 +20,7 @@ erDiagram
   Asset ||--o| RepositoryConnection : may_have
   Asset ||--o{ SBOM : receives
   SBOM ||--o{ SBOMIngestion : processed_by
-  SBOM ||--o{ ComponentOccurrence : lists
+  SBOMIngestion ||--o{ ComponentOccurrence : lists
   Organization ||--o{ Component : owns
   Component ||--o{ ComponentOccurrence : appears_as
   ComponentOccurrence ||--o{ DependencyRelationship : from
@@ -49,7 +49,7 @@ If the diagram is not rendered, the sections below define each entity and its re
 | Tenant-owned | Row includes `organizationId`. Queries always apply that predicate from trusted context. |
 | Global / shared catalog | Vulnerability intelligence, KEV snapshots, and built-in **RiskPolicy** definitions. Not tenant-owned. |
 | Reference rule | Tenant **Finding** rows may store the UUID of a global **Vulnerability** or **VulnerabilitySourceRecord**. They must not copy another organization's findings. |
-| Soft identity of a finding | `organizationId` + `assetId` + component identity (PURL if present, else ecosystem + name) + vulnerability identity (OSV id and CVE when known). New SBOMs add **FindingObservation** rows rather than duplicating the finding when identity matches. |
+| Soft identity of a finding | `organizationId` + `assetId` + **versionless** component identity + vulnerability identity (**OSV id**). CVE and other aliases are denormalized; they are **not** part of the identity key. New ingestions add **FindingObservation** rows rather than duplicating the finding when identity matches. Versionless identity means CycloneDX/PURL **type + namespace + name** (or ecosystem + namespace + name). Strip `@version` / `?` / subpath from PURLs before using them as finding or **Component** identity. |
 | No cascade-delete of evidence | Foreign keys must not erase SBOMs, findings, audit events, or remediation records as a convenience. |
 
 **Component** identities derived from tenant SBOMs are **tenant-owned**. Private package names must not land in a global component catalog.
@@ -71,12 +71,12 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | SBOM | | yes | yes | yes | metadata | original bytes immutable | yes | Original object never replaced |
 | SBOMIngestion | | yes | | yes | state machine | | yes | Reprocess = new row |
 | Component | | yes | | | | | yes | Tenant package identity |
-| ComponentOccurrence | | yes | | yes | no | yes | yes | Per SBOM |
-| DependencyRelationship | | yes | | yes | no | yes | yes | Observed edge |
+| ComponentOccurrence | | yes | | yes | no | yes | yes | Per **SBOMIngestion** |
+| DependencyRelationship | | yes | | yes | no | yes | yes | Observed edge per ingestion |
 | Vulnerability | yes | | | | withdrawn flag additive | additive | | Shared identity |
 | VulnerabilitySourceRecord | yes | | | yes | no | yes | yes | Never silent overwrite |
 | Finding | | yes | | | state | | yes | Current calc pointer may move |
-| FindingObservation | | yes | | yes | no | yes | yes | Per SBOM compare |
+| FindingObservation | | yes | | yes | no | yes | yes | Per **SBOMIngestion** compare |
 | RiskPolicy (builtin) | yes | | | | no after publish | versioned | | Immutable published definition |
 | RiskPolicy (org override) | | yes | | | no after publish | versioned | yes | |
 | RiskCalculation | | yes | | yes | no | yes | yes | History never overwritten |
@@ -93,11 +93,12 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 
 | Pair | Distinction |
 | --- | --- |
-| **Component** vs **ComponentOccurrence** | Identity vs this package **version** listed in **this** SBOM |
+| **Component** vs **ComponentOccurrence** | Versionless package identity vs this package **version** listed in **this ingestion** |
 | **Vulnerability** vs **Finding** | Shared intel vs tenant+asset observation of it |
 | **VulnerabilitySourceRecord** vs **Vulnerability** | One retrieved payload vs normalized identity |
 | Vulnerability **severity** vs **priority** | Source fact vs calculated ranking |
-| **Finding** vs **FindingObservation** | Stable identity vs per-SBOM presence/absence/inconclusive |
+| **Finding** vs **FindingObservation** | Stable identity vs per-ingestion presence/absence/inconclusive (a **calculated** compare result) |
+| **SBOM** vs **SBOMIngestion** | Immutable original document vs one processing attempt (parser version, graph, observations) |
 | **RemediationTask** vs **RiskAcceptance** | Work tracking vs time-boxed acceptance of residual risk |
 | **Asset** vs **SBOM** | Inventoried system vs one evidence document |
 | Current **RiskCalculation** vs history | `currentRiskCalculationId` vs append-only prior rows |
@@ -196,8 +197,8 @@ Lifecycle: `active` ↔ `archived`. Creation enters `active`. No hard delete in 
 | `deploymentContext` | Optional untrusted text |
 | `externalIdentifiers` | Optional map of vendor keys |
 | `tags` | Optional short labels; length-capped |
-| `lastObservedAt` | UTC of last **completed** ingestion |
-| `lastSuccessfulSbomIngestionId` | Optional FK |
+| `lastObservedAt` | UTC `uploadedAt` of the **current** completed ingestion (see below), not the wall-clock of whichever worker finished last |
+| `lastSuccessfulSbomIngestionId` | FK to the **current** completed ingestion: among `completed` ingestions for this asset, the one whose SBOM `uploadedAt` is greatest (tie-break `SBOMIngestion.createdAt`, then `SBOMIngestion.id`). A late-finishing **older** upload must not overwrite this pointer. |
 
 Context changes (environment, criticality, exposure, classification) emit audit events and enqueue **RiskCalculation** with `calculationReason: asset_change`. History is not erased.
 
@@ -292,26 +293,30 @@ Tenant-owned package identity extracted from SBOMs.
 | --- | --- |
 | `id` | UUID |
 | `organizationId` | |
-| `purl` | Optional |
-| `ecosystem` | Required for correlation when PURL absent |
+| `purl` | Optional **versionless** PURL (`pkg:type/namespace/name` only). Never store `@version`, qualifiers, or subpath on this row. |
+| `ecosystem` | Required for correlation when versionless PURL absent |
 | `name` | Untrusted text |
 | `namespace` | Optional |
 
-Uniqueness is organization-scoped on a normalized identity key (PURL, or ecosystem + name). Names are never executed and are escaped in UI.
+Uniqueness is organization-scoped on a normalized **versionless** identity key (versionless PURL, or ecosystem + namespace + name). Version belongs on **ComponentOccurrence**. Names are never executed and are escaped in UI.
 
 ## ComponentOccurrence
 
-A component as listed in a specific SBOM, including version and bom-ref.
+A component as listed in a specific **SBOMIngestion**, including version and bom-ref.
 
 | Field (logical) | Notes |
 | --- | --- |
 | `id` | UUID |
 | `organizationId` | |
-| `sbomId` | |
-| `componentId` | |
-| `version` | Untrusted text |
+| `sbomId` | Denormalized; original document |
+| `sbomIngestionId` | Required. Derived graph is per processing attempt |
+| `componentId` | Versionless identity |
+| `version` | Untrusted text; **not** part of **Component** or **Finding** identity |
+| `versionedPurl` | Optional full PURL including version as listed in the document |
 | `bomRef` | Optional, untrusted |
 | `isDirect` | Observed from the document when present; otherwise unknown |
+
+Uniqueness: `(organizationId, sbomIngestionId, componentId, version)`. Parser reprocess of the same SBOM inserts a new ingestion and a new occurrence set; it does not overwrite a completed ingestion's graph.
 
 ## DependencyRelationship
 
@@ -321,7 +326,8 @@ An **observed** edge between occurrences in the same SBOM. Not a risk score.
 | --- | --- |
 | `id` | UUID |
 | `organizationId` | |
-| `sbomId` | |
+| `sbomId` | Denormalized |
+| `sbomIngestionId` | Required |
 | `fromOccurrenceId` | |
 | `toOccurrenceId` | |
 
@@ -337,7 +343,7 @@ Normalized, **shared catalog** record for a vulnerability identity (typically an
 | `aliases` | Additional identifiers |
 | `withdrawnAt` | Optional UTC; withdrawn is additive, not a silent delete |
 
-This row is a projection for correlation. Authoritative provenance lives on **VulnerabilitySourceRecord**.
+This row is a projection for correlation. Authoritative provenance lives on **VulnerabilitySourceRecord**. **Finding** identity uses `osvId` (internal `id` as FK). `cveId` and `aliases` may appear later; adding a CVE must **not** change finding identity or create a second finding.
 
 ## VulnerabilitySourceRecord
 
@@ -362,24 +368,25 @@ Tenant-owned link between an asset's observed component identity and a **Vulnera
 
 Lifecycle: [finding-lifecycle.md](finding-lifecycle.md).
 
-Does not store a mutable "score" in place. Current priority comes from the latest **RiskCalculation** referenced by `currentRiskCalculationId`. Each calculation must store `policyVersion`, `policyDefinitionSha256` (hash of the immutable published definition), full **contributingFactors**, and intel source record ids used.
+Does not store a mutable "score" in place. Current priority comes from the latest **RiskCalculation** referenced by `currentRiskCalculationId`. Each calculation must store `policyVersion`, `policyDefinitionSha256`, `inputFingerprint`, full **contributingFactors**, intel source record ids used, **priorityBand**, due-date recommendation, and escalation recommendation.
 
 ## FindingObservation
 
-Per-SBOM observation of whether the finding's component identity was present.
+Per-**SBOMIngestion** compare result for whether the finding's **versionless** component identity was present. The `result` is a **calculated conclusion**, not a raw SBOM field.
 
 | Field (logical) | Notes |
 | --- | --- |
 | `id` | UUID |
 | `organizationId` | |
 | `findingId` | |
-| `sbomId` | |
-| `occurrenceId` | Optional if present |
+| `sbomId` | Denormalized |
+| `sbomIngestionId` | Required. Uniqueness: `(organizationId, findingId, sbomIngestionId)` |
+| `occurrenceId` | Optional if present (one representative occurrence; mixed versions use method `version_out_of_affected_range` / remain `present`) |
 | `result` | `present`, `absent`, `inconclusive` — **calculated** from compare rules, stored with method |
-| `method` | For example `exact_purl_version`, `ecosystem_name_version`, `missing_identity` |
+| `method` | For example `exact_purl`, `ecosystem_name_version`, `version_out_of_affected_range`, `missing_identity`, `incomplete_sbom_coverage` |
 | `observedAt` | UTC |
 
-`resolved` on the finding is a conclusion over observations, not a ticket field.
+`resolved` on the finding is a conclusion over the **current** ingestion's observation (latest `uploadedAt` among `completed` ingestions), not a ticket field and not whichever ingestion finished last.
 
 ## RiskPolicy
 
@@ -411,12 +418,17 @@ Append-only calculated conclusion for a finding under one policy version.
 | `policyDefinitionSha256` | SHA-256 of the published **RiskPolicy.definition** bytes used |
 | `intelSourceRecordIds` | Source records whose fields were read |
 | `priority` | Stored ranking (synonym: risk score) |
+| `priorityBand` | Calculated grouping (for example P1–P4); stored, not inferred later from a changing threshold |
+| `dueDateRecommendationDays` | Calculated recommendation; not a contractual SLA |
+| `escalationRecommendation` | Calculated boolean/label; MVP does not auto-notify |
 | `severitySnapshot` | Copied observed source severity, not the priority |
 | `contributingFactors` | Full factor set used |
+| `inputFingerprint` | SHA-256 of the canonical input object (sorted intel source record ids, `sbomIngestionId` or null, asset context version or null, override id or null, `calculationReason`, `policyDefinitionSha256`) |
+| `sbomIngestionId` | Set for `initial` / `rescan`; null for intel/policy/asset/manual reasons that are not ingest-driven |
 | `calculatedAt` | UTC |
 | `calculationReason` | `initial`, `rescan`, `intel_refresh`, `policy_change`, `asset_change`, `manual_recalc`, `manual_override` |
 
-Recalculation inserts a new row. It does not erase previous rows.
+Recalculation inserts a new row. It does not erase previous rows. Replay uniqueness: `(organizationId, findingId, inputFingerprint)`. Do not use a different key in the intel docs.
 
 ## RemediationTask
 
@@ -513,7 +525,7 @@ Transactional outbox row for durable work ([ADR 0007](../adr/0007-transactional-
 | `eventType` | Stable name |
 | `aggregateType` / `aggregateId` | |
 | `payload` | Minimal ids, not raw SBOMs |
-| `dedupeKey` | Unique with organization for tenant work |
+| `dedupeKey` | Unique with organization for tenant work. System events (null `organizationId`) use a non-null `dedupeKey` unique on `(eventType, dedupeKey)` because PostgreSQL `UNIQUE` allows duplicate nulls. |
 | `createdAt` | UTC |
 | `publishedAt` | Optional UTC |
 

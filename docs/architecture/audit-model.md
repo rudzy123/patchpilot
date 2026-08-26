@@ -80,6 +80,7 @@ Do not log authorization headers or cookies in `payload`.
 - Insert audit in the **same transaction** as the state change it describes, when both are PostgreSQL rows.
 - Do not insert audit in a transaction that also calls object storage or HTTP.
 - If object storage succeeded and DB commit fails, operators may see an orphan object; a later reconcile job should not invent an upload audit without a user. Failed HTTP uploads that never stored bytes still may record `sbom.upload_rejected` **if** a DB write is possible; otherwise metrics-only.
+- Replay uniqueness: tenant events unique on `(organizationId, action, subjectId, correlationId)`. System events (`organizationId` null) **must** set `correlationId` and are unique on `(action, subjectId, correlationId)` among rows where `organizationId` IS NULL. Do not rely on a UNIQUE column that includes nullable `organizationId` alone.
 
 ## What audit is not
 

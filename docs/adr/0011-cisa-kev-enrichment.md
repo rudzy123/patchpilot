@@ -12,7 +12,7 @@ The MVP journey enriches applicable findings with CISA Known Exploited Vulnerabi
 
 ## Decision
 
-Import CISA **KEV** as a **snapshot** (worker outbound HTTPS) and **enrich** findings that have a matching CVE. Store why it matched (catalog identity, retrieved-at, hash). KEV is not a correlation range matcher and not **priority** by itself. Removal from a later snapshot is additive history; new **RiskCalculation** reflects current listing. Do not silently overwrite snapshots.
+Import CISA **KEV** as a **snapshot** (worker outbound HTTPS) and **enrich** findings whose **Vulnerability** has a matching **CVE alias**. No CVE → no KEV match. Store why it matched (catalog identity, retrieved-at, hash). KEV is not a correlation range matcher and not **priority** by itself. Removal from a later snapshot is additive history; new **RiskCalculation** reflects current listing. Do not silently overwrite snapshots.
 
 ## Alternatives considered
 

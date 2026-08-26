@@ -66,18 +66,18 @@ Tenant uniqueness always includes `organizationId`.
 | SBOM upload HTTP | `Idempotency-Key` + org |
 | SBOM document | org + asset + sha256 |
 | Outbox | org + `dedupeKey` |
-| Finding create | org + asset + component identity + vuln identity |
-| RiskCalculation | org + finding + `policyDefinitionSha256` + source record ids + reason + ingestion id where applicable |
+| Finding create | org + asset + **versionless** component identity + **OSV id** |
+| RiskCalculation | org + finding + `inputFingerprint` (canonical hash of reason, `policyDefinitionSha256`, sorted intel source record ids, `sbomIngestionId` or null, asset context version or null, override id or null). Intel refresh and ingest docs must use this same key — not a shorter `(finding, sourceRecordId, policyVersion)` tuple. |
 | RiskAcceptance create | `Idempotency-Key` + org; at most one `active` acceptance per finding |
 | Export create | `Idempotency-Key` + org |
-| System intel refresh outbox | `eventType` + cursor/`payloadSha256` (null org) |
-| Audit | Do not duplicate on replay: unique `(organizationId, action, subjectId, correlationId)` where safe, or handler checks existing event |
+| System intel refresh outbox | `eventType` + non-null `dedupeKey` (cursor/`payloadSha256`); unique on `(eventType, dedupeKey)` because `organizationId` is null |
+| Audit | Do not duplicate on replay: unique `(organizationId, action, subjectId, correlationId)` for tenant events. System events require a non-null `correlationId` and unique `(action, subjectId, correlationId)` where `organizationId` IS NULL. |
 
 Replay of the same job twice produces one tenant-visible effect (required test).
 
 ## Queue duplication and races
 
-- Two uploads of different hashes for one asset: both proceed; rescan compare uses latest **completed** ingestion only.
+- Two uploads of different hashes for one asset: both proceed; rescan compare and `lastSuccessfulSbomIngestionId` use the `completed` ingestion whose SBOM `uploadedAt` is greatest, **not** the last worker to finish.
 - Two workers correlating the same SBOM: unique constraints prevent duplicate findings; second worker updates observations idempotently.
 - Risk acceptance vs rescan: last completed transaction wins; both leave audit rows.
 - Intel refresh vs ingest: calculations are append-only; last `currentRiskCalculationId` update is a compare-and-set on finding row version if needed.
@@ -97,7 +97,7 @@ Dead-lettered jobs retain payload **ids** only (no raw SBOM). Operators replay a
 
 ## Partial parse
 
-If persist_graph succeeds and correlate fails transiently, resume from stage `correlate` without deleting components. Do not leave a second organization's data mutated.
+If persist_graph succeeds and correlate fails transiently, resume from stage `correlate` without deleting components. The ingestion stays `processing` (not `completed`). Do not leave a second organization's data mutated.
 
 ## Delivery semantics
 
@@ -105,7 +105,7 @@ Delivery is **at-least-once**. PatchPilot does **not** claim exactly-once proces
 
 ## Job leases
 
-`running` jobs hold a lease (`leaseExpiresAt`). Initial recommendation: 15 minutes, configurable, validate under load. Heartbeat while working. On expiry another worker may start (**lease theft** if clocks skew: still safe if idempotent). Workers must not accept a client-supplied lease owner.
+`running` jobs hold a lease (`leaseExpiresAt`). Ingestion processing uses **that same lease**, not a second independent lock. Initial recommendation: 15 minutes, configurable, validate under load. Heartbeat while working. On expiry another worker may start (**lease theft** if clocks skew: still safe if idempotent). Workers must not accept a client-supplied lease owner.
 
 ## Retry
 
@@ -117,7 +117,7 @@ Outbound HTTP and storage calls have timeouts (intel defaults in [vulnerability-
 
 ## Orphans and reconciliation
 
-Orphan object cleanup after grace period. Reconciliation jobs: unpublished outbox, stale `running`, intel cursor stuck. Runbooks: [docs/runbooks/](../runbooks/README.md).
+Orphan object cleanup after grace period. Reconciliation jobs: unpublished outbox, stale `running`, intel cursor stuck, expired **RiskAcceptance**, expired **manual_override** calculations. Runbooks: [docs/runbooks/](../runbooks/README.md).
 
 ## Backup, RPO, RTO (proposals)
 

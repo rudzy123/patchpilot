@@ -94,7 +94,7 @@ When `environmentId`, `businessCriticality`, `internetExposure`, or asset `dataC
 
 ## SBOM relationship
 
-An asset has many **SBOM** documents, ordered by `uploadedAt`. The latest **completed** ingestion is the current observation source for rescan conclusions. Failed or quarantined ingestions do not change finding presence or `lastObservedAt`.
+An asset has many **SBOM** documents, ordered by `uploadedAt`. The **current** observation source for rescan conclusions is the `completed` **SBOMIngestion** whose SBOM `uploadedAt` is greatest (tie-break ingestion `createdAt`, then id) — not the last worker to finish. Failed, quarantined, or still-`processing` ingestions do not change finding presence or `lastObservedAt`. Completing an older upload still stores that ingestion's graph; it must not overwrite `lastSuccessfulSbomIngestionId` if a newer upload already completed.
 
 ## RepositoryConnection
 

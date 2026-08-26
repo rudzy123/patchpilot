@@ -18,6 +18,8 @@ A client-supplied `organizationId` that does not match membership is ignored for
 
 A user may belong to several organizations. Switching org in the UI changes which membership is selected. It does not grant a union query across organizations.
 
+After the first user exists, creating a user requires an invitation (or equivalent authenticated path). The instance must not offer unauthenticated organization signup ([OD-1](open-decisions.md)).
+
 ## How authorization is enforced
 
 Authorization is **server-side** in use cases and repository adapters, not solely in React.
@@ -103,7 +105,7 @@ Do not include exploit payloads. Minimal fixtures only.
 4. On mismatch, the job **fails terminal** to the dead-letter path without mutating, and an operational metric fires. It does not "repair" by writing to the payload org.
 5. Process one organization's data per job.
 
-System jobs (OSV refresh) have null organization and must not write tenant findings except via a subsequent tenant-scoped outbox event per affected org/finding.
+System jobs (OSV **modified-since** refresh) have null organization and must not write tenant findings except via a subsequent tenant-scoped outbox event per affected org/finding. Targeted package queries, if used, are **per-organization** jobs and must not persist tenant package names on global catalog rows.
 
 ## How cache keys include organization context
 

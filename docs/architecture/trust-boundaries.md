@@ -91,7 +91,7 @@ Per architecture invariants, validate with Zod (or equivalent schema) at the bou
 
 ### Worker → Redis
 
-- Consume jobs idempotently.
+- Consume jobs idempotently. The API does not publish jobs here.
 - Reload aggregates from PostgreSQL. Job `organizationId` is not sufficient.
 
 ### Worker → OSV / KEV

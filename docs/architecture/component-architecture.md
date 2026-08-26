@@ -39,12 +39,14 @@ flowchart TB
   worker --> domain
   worker --> db
   worker --> integ
+  worker --> sbom
+  worker --> intel
+  worker --> policy
   domain --> contracts
   db --> domain
   integ --> domain
   sbom --> domain
   intel --> domain
-  policy --> domain
   auth --> domain
   db --> config
   integ --> config
@@ -52,7 +54,7 @@ flowchart TB
   obs --> config
 ```
 
-If the diagram is not rendered: apps depend on packages; packages must not depend on apps. `apps/web` uses `packages/contracts` and calls `apps/api` over HTTP; it does not import the API application. Domain and use cases must not import Fastify, Next.js, Prisma, Redis, BullMQ, MinIO, or other vendor SDKs.
+If the diagram is not rendered: apps depend on packages; packages must not depend on apps. `apps/web` uses `packages/contracts` and calls `apps/api` over HTTP; it does not import the API application. Domain and use cases must not import Fastify, Next.js, Prisma, Redis, BullMQ, MinIO, or other vendor SDKs. **`packages/policy-engine` must not import `packages/domain`.** Domain defines a `PriorityEngine` port; the policy package is a pure function library; `apps/worker` injects the implementation. Scoring use cases depend on the port, not the package.
 
 ## Target packages
 
@@ -63,7 +65,7 @@ If the diagram is not rendered: apps depend on packages; packages must not depen
 | `packages/config` | Typed configuration; only reader of `process.env` |
 | `packages/auth` | Session verification, password hashing port, CSRF helpers used by the API |
 | `packages/database` | Prisma schema, migrations, repository adapters |
-| `packages/sbom` | CycloneDX allowlist, parse-on-copy, graph extraction (pure + adapter boundary) |
+| `packages/sbom` | CycloneDX allowlist, parse-on-copy, graph extraction **per SBOMIngestion** (pure + adapter boundary) |
 | `packages/vulnerability-intelligence` | Normalized intel types, matching ports |
 | `packages/policy-engine` | Versioned priority calculation; no I/O |
 | `packages/integrations` | HTTP and object-storage adapters (OSV, KEV, S3-compatible) |
@@ -91,6 +93,7 @@ They must not contain domain logic or infrastructure SDKs.
 `apps/worker`:
 
 - Wires queue adapters to the same use cases where possible (parse, correlate, enrich, score).
+- Injects `packages/sbom`, `packages/vulnerability-intelligence`, and `packages/policy-engine` implementations into domain ports.
 - Reloads organization scope from persistence before mutating tenant data.
 
 ## TypeScript defaults
@@ -112,7 +115,7 @@ Contracts must not re-introduce Prisma models into the web app.
 
 ## Policy engine isolation
 
-`packages/policy-engine` is deterministic and side-effect free. It receives **observed facts** plus policy definition; it returns **priority**, **contributing factors**, and **policy version**. It does not call OSV, Prisma, or an AI provider ([ADR 0012](../adr/0012-explainable-policy-engine.md)).
+`packages/policy-engine` is deterministic and side-effect free. It receives **observed facts** plus policy definition; it returns **priority**, **priority band**, **due-date recommendation**, **escalation recommendation**, **contributing factors**, and **policy version**. It does not call OSV, Prisma, or an AI provider ([ADR 0012](../adr/0012-explainable-policy-engine.md)). It does not import `packages/domain`.
 
 ## Integration isolation
 
