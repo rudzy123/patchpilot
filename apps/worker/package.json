@@ -22,7 +22,7 @@
     "@patchpilot/logger": "workspace:*",
     "@patchpilot/observability": "workspace:*",
     "bullmq": "^5.66.4",
-    "ioredis": "^5.8.2"
+    "ioredis": "^6.0.0"
   },
   "devDependencies": {
     "@patchpilot/eslint-config": "workspace:*",
