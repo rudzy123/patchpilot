@@ -38,6 +38,9 @@ pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Ephemeral PatchPilot supply-chain SBOM (CI/local Syft). Not product ingestion.
+patchpilot-sbom.cdx.json
+
 # Test artifacts
 playwright-report/
 playwright/.cache/

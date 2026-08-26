@@ -48,11 +48,11 @@ Architecture PRs include or precede ADRs.
 
 Follow [testing strategy](../architecture/testing-strategy.md). Required security tests cannot be skipped without a tracked reason.
 
-## Pipeline (when GitHub Actions exists)
+## Pipeline
 
-Required checks in [branching strategy](../development/branching-strategy.md): lint, TypeScript strict, Vitest, Playwright when web UI changes, secret scanning / dependency review when those workflows exist, build of touched apps.
+Intended required checks (confirm names after GitHub has executed the workflows) are listed in [branching strategy](../development/branching-strategy.md) and [ci.md](../development/ci.md): `CI / Workflows`, `CI / Quality`, `Integration / Integration`, `CodeQL / Analyze`, and `Dependency review / Dependency review`. Do not require Scorecard, SBOM, Release dry run, E2E, or Container build.
 
-Until CI exists, report **actual** local command results. Do not claim checks passed if they were not run.
+Report **actual** local command results when GitHub-hosted jobs have not run. Do not claim checks passed if they were not run.
 
 ## Vulnerability handling
 

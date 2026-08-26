@@ -1,0 +1,14 @@
+# Default owner during the single-maintainer phase.
+# Do not enable "Require review from Code Owners" until additional maintainers
+# can approve independently. See docs/development/branch-protection.md.
+* @rudzy123
+
+# Intended ownership boundaries for when more maintainers join.
+/.github/ @rudzy123
+/.cursor/ @rudzy123
+/docs/security/ @rudzy123
+/packages/database/ @rudzy123
+/apps/api/ @rudzy123
+/apps/worker/ @rudzy123
+/apps/web/ @rudzy123
+/deploy/ @rudzy123

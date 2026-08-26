@@ -1,0 +1,13 @@
+name: JavaScript and TypeScript
+
+disable-default-queries: false
+
+paths-ignore:
+  - '**/node_modules/**'
+  - '**/dist/**'
+  - '**/.next/**'
+  - '**/coverage/**'
+  - '**/playwright-report/**'
+  - '**/test-results/**'
+  - '**/.turbo/**'
+  - '**/.cache/**'

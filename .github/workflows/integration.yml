@@ -1,0 +1,105 @@
+name: Integration
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: integration-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash --noprofile --norc -eo pipefail {0}
+
+jobs:
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PATCHPILOT_DEPLOYMENT_ENVIRONMENT: test
+      PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS: 'true'
+      DATABASE_URL: postgresql://patchpilot:patchpilot-dev-not-for-production@127.0.0.1:55432/patchpilot
+      REDIS_URL: redis://127.0.0.1:16379
+      OBJECT_STORAGE_ENDPOINT: http://127.0.0.1:19000
+      OBJECT_STORAGE_ACCESS_KEY: patchpilot-dev-access
+      OBJECT_STORAGE_SECRET_KEY: patchpilot-dev-secret-not-for-production
+      OBJECT_STORAGE_BUCKET: patchpilot-dev
+      OBJECT_STORAGE_USE_SSL: 'false'
+    services:
+      postgres:
+        # Same tag as deploy/compose/compose.yaml. Index digest from Docker Hub on 2026-08-26.
+        image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+        env:
+          POSTGRES_USER: patchpilot
+          POSTGRES_PASSWORD: patchpilot-dev-not-for-production
+          POSTGRES_DB: patchpilot
+        ports:
+          - 127.0.0.1:55432:5432
+        options: >-
+          --health-cmd "pg_isready -U patchpilot -d patchpilot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 5s
+      redis:
+        # Same tag as deploy/compose/compose.yaml. Index digest from Docker Hub on 2026-08-26.
+        image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+        ports:
+          - 127.0.0.1:16379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+          --health-start-period 5s
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Start MinIO
+        env:
+          MINIO_ROOT_USER: patchpilot-dev-access
+          MINIO_ROOT_PASSWORD: patchpilot-dev-secret-not-for-production
+        run: |
+          docker run -d --name patchpilot-minio \
+            --publish 127.0.0.1:19000:9000 \
+            --env MINIO_ROOT_USER \
+            --env MINIO_ROOT_PASSWORD \
+            minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e \
+            server /data
+          deadline=$((SECONDS + 60))
+          until curl -fsS http://127.0.0.1:19000/minio/health/live >/dev/null; do
+            if ((SECONDS >= deadline)); then
+              printf 'MinIO did not become healthy within 60s. Not dumping container logs because they can include root credentials.\n'
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Apply Prisma migrations
+        run: pnpm db:migrate:deploy
+
+      - name: Run integration tests
+        run: pnpm test:integration
+
+      - name: Stop MinIO
+        if: always()
+        run: |
+          if docker container inspect patchpilot-minio >/dev/null 2>&1; then
+            docker rm -f patchpilot-minio >/dev/null
+          fi

@@ -21,6 +21,6 @@ Full policy: [docs/development/branching-strategy.md](../../docs/development/bra
 
 ## Pull requests
 
-Required checks live in [docs/development/branching-strategy.md](../../docs/development/branching-strategy.md). Until CI exists, run the equivalent locally and report actual results. Complete [docs/development/review-checklist.md](../../docs/development/review-checklist.md). Add an ADR when the change is an architecture decision.
+Required checks live in [docs/development/branching-strategy.md](../../docs/development/branching-strategy.md) and [docs/development/ci.md](../../docs/development/ci.md). Run the equivalent locally as well and report actual results when GitHub-hosted jobs have not run. Complete [docs/development/review-checklist.md](../../docs/development/review-checklist.md). Add an ADR when the change is an architecture decision.
 
 Do not merge with skipped tests unless a tracked reason is documented. Do not describe the tree as production-ready merely because checks passed.

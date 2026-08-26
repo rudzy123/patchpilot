@@ -1,5 +1,13 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    ".nvmrc",
+    "pnpm-lock.yaml",
+    "package.json",
+    "tsconfig.json",
+    "prettier.config.js",
+    "eslint.config.js"
+  ],
   "globalEnv": ["CI", "NODE_ENV", "NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT"],
   "tasks": {
     "build": {

@@ -21,8 +21,8 @@ Application shells and shared packages exist. Do not add product functionality (
 2. Make a focused change. Preserve layering and security rules.
 3. Add or update tests with the change.
 4. Use [Conventional Commits](docs/development/commit-guidelines.md).
-5. Open a pull request and complete the [review checklist](docs/development/review-checklist.md).
-6. Meet the [definition of done](docs/development/definition-of-done.md).
+5. Open a pull request and complete the [review checklist](docs/development/review-checklist.md) and [pull request process](docs/development/pull-request-process.md).
+6. Meet the [definition of done](docs/development/definition-of-done.md). Required GitHub checks are listed in [ci.md](docs/development/ci.md).
 
 Do not commit secrets, credentials, tokens, API keys, private URLs, raw production SBOMs, or environment-specific values. Example files must be clearly fake.
 
@@ -34,7 +34,7 @@ Every pull request should:
 - Stay within MVP scope, or label future work as future work.
 - Include tests for significant behavior.
 - Update docs, ADRs, runbooks, or threat-model notes when behavior or operations change.
-- Pass the required pull-request checks listed in [branching strategy](docs/development/branching-strategy.md).
+- Pass the required pull-request checks listed in [branching strategy](docs/development/branching-strategy.md) and [ci.md](docs/development/ci.md).
 
 Security-sensitive changes need explicit review against [`.cursor/rules/security.mdc`](.cursor/rules/security.mdc) and [SECURITY.md](SECURITY.md).
 

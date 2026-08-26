@@ -75,6 +75,7 @@ pnpm typecheck
 pnpm test:unit
 pnpm test:integration
 pnpm build
+pnpm workflows:lint
 ```
 
 | Command | Purpose |
@@ -86,6 +87,7 @@ pnpm build
 | `pnpm test:unit` | Vitest unit tests (no Compose) |
 | `pnpm test:integration` | Compose-backed PostgreSQL, Redis, and MinIO checks |
 | `pnpm build` | Production build of packages and apps |
+| `pnpm workflows:lint` | Checksum-pinned actionlint on `.github/workflows` |
 | `pnpm infrastructure:up` | Start local PostgreSQL, Redis, MinIO and wait until healthchecks pass |
 | `pnpm infrastructure:status` | Show Compose container status and health. After `infrastructure:down`, this prints an empty table and exits 0; that means no PatchPilot containers are running, not a healthcheck failure |
 | `pnpm infrastructure:down` | Stop Compose services. Named volumes persist; this is not a data reset |
@@ -96,7 +98,7 @@ pnpm build
 | `pnpm db:migrate:deploy` | Apply existing migrations non-interactively (`prisma migrate deploy`) |
 | `pnpm db:reset` | Reset the local database (destructive; refused when `NODE_ENV` or `PATCHPILOT_DEPLOYMENT_ENVIRONMENT` is `production`) |
 
-Environment variables are documented in [environment-variables.md](environment-variables.md). Test labels are in [testing.md](testing.md). Failures: [troubleshooting.md](troubleshooting.md) and [local infrastructure runbook](../runbooks/local-infrastructure-failure.md).
+Environment variables are documented in [environment-variables.md](environment-variables.md). Test labels are in [testing.md](testing.md). Failures: [troubleshooting.md](troubleshooting.md) and [local infrastructure runbook](../runbooks/local-infrastructure-failure.md). GitHub Actions: [ci.md](ci.md).
 
 ## What this foundation does not include
 

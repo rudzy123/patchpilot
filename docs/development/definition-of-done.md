@@ -38,5 +38,5 @@ Every significant feature must include:
 ## Pull request
 
 - Conventional Commits and the [review checklist](review-checklist.md) completed.
-- Required checks pass or, before CI exists, equivalent commands were run and reported accurately.
+- Required checks pass on GitHub, or equivalent commands were run and reported accurately when hosted jobs have not finished.
 - No unexplained dependency additions.

@@ -7,6 +7,7 @@ This repository has a **development foundation**: a pnpm + Turborepo monorepo, a
 ## Start here
 
 - [Local setup](docs/development/local-setup.md)
+- [CI](docs/development/ci.md)
 - [AGENTS.md](AGENTS.md) — central guide for contributors and coding agents
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to propose changes
 - [SECURITY.md](SECURITY.md) — private vulnerability reporting
@@ -26,7 +27,7 @@ pnpm db:generate
 pnpm dev
 ```
 
-In another terminal, the quality gates are `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:integration`, and `pnpm build`.
+In another terminal, the quality gates are `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:integration`, `pnpm build`, and `pnpm workflows:lint`.
 
 `.env.example` values are development placeholders and are unfit for production.
 

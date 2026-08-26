@@ -1,0 +1,75 @@
+name: Feature request
+description: Propose a product or platform change within or beyond the current MVP.
+title: '[feat] '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem and the outcome you want. Do not include exploit details. Security-sensitive ideas still belong in [SECURITY.md](https://github.com/rudzy123/patchpilot/blob/main/SECURITY.md) if they disclose a vulnerability.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is difficult or missing today?
+    validations:
+      required: true
+  - type: dropdown
+    id: user
+    attributes:
+      label: Affected user
+      options:
+        - Organization member
+        - Organization owner or admin
+        - Instance operator
+        - Contributor or maintainer
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Proposed outcome
+      description: What should be true after the change?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other approaches you considered.
+  - type: dropdown
+    id: mvp
+    attributes:
+      label: MVP relevance
+      options:
+        - Needed for the current MVP journey
+        - Helpful but not MVP
+        - Future work after MVP
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security and privacy considerations
+      description: Tenancy, secrets, untrusted input, or audit impact. Say "none identified" if that is your assessment.
+    validations:
+      required: true
+  - type: textarea
+    id: operations
+    attributes:
+      label: Operational considerations
+      description: Persistence, jobs, Compose, backups, or operator config.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Testable statements for "done".
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: What this request is not asking for.

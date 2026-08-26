@@ -48,6 +48,10 @@ If `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`, placeholder credentials, pret
 
 `pnpm db:*` runs in `@patchpilot/database`. `db:migrate`, `db:migrate:deploy`, and `db:reset` need a reachable `DATABASE_URL`. `db:generate` and `db:validate` do not need a live database. The only model is `SchemaFoundation`: technical scaffolding with no product fields and no application references. Prisma 6.19 does not require a model to generate a client; the table is kept so the existing Session 3 migration is not followed by a drop-only migration. Remove or replace it during the database-domain milestone. `db:reset` exits without running when `PATCHPILOT_DEPLOYMENT_ENVIRONMENT` or `NODE_ENV` is `production`. Use `pnpm db:migrate:deploy` in CI; `pnpm db:migrate` is interactive.
 
+## `pnpm workflows:lint` fails
+
+The script downloads pinned `actionlint` 1.7.12 and verifies SHA-256 checksums for the archive and the binary, including cached copies. Failures mean the archive or binary changed, the local cache is stale or untrusted, the network is blocked, or a workflow YAML error. Delete `.cache/actionlint/` and retry rather than bypassing the checksum. See [ci.md](ci.md).
+
 ## Ports already in use
 
 Override `PATCHPILOT_POSTGRES_PORT`, `PATCHPILOT_REDIS_PORT`, `PATCHPILOT_MINIO_API_PORT`, and `PATCHPILOT_MINIO_CONSOLE_PORT`, then update `DATABASE_URL`, `REDIS_URL`, and `OBJECT_STORAGE_ENDPOINT` to match. Bindings are `127.0.0.1` only.

@@ -1,6 +1,6 @@
 # Testing
 
-Vitest is the unit and integration runner. Playwright is **not** wired in this foundation; the landing page and health contract are covered by unit tests. Browser journeys belong to a later milestone when product UI exists.
+Vitest is the unit and integration runner. Playwright is **not** wired in this foundation; the landing page and health contract are covered by unit tests. Browser journeys belong to a later milestone when product UI exists. GitHub-hosted E2E testing is deferred until actual Playwright tests exist; see [CI-DEFER-1](ci.md#deferred-ci-work). Do not treat the local `pnpm test:e2e` placeholder as end-to-end validation.
 
 ## Labels
 
@@ -20,7 +20,7 @@ pnpm test:e2e
 pnpm infrastructure:down
 ```
 
-`pnpm test` is an alias for `pnpm test:unit`. `pnpm test:e2e` is reserved and currently prints that Playwright is not wired; it exits 0 because there are no browser tests to execute. Do not treat that as a Playwright pass.
+`pnpm test` is an alias for `pnpm test:unit`. `pnpm test:e2e` is reserved and currently prints that Playwright is not wired; it exits 0 because there are no browser tests to execute. Do not treat that as a Playwright pass. GitHub Actions does not run this command. Keep it locally only to preserve the documented command interface.
 
 ## What unit tests cover in this foundation
 
