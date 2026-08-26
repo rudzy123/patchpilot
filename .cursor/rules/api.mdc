@@ -1,0 +1,29 @@
+---
+description: Fastify API boundaries, OpenAPI, validation, and use-case-only handlers.
+globs: apps/api/**
+alwaysApply: false
+---
+
+# API
+
+Handlers parse HTTP input, enforce authentication context, and invoke application use cases. They must not contain domain logic, Prisma calls, Redis/BullMQ calls, or object-storage SDK usage.
+
+## Boundaries
+
+- Validate untrusted input with Zod at the edge. Align request/response types with the OpenAPI specification.
+- Authorize from the authenticated principal and membership, not from a client-supplied `organizationId`.
+- Apply rate limits by endpoint sensitivity (auth, upload, export, and webhook endpoints are stricter).
+- Enforce body and upload size limits. Reject invalid CycloneDX before parse-and-store.
+- Mutation endpoints must consider retries and idempotency keys or equivalent replay protection.
+
+## Reliability and audit
+
+- Persist state changes in a transaction with an outbox row when background work is required.
+- Record append-only audit events for security-sensitive and remediation-sensitive mutations.
+- Propagate request and correlation identifiers into logs and downstream jobs.
+- Never log tokens, cookies, raw SBOMs, or full feed payloads.
+
+## Errors
+
+- Use a stable error taxonomy (validation, unauthorized, forbidden, not found, conflict, rate limited, unprocessable evidence, internal).
+- Do not leak existence of other organizations' resources.

@@ -1,0 +1,27 @@
+---
+description: Idempotent workers, transactional outbox, and queue isolation rules.
+globs: apps/worker/**
+alwaysApply: false
+---
+
+# Workers
+
+Workers consume durable jobs created through the transactional outbox. Assume at-least-once delivery.
+
+## Idempotency
+
+- Every job handler must be idempotent. Use job identity, content hashes, or row version checks.
+- Replaying a job must not duplicate findings, assignments, notifications, or audit events.
+- Failed handlers must fail in a way that can be retried or dead-lettered without partial silent corruption.
+
+## Isolation
+
+- Domain and application code must not import BullMQ or Redis. Workers depend on queue adapters.
+- Do not perform object-storage or HTTP calls inside a database transaction.
+- Process one organization's data per job unless an accepted ADR says otherwise. Never trust organization IDs present only in payload without re-checking persistence.
+
+## Operations
+
+- Structured logs with correlation and job IDs. Redact SBOMs, tokens, and feed payloads.
+- Record metrics for success, retry, poison messages, and lag.
+- Document the operational failure plan for each new job type (retry, backoff, DLQ, replay).

@@ -1,0 +1,29 @@
+---
+description: Prisma, migrations, transactions, and evidence-preserving persistence rules.
+globs: "packages/database/**,**/*.prisma,**/migrations/**"
+alwaysApply: false
+---
+
+# Database
+
+Prisma is an infrastructure concern. Do not use Prisma from domain, application use cases, route handlers, or React code. Expose repositories or adapters instead.
+
+## Schema and migrations
+
+- Create new migrations. Never edit a migration that has been applied to shared environments.
+- Use UUIDs or another opaque identifier. Persist timestamps in UTC.
+- Every tenant-owned row must include an organization scope that queries always apply.
+- Avoid cascading deletion of evidentiary data (SBOMs, findings, audit events, remediation records). Use explicit retention and deletion policies.
+
+## Transactions
+
+- Use transactions for state transitions.
+- Do not call network, queue, or object-storage APIs inside a transaction.
+- Enqueue durable work by writing an outbox row in the same transaction as the state change.
+
+## Integrity
+
+- Do not silently overwrite vulnerability-intelligence records. Preserve source provenance.
+- Store policy version and contributing factors with each calculated priority.
+- Separate observed facts from calculated conclusions in the model.
+- Access control is not a `WHERE organization_id = $clientInput` check alone; the organization comes from authorized context.

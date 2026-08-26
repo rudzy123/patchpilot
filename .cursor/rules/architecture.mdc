@@ -1,0 +1,41 @@
+---
+description: Layering, modular monolith, TypeScript, and dependency rules for PatchPilot.
+alwaysApply: true
+---
+
+# Architecture
+
+PatchPilot is a modular monolith with separately deployable `web`, `api`, and `worker` apps. Do not introduce microservices without an accepted ADR.
+
+Closer instructions may add constraints. They must not weaken [security.mdc](security.mdc).
+
+## Layers
+
+- API presentation (Fastify routes) parses input and invokes application use cases. No business logic in handlers.
+- Web presentation (Next.js) talks to the API. It must not contain domain logic, import Prisma, or call object storage. Browser code is not an authorization boundary.
+- Application use cases orchestrate authorization against authenticated context and call domain/infrastructure ports. There is no required `packages/application` yet; use-case modules may live under `packages/` or beside an app, but they must not import Fastify, Next.js, Prisma, Redis, BullMQ, MinIO, or vendor SDKs.
+- Domain owns state transitions, scoring inputs, and invariants. Same framework-import ban.
+- Infrastructure implements adapters: Prisma, queues, object storage, HTTP clients.
+
+Dependency direction: presentation → application ports → domain; infrastructure implements ports. Apps may depend on packages. Packages must not depend on apps.
+
+## TypeScript
+
+- Strict mode, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes` where compatible.
+- No implicit `any`. Avoid explicit `any`. No `ts-ignore` without a narrow, documented justification.
+- Named exports except where a framework requires a default export.
+- Inject dependencies through constructors, functions, or factories. No hidden globals. Do not read `process.env` outside `packages/config`.
+
+## Data and reliability
+
+- Opaque identifiers (UUIDs or equivalent). Persist timestamps in UTC.
+- Transactions for state transitions only. No network, queue, or object-storage I/O inside a DB transaction.
+- Durable background work goes through a transactional outbox. Assume at-least-once delivery.
+- Prisma stays in database infrastructure. Domain code never imports Prisma.
+
+## Product constraints
+
+- Stay inside [docs/product/mvp-scope.md](../../docs/product/mvp-scope.md) unless the task labels work as future.
+- Version risk-scoring policy. Persist policy version and contributing factors. AI must not set authoritative scores.
+- Preserve provenance. Do not silently overwrite vulnerability intelligence.
+- Append-only audit events for security-sensitive and remediation-sensitive operations. Do not cascade-delete evidence.

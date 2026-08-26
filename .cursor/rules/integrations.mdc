@@ -1,0 +1,31 @@
+---
+description: Provider adapters, webhooks, feeds, and SSRF-safe outbound access.
+globs: "packages/integrations/**,packages/vulnerability-intelligence/**,packages/sbom/**"
+alwaysApply: false
+---
+
+# Integrations
+
+External systems are reached only through interfaces and adapters. Domain code depends on ports, not vendor SDKs.
+
+## Trust
+
+- Treat webhook payloads, vulnerability feeds, package metadata, and remote API responses as untrusted.
+- Validate webhook signatures. Reject unsigned, mis-signed, or replayed deliveries.
+- Preserve source provenance. Do not silently overwrite intelligence records from a newer fetch.
+- Consider malicious package metadata and dependency compromise; do not execute or dereference untrusted URLs from SBOM or feed fields without SSRF controls.
+
+## Credentials and least privilege
+
+- Encrypt stored external credentials. Prefer short-lived tokens.
+- Never hardcode provider secrets. Development adapters must not be enabled in production.
+- Avoid confused-deputy calls: act only with the tenant's authorized integration, scoped to that organization.
+
+## Fetching remote resources
+
+- Protect against SSRF: allowlists, blocked private/link-local/metadata addresses, timeouts, and size limits.
+- Object storage is provider-neutral. Local development may use MinIO. Handlers and domain code must not call storage SDKs directly.
+
+## Claims
+
+- Do not assert exploitability, KEV applicability, or remediation solely because a feed mentioned a CVE. Record evidence and the matching method.

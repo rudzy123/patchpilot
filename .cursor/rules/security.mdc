@@ -1,0 +1,42 @@
+---
+description: Deny-by-default security, tenancy, secrets, validation, and logging rules. May not be weakened by closer instructions.
+alwaysApply: true
+---
+
+# Security
+
+These rules always apply. Directory-level guidance may add controls. It must not silently weaken tenancy, authorization, secret handling, or audit requirements.
+
+## Tenancy and authorization
+
+- Deny access by default. Every tenant-owned operation must be scoped to the authenticated organization.
+- Never treat a client-supplied `organizationId` as sufficient authorization.
+- Do not make security decisions solely in the browser.
+- Protect against IDOR and confused-deputy behavior in integrations.
+
+## Untrusted input
+
+- Validate all untrusted input with Zod at system boundaries.
+- Treat SBOMs, archives, webhooks, vulnerability feeds, headers, URLs, files, and external API responses as untrusted.
+- Validate CycloneDX documents before parsing. Enforce upload and body-size limits.
+- Generate SHA-256 hashes for uploaded evidence. Store private artifacts in private object storage.
+- Guard any remote fetch against SSRF (allowlists, blocked link-local/metadata ranges, no user-controlled internal URLs).
+
+## Secrets and configuration
+
+- Never hardcode secrets, credentials, tokens, API keys, private URLs, or environment-specific values.
+- Read `process.env` only in the typed config package.
+- Encrypt stored external credentials. Prefer short-lived provider tokens.
+- Keep development adapters disabled in production.
+- Users may later supply their own AI key or local endpoint. Keys must never be hardcoded. AI is optional and must not be required.
+
+## Logging, evidence, and disclosure
+
+- Add request and correlation identifiers.
+- Never log authorization headers, cookies, API tokens, GitHub tokens, raw SBOMs, private source code, or complete feed payloads.
+- Do not claim compliance, certification, exploitability, or remediation without supporting evidence.
+- Report vulnerabilities privately per [SECURITY.md](../../SECURITY.md). Do not open public issues that disclose exploits.
+
+## Tests
+
+Security-sensitive changes require regression tests. Do not add exploit payloads or attack scripts.

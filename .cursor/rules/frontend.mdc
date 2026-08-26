@@ -1,0 +1,29 @@
+---
+description: Next.js App Router UI rules. Browser code must not be the sole security control.
+globs: apps/web/**
+alwaysApply: false
+---
+
+# Frontend
+
+The web app is Next.js App Router and React. It is a presentation layer over the API.
+
+## Security
+
+- Do not make authorization, tenancy, or risk-score decisions solely in the browser.
+- Do not treat a client-supplied organization identifier as authorization.
+- Do not embed API keys, provider tokens, or private URLs in client bundles.
+- Server components and route handlers still follow [security.mdc](security.mdc). They must not import Prisma or call object storage directly.
+
+## UX and accessibility
+
+- Prefer accessible, semantic controls. Interactive elements need names, keyboard access, and visible focus.
+- Separate observed facts from calculated conclusions in the UI.
+- Do not claim compliance, certification, exploitability, or completed remediation without evidence returned by the API.
+- AI explanation features, if added later, are optional and clearly labeled as non-authoritative.
+
+## Data loading
+
+- Fetch through the API. Do not reach into the database package from `apps/web`.
+- Handle empty, error, forbidden, and stale-scan states explicitly.
+- Redact or omit raw SBOM contents in client logs and analytics.

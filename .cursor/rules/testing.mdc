@@ -1,0 +1,32 @@
+---
+description: Deterministic Vitest and Playwright expectations for PatchPilot.
+globs: "**/*.{test,spec}.{ts,tsx},**/e2e/**,**/playwright/**,packages/test-utils/**"
+alwaysApply: false
+---
+
+# Testing
+
+Unit and integration tests use Vitest. Browser end-to-end tests use Playwright.
+
+## Requirements
+
+- Significant features need tests with the implementation, not as a follow-up wish.
+- Tests must be deterministic. No arbitrary sleeps. Wait on conditions, events, or fake timers.
+- Do not skip tests without a tracked ticket or documented reason in the test.
+- Do not claim commands passed unless they were executed.
+- Prefer fakes and fixtures over live network. Mark true integration tests explicitly.
+- Tenant tests must prove organization isolation, not only the happy path.
+- Security fixes need regression tests without exploit payloads.
+
+## Boundaries
+
+- Domain tests should not boot Fastify, Next.js, Redis, or MinIO.
+- API tests may use in-process Fastify with test doubles for use cases.
+- Persistence tests belong with database infrastructure and must clean up data they create.
+- Playwright covers user-visible journeys. It is not a substitute for unit tests of scoring, tenancy, or SBOM parsing.
+
+## Fixtures
+
+- Sample SBOMs must be minimized and free of secrets.
+- Do not commit proprietary or customer SBOMs.
+- Time-dependent assertions should freeze time to UTC.
