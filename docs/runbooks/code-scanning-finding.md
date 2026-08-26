@@ -2,6 +2,8 @@
 
 Use this for GitHub code scanning alerts from CodeQL or OpenSSF Scorecard SARIF.
 
+This repository uses the **advanced** CodeQL workflow (`.github/workflows/codeql.yml`), not GitHub's default setup. If a CodeQL job fails while uploading SARIF because default setup is enabled, follow [ci-failure.md](ci-failure.md) and [repository-settings.md](../development/repository-settings.md) instead of changing queries.
+
 ## Immediate actions
 
 1. Open **Security → Code scanning** and read the alert, file, and query help.
