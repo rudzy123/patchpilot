@@ -1,0 +1,15 @@
+{
+  "extends": "@patchpilot/typescript-config/base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": true,
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": ".tsc-check"
+  },
+  "include": ["scripts/**/*.mjs", "eslint.config.js", "prettier.config.js"],
+  "exclude": ["node_modules", "apps", "packages", "dist"]
+}

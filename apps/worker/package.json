@@ -1,0 +1,37 @@
+{
+  "name": "@patchpilot/worker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Background worker foundation. No product jobs in this iteration.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@patchpilot/config": "workspace:*",
+    "@patchpilot/database": "workspace:*",
+    "@patchpilot/integrations": "workspace:*",
+    "@patchpilot/logger": "workspace:*",
+    "@patchpilot/observability": "workspace:*",
+    "bullmq": "^5.66.4",
+    "ioredis": "^5.8.2"
+  },
+  "devDependencies": {
+    "@patchpilot/eslint-config": "workspace:*",
+    "@patchpilot/test-utils": "workspace:*",
+    "@patchpilot/typescript-config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

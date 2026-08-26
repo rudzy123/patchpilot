@@ -13,7 +13,7 @@ Start with [AGENTS.md](AGENTS.md). It is the navigation document for both humans
 3. Check whether an [ADR](docs/adr/README.md) is required. Architecture and security design live in [docs/architecture](docs/architecture/README.md) and [docs/security](docs/security/README.md).
 4. Search existing issues and pull requests before duplicating work.
 
-Application packages are not scaffolded yet. Do not add product functionality, application manifests, or dependencies unless a task explicitly asks for them.
+Application shells and shared packages exist. Do not add product functionality (auth, SBOM processing, scoring, remediation, GitHub, or AI) unless a task explicitly asks for it.
 
 ## Development workflow
 

@@ -1,0 +1,37 @@
+{
+  "name": "@patchpilot/eslint-config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared ESLint flat configurations for PatchPilot.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./base": "./base.js",
+    "./node": "./node.js",
+    "./node-allow-env": "./node-allow-env.js",
+    "./library": "./library.js",
+    "./next": "./next.js"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "node --eval \"process.stdout.write('no unit tests\\n')\"",
+    "clean": "node --eval \"process.exit(0)\""
+  },
+  "dependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.4.0",
+    "typescript-eslint": "^8.46.4"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0",
+    "typescript": "~5.9.0"
+  },
+  "devDependencies": {
+    "@patchpilot/typescript-config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "typescript": "~5.9.3"
+  }
+}

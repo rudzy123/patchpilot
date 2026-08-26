@@ -1,0 +1,9 @@
+{
+  "extends": "@patchpilot/typescript-config/library.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts", "vitest.config.ts"]
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@patchpilot/integrations",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Provider-neutral integration ports. No vendor SDKs in this iteration.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "devDependencies": {
+    "@patchpilot/config": "workspace:*",
+    "@patchpilot/eslint-config": "workspace:*",
+    "@patchpilot/test-utils": "workspace:*",
+    "@patchpilot/typescript-config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

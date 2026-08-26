@@ -1,0 +1,16 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Technical placeholder only. Prisma requires at least one model to generate a client.
+// Product tables (Organization, User, Asset, SBOM, Finding, AuditEvent, OutboxEvent, …)
+// are intentionally deferred to the database-domain milestone.
+model SchemaFoundation {
+  id        String   @id @default("patchpilot-foundation")
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+}

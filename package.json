@@ -1,0 +1,48 @@
+{
+  "name": "patchpilot",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Self-hosted vulnerability prioritization and remediation. Development foundation only.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": "^24.0.0",
+    "pnpm": "^11.24.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "eslint . && turbo run lint",
+    "lint:fix": "eslint . --fix && turbo run lint -- --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && turbo run typecheck",
+    "test": "pnpm test:unit",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration",
+    "test:e2e": "turbo run test:e2e",
+    "db:generate": "node scripts/run-database-command.mjs generate",
+    "db:validate": "node scripts/run-database-command.mjs validate",
+    "db:migrate": "node scripts/run-database-command.mjs migrate",
+    "db:reset": "node scripts/run-database-command.mjs reset",
+    "infrastructure:up": "node scripts/run-infrastructure.mjs up",
+    "infrastructure:down": "node scripts/run-infrastructure.mjs down",
+    "infrastructure:logs": "node scripts/run-infrastructure.mjs logs",
+    "clean": "turbo run clean && node scripts/clean-root.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@patchpilot/eslint-config": "workspace:*",
+    "@patchpilot/typescript-config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.4.0",
+    "prettier": "^3.9.6",
+    "turbo": "^2.8.12",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vitest": "^4.1.11"
+  }
+}
