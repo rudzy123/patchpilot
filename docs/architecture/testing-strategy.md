@@ -1,0 +1,63 @@
+# Testing strategy
+
+Tests are part of the definition of done for significant features, not a follow-up wish. Unit and integration tests use **Vitest**. Browser end-to-end tests use **Playwright**. Rules: [testing.mdc](../../.cursor/rules/testing.mdc).
+
+This strategy is for v0.1 architecture. It does not claim a CI pipeline already exists. Until CI exists, authors run the equivalent locally and report actual results.
+
+## Layers
+
+| Layer | What to test | Must not |
+| --- | --- | --- |
+| Domain / policy-engine | Invariants, factor math, finding identity, state transitions | Boot Fastify, Next.js, Redis, MinIO |
+| SBOM parser | Allowlist, limits, fixtures, prototype-key rejection | Live network; customer SBOMs |
+| Use cases | Authz denials, org scoping, idempotency | Import Prisma in the test subject (inject fakes) |
+| API | Zod validation, error taxonomy, CSRF/session, rate-limit headers | Domain rules duplicated in the handler |
+| Persistence | Constraints, org predicates, no cascade-delete of evidence | Share dirty data between tests |
+| Worker | Replay twice = one effect; org mismatch dead-letters | Trust payload org |
+| Playwright | MVP journey happy path + empty/error/forbidden | Substitute for unit tests of scoring or tenancy |
+
+## Determinism
+
+- No arbitrary sleeps. Wait on conditions, events, or fake timers.
+- Freeze time to UTC for expiry, KEV dates, and `retrievedAt`.
+- Prefer fixtures over live OSV/KEV. Mark true integration tests explicitly.
+- Sample SBOMs minimized, no secrets, no proprietary documents.
+
+## Security-sensitive tests (required)
+
+Even if a glob did not attach:
+
+1. **Tenant isolation:** org A cannot read org B assets, SBOMs, findings, exports, credentials ([tenant isolation](tenant-isolation.md)).
+2. **ID lookup without org** fails at repository port.
+3. **Job replay** idempotency.
+4. **Job org mismatch** does not mutate.
+5. **Upload rejects** wrong content-type, oversized body, disallowed specVersion (no exploit payload).
+6. **Intelligence** additive write; conflict retains both; withdrawn does not delete findings.
+7. **Policy** same inputs → same priority; recalc does not erase old **RiskCalculation**.
+8. **Audit** insert-only (attempted update fails).
+9. **Redaction** unit tests on logger (token-like strings).
+10. **Development adapters** cannot be constructed when config is production.
+
+Do not commit working exploit payloads.
+
+## Fixtures
+
+| Fixture | Use |
+| --- | --- |
+| Minimal CycloneDX 1.5 JSON with one npm component | Happy parse |
+| Same hash uploaded twice | Duplicate/idempotency |
+| Nested JSON at depth 33 | Depth reject |
+| Component count over 10,000 (generated in test, not a 10k file in git if avoidable—generate) | Limit |
+| OSV hit / miss / wrong ecosystem / withdrawn | Matcher |
+| KEV snapshot with and without CVE | Enrichment change |
+| Two orgs | Isolation |
+
+## Coverage expectations for the MVP journey
+
+Playwright (when web exists): create org → asset → upload → see finding with policy version and factors → assign task → record acceptance → upload newer SBOM → see observation result → export. Also forbidden org id and empty inventory.
+
+## Related documents
+
+- [Definition of done](../development/definition-of-done.md)
+- [Review checklist](../development/review-checklist.md)
+- [Secure development plan](../security/secure-development-plan.md)
