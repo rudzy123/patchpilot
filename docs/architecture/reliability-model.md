@@ -67,7 +67,10 @@ Tenant uniqueness always includes `organizationId`.
 | SBOM document | org + asset + sha256 |
 | Outbox | org + `dedupeKey` |
 | Finding create | org + asset + component identity + vuln identity |
-| RiskCalculation | org + finding + policy version + source record ids + reason + ingestion id where applicable |
+| RiskCalculation | org + finding + `policyDefinitionSha256` + source record ids + reason + ingestion id where applicable |
+| RiskAcceptance create | `Idempotency-Key` + org; at most one `active` acceptance per finding |
+| Export create | `Idempotency-Key` + org |
+| System intel refresh outbox | `eventType` + cursor/`payloadSha256` (null org) |
 | Audit | Do not duplicate on replay: unique `(organizationId, action, subjectId, correlationId)` where safe, or handler checks existing event |
 
 Replay of the same job twice produces one tenant-visible effect (required test).

@@ -32,7 +32,7 @@ Production replaces Compose services with operator-managed PostgreSQL, Redis, an
 Only `packages/config` reads `process.env`. Production must:
 
 - Require HTTPS termination (operator ingress).
-- Disable development adapters (fake auth, unrestricted HTTP, unsigned webhooks).
+- Disable development adapters: `deploymentEnvironment=production` implies `allowDevelopmentAdapters=false`. Construction of fake auth, unrestricted HTTP, or unsigned webhooks must throw at boot.
 - Require secrets for DB, Redis, object storage, session material, and credential KEK ([OD-4](open-decisions.md)).
 - Set allowlists for OSV and KEV hosts.
 

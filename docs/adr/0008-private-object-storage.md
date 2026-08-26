@@ -30,7 +30,7 @@ Backups must include the bucket and the database. Orphan objects possible; recon
 
 ## Security and tenancy
 
-Guessing a digest must not yield another organization's object. Presigned public URLs need a future ADR.
+Guessing a digest must not yield another organization's object. Get/put use the **stored** org-prefixed key from the **SBOM** row after an organization-scoped reload. Presigned public URLs need a future ADR.
 
 ## Operational failure plan
 

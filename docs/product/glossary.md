@@ -17,7 +17,7 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **Component** | A package or library listed in an SBOM, including identifying coordinates used for correlation. |
 | **Dependency relationship** | An edge between components as recorded in the SBOM. Observed fact, not a risk score. |
 | **Vulnerability record** | Intelligence about a vulnerability (for example a CVE) from a named source, with provenance. |
-| **Finding** | The link between an asset’s observed component (from a specific SBOM) and a vulnerability record, plus later enrichment and scores. |
+| **Finding** | Tenant-owned link between an **asset**'s component identity and a **vulnerability record**, spanning SBOMs. Per-SBOM presence is a **Finding observation**, not a new finding when identity matches. |
 | **Correlation** | Matching components to vulnerability records using defined identifiers and recorded method. |
 | **CISA KEV** | CISA Known Exploited Vulnerabilities catalog. Used to **enrich** applicable findings. KEV listing is not by itself proof of exploitation in the user’s environment. |
 | **Enrichment** | Additional observed or catalog data attached to a finding, with source and time. Distinct from the priority calculation. |
@@ -30,7 +30,7 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **Risk acceptance** | An explicit, auditable decision to accept a finding for a defined reason and period. |
 | **Compensating control** | A recorded control that reduces risk without removing the vulnerable component. It is evidence of a claim, not automatic score override unless policy says so. |
 | **Re-scan** | Processing a newer SBOM for an asset and comparing prior findings. |
-| **Resolved (on rescan)** | A calculated conclusion that a previous finding’s affected component is no longer observed. Requires evidence from the new SBOM; not implied by ticket status. |
+| **Resolved (on rescan)** | A calculated conclusion that the affected component is no longer observed **in range** on a newer SBOM with **adequate coverage**. Requires stored observation evidence; not implied by ticket status or KEV absence. |
 | **Audit event** | Append-only record of a security- or remediation-sensitive operation (see `security.mdc`). Never updated in place. |
 | **Shared catalog** | Non-tenant data such as vulnerability intelligence and KEV snapshots. May be global. Findings that use it remain tenant-owned. |
 | **Provenance** | Source, retrieved-at (UTC), and source identity for intelligence or evidence. Updates are versioned or additive, never a silent in-place replace. |

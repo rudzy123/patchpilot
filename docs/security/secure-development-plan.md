@@ -59,7 +59,7 @@ Until CI exists, report **actual** local command results. Do not claim checks pa
 - Private report via SECURITY.md.
 - Public PRs must not include working exploits.
 - Fixes get regression tests.
-- Development adapters stay disabled in production configs.
+- Development adapters stay disabled when `deploymentEnvironment` is `production` (`allowDevelopmentAdapters` false).
 
 ## Optional AI (future)
 

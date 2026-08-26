@@ -110,12 +110,12 @@ Per architecture invariants, validate with Zod (or equivalent schema) at the bou
 
 When a future ADR adds webhooks:
 
-- Signature verification required
-- Reject replay (delivery id + timestamp window)
+- Signature verification required (deny unsigned deliveries)
+- Reject replay: persist provider **delivery id** as unique per integration **and** reject timestamps outside a **configurable window** (initial proposal: 5 minutes skew; validate before production use)
 - Validate payload shape
-- Deny unsigned deliveries
 - Map installations 1:1 with organizations
 - Treat repo/org ids in the payload as untrusted until they match stored installation
+- Job/payload org ids are not membership
 
 v0.1 has **no** inbound webhook listener. [RepositoryConnection](domain-model.md#repositoryconnection) stays `not_configured`.
 

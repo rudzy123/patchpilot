@@ -86,8 +86,8 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | AuditEvent | system or T | tenant when org set | yes | yes | **no** | yes | keep in v0.1 | |
 | Integration | system or T | tenant when org set | yes | | yes | | | |
 | ExternalCredential | | yes | yes | | state | versions | yes | Ciphertext Restricted |
-| OutboxEvent | | tenant work | | | publishedAt | | | Payload = ids |
-| BackgroundJob | | tenant work | | | state | | | |
+| OutboxEvent | system or T | tenant when org set | | | publishedAt | | | Tenant work requires `organizationId`; system intel refresh may be null |
+| BackgroundJob | system or T | tenant when org set | | | state | | | Same split as outbox |
 
 ## Distinctions (do not collapse)
 
@@ -362,7 +362,7 @@ Tenant-owned link between an asset's observed component identity and a **Vulnera
 
 Lifecycle: [finding-lifecycle.md](finding-lifecycle.md).
 
-Does not store a mutable "score" in place. Current priority comes from the latest **RiskCalculation** referenced by `currentRiskCalculationId`.
+Does not store a mutable "score" in place. Current priority comes from the latest **RiskCalculation** referenced by `currentRiskCalculationId`. Each calculation must store `policyVersion`, `policyDefinitionSha256` (hash of the immutable published definition), full **contributingFactors**, and intel source record ids used.
 
 ## FindingObservation
 
@@ -408,11 +408,13 @@ Append-only calculated conclusion for a finding under one policy version.
 | `findingId` | |
 | `riskPolicyId` | |
 | `policyVersion` | Copied for evidence even if policy row later supersedes |
+| `policyDefinitionSha256` | SHA-256 of the published **RiskPolicy.definition** bytes used |
+| `intelSourceRecordIds` | Source records whose fields were read |
 | `priority` | Stored ranking (synonym: risk score) |
 | `severitySnapshot` | Copied observed source severity, not the priority |
 | `contributingFactors` | Full factor set used |
 | `calculatedAt` | UTC |
-| `calculationReason` | `initial`, `rescan`, `intel_refresh`, `policy_change`, `manual_recalc` |
+| `calculationReason` | `initial`, `rescan`, `intel_refresh`, `policy_change`, `asset_change`, `manual_recalc`, `manual_override` |
 
 Recalculation inserts a new row. It does not erase previous rows.
 

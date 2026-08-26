@@ -12,7 +12,7 @@ Durable work must not be published to Redis inside the same database transaction
 
 ## Decision
 
-Every mutation that needs background work writes an **OutboxEvent** in the **same PostgreSQL transaction** as the state change. A relay publishes to BullMQ and marks `publishedAt`. Relays and handlers are **idempotent**. Tenant `dedupeKey` values include `organizationId`. No parser, feed, or object-storage I/O inside that transaction.
+Every mutation that needs background work writes an **OutboxEvent** in the **same PostgreSQL transaction** as the state change. A relay publishes to BullMQ and marks `publishedAt`. Relays and handlers are **idempotent**. Tenant `dedupeKey` values include `organizationId`. No parser, feed HTTP, queue publish, or object-storage I/O inside that transaction (including worker correlate/enrich stages).
 
 ## Alternatives considered
 

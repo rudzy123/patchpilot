@@ -82,15 +82,16 @@ A `member` may **request** (requester). Only `admin` or `owner` may **approve** 
 | Reason | Required untrusted text |
 | Compensating-control evidence ids | Optional claims |
 | `validFrom` / `expiresAt` | Required UTC; `expiresAt` > `validFrom` |
-| `reviewAt` | Optional; default proposal: 7 days before expiry (configurable) |
+| `reviewAt` | Required UTC; must be `< expiresAt`. Default proposal: 7 days before expiry when duration allows, else `validFrom` (configurable) |
 | Supporting **Evidence** | Optional |
 | Status | Lifecycle above |
 
-Maximum duration is a **configurable initial recommendation**: 365 days. Operators may lower it. The product must reject missing `expiresAt`.
+Maximum duration is a **configurable initial recommendation**: 365 days. Operators may lower it. The product must reject missing `expiresAt` or missing `reviewAt`.
 
-### Expiry job
+### Review and expiry jobs
 
-A scheduled job loads acceptances with `expiresAt <= now` and `state = active`, transitions to `expired`, writes audit, and updates finding state per [finding lifecycle](finding-lifecycle.md) (typically back to `open` if still `present`). Idempotent on acceptance id. Expired acceptances trigger review (finding visible in the default queue again) — they do not auto-`resolved`.
+- **Review job:** `reviewAt <= now` and `state = active` → emit audit `risk_acceptance.review_due` and surface the finding in a review queue. It does **not** auto-`resolved` or extend `expiresAt`.
+- **Expiry job:** `expiresAt <= now` and `state = active` → `expired`, audit, finding state per [finding lifecycle](finding-lifecycle.md) (typically back to `open` if still `present`). Idempotent on acceptance id.
 
 ## Compensating controls
 

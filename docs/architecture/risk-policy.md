@@ -46,7 +46,7 @@ UI, exports, and logs must not label priority as "CVSS" or as "exploitability pr
 
 - Built-in policy key: `patchpilot.builtin.v0`.
 - Versions are monotonic integers per key. Published **RiskPolicy.definition** is immutable.
-- Each **RiskCalculation** stores `riskPolicyId`, `policyVersion`, and the full **contributingFactors** object used.
+- Each **RiskCalculation** stores `riskPolicyId`, `policyVersion`, `policyDefinitionSha256` of the published definition, intel source record ids, and the full **contributingFactors** object used. Re-running the engine on those stored inputs plus the hashed definition must yield the same **priority**.
 - Application release version and policy version are independent. Release notes must mention policy version when scoring behavior changes.
 
 ## Contributing factors

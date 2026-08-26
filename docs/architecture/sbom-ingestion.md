@@ -83,12 +83,14 @@ Duplicate means the same `organizationId` + `assetId` + `sha256`.
 
 After `accepted`, the relay publishes `sbom.ingest`. The worker:
 
-1. Reloads SBOM with organization predicate.
-2. Gets a copy from object storage.
+1. Reloads the **SBOM** row with an organization predicate and uses the stored `objectKey` (never a key built only from a payload digest).
+2. Gets a copy from object storage **outside** any database transaction.
 3. Full CycloneDX schema validation for the allowlisted version.
 4. Enforces depth, component, and edge limits on the **logical** graph (not only JSON depth).
-5. Persists derived graph.
-6. Correlates, enriches, scores (see [data flow](data-flow.md)).
+5. Persists derived graph in a **database transaction that performs no HTTP, queue, or object-storage I/O**.
+6. Correlates, enriches, scores in **separate** steps: feed HTTP (OSV) is always outside a DB transaction; finding/calculation writes are their own transactions with outbox rows as needed (see [data flow](data-flow.md)).
+
+A single worker **process** may run parse + correlate + enrich + score for one ingestion, but it **must not** combine feed or storage I/O with a state-transition transaction. Stage values remain `validate`, `parse`, `persist_graph`, `correlate`, `enrich`, `score`.
 
 ## Pipeline (text is canonical)
 
@@ -107,9 +109,11 @@ sequenceDiagram
   API->>OS: Put original bytes
   API->>PG: SBOM, ingestion accepted, outbox, audit
   Relay->>W: Publish job
-  W->>PG: Claim lease, reload org
-  W->>OS: Get copy
-  W->>PG: Validate, graph, correlate, score
+  W->>PG: Claim lease, reload org and objectKey
+  W->>OS: Get copy (outside DB transaction)
+  W->>PG: Persist graph only (no HTTP)
+  W->>W: OSV fetch if cache miss (outside DB transaction)
+  W->>PG: Findings, calculations, outbox
 ```
 
 If the diagram is not rendered, the sentence above is complete.
@@ -153,7 +157,7 @@ States: `accepted`, `queued`, `processing`, `completed`, `rejected`, `quarantine
 
 `completed`, `rejected`, and `duplicate` are terminal for **that** ingestion row. Parser reprocess creates a **new** SBOMIngestion on the same SBOM.
 
-For v0.1, one worker job may run parse + correlate + enrich + score before `completed`, using internal `stage` values: `validate`, `parse`, `persist_graph`, `correlate`, `enrich`, `score`. Failures after persist_graph must be idempotent to resume without duplicating findings.
+For v0.1, one worker **job** may sequence parse + correlate + enrich + score before `completed`, using internal `stage` values: `validate`, `parse`, `persist_graph`, `correlate`, `enrich`, `score`. Failures after persist_graph must be idempotent to resume without duplicating findings. Feed HTTP and object-storage get/put remain **outside** every database transaction.
 
 ## Poison payload handling
 

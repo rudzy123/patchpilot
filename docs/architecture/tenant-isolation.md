@@ -9,7 +9,7 @@ This document is the canonical tenancy design for v0.1 ([ADR 0013](../adr/0013-o
 1. The user authenticates (interim: session cookie bound to a **User** id, [OD-1](open-decisions.md)).
 2. The API loads **Membership** rows that are not revoked.
 3. The request names a target organization only as a **selector** among memberships the user already has (for example path `/organizations/{organizationId}/...` where `{organizationId}` must match a membership).
-4. If the user has no membership for that id, the API returns **not found** or **forbidden** using a policy that does **not** leak whether the organization exists.
+4. If the user has no membership for that id, the API returns **not found** for tenant-owned resources (same as a missing id). It does **not** return `forbidden` in a way that confirms another organization exists. `forbidden` is reserved for an authenticated member of **this** organization who lacks the role for the operation.
 5. Use cases receive `AuthorizedContext { userId, organizationId, role }`. They never receive a raw client id as proof.
 
 A client-supplied `organizationId` that does not match membership is ignored for authorization. GitHub accounts, webhook fields, and job payloads are not membership.
@@ -45,7 +45,7 @@ listFindings(organizationId, query)
 getSbomObjectMeta(organizationId, sbomId)
 ```
 
-Adapters translate this to a query that **always** contains `WHERE organization_id = $authorizedOrg`.
+Adapters translate this to a query that **always** contains `WHERE organization_id = $authorizedOrg` from **AuthorizedContext**, never from `query.organizationId` or the request body.
 
 Forbidden patterns:
 

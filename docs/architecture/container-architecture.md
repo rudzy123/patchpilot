@@ -89,7 +89,7 @@ Redis is not exposed to the browser. PostgreSQL is not exposed to the browser.
 | PostgreSQL | Compose service | Operator-provided PostgreSQL |
 | Redis | Compose service | Operator-provided Redis |
 | Object storage | MinIO | S3-compatible private store |
-| Development adapters | May be enabled only when `NODE_ENV` / config marks non-production | Must be impossible to select |
+| Development adapters | Allowed only when `deploymentEnvironment` is not `production` **and** `allowDevelopmentAdapters` is true | `allowDevelopmentAdapters` must be false and unselectable; `NODE_ENV=production` alone is not sufficient if the typed flag is true |
 
 Scaling `worker` replicas is still a modular monolith: same schema, same packages, competing for jobs. Splitting worker types into separately owned services requires a new ADR.
 

@@ -59,7 +59,13 @@ Even if a glob did not attach:
 7. **Policy** same inputs → same priority; recalc does not erase old **RiskCalculation**.
 8. **Audit** insert-only (attempted update fails).
 9. **Redaction** unit tests on logger (token-like strings).
-10. **Development adapters** cannot be constructed when config is production.
+10. **Development adapters** cannot be constructed when `deploymentEnvironment` is `production` or `allowDevelopmentAdapters` is false.
+11. **KEV absence** does not auto-close findings or present "not exploited."
+12. **Coverage:** a thinner SBOM does not yield `absent`/`resolved` (heuristic fixtures).
+13. **Out-of-range:** mixed in-range and out-of-range occurrences of the same identity do not `resolved`.
+14. **Worker I/O:** tests or architecture-boundary checks that feed/storage adapters are not invoked inside a mocked DB transaction.
+15. **Export isolation:** org A cannot download org B export snapshots.
+16. **Policy replay:** stored factors + `policyDefinitionSha256` reproduce the same priority.
 
 Do not commit working exploit payloads.
 
@@ -72,7 +78,8 @@ Do not commit working exploit payloads.
 | Nested JSON at depth 33 | Depth reject |
 | Component count over 10,000 (generated in test, not a 10k file in git if avoidable—generate) | Limit |
 | OSV hit / miss / wrong ecosystem / withdrawn | Matcher |
-| KEV snapshot with and without CVE | Enrichment change |
+| KEV snapshot with and without CVE | Enrichment change; absence must not auto-resolve |
+| Two versions of one package, one still in range | Must not `resolved` |
 | Two orgs | Isolation |
 
 ## Coverage expectations for the MVP journey

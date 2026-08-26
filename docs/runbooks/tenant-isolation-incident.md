@@ -15,16 +15,19 @@ This is a **security incident**. Do not file a public GitHub issue with reproduc
 ## Immediate actions
 
 1. Preserve evidence: request id, actor user id, claimed org, target ids, timestamps (UTC). **Redact** tokens, cookies, raw SBOMs.
-2. Disable development adapters if production config might have enabled them.
-3. Do not "browse" other tenants to confirm. Use a scripted, org-scoped query or a restored copy.
-4. Rotate session secrets and **ExternalCredential** material if leakage is plausible.
-5. If object storage was public, make the bucket private immediately and assume SBOM disclosure.
+2. Set `allowDevelopmentAdapters=false` and restart API/worker if that flag could have been true.
+3. Revoke sessions for the suspected actor (and all sessions if the leak path is unclear).
+4. Pause **tenant** ingest/recalculate workers (system intel refresh may continue). Pausing is better than continued mix-up.
+5. If the object-storage bucket is public or listable, make it private immediately and assume SBOM disclosure.
+6. Do not open another organization's SBOM in a ticket, chat, or browser to "confirm."
 
-## Containment
+## Containment queries (org-scoped)
 
-- Block the affected API keys/sessions.
-- Pause workers only if jobs are writing across orgs; pausing is better than continued mix-up.
-- Do not enable a cross-organization operator bypass. None exists in v0.1.
+Instance operators may run these **only** on a forensic copy when possible:
+
+- Count rows whose `organization_id` does not match the object's key prefix `org/{organizationId}/`.
+- List **BackgroundJob** rows in `running`/`succeeded` in the incident window and confirm each mutated aggregate's persisted `organizationId`.
+- Compare API access logs by `requestId` for resource ids that do not belong to the caller's memberships (ids only, no bodies).
 
 ## Investigation questions
 
@@ -36,9 +39,11 @@ This is a **security incident**. Do not file a public GitHub issue with reproduc
 
 ## Recovery
 
-- Patch the predicate; add/adjust isolation tests ([testing-strategy.md](../architecture/testing-strategy.md)).
-- Audit: record `incident` metadata without Restricted payloads (if a suitable action exists; otherwise instance-operator notes outside the tenant audit table).
-- Notify the affected organization's `owner` via the operator's out-of-band process. PatchPilot does not claim a legal notification SLA.
+1. Keep the application **without** a cross-org bypass. None exists in v0.1.
+2. After a code fix, deploy and run the isolation tests in [testing-strategy.md](../architecture/testing-strategy.md).
+3. Record operator notes outside tenant audit if no `incident` action exists; do not put Restricted payloads in **AuditEvent**.
+4. Notify the affected organization's `owner` out of band. PatchPilot does not claim a legal notification SLA.
+5. Rotate session signing material, object-storage credentials, and **ExternalCredential** rows if disclosure is plausible.
 
 ## Verification
 

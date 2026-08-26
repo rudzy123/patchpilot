@@ -62,7 +62,7 @@ At minimum, emit events for:
 | `risk_policy.published` | Org override or builtin publish |
 | `finding.state_changed` | Finding lifecycle transition |
 | `remediation_task.created` / `remediation_task.transition` | Assignment and activity |
-| `risk_acceptance.created` / `expired` / `revoked` / `superseded` | Acceptance including requester/approver ids |
+| `risk_acceptance.created` / `expired` / `revoked` / `superseded` / `review_due` | Acceptance including requester/approver ids |
 | `finding.false_positive` / `finding.mitigated` | Specialized transitions |
 | `priority.override` | Manual override |
 | `auth.session_revoked` / `auth.login_failed` | Authentication-sensitive (no secrets in payload) |

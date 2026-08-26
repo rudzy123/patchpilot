@@ -75,8 +75,8 @@ Asynchronous worker work:
 
 1. For each occurrence, build ecosystem + name + version or PURL.
 2. Match against **Vulnerability** / **VulnerabilitySourceRecord** using recorded **method**.
-3. On cache miss, worker may query OSV through the integration adapter (allowlisted, rate-limited). Raw responses become additive **VulnerabilitySourceRecord** rows with `retrievedAt` and `payloadSha256`.
-4. Create or reuse **Finding** by stable identity. Add **FindingObservation** `present`.
+3. On cache miss, the worker queries OSV through the integration adapter (allowlisted, rate-limited) **outside** a database transaction. Raw responses become additive **VulnerabilitySourceRecord** rows in a later transaction with provenance (`retrievedAt`, `payloadSha256`).
+4. Create or reuse **Finding** by stable identity. Add **FindingObservation** `present` in a transaction **without** HTTP I/O.
 5. Do not send original SBOM documents to OSV.
 
 ## 7. Enrich with CISA KEV
@@ -90,7 +90,7 @@ Asynchronous worker work:
 1. Collect **observed facts** (severity snapshot from intel, KEV listed boolean, environment sensitivity, direct/transitive if known, fix-available if present in the source record).
 2. Load effective **RiskPolicy** (organization override if published, else built-in).
 3. `packages/policy-engine` returns priority, full **contributing factors**, and policy version. No AI.
-4. Insert **RiskCalculation**. Point the finding at it. **AuditEvent** `priority.calculated`.
+4. Insert **RiskCalculation** (including `policyDefinitionSha256`). Point the finding at it. **AuditEvent** `priority.calculated`.
 
 ## 9–10. Assign and record remediation
 

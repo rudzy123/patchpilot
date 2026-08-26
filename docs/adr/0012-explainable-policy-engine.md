@@ -12,7 +12,7 @@ Scores must be explainable, replayable, and honest. AI must not set authoritativ
 
 ## Decision
 
-Implement a deterministic **policy engine** in `packages/policy-engine` with **no I/O**. Each **RiskCalculation** stores policy version and the **full contributing factors**. Recalculation inserts a new row; history is not erased. Organization overrides publish a new tenant-owned policy version and do not mutate historical results. Distinguish **vulnerability severity** (observed from intel) from **remediation priority** (calculated). Default policy does not auto-score compensating-control prose or task completion.
+Implement a deterministic **policy engine** in `packages/policy-engine` with **no I/O**. Each **RiskCalculation** stores policy version, **`policyDefinitionSha256`**, contributing factors, and intel source record ids. Recalculation inserts a new row; history is not erased. Organization overrides publish a new tenant-owned policy version and do not mutate historical results. Distinguish **vulnerability severity** (observed from intel) from **remediation priority** (calculated). Default policy does not auto-score compensating-control prose or task completion.
 
 ## Alternatives considered
 

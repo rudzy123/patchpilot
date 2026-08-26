@@ -49,6 +49,12 @@ stateDiagram-v2
   risk_accepted --> open: expired or revoked and still present
   open --> mitigated: compensating control recorded
   open --> false_positive: authorized FP
+  verification_pending --> false_positive: authorized FP
+  verification_pending --> mitigated: compensating control
+  inconclusive --> risk_accepted: acceptance approved
+  false_positive --> resolved: evidence-backed absent or out of range
+  false_positive --> inconclusive: rescan inconclusive
+  false_positive --> open: FP revoked
   open --> resolved: evidence-backed
   verification_pending --> resolved: evidence-backed
   risk_accepted --> resolved: evidence-backed
@@ -61,7 +67,6 @@ stateDiagram-v2
   resolved --> open: later present
   resolved --> inconclusive: later inconclusive
   inconclusive --> open: later present
-  false_positive --> open: FP revoked
 ```
 
 If the diagram is not rendered, the transition table is authoritative.
@@ -88,19 +93,19 @@ Due dates are **calculated recommendations** on **RiskCalculation**, not a findi
 | (create) | `open` | Correlation created the finding from a `present` observation | Calculated from intel + SBOM |
 | `open` | `verification_pending` | Remediation task `completed` or verify requested | Workflow |
 | `verification_pending` | `open` | Latest conclusive observation is `present` | Calculated |
-| `open` / `verification_pending` / `mitigated` | `risk_accepted` | Acceptance `active` | Workflow |
+| `open` / `verification_pending` / `mitigated` / `inconclusive` | `risk_accepted` | Acceptance `active` | Workflow |
 | `risk_accepted` | `open` | Acceptance `expired`/`revoked`/`superseded` without replacement, and still `present` | Workflow |
-| `open` | `mitigated` | Compensating control recorded | Workflow |
-| `open` | `false_positive` | Authorized FP | Workflow |
+| `open` / `verification_pending` | `mitigated` | Compensating control recorded | Workflow |
+| `open` / `verification_pending` | `false_positive` | Authorized FP | Workflow |
 | `false_positive` | `open` | FP revoked | Workflow |
 | `mitigated` | `open` | Control withdrawn | Workflow |
-| `open`, `verification_pending`, `risk_accepted`, `mitigated`, `inconclusive` | `resolved` | Evidence-backed resolution (below) | Calculated / evidenced |
-| `open`, `verification_pending`, `risk_accepted`, `mitigated` | `inconclusive` | Latest completed ingestion yields `inconclusive` | Calculated |
+| `open`, `verification_pending`, `risk_accepted`, `mitigated`, `inconclusive`, `false_positive` | `resolved` | Evidence-backed resolution (below) | Calculated / evidenced |
+| `open`, `verification_pending`, `risk_accepted`, `mitigated`, `false_positive` | `inconclusive` | Latest completed ingestion yields `inconclusive` | Calculated |
 | `resolved` | `open` | Later completed ingestion yields `present` | Calculated |
 | `resolved` | `inconclusive` | Later completed ingestion yields `inconclusive` | Calculated |
 | `inconclusive` | `open` | Later completed ingestion yields `present` | Calculated |
 
-`false_positive` stays until revoked even if later SBOMs still list the component; new **FindingObservation** rows are still written. UI shows still-observed + FP.
+`false_positive` remains until revoked **or** evidence-backed `resolved` / `inconclusive` from a later completed ingestion. New **FindingObservation** rows are always written. UI must not label FP as remediated.
 
 When `risk_accepted` and evidence supports `resolved`, the finding becomes `resolved`. The acceptance row remains historical.
 
@@ -130,8 +135,8 @@ Inconclusive must not be displayed as "fixed."
 
 | Situation | May set `resolved`? | Evidence | Confidence |
 | --- | --- | --- | --- |
-| Component no longer present | yes | Observation `absent` + method showing compare was possible | `high` if PURL/ecosystem+name stable across SBOMs |
-| Component upgraded outside affected range | yes | Observation `present` at a version the **VulnerabilitySourceRecord** marks unaffected/fixed, method `version_out_of_affected_range` | `high` when range parse succeeded; else `inconclusive` |
+| Component no longer present | yes, if coverage adequate | Observation `absent` **and** compare method shows identity could have been seen | `high` if PURL/ecosystem+name stable across SBOMs |
+| Component upgraded outside affected range | yes, if **every** occurrence of that identity on the latest completed SBOM is outside the affected range (or absent) | Observation method `version_out_of_affected_range`; if **any** occurrence remains in range → remain `present`, do not `resolved` | `high` when range parse succeeded for all occurrences; else `inconclusive` |
 | Advisory withdrawn | no by itself | New calculation with `advisory_withdrawn`; finding may remain `open` | Withdrawal is intel, not asset evidence |
 | VEX not-affected | **future** | Not MVP ([non-goals](../product/non-goals.md) extra formats) | — |
 | Compensating mitigation | no | State `mitigated` + **Evidence**; component still present | Claim only |
@@ -139,7 +144,13 @@ Inconclusive must not be displayed as "fixed."
 | Asset decommissioning | only with explicit verify | Asset `archived` **plus** `admin`/`owner` verification reason `asset_decommissioned` stored as **Evidence**; not implied by archive alone | `medium` |
 | Newer SBOM omits component, coverage poor | no | Observation `inconclusive` / `incomplete_sbom_coverage` | Absence is **not** proof |
 
-**Incomplete inventory:** if the new SBOM has dramatically fewer components than the previous completed graph (threshold is a **configurable proposal**, initial recommendation: drop of ≥50% component count), treat missing former components as `inconclusive`, not `absent`.
+**Incomplete inventory:** do **not** record `absent` (and therefore do not `resolved` from absence) when coverage is inadequate. Initial **configurable proposals** (validate before treating as defaults):
+
+- Component count drops by ≥50% versus the previous **completed** graph.
+- The previous completed SBOM recorded dependency edges and the new one has none (or far fewer than a configurable ratio).
+- The compare method is weaker than the previous observation (for example previous used PURL, new SBOM has name only).
+
+Treat those missing former components as `inconclusive` / `incomplete_sbom_coverage`, not `absent`. Same component count does not prove completeness; it only avoids this particular heuristic.
 
 Withdrawn vulnerabilities: do not auto-`resolved`. Changed severity or KEV: new **RiskCalculation** only. Unsupported/archived assets: no new uploads; existing findings remain until verification rules apply.
 

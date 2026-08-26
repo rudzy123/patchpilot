@@ -12,7 +12,7 @@ OSV, KEV, and object storage must not leak vendor SDKs into domain code. GitHub 
 
 ## Decision
 
-Reach external systems only through **ports and adapters**. Domain depends on ports. Object storage is S3-compatible and provider-neutral. HTTP feeds validate with Zod at the adapter. **Integration** and **ExternalCredential** entities exist even if v0.1 tenant credentials are unused. Development adapters (fake auth, unsigned webhooks, unrestricted HTTP, plaintext stubs) are not selectable when configuration is production. Decrypt credentials only in adapters.
+Reach external systems only through **ports and adapters**. Domain depends on ports. Object storage is S3-compatible and provider-neutral. HTTP feeds validate with Zod at the adapter. **Integration** and **ExternalCredential** entities exist even if v0.1 tenant credentials are unused. Development adapters (fake auth, unsigned webhooks, unrestricted HTTP, plaintext stubs) are not constructible when `deploymentEnvironment` is `production` or `allowDevelopmentAdapters` is false. `NODE_ENV` alone is not the gate. Decrypt credentials only in adapters.
 
 ## Alternatives considered
 
