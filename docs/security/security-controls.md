@@ -123,6 +123,29 @@ Canonical rules: [security.mdc](../../.cursor/rules/security.mdc). Threats: [thr
 | Dev adapters | C8 |
 | AI later | ADR 0017, C6, C8 |
 
+## Mapping to required tests
+
+Control catalog → numbered tests in [testing-strategy.md](../architecture/testing-strategy.md). Cross-tenant procedure detail is in [tenant-isolation.md](../architecture/tenant-isolation.md). Threat-model rows also list a **Test** column.
+
+| Control | Required tests (minimum) |
+| --- | --- |
+| C1 Deny-by-default authorization | 1, 2, 4, 15 |
+| C2 Input validation | 5, 12, 13 |
+| C3 Untrusted SBOM handling | 5, 12, 14, 20 |
+| C4 Tenant-scoped persistence | 1, 2, 4, 15, 17, 21 |
+| C5 Intelligence provenance | 6, 11, 21 |
+| C6 Explainable scoring | 7, 16, 19 |
+| C7 Audit integrity | 8 |
+| C8 Secrets and config | 9, 10 |
+| C9 SSRF and egress | 14 (no URL fetch / no I/O in transactions); adapter allowlist tests when HTTP adapters exist |
+| C10 Webhook readiness (dormant) | None in v0.1 (no listeners). When added: signature + replay tests |
+| C11 Session and CSRF | API authorization suite in testing-strategy (CSRF/session/role matrix) |
+| C12 Injection and XSS | 5 (parser); UI XSS when web exists (Playwright + escape tests) |
+| C13 Jobs | 3, 4, 14, 18, 20 |
+| C14 Observability redaction | 9 |
+| C15 Supply chain (process) | No exploit payloads; lockfile when apps exist |
+| C16 Rate limiting | 5 (upload size/reject); outbound 429 classified as retryable in worker tests | |
+
 ## Related documents
 
 - [Secure development plan](secure-development-plan.md)
