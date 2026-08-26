@@ -32,12 +32,40 @@ export const libraryConfig = [
               name: 'minio',
               message: 'Library packages must not import MinIO.',
             },
+            {
+              name: '@patchpilot/database',
+              message:
+                'Library packages must not import Prisma persistence. Depend on a port instead.',
+            },
+            {
+              name: '@patchpilot/api',
+              message: 'Packages must not depend on applications.',
+            },
+            {
+              name: '@patchpilot/web',
+              message: 'Packages must not depend on applications.',
+            },
+            {
+              name: '@patchpilot/worker',
+              message: 'Packages must not depend on applications.',
+            },
           ],
           patterns: [
             {
-              group: ['fastify/*', 'next/*', '@prisma/*', 'ioredis/*', 'bullmq/*', 'minio/*'],
+              group: [
+                'fastify/*',
+                'next/*',
+                '@prisma/*',
+                'ioredis/*',
+                'bullmq/*',
+                'minio/*',
+                '@patchpilot/database/*',
+                '@patchpilot/api/*',
+                '@patchpilot/web/*',
+                '@patchpilot/worker/*',
+              ],
               message:
-                'Library packages must not import application frameworks or infrastructure SDKs.',
+                'Library packages must not import application frameworks, apps, or infrastructure SDKs.',
             },
           ],
         },

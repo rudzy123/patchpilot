@@ -2,12 +2,32 @@ import { Redis } from 'ioredis';
 
 import { type RedisConnectionPort } from '@patchpilot/integrations';
 
-export function createRedisConnection(url: string): RedisConnectionPort {
-  const client = new Redis(url, {
+export const MAX_REDIS_RECONNECT_ATTEMPTS = 3;
+
+export function createIoredisOptions(): {
+  maxRetriesPerRequest: number;
+  connectTimeout: number;
+  lazyConnect: boolean;
+  enableOfflineQueue: boolean;
+  retryStrategy: (attempt: number) => number | null;
+} {
+  return {
     maxRetriesPerRequest: 1,
     connectTimeout: 1000,
     lazyConnect: true,
-  });
+    enableOfflineQueue: false,
+    retryStrategy(attempt: number): number | null {
+      if (attempt > MAX_REDIS_RECONNECT_ATTEMPTS) {
+        return null;
+      }
+
+      return Math.min(attempt * 50, 200);
+    },
+  };
+}
+
+export function createRedisConnection(url: string): RedisConnectionPort {
+  const client = new Redis(url, createIoredisOptions());
 
   return {
     async ping(timeoutMs: number): Promise<boolean> {
@@ -31,9 +51,12 @@ export function createRedisConnection(url: string): RedisConnectionPort {
       }
     },
     async quit(): Promise<void> {
-      if (client.status !== 'end') {
-        await client.quit();
+      if (client.status === 'wait' || client.status === 'end') {
+        client.disconnect();
+        return;
       }
+
+      await client.quit();
     },
   };
 }

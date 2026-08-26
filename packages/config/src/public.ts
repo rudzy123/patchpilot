@@ -13,7 +13,7 @@ export function loadPublicConfigFrom(
   const deploymentEnvironment = env['NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT']?.trim();
   const parsed = publicConfigSchema.safeParse({
     appName: 'PatchPilot',
-    deploymentEnvironment: deploymentEnvironment ?? 'development',
+    deploymentEnvironment,
   });
 
   if (!parsed.success) {

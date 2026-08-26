@@ -6,8 +6,8 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev --port 3000 --hostname 127.0.0.1",
-    "build": "next build",
+    "dev": "NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT=\"${NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT:-development}\" next dev --port 3000 --hostname 127.0.0.1",
+    "build": "NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT=\"${NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT:-production}\" next build",
     "start": "next start --port 3000 --hostname 127.0.0.1",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",

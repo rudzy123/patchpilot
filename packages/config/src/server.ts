@@ -69,6 +69,15 @@ export const serverConfigSchema = z
       });
     }
 
+    if (value.deploymentEnvironment === 'production' && !redisUrlHasPassword(value.redisUrl)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['redisUrl'],
+        message:
+          'Production Redis URLs must include a password. Unauthenticated Redis is a development adapter.',
+      });
+    }
+
     if (value.corsAllowedOrigins.some((origin) => origin === '*')) {
       context.addIssue({
         code: 'custom',
@@ -164,6 +173,15 @@ export function loadServerConfigFrom(
 
 export function loadServerConfig(): ServerConfig {
   return loadServerConfigFrom(process.env);
+}
+
+function redisUrlHasPassword(redisUrl: string): boolean {
+  try {
+    const parsed = new URL(redisUrl);
+    return parsed.password.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 function containsDevelopmentCredential(config: ServerConfig): boolean {

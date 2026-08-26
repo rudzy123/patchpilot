@@ -30,7 +30,7 @@ export function createWorkerApp(dependencies: WorkerDependencies): WorkerApp {
     async start(): Promise<void> {
       const database = await dependencies.checkDatabaseReady(dependencies.readinessTimeoutMs);
       if (!database.ok) {
-        throw new Error('Worker dependencies failed to initialize: postgresql is not ready.');
+        throw new Error('Worker dependencies failed to initialize: database is not ready.');
       }
 
       const redisReady = await dependencies.redis.ping(dependencies.readinessTimeoutMs);
@@ -52,10 +52,6 @@ export function createWorkerApp(dependencies: WorkerDependencies): WorkerApp {
       }
 
       acceptingWork = false;
-      const timer = setTimeout(() => {
-        dependencies.logger.error('worker shutdown timed out');
-      }, dependencies.shutdownTimeoutMs);
-      timer.unref();
       await dependencies.redis.quit();
       await dependencies.telemetry.shutdown();
       stopped = true;

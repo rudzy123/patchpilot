@@ -61,5 +61,10 @@ child.on('error', (error) => {
 });
 
 child.on('exit', (code) => {
+  if (command === 'down' && (code === 0 || code === null)) {
+    process.stderr.write(
+      'Compose services stopped. Named volumes were kept. Data is discarded only with `docker compose down -v`, which is destructive.\n',
+    );
+  }
   process.exit(code ?? 1);
 });

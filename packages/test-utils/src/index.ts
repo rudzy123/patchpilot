@@ -45,6 +45,23 @@ export function createFoundationTestEnv(): Readonly<Record<string, string>> {
   });
 }
 
+export function createFoundationProductionTestEnv(): Readonly<Record<string, string>> {
+  return Object.freeze({
+    ...createFoundationTestEnv(),
+    PATCHPILOT_DEPLOYMENT_ENVIRONMENT: 'production',
+    PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS: 'false',
+    LOG_PRETTY: 'false',
+    DATABASE_URL: 'postgresql://patchpilot:operator-secret@db.internal:5432/patchpilot',
+    REDIS_URL: 'redis://:operator-redis-secret@redis.internal:6379',
+    OBJECT_STORAGE_ENDPOINT: 'https://objects.internal:9000',
+    OBJECT_STORAGE_ACCESS_KEY: 'operator-supplied-access-key',
+    OBJECT_STORAGE_SECRET_KEY: 'operator-supplied-secret-key-value',
+    OBJECT_STORAGE_BUCKET: 'patchpilot',
+    OBJECT_STORAGE_USE_SSL: 'true',
+    NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'production',
+  });
+}
+
 export async function getFreePort(): Promise<number> {
   return await new Promise((resolve, reject) => {
     const server = createServer();

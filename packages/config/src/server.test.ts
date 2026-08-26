@@ -30,6 +30,32 @@ function validDevelopmentEnv(): Record<string, string> {
   };
 }
 
+function validProductionEnv(): Record<string, string> {
+  return {
+    PATCHPILOT_DEPLOYMENT_ENVIRONMENT: 'production',
+    PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS: 'false',
+    LOG_LEVEL: 'info',
+    LOG_PRETTY: 'false',
+    API_HOST: '127.0.0.1',
+    API_PORT: '3001',
+    WEB_PORT: '3000',
+    CORS_ALLOWED_ORIGINS: 'https://patchpilot.example',
+    DATABASE_URL: 'postgresql://patchpilot:operator-secret@db.internal:5432/patchpilot',
+    REDIS_URL: 'redis://:operator-redis-secret@redis.internal:6379',
+    OBJECT_STORAGE_ENDPOINT: 'https://objects.internal:9000',
+    OBJECT_STORAGE_ACCESS_KEY: 'operator-supplied-access-key',
+    OBJECT_STORAGE_SECRET_KEY: 'operator-supplied-secret-key-value',
+    OBJECT_STORAGE_BUCKET: 'patchpilot',
+    OBJECT_STORAGE_USE_SSL: 'true',
+    OTEL_ENABLED: 'false',
+    READINESS_TIMEOUT_MS: '1000',
+    SHUTDOWN_TIMEOUT_MS: '10000',
+    REQUEST_BODY_LIMIT_BYTES: '1048576',
+    REQUEST_ID_HEADER: 'x-request-id',
+    CORRELATION_ID_HEADER: 'x-correlation-id',
+  };
+}
+
 describe('loadServerConfigFrom', () => {
   it('loads development configuration from an explicit env record', () => {
     const config = loadServerConfigFrom(validDevelopmentEnv());
@@ -72,6 +98,19 @@ describe('loadServerConfigFrom', () => {
     expect(() => loadServerConfigFrom(env)).toThrow(/exact allowlist/);
   });
 
+  it('rejects unauthenticated Redis URLs in production', () => {
+    const env = validProductionEnv();
+    env['REDIS_URL'] = 'redis://redis.internal:6379';
+    expect(() => loadServerConfigFrom(env)).toThrow(/must include a password/);
+  });
+
+  it('accepts production configuration with operator secrets and authenticated Redis', () => {
+    const config = loadServerConfigFrom(validProductionEnv());
+    expect(config.deploymentEnvironment).toBe('production');
+    expect(config.allowDevelopmentAdapters).toBe(false);
+    expect(config.redisUrl).toContain('operator-redis-secret');
+  });
+
   it('returns an actionable error for a missing variable', () => {
     const env = validDevelopmentEnv();
     delete env['DATABASE_URL'];
@@ -89,5 +128,9 @@ describe('loadPublicConfigFrom', () => {
     expect(publicConfig.appName).toBe('PatchPilot');
     expect(publicConfig).not.toHaveProperty('databaseUrl');
     expect(JSON.stringify(publicConfig)).not.toContain('postgresql');
+  });
+
+  it('does not default the public environment label to development', () => {
+    expect(() => loadPublicConfigFrom({})).toThrow(/Public configuration is invalid/);
   });
 });

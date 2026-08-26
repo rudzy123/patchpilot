@@ -5,16 +5,28 @@ export type DatabaseReadiness = {
 };
 
 let prismaClient: PrismaClient | undefined;
+let configuredDatabaseUrl: string | undefined;
 
 export function getPrismaClient(options?: { databaseUrl?: string }): PrismaClient {
-  prismaClient ??= new PrismaClient({
+  const requestedUrl = options?.databaseUrl;
+
+  if (prismaClient !== undefined) {
+    if (requestedUrl !== undefined && requestedUrl !== configuredDatabaseUrl) {
+      throw new Error('Prisma client is already initialized with a different database URL.');
+    }
+
+    return prismaClient;
+  }
+
+  configuredDatabaseUrl = requestedUrl;
+  prismaClient = new PrismaClient({
     log: [],
-    ...(options?.databaseUrl === undefined
+    ...(requestedUrl === undefined
       ? {}
       : {
           datasources: {
             db: {
-              url: options.databaseUrl,
+              url: requestedUrl,
             },
           },
         }),
@@ -24,11 +36,13 @@ export function getPrismaClient(options?: { databaseUrl?: string }): PrismaClien
 
 export async function disconnectPrisma(): Promise<void> {
   if (prismaClient === undefined) {
+    configuredDatabaseUrl = undefined;
     return;
   }
 
   const client = prismaClient;
   prismaClient = undefined;
+  configuredDatabaseUrl = undefined;
   await client.$disconnect();
 }
 
@@ -55,4 +69,5 @@ export async function checkDatabaseReady(
 
 export function resetPrismaClientForTests(): void {
   prismaClient = undefined;
+  configuredDatabaseUrl = undefined;
 }

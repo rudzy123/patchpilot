@@ -1,5 +1,5 @@
 import { loadServerConfig } from '@patchpilot/config';
-import { checkDatabaseReady } from '@patchpilot/database';
+import { checkDatabaseReady, disconnectPrisma } from '@patchpilot/database';
 import { createLogger } from '@patchpilot/logger';
 import { startTelemetry } from '@patchpilot/observability';
 
@@ -34,10 +34,15 @@ async function main(): Promise<void> {
     logger.info({ signal }, 'shutting down');
     const timer = setTimeout(() => {
       logger.error('shutdown timed out');
+      process.exit(1);
     }, config.shutdownTimeoutMs);
-    timer.unref();
-    await app.close();
-    await telemetry.shutdown();
+    try {
+      await app.close();
+      await disconnectPrisma();
+      await telemetry.shutdown();
+    } finally {
+      clearTimeout(timer);
+    }
   };
 
   process.once('SIGTERM', () => {
@@ -54,5 +59,5 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : 'Unknown startup error';
   process.stderr.write(`API failed to start: ${message}\n`);
-  process.exitCode = 1;
+  process.exit(1);
 });

@@ -67,15 +67,24 @@ describe('worker application', () => {
     expect(quitCount).toBe(1);
   });
 
-  it('surfaces initialization failure', async () => {
+  it('surfaces initialization failure and still allows shutdown to release redis', async () => {
+    let quitCount = 0;
     const worker = createWorkerApp({
       logger: silentLogger(),
       telemetry: { shutdown: async () => undefined },
-      redis: fakeRedis({ pingOk: false }),
+      redis: fakeRedis({
+        pingOk: false,
+        onQuit: () => {
+          quitCount += 1;
+        },
+      }),
       checkDatabaseReady: async () => ({ ok: true }),
       shutdownTimeoutMs: 100,
       readinessTimeoutMs: 50,
     });
     await expect(worker.start()).rejects.toThrow(/redis is not ready/);
+    expect(worker.isAcceptingWork()).toBe(false);
+    await worker.stop();
+    expect(quitCount).toBe(1);
   });
 });

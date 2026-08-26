@@ -26,6 +26,10 @@ export const nextConfig = [
               message: 'The web app must not import Prisma. Call apps/api instead.',
             },
             {
+              name: '@patchpilot/database',
+              message: 'The web app must not import Prisma persistence. Call apps/api instead.',
+            },
+            {
               name: 'fastify',
               message: 'The web app must not import the API framework.',
             },

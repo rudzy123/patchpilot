@@ -9,7 +9,7 @@ Copy [`.env.example`](../../.env.example) to `.env`. Example values are **develo
 | Variable | Purpose |
 | --- | --- |
 | `PATCHPILOT_DEPLOYMENT_ENVIRONMENT` | `development`, `test`, or `production`. This flag, not `NODE_ENV` alone, gates development adapters. |
-| `PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS` | Must be `false` in production. Pretty logs and placeholder credentials are development adapters. |
+| `PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS` | Must be `false` in production. Pretty logs, unauthenticated Redis, and placeholder credentials are development adapters. |
 | `LOG_LEVEL` | Pino level (`fatal` … `silent`). |
 | `LOG_PRETTY` | Pretty-print logs. Rejected when the deployment environment is `production`. |
 | `API_HOST` | Fastify bind address. Local default `127.0.0.1`. |
@@ -35,7 +35,7 @@ Copy [`.env.example`](../../.env.example) to `.env`. Example values are **develo
 
 | Variable | Purpose |
 | --- | --- |
-| `NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT` | Public environment label (`development`, `test`, or `production`). The app name is hardcoded as `PatchPilot`. |
+| `NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT` | Required public environment label (`development`, `test`, or `production`). `loadPublicConfigFrom` does not default it. Web `dev`/`build` scripts supply `development`/`production` only when the variable is unset, so a clean checkout can still build. |
 
 Do not add `DATABASE_URL`, Redis URLs, object-storage secrets, or API tokens to `NEXT_PUBLIC_*` files.
 
@@ -52,4 +52,4 @@ If you change these, also change `DATABASE_URL`, `REDIS_URL`, and `OBJECT_STORAG
 
 ## Production notes
 
-Production configuration must set `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`, `PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS=false`, `LOG_PRETTY=false`, operator-supplied credentials (not `patchpilot-dev`, `not-for-production`, `minioadmin`, `changeme`, or `password` fragments), and an exact CORS allowlist. Bind addresses and TLS are operator responsibilities.
+Production configuration must set `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`, `PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS=false`, `LOG_PRETTY=false`, operator-supplied credentials (not `patchpilot-dev`, `not-for-production`, `minioadmin`, `changeme`, or `password` fragments), a Redis URL that includes a password, and an exact CORS allowlist. Bind addresses and TLS are operator responsibilities.

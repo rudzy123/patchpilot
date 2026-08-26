@@ -14,6 +14,8 @@ const redactPaths = [
   'authorization',
   'cookie',
   'set-cookie',
+  'proxy-authorization',
+  'www-authenticate',
   'accessToken',
   'access_token',
   'refreshToken',
@@ -28,10 +30,14 @@ const redactPaths = [
   'signed_url',
   'headers.authorization',
   'headers.cookie',
+  'headers["proxy-authorization"]',
+  'headers["www-authenticate"]',
   'headers["set-cookie"]',
   'headers["set-cookie"][*]',
   'req.headers.authorization',
   'req.headers.cookie',
+  'req.headers["proxy-authorization"]',
+  'req.headers["www-authenticate"]',
   'req.headers["set-cookie"]',
   'res.headers["set-cookie"]',
   '*.authorization',
@@ -105,9 +111,12 @@ function serializeRequest(request: unknown): Record<string, unknown> {
   const record = request as Record<string, unknown>;
   const headers = sanitizeHeaders(record['headers']);
 
+  const rawUrl = record['url'];
+  const url = typeof rawUrl === 'string' ? rawUrl.split('?')[0] : rawUrl;
+
   return {
     method: record['method'],
-    url: record['url'],
+    url,
     headers,
   };
 }
@@ -122,11 +131,15 @@ function sanitizeHeaders(headers: unknown): Record<string, unknown> {
     const lower = key.toLowerCase();
     if (
       lower === 'authorization' ||
+      lower === 'proxy-authorization' ||
+      lower === 'www-authenticate' ||
       lower === 'cookie' ||
       lower === 'set-cookie' ||
       lower.includes('token') ||
       lower.includes('api-key') ||
-      lower.includes('apikey')
+      lower.includes('apikey') ||
+      lower.includes('secret') ||
+      lower.includes('signature')
     ) {
       sanitized[key] = '[Redacted]';
       continue;

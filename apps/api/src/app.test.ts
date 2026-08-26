@@ -1,7 +1,7 @@
 import { Writable } from 'node:stream';
 
 import { loadServerConfigFrom } from '@patchpilot/config';
-import { createFoundationTestEnv } from '@patchpilot/test-utils';
+import { createFoundationProductionTestEnv, createFoundationTestEnv } from '@patchpilot/test-utils';
 import { createLogger } from '@patchpilot/logger';
 import { describe, expect, it } from 'vitest';
 
@@ -50,7 +50,7 @@ describe('api application factory', () => {
     await app.close();
   });
 
-  it('reports ready when postgresql is healthy and not_ready when it is not', async () => {
+  it('reports ready when the database is healthy and not_ready when it is not', async () => {
     const logs = collectingLogger();
     const readyApp = await buildApi({
       config: testConfig(),
@@ -62,7 +62,7 @@ describe('api application factory', () => {
     expect(ready.statusCode).toBe(200);
     expect(ready.json()).toMatchObject({
       status: 'ready',
-      checks: [{ name: 'postgresql', status: 'up' }],
+      checks: [{ name: 'database', status: 'up' }],
     });
     expect(JSON.stringify(ready.json())).not.toContain('postgresql://');
     await readyApp.close();
@@ -77,7 +77,7 @@ describe('api application factory', () => {
     expect(down.statusCode).toBe(503);
     expect(down.json()).toMatchObject({
       status: 'not_ready',
-      checks: [{ name: 'postgresql', status: 'down' }],
+      checks: [{ name: 'database', status: 'down' }],
     });
     await downApp.close();
   });
@@ -136,6 +136,31 @@ describe('api application factory', () => {
     await app.close();
   });
 
+  it('does not log configuration values from internal errors in production', async () => {
+    const logs = collectingLogger();
+    const app = await buildApi({
+      config: loadServerConfigFrom(createFoundationProductionTestEnv()),
+      logger: logs.logger,
+      checkDatabaseReady: async () => {
+        throw new Error(
+          "Can't reach database server at postgresql://patchpilot:operator-secret@db.internal:5432/patchpilot",
+        );
+      },
+    });
+    const response = await app.inject({ method: 'GET', url: '/health/ready' });
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: 'internal',
+        message: 'An internal error occurred.',
+      },
+    });
+    expect(logs.output()).not.toContain('operator-secret');
+    expect(logs.output()).not.toContain('postgresql://');
+    expect(JSON.stringify(response.json())).not.toContain('operator-secret');
+    await app.close();
+  });
+
   it('redacts sensitive headers from logs', async () => {
     const logs = collectingLogger();
     const app = await buildApi({
@@ -149,10 +174,12 @@ describe('api application factory', () => {
       headers: {
         authorization: 'Bearer secret-token',
         cookie: 'session=secret',
+        'proxy-authorization': 'Basic proxy-secret',
       },
     });
     expect(logs.output()).not.toContain('secret-token');
     expect(logs.output()).not.toContain('session=secret');
+    expect(logs.output()).not.toContain('proxy-secret');
     expect(logs.output()).toContain('[Redacted]');
     await app.close();
   });

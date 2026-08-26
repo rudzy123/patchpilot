@@ -1,5 +1,5 @@
 import { loadServerConfig } from '@patchpilot/config';
-import { checkDatabaseReady } from '@patchpilot/database';
+import { checkDatabaseReady, disconnectPrisma } from '@patchpilot/database';
 import { createEmptyJobRegistry } from '@patchpilot/integrations';
 import { createLogger } from '@patchpilot/logger';
 import { startTelemetry } from '@patchpilot/observability';
@@ -34,7 +34,16 @@ async function main(): Promise<void> {
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'worker shutting down');
-    await worker.stop();
+    const timer = setTimeout(() => {
+      logger.error('worker shutdown timed out');
+      process.exit(1);
+    }, config.shutdownTimeoutMs);
+    try {
+      await worker.stop();
+      await disconnectPrisma();
+    } finally {
+      clearTimeout(timer);
+    }
   };
 
   process.once('SIGTERM', () => {
@@ -44,11 +53,16 @@ async function main(): Promise<void> {
     void shutdown('SIGINT');
   });
 
-  await worker.start();
+  try {
+    await worker.start();
+  } catch (error: unknown) {
+    await shutdown('startup-failure');
+    throw error;
+  }
 }
 
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : 'Unknown startup error';
   process.stderr.write(`Worker failed to start: ${message}\n`);
-  process.exitCode = 1;
+  process.exit(1);
 });

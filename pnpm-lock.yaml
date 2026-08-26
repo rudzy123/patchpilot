@@ -62,9 +62,6 @@ importers:
       '@patchpilot/database':
         specifier: workspace:*
         version: link:../../packages/database
-      '@patchpilot/domain':
-        specifier: workspace:*
-        version: link:../../packages/domain
       '@patchpilot/logger':
         specifier: workspace:*
         version: link:../../packages/logger
@@ -360,6 +357,9 @@ importers:
       pino:
         specifier: ^10.3.1
         version: 10.3.1
+      pino-pretty:
+        specifier: ^13.1.3
+        version: 13.1.3
     devDependencies:
       '@patchpilot/eslint-config':
         specifier: workspace:*
@@ -373,9 +373,6 @@ importers:
       eslint:
         specifier: ^9.39.1
         version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
-      pino-pretty:
-        specifier: ^13.1.3
-        version: 13.1.3
       typescript:
         specifier: ~5.9.3
         version: 5.9.3

@@ -106,7 +106,12 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
         requestId: request.requestId,
         correlationId: request.correlationId,
         statusCode,
-        err: { type: errorName(error), message: errorMessage(error) },
+        err: {
+          type: errorName(error),
+          ...(dependencies.config.deploymentEnvironment === 'production'
+            ? {}
+            : { message: errorMessage(error) }),
+        },
       },
       'request failed',
     );
@@ -138,7 +143,7 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       service: 'api' as const,
       timestamp: now(),
       version: '0.0.0',
-      checks: [{ name: 'postgresql', status: database.ok ? ('up' as const) : ('down' as const) }],
+      checks: [{ name: 'database', status: database.ok ? ('up' as const) : ('down' as const) }],
     };
     const parsed = healthReadyResponseSchema.parse(payload);
     if (parsed.status === 'not_ready') {
@@ -156,7 +161,7 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       {
         req: {
           method: request.method,
-          url: request.url,
+          url: request.routeOptions.url ?? request.url.split('?')[0],
           headers: request.headers,
         },
       },

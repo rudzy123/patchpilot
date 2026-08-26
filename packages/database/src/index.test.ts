@@ -19,6 +19,14 @@ describe('prisma client lifecycle', () => {
     expect(first).toBe(second);
   });
 
+  it('rejects a second initialization with a different database URL', () => {
+    resetPrismaClientForTests();
+    getPrismaClient({ databaseUrl: 'postgresql://patchpilot:one@127.0.0.1:1/patchpilot' });
+    expect(() =>
+      getPrismaClient({ databaseUrl: 'postgresql://patchpilot:two@127.0.0.1:1/patchpilot' }),
+    ).toThrow(/different database URL/);
+  });
+
   it('reports not ready when PostgreSQL is unavailable without leaking connection strings', async () => {
     resetPrismaClientForTests();
     const result = await checkDatabaseReady(200, {

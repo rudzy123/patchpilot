@@ -67,7 +67,7 @@ nvm use        # or install Node 24 another way
 | `pnpm test:integration` | Compose-backed PostgreSQL, Redis, and MinIO checks |
 | `pnpm build` | Production build of packages and apps |
 | `pnpm infrastructure:up` | Start local PostgreSQL, Redis, MinIO |
-| `pnpm infrastructure:down` | Stop Compose services |
+| `pnpm infrastructure:down` | Stop Compose services. Named volumes persist; this is not a data reset |
 | `pnpm infrastructure:logs` | Follow Compose logs |
 | `pnpm db:validate` | Prisma schema validate |
 | `pnpm db:generate` | Generate Prisma Client |

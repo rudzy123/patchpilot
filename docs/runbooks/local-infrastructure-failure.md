@@ -8,7 +8,7 @@ Compose file: `deploy/compose/compose.yaml`. Apps are not in Compose; start them
 
 - `pnpm infrastructure:up` exits non-zero or hangs on `--wait`.
 - `pnpm test:integration` fails with connection errors.
-- API `/health/ready` returns `503` with `postgresql` `down`.
+- API `/health/ready` returns `503` with check name `database` `down`.
 - Worker prints that PostgreSQL or Redis is not ready.
 - MinIO console or API port refuses connections.
 

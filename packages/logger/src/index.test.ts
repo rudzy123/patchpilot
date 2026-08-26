@@ -42,6 +42,9 @@ describe('logger redaction', () => {
             authorization: 'Bearer super-secret-access-token',
             cookie: 'session=secret-session-cookie',
             'set-cookie': 'session=secret-session-cookie',
+            'proxy-authorization': 'Basic proxy-secret',
+            'x-storage-secret': 'header-secret-value',
+            'x-amz-signature': 'signed-query-secret',
             'x-request-id': 'req-1',
           },
           body: { shouldNotAppearIfSerialized: true },
@@ -60,6 +63,9 @@ describe('logger redaction', () => {
     expect(output).toContain('[Redacted]');
     expect(output).not.toContain('Bearer super-secret-access-token');
     expect(output).not.toContain('secret-session-cookie');
+    expect(output).not.toContain('proxy-secret');
+    expect(output).not.toContain('header-secret-value');
+    expect(output).not.toContain('signed-query-secret');
     expect(output).not.toContain('access-token-value');
     expect(output).not.toContain('refresh-token-value');
     expect(output).not.toContain('api-key-value');
