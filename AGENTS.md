@@ -17,7 +17,7 @@ Do not treat product, styling, or convenience guidance as permission to bypass d
 
 ## Current repository state
 
-Application packages, manifests, and runtime code are not scaffolded yet. The layout below is the **target** modular monolith. Do not invent a different topology without an accepted ADR.
+Application packages, manifests, and runtime code are not scaffolded yet. v0.1 architecture, security design, and operational runbooks exist under `docs/architecture/`, `docs/security/`, and `docs/runbooks/`. ADRs 0001–0018 are **Accepted**. The layout below is the **target** modular monolith. Do not invent a different topology without an accepted ADR.
 
 ## Target repository layout
 
@@ -63,7 +63,11 @@ Begin as a modular monolith with separately deployable `web`, `api`, and `worker
 | Users and language | [docs/product/target-users.md](docs/product/target-users.md), [docs/product/glossary.md](docs/product/glossary.md) |
 | Definition of done | [docs/development/definition-of-done.md](docs/development/definition-of-done.md) |
 | Git, reviews, releases | [docs/development/branching-strategy.md](docs/development/branching-strategy.md), [docs/development/commit-guidelines.md](docs/development/commit-guidelines.md), [docs/development/review-checklist.md](docs/development/review-checklist.md), [docs/development/release-principles.md](docs/development/release-principles.md) |
+| Architecture | [docs/architecture/README.md](docs/architecture/README.md) |
+| Security design | [docs/security/README.md](docs/security/README.md) |
+| Operational runbooks | [docs/runbooks/README.md](docs/runbooks/README.md) |
 | Architecture decisions | [docs/adr/README.md](docs/adr/README.md) |
+| Open architecture decisions | [docs/architecture/open-decisions.md](docs/architecture/open-decisions.md) |
 | Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Vulnerability disclosure | [SECURITY.md](SECURITY.md) |
 | Conduct | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |

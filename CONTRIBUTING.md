@@ -10,7 +10,7 @@ Start with [AGENTS.md](AGENTS.md). It is the navigation document for both humans
 
 1. Read [AGENTS.md](AGENTS.md) and the applicable files under [`.cursor/rules/`](.cursor/rules/).
 2. Read the product scope: [vision](docs/product/vision.md), [MVP](docs/product/mvp-scope.md), and [non-goals](docs/product/non-goals.md).
-3. Check whether an [ADR](docs/adr/README.md) is required.
+3. Check whether an [ADR](docs/adr/README.md) is required. Architecture and security design live in [docs/architecture](docs/architecture/README.md) and [docs/security](docs/security/README.md).
 4. Search existing issues and pull requests before duplicating work.
 
 Application packages are not scaffolded yet. Do not add product functionality, application manifests, or dependencies unless a task explicitly asks for them.
