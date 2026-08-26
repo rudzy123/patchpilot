@@ -1,6 +1,6 @@
 # ADR 0008: Private object storage for original SBOM evidence
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-26
 - Deciders: PatchPilot maintainers
 - Supersedes: none

@@ -1,6 +1,6 @@
 # ADR 0013: Organization-scoped multi-tenancy
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-26
 - Deciders: PatchPilot maintainers
 - Supersedes: none

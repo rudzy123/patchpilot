@@ -54,13 +54,61 @@ If the diagram is not rendered, the sections below define each entity and its re
 
 **Component** identities derived from tenant SBOMs are **tenant-owned**. Private package names must not land in a global component catalog.
 
+## Record classification
+
+Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitive, **E** evidentiary, **M** mutable in place (status/metadata), **A** append-only (new rows, no in-place rewrite of history), **R** retention-controlled.
+
+| Entity | G | T | S | E | M | A | R | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Organization | | yes | yes | | yes | | yes | Tenant boundary |
+| User | instance | | yes | | yes | | | Not a tenant table; listed only via membership |
+| Membership | | yes | yes | | revoke only | | yes | Revoke, do not hard-delete |
+| Team | | yes | | | yes | | yes | Not an authz substitute |
+| Asset | | yes | | | yes | | yes | See [asset-model](asset-model.md) |
+| AssetOwner | | yes | | | yes | | | Operational, not authorization |
+| Environment | | yes | | | yes | | | `sensitivityClass` is stored data |
+| RepositoryConnection | | yes | yes | | yes | | | v0.1 `not_configured` only |
+| SBOM | | yes | yes | yes | metadata | original bytes immutable | yes | Original object never replaced |
+| SBOMIngestion | | yes | | yes | state machine | | yes | Reprocess = new row |
+| Component | | yes | | | | | yes | Tenant package identity |
+| ComponentOccurrence | | yes | | yes | no | yes | yes | Per SBOM |
+| DependencyRelationship | | yes | | yes | no | yes | yes | Observed edge |
+| Vulnerability | yes | | | | withdrawn flag additive | additive | | Shared identity |
+| VulnerabilitySourceRecord | yes | | | yes | no | yes | yes | Never silent overwrite |
+| Finding | | yes | | | state | | yes | Current calc pointer may move |
+| FindingObservation | | yes | | yes | no | yes | yes | Per SBOM compare |
+| RiskPolicy (builtin) | yes | | | | no after publish | versioned | | Immutable published definition |
+| RiskPolicy (org override) | | yes | | | no after publish | versioned | yes | |
+| RiskCalculation | | yes | | yes | no | yes | yes | History never overwritten |
+| RemediationTask | | yes | | | until terminal | | yes | Completion ≠ resolved |
+| RiskAcceptance | | yes | yes | yes | state only | amendments = new row | yes | Expiration required |
+| Evidence | | yes | yes | yes | no | yes | yes | |
+| AuditEvent | system or T | tenant when org set | yes | yes | **no** | yes | keep in v0.1 | |
+| Integration | system or T | tenant when org set | yes | | yes | | | |
+| ExternalCredential | | yes | yes | | state | versions | yes | Ciphertext Restricted |
+| OutboxEvent | | tenant work | | | publishedAt | | | Payload = ids |
+| BackgroundJob | | tenant work | | | state | | | |
+
+## Distinctions (do not collapse)
+
+| Pair | Distinction |
+| --- | --- |
+| **Component** vs **ComponentOccurrence** | Identity vs this package **version** listed in **this** SBOM |
+| **Vulnerability** vs **Finding** | Shared intel vs tenant+asset observation of it |
+| **VulnerabilitySourceRecord** vs **Vulnerability** | One retrieved payload vs normalized identity |
+| Vulnerability **severity** vs **priority** | Source fact vs calculated ranking |
+| **Finding** vs **FindingObservation** | Stable identity vs per-SBOM presence/absence/inconclusive |
+| **RemediationTask** vs **RiskAcceptance** | Work tracking vs time-boxed acceptance of residual risk |
+| **Asset** vs **SBOM** | Inventoried system vs one evidence document |
+| Current **RiskCalculation** vs history | `currentRiskCalculationId` vs append-only prior rows |
+
 ## Lifecycle index (canonical states)
 
 | Entity | States | Detail |
 | --- | --- | --- |
 | Asset | `active`, `archived` | [asset-model.md](asset-model.md) |
 | SBOMIngestion | `accepted`, `queued`, `processing`, `completed`, `rejected`, `quarantined`, `failed`, `duplicate` | [sbom-ingestion.md](sbom-ingestion.md) |
-| Finding | `open`, `in_remediation`, `risk_accepted`, `resolved`, `inconclusive` | [finding-lifecycle.md](finding-lifecycle.md) |
+| Finding | `open`, `verification_pending`, `risk_accepted`, `mitigated`, `false_positive`, `resolved`, `inconclusive` | [finding-lifecycle.md](finding-lifecycle.md) |
 | RemediationTask | `open`, `assigned`, `in_progress`, `blocked`, `completed`, `cancelled` | [remediation-lifecycle.md](remediation-lifecycle.md) |
 | RiskAcceptance | `active`, `expired`, `revoked`, `superseded` | [remediation-lifecycle.md](remediation-lifecycle.md) |
 | BackgroundJob | `pending`, `queued`, `running`, `succeeded`, `failed`, `dead_lettered`, `cancelled` | [reliability-model.md](reliability-model.md) |
@@ -128,9 +176,30 @@ Team membership can be modeled as a join table in persistence without a separate
 
 ## Asset
 
-A software system the organization tracks and that can receive SBOM uploads. Detail: [asset-model.md](asset-model.md).
+A software system the organization tracks and that can receive SBOM uploads. Detail and vocabularies: [asset-model.md](asset-model.md).
 
-Lifecycle: `active` ↔ `archived` (see transitions in asset-model). Creation enters `active`. No hard delete in v0.1.
+Lifecycle: `active` ↔ `archived`. Creation enters `active`. No hard delete in v0.1.
+
+| Field (logical) | Notes |
+| --- | --- |
+| `id` | UUID |
+| `organizationId` | Tenant scope |
+| `name` | Required |
+| `description` | Optional untrusted text |
+| `assetType` | Controlled vocabulary |
+| `environmentId` | Optional FK |
+| `businessCriticality` | Controlled vocabulary |
+| `internetExposure` | Controlled vocabulary |
+| `dataClassification` | Controlled vocabulary (asset's *data*, not PatchPilot's class of the row) |
+| `lifecycleStatus` | `active` or `archived` |
+| `repositoryUrl` | Optional untrusted URL; **not fetched** in v0.1 |
+| `deploymentContext` | Optional untrusted text |
+| `externalIdentifiers` | Optional map of vendor keys |
+| `tags` | Optional short labels; length-capped |
+| `lastObservedAt` | UTC of last **completed** ingestion |
+| `lastSuccessfulSbomIngestionId` | Optional FK |
+
+Context changes (environment, criticality, exposure, classification) emit audit events and enqueue **RiskCalculation** with `calculationReason: asset_change`. History is not erased.
 
 ## AssetOwner
 

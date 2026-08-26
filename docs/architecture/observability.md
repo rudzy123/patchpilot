@@ -15,6 +15,8 @@ PatchPilot v0.1 uses **OpenTelemetry** for traces and metrics ([ADR 0016](../adr
 | `requestId` | API on each HTTP request | Logs, traces, outbox payload, jobs |
 | `correlationId` | Same as requestId or worker-generated for scheduled jobs | Same |
 | `jobId` | Background job | Logs, traces, audit `correlationId` when the actor is system |
+| `ingestionId` | SBOM ingestion | Logs, traces |
+| `providerSyncId` | Intel refresh job | Logs, traces |
 | `organizationId` | From authorized context only | Logs as UUID, never with SBOM bodies |
 | `traceId` / `spanId` | OpenTelemetry | Exporters the operator configures |
 
@@ -23,7 +25,7 @@ Do not put raw authorization headers in trace attributes.
 ## Logs
 
 - JSON logs via `packages/logger`.
-- Redact: authorization headers, cookies, API tokens, GitHub tokens, raw SBOMs, private source code, plaintext credentials, complete vulnerability-feed payloads.
+- Redact: authorization headers, cookies, API tokens, GitHub tokens and installation tokens, raw SBOMs, private source code, private repository content, plaintext credentials, complete vulnerability-feed payloads, object-storage **signed URLs**.
 - Component names may appear as **truncated** untrusted strings in debug logs only when needed; prefer ids and hashes (`sha256` prefix).
 - Log finding **priority** as a number plus policy version, not as "exploitable."
 
@@ -53,6 +55,21 @@ Sampling is operator-configured. Default local: always on. Production default: p
 - API readiness: PostgreSQL ping.
 - Worker readiness: PostgreSQL + Redis ping.
 - Do not expose config secrets or dump queues on public health routes.
+
+## Alert categories (proposals)
+
+`ingestion_quarantine`, `job_dead_letter`, `queue_lag`, `intel_stale`, `authz_deny_spike`, `upload_reject_spike`. Alerts must not include Restricted bodies.
+
+## SLO proposals (not contractual)
+
+Initial recommendations pending production measurement:
+
+| SLO | Proposal |
+| --- | --- |
+| API availability (non-upload) | 99% monthly, operator-hosted |
+| Upload accept (authz + store + outbox) p95 | 5 seconds excluding worker parse |
+| Ingestion complete p95 for SBOMs under 5 MiB / <1k components | 15 minutes excluding feed outage |
+| Intel snapshot freshness | See staleness thresholds (configurable) |
 
 ## What not to export
 

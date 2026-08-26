@@ -13,20 +13,24 @@ SBOMs are untrusted. Do not execute content. Do not fetch `externalReferences`, 
 
 ## Default limits
 
-Values are operator-overridable through `packages/config`. Defaults are conservative for a self-hosted MVP. Changing a default in a release is a documented behavior change.
+**All numeric limits below are configurable initial recommendations.** They require performance validation on representative SBOMs before they are treated as production defaults. Operators override them through `packages/config`. Changing a default in a release is a documented behavior change.
 
-| Limit | Default | On violation |
+| Limit | Initial recommendation | On violation |
 | --- | --- | --- |
 | Upload size (Content-Length and counted bytes) | 20 MiB | Reject before store; HTTP 413 / validation error |
 | Content-Type allowlist | `application/json`, `application/vnd.cyclonedx+json` | Reject; no store |
 | Charset | UTF-8 only | Reject |
 | JSON parse byte cap | 20 MiB (same as upload) | Reject |
-| Max JSON object/array nesting depth | 32 | `rejected` (sync if detected in pre-check, else during processing) |
+| Max JSON object/array nesting depth | 32 | `rejected` |
 | Max string length per JSON string | 64 KiB | `rejected` |
+| Max identifier length (purl, bom-ref, name) | 2 KiB | `rejected` |
 | CycloneDX `specVersion` allowlist | `1.4`, `1.5`, `1.6` | `rejected` |
 | Max components | 10,000 | `rejected` |
 | Max dependency edges | 50,000 | `rejected` |
-| Max bom-ref uniqueness violations | Duplicate `bom-ref` in one document | `rejected` |
+| Duplicate `bom-ref` in one document | not allowed | `rejected` |
+| Parse CPU/time budget | 60 s (configurable) | `quarantined` |
+
+Explicitly **rejected** media: `application/pdf`, `application/zip`, `application/gzip`, `application/x-tar`, `application/xml`, `text/xml`, SPDX types, CycloneDX XML. Do not sniff PDF `%PDF` or zip magic as a substitute for allowlisting JSON — still reject if magic matches those families after a bounded prefix check.
 
 Archives (zip, tar, gzip-wrapped JSON) are **not** accepted. SPDX is **not** accepted. XML CycloneDX is **not** accepted.
 
@@ -86,7 +90,47 @@ After `accepted`, the relay publishes `sbom.ingest`. The worker:
 5. Persists derived graph.
 6. Correlates, enriches, scores (see [data flow](data-flow.md)).
 
+## Pipeline (text is canonical)
+
+Upload initiated → authorization checked → upload limit enforced → evidence hashed (SHA-256) → evidence privately stored → ingestion record created → outbox event written → worker claims job **with a lease** → CycloneDX document validated → components normalized → dependency graph created → vulnerabilities correlated → findings created or observed → risk calculated → ingestion completed.
+
+```mermaid
+sequenceDiagram
+  actor User
+  participant API as apps/api
+  participant OS as Object storage
+  participant PG as PostgreSQL
+  participant Relay as Outbox relay
+  participant W as apps/worker
+  User->>API: POST CycloneDX JSON plus Idempotency-Key
+  API->>API: Authz, content-type, size, hash
+  API->>OS: Put original bytes
+  API->>PG: SBOM, ingestion accepted, outbox, audit
+  Relay->>W: Publish job
+  W->>PG: Claim lease, reload org
+  W->>OS: Get copy
+  W->>PG: Validate, graph, correlate, score
+```
+
+If the diagram is not rendered, the sentence above is complete.
+
 HTTP upload does not wait for correlation.
+
+Duplicate **components** (same bom-ref): reject. Duplicate identity (same purl+version) in one SBOM: persist one **ComponentOccurrence** and record a parse warning; do not explode rows.
+
+## Processing leases
+
+When a worker moves ingestion to `processing`, it writes `leaseOwner`, `leaseExpiresAt` (initial recommendation: 15 minutes, configurable, must be validated under load). Heartbeats extend the lease. On expiry, another worker may claim. Handlers are idempotent so overlapping claims must not duplicate findings. Lease theft (forged owner) is mitigated by treating lease fields as worker-internal, not client-supplied.
+
+## Transaction and rollback
+
+- Object storage put is **outside** the DB transaction. Failure before put: no row. Failure after put, before commit: orphan (cleanup job).
+- DB transaction: SBOM + ingestion + outbox + audit. Rollback drops those rows only; it does not delete the object (orphan path).
+- Worker graph persist: transactional for derived rows; on rollback the ingestion returns to `queued` or stays `processing` for retry. Completed correlation must not leave a second org mutated.
+
+## Observability
+
+Emit `ingestionId`, `jobId`, `organizationId` (UUID), `stage`, `state`, duration, reject reason **codes**. Never raw SBOMs. See [observability](observability.md) and [sbom-ingestion-failure](../runbooks/sbom-ingestion-failure.md).
 
 ## Lifecycle states
 
@@ -141,7 +185,7 @@ Poison jobs go to the dead-letter path. The original object remains for forensic
 | Over limits | No | `rejected` |
 | Poison | No automatic | `quarantined` |
 
-Default: five attempts for transient errors, then `failed` / job `dead_lettered`. See [reliability](reliability-model.md).
+Default: five attempts for transient errors, then `failed` / job `dead_lettered`. Backoff is exponential **with jitter**. See [reliability](reliability-model.md). Attempt count is a configurable proposal pending validation.
 
 ## Terminal failure
 

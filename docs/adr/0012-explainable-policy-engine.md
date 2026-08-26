@@ -1,6 +1,6 @@
 # ADR 0012: Explainable versioned policy engine
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-26
 - Deciders: PatchPilot maintainers
 - Supersedes: none

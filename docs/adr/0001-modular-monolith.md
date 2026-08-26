@@ -1,6 +1,6 @@
 # ADR 0001: Modular monolith with separate web, API, and worker deployments
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-26
 - Deciders: PatchPilot maintainers
 - Supersedes: none

@@ -105,6 +105,28 @@ Do not include exploit payloads. Minimal fixtures only.
 
 System jobs (OSV refresh) have null organization and must not write tenant findings except via a subsequent tenant-scoped outbox event per affected org/finding.
 
+## How cache keys include organization context
+
+Any cache (HTTP response cache, Redis cache if added later) for tenant-owned data **must** include `organizationId` in the key. Global intel cache keys must **not** include tenant ids and must not store tenant component names.
+
+Forbidden: `finding:{findingId}` without org. Required: `org:{organizationId}:finding:{findingId}` or no cache.
+
+## PostgreSQL row-level security (future)
+
+Application-level organization scoping is the v0.1 strategy. **Row-Level Security (RLS)** is a future defense-in-depth option. It is **not** an MVP requirement: session GUCs are easy to get wrong in connection pools, and RLS does not replace use-case authorization. Revisit with an ADR if pool-safe session variables and a compelling residual-risk argument exist.
+
+## How logs and metrics avoid disclosure
+
+Log organization and resource **UUIDs**, counts, and hashes — not raw SBOMs, package lists, or export bodies. Metric labels: event type and state, not tenant name or package name. See [observability](observability.md).
+
+## How support and administrative access is controlled
+
+No application API lists all organizations' Restricted data. Instance operators use infrastructure access (see [OD-10](open-decisions.md)). Support must not request a "break-glass org switcher." Incidents: [tenant-isolation-incident.md](../runbooks/tenant-isolation-incident.md).
+
+## Tenant deletion vs evidentiary retention
+
+v0.1 has no self-service hard delete of an organization. Archive hides writes. Purge, if ever added, must not cascade-delete audit or original SBOMs without the [retention](retention-and-deletion.md) job and new audit events. Application-level scoping remains required even if RLS is added later.
+
 ## How administrative operations are separated
 
 | Plane | Examples | Data scope |

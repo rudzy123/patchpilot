@@ -96,6 +96,37 @@ Dead-lettered jobs retain payload **ids** only (no raw SBOM). Operators replay a
 
 If persist_graph succeeds and correlate fails transiently, resume from stage `correlate` without deleting components. Do not leave a second organization's data mutated.
 
+## Delivery semantics
+
+Delivery is **at-least-once**. PatchPilot does **not** claim exactly-once processing. Idempotent consumers + org-scoped `dedupeKey` values make duplicates safe.
+
+## Job leases
+
+`running` jobs hold a lease (`leaseExpiresAt`). Initial recommendation: 15 minutes, configurable, validate under load. Heartbeat while working. On expiry another worker may start (**lease theft** if clocks skew: still safe if idempotent). Workers must not accept a client-supplied lease owner.
+
+## Retry
+
+Exponential backoff **with jitter**. Classify retryable vs not (see table above). Circuit-breaking: after consecutive feed failures, system **Integration** → `degraded`; stop hammering; probe on a slow timer.
+
+## Timeouts and shutdown
+
+Outbound HTTP and storage calls have timeouts (intel defaults in [vulnerability-intelligence.md](vulnerability-intelligence.md)). Graceful shutdown: stop leasing new jobs, finish or return the current lease, then exit. Forced kill relies on lease expiry.
+
+## Orphans and reconciliation
+
+Orphan object cleanup after grace period. Reconciliation jobs: unpublished outbox, stale `running`, intel cursor stuck. Runbooks: [docs/runbooks/](../runbooks/README.md).
+
+## Backup, RPO, RTO (proposals)
+
+These are **initial operational proposals**, not guarantees or contractual SLOs.
+
+| Objective | Initial proposal | Notes |
+| --- | --- | --- |
+| RPO | ≤ 24 hours for PostgreSQL + object storage together | Operator-controlled backups ([OD-13](open-decisions.md)) |
+| RTO | ≤ 8 hours to restore API/worker to accept uploads | Depends on operator runbooks |
+
+Restore both stores together. Degraded mode during provider outages: last intel snapshots, freshness visible, no fake "all clear."
+
 ## Related documents
 
 - [SBOM ingestion](sbom-ingestion.md)

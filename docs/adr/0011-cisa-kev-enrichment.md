@@ -1,6 +1,6 @@
 # ADR 0011: CISA KEV enrichment
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-26
 - Deciders: PatchPilot maintainers
 - Supersedes: none

@@ -1,6 +1,6 @@
 # ADR 0010: OSV as the initial vulnerability correlation source
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-26
 - Deciders: PatchPilot maintainers
 - Supersedes: none

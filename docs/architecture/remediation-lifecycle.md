@@ -49,45 +49,56 @@ stateDiagram-v2
 
 Each transition emits **AuditEvent** `remediation_task.transition` (or more specific names listed in [audit-model.md](audit-model.md)).
 
-Finding state coupling: if any task is `assigned`, `in_progress`, or `blocked`, finding may be `in_remediation` unless `risk_accepted` takes display precedence as defined in finding lifecycle (`risk_accepted` can coexist with tasks).
+Finding coupling: assignment lives on the **RemediationTask**. Completing a task moves the finding to `verification_pending` per [finding lifecycle](finding-lifecycle.md). `risk_accepted`, `mitigated`, and `false_positive` can coexist with tasks; UI shows both.
 
 ## RiskAcceptance
 
-Explicit, auditable decision to accept a finding for a defined reason and period.
+Explicit, auditable decision to accept residual risk on a **finding** (MVP scope is finding-level, not blanket asset-level). It never marks the **vulnerability** or finding as **resolved** / fixed.
 
 ### States
 
 `active`, `expired`, `revoked`, `superseded`.
 
+There is **no** permanent acceptance in v0.1.
+
 ### Allowed transitions
 
 | From | To | Trigger |
 | --- | --- | --- |
-| (create) | `active` | `admin` or `owner`; reason, `expiresAt` (UTC) required |
+| (create as request) | `active` | `admin` or `owner` **approves**; `expiresAt` required |
 | `active` | `expired` | Time passed `expiresAt` (system job, idempotent) |
 | `active` | `revoked` | `admin` or `owner` |
 | `active` | `superseded` | New acceptance created for the same finding |
 
-Amendments do not edit reason in place. A new row is inserted; the previous becomes `superseded`.
+A `member` may **request** (requester). Only `admin` or `owner` may **approve** (approver must be a different user when more than one eligible actor exists; solo-owner orgs may approve their own request — record that fact). Amendments do not edit reason in place. A new row is inserted; the previous becomes `superseded`.
 
 ### Required fields
 
-- Finding id, organization id, actor user id
-- Reason (text; untrusted; stored and escaped)
-- Period (`validFrom`, `expiresAt`)
-- Optional compensating-control **Evidence** ids (claims, not automatic score override)
+| Field | Rule |
+| --- | --- |
+| Finding, organization | Authorized org; finding not used to "fix" intel |
+| Requester user id | Membership in org |
+| Approver user id | `admin` or `owner` |
+| Reason | Required untrusted text |
+| Compensating-control evidence ids | Optional claims |
+| `validFrom` / `expiresAt` | Required UTC; `expiresAt` > `validFrom` |
+| `reviewAt` | Optional; default proposal: 7 days before expiry (configurable) |
+| Supporting **Evidence** | Optional |
+| Status | Lifecycle above |
+
+Maximum duration is a **configurable initial recommendation**: 365 days. Operators may lower it. The product must reject missing `expiresAt`.
 
 ### Expiry job
 
-A scheduled job loads acceptances with `expiresAt <= now` and `state = active`, transitions to `expired`, writes audit events, and updates finding state per [finding lifecycle](finding-lifecycle.md). Idempotent on acceptance id.
+A scheduled job loads acceptances with `expiresAt <= now` and `state = active`, transitions to `expired`, writes audit, and updates finding state per [finding lifecycle](finding-lifecycle.md) (typically back to `open` if still `present`). Idempotent on acceptance id. Expired acceptances trigger review (finding visible in the default queue again) — they do not auto-`resolved`.
 
 ## Compensating controls
 
-Stored as **Evidence** `compensating_control` plus audit. Default policy does not auto-change **priority**. Reviewers see the claim and the still-observed component.
+Stored as **Evidence** `compensating_control` plus audit. Finding may move to `mitigated` (still observed). Default policy does not auto-change **priority** unless a published factor catalog includes a named, schema-checked control. Reviewers see the claim and the still-observed component separately from `resolved`.
 
 ## Re-scan after remediation
 
-Operators upload a newer SBOM. Compare rules in finding lifecycle decide `present` / `absent` / `inconclusive`. Task `completed` plus `absent` is the evidence-preserving story: work was recorded **and** the component was not observed later.
+Operators upload a newer SBOM. Compare rules in [finding lifecycle](finding-lifecycle.md) decide `present` / `absent` / `inconclusive` and whether coverage is adequate. Task `completed` plus observation `absent` (or out-of-range) is the evidence-preserving story. Absence from an incomplete SBOM is not proof.
 
 ## Exports
 

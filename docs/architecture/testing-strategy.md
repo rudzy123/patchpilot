@@ -16,6 +16,29 @@ This strategy is for v0.1 architecture. It does not claim a CI pipeline already 
 | Worker | Replay twice = one effect; org mismatch dead-letters | Trust payload org |
 | Playwright | MVP journey happy path + empty/error/forbidden | Substitute for unit tests of scoring or tenancy |
 
+## Test types (v0.1 plan)
+
+| Type | Role |
+| --- | --- |
+| Unit | Domain, policy-engine, redaction, matching adapters with fixtures |
+| Domain state-machine | Finding, ingestion, task, acceptance, job, integration, credential |
+| Property-based | Policy determinism; idempotent replay; org predicate always present |
+| Repository integration | PostgreSQL constraints, org unique keys, no evidence cascade-delete |
+| Redis/worker | Lease expiry, retry, DLQ, replay |
+| Object-storage adapter | Org-prefixed keys; private ACL assumptions |
+| Contract | OpenAPI vs handler Zod |
+| Provider-adapter fixtures | OSV/KEV JSON fixtures; **no live OSV/KEV in normal CI** |
+| API authorization | CSRF, session, role matrix |
+| Cross-tenant security | Required |
+| Playwright | MVP journey |
+| Performance | Limit tests; not a pass/fail gate until baselines exist |
+| Parser fuzzing / malicious-input | Depth, prototype keys, huge strings — no exploit write-ups |
+| Resilience | Feed 5xx, Redis down, storage 503 |
+| Backup restoration | Operator procedure test when compose exists |
+| Migration | Apply from empty |
+| Architecture-boundary | Domain must not import Prisma/Fastify |
+| Log-redaction | Token-like strings |
+
 ## Determinism
 
 - No arbitrary sleeps. Wait on conditions, events, or fake timers.

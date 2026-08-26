@@ -1,6 +1,6 @@
 # ADR 0004: Fastify API
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-26
 - Deciders: PatchPilot maintainers
 - Supersedes: none

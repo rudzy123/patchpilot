@@ -2,7 +2,7 @@
 
 This directory is the v0.1 architecture design for PatchPilot. Application packages are not scaffolded yet. These documents are the intended shape of the modular monolith; they do not claim that runtime code exists.
 
-Decisions in this directory assume the Architecture Decision Records under [docs/adr/](../adr/README.md). Those ADRs are **Proposed** until a maintainer accepts them.
+Decisions in this directory follow the Architecture Decision Records under [docs/adr/](../adr/README.md). ADRs 0001–0018 are **Accepted** for v0.1. Remaining gaps are listed in [open-decisions.md](open-decisions.md).
 
 ## How to read this set
 
@@ -14,6 +14,7 @@ Decisions in this directory assume the Architecture Decision Records under [docs
 6. [Trust boundaries](trust-boundaries.md) and [tenant isolation](tenant-isolation.md) — authorization and organization scope.
 7. Capability designs: [assets](asset-model.md), [SBOM ingestion](sbom-ingestion.md), [vulnerability intelligence](vulnerability-intelligence.md), [findings](finding-lifecycle.md), [risk policy](risk-policy.md), [remediation](remediation-lifecycle.md), [audit](audit-model.md).
 8. Operations: [reliability](reliability-model.md), [observability](observability.md), [deployment](deployment-model.md), [testing](testing-strategy.md), [data classification](data-classification.md), [retention](retention-and-deletion.md).
+9. Runbooks: [docs/runbooks/](../runbooks/README.md).
 
 Security design lives in [docs/security/](../security/README.md). Product language lives in the [glossary](../product/glossary.md). Scope limits live in [MVP scope](../product/mvp-scope.md) and [non-goals](../product/non-goals.md).
 

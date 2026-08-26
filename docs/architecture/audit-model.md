@@ -23,15 +23,25 @@ Application roles cannot "correct" an audit row. Corrections are new events.
 
 | Field (logical) | Notes |
 | --- | --- |
-| `id` | UUID |
+| `id` | UUID (event id) |
 | `organizationId` | Required for tenant operations; null only for system catalog events |
 | `actorUserId` | Null for system jobs; then `actorType = system` |
 | `actorType` | `user`, `system`, `instance_operator` |
 | `action` | Stable dotted name |
-| `subjectType` / `subjectId` | |
+| `subjectType` / `subjectId` | Target type / target id |
 | `correlationId` | Request or job id |
-| `createdAt` | UTC, set once |
-| `payload` | Redacted structured metadata: ids, hashes, policy version, states. **No** raw SBOMs, tokens, passwords, or full feed payloads |
+| `createdAt` | Server UTC, set once |
+| `schemaVersion` | Audit payload schema |
+| `retentionCategory` | `security` (keep in v0.1) |
+| `sourceIp` | Optional; store only if operator policy permits; never log in app logs if Restricted |
+| `userAgent` | Optional; same policy |
+| `payload` | Redacted structured metadata: ids, hashes, policy version, states |
+
+**Must not** appear in payload or logs: raw SBOM documents, external API tokens, authorization headers, cookies, full third-party payloads, source code, sensitive object-storage URLs (including presigned/signed URLs).
+
+## Database-only immutability — limitations
+
+PostgreSQL INSERT-only plus revoked UPDATE/DELETE on the table is the v0.1 control. It is **not** physical WORM storage. Superusers, stolen credentials, backups, and disk snapshots can still alter or copy rows. Operators who need stronger immutability must export audit to an external append-only store (future ADR). See [audit-integrity-failure.md](../runbooks/audit-integrity-failure.md).
 
 Tenant audit queries always include `organizationId` from authorized context. System events are visible to instance operators only, not to org members of unrelated tenants.
 
@@ -52,7 +62,11 @@ At minimum, emit events for:
 | `risk_policy.published` | Org override or builtin publish |
 | `finding.state_changed` | Finding lifecycle transition |
 | `remediation_task.created` / `remediation_task.transition` | Assignment and activity |
-| `risk_acceptance.created` / `expired` / `revoked` / `superseded` | Acceptance |
+| `risk_acceptance.created` / `expired` / `revoked` / `superseded` | Acceptance including requester/approver ids |
+| `finding.false_positive` / `finding.mitigated` | Specialized transitions |
+| `priority.override` | Manual override |
+| `auth.session_revoked` / `auth.login_failed` | Authentication-sensitive (no secrets in payload) |
+| `admin.access` | Instance-operator actions on system integrations |
 | `compensating_control.recorded` | Evidence of a control claim |
 | `export.created` | Exports |
 | `credential.created` / `rotated` / `revoked` / `validation_failed` | **ExternalCredential** |

@@ -1,6 +1,6 @@
 # ADR 0014: Append-only audit events
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-26
 - Deciders: PatchPilot maintainers
 - Supersedes: none

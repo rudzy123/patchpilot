@@ -12,4 +12,6 @@ PatchPilot can support an organization's vulnerability-management process. These
 | [Secure development plan](secure-development-plan.md) | How we design, review, and test security-sensitive change |
 | [Risk register](risk-register.md) | Prioritized architecture and security risks |
 
+Operational failure plans: [docs/runbooks/](../runbooks/README.md).
+
 Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). Do not document exploit payloads in public issues or READMEs.

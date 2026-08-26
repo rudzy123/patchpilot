@@ -94,7 +94,7 @@ Asynchronous worker work:
 
 ## 9–10. Assign and record remediation
 
-1. Create **RemediationTask** (`open` → `assigned`). Finding may move to `in_remediation`.
+1. Create **RemediationTask** (`open` → `assigned`). The finding stays `open` until a task completes (`verification_pending`) or an acceptance/mitigation/FP rule applies.
 2. Record activity as task state changes plus **AuditEvent**. Completing a task does **not** set finding `resolved`.
 3. **RiskAcceptance** (`active`) and compensating **Evidence** are explicit rows plus audit events.
 

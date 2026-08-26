@@ -1,6 +1,6 @@
 # ADR 0006: Redis and BullMQ
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-26
 - Deciders: PatchPilot maintainers
 - Supersedes: none

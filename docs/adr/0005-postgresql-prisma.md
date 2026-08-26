@@ -1,6 +1,6 @@
 # ADR 0005: PostgreSQL and Prisma
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-26
 - Deciders: PatchPilot maintainers
 - Supersedes: none

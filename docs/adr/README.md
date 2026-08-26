@@ -37,29 +37,27 @@ Closer implementation notes may add detail. They must not silently weaken accept
 
 ## Index
 
-**Proposed** (v0.1 architecture; not yet maintainer-accepted):
+**Accepted** for v0.1:
 
 | Number | Title | Status |
 | --- | --- | --- |
-| [0001](0001-modular-monolith.md) | Modular monolith with separate web, API, and worker deployments | Proposed |
-| [0002](0002-pnpm-turborepo.md) | pnpm and Turborepo monorepo | Proposed |
-| [0003](0003-nextjs-frontend.md) | Next.js frontend | Proposed |
-| [0004](0004-fastify-api.md) | Fastify API | Proposed |
-| [0005](0005-postgresql-prisma.md) | PostgreSQL and Prisma | Proposed |
-| [0006](0006-redis-bullmq.md) | Redis and BullMQ | Proposed |
-| [0007](0007-transactional-outbox.md) | Transactional outbox | Proposed |
-| [0008](0008-private-object-storage.md) | Private object storage for original SBOM evidence | Proposed |
-| [0009](0009-cyclonedx-json.md) | CycloneDX JSON as the initial SBOM format | Proposed |
-| [0010](0010-osv-correlation.md) | OSV as the initial vulnerability correlation source | Proposed |
-| [0011](0011-cisa-kev-enrichment.md) | CISA KEV enrichment | Proposed |
-| [0012](0012-explainable-policy-engine.md) | Explainable versioned policy engine | Proposed |
-| [0013](0013-organization-scoped-tenancy.md) | Organization-scoped multi-tenancy | Proposed |
-| [0014](0014-append-only-audit.md) | Append-only audit events | Proposed |
-| [0015](0015-provider-neutral-integrations.md) | Provider-neutral external integrations | Proposed |
-| [0016](0016-opentelemetry.md) | OpenTelemetry observability | Proposed |
-| [0017](0017-optional-ai-user-credentials.md) | Optional AI with user-supplied credentials only | Proposed |
-| [0018](0018-go-cli-deferred.md) | Go CLI deferred until after the web MVP | Proposed |
-
-Accepted ADRs: none yet.
+| [0001](0001-modular-monolith.md) | Modular monolith with separate web, API, and worker deployments | Accepted |
+| [0002](0002-pnpm-turborepo.md) | pnpm and Turborepo monorepo | Accepted |
+| [0003](0003-nextjs-frontend.md) | Next.js frontend | Accepted |
+| [0004](0004-fastify-api.md) | Fastify API | Accepted |
+| [0005](0005-postgresql-prisma.md) | PostgreSQL and Prisma | Accepted |
+| [0006](0006-redis-bullmq.md) | Redis and BullMQ | Accepted |
+| [0007](0007-transactional-outbox.md) | Transactional outbox | Accepted |
+| [0008](0008-private-object-storage.md) | Private object storage for original SBOM evidence | Accepted |
+| [0009](0009-cyclonedx-json.md) | CycloneDX JSON as the initial SBOM format | Accepted |
+| [0010](0010-osv-correlation.md) | OSV as the initial vulnerability correlation source | Accepted |
+| [0011](0011-cisa-kev-enrichment.md) | CISA KEV enrichment | Accepted |
+| [0012](0012-explainable-policy-engine.md) | Explainable versioned policy engine | Accepted |
+| [0013](0013-organization-scoped-tenancy.md) | Organization-scoped multi-tenancy | Accepted |
+| [0014](0014-append-only-audit.md) | Append-only audit events | Accepted |
+| [0015](0015-provider-neutral-integrations.md) | Provider-neutral external integrations | Accepted |
+| [0016](0016-opentelemetry.md) | OpenTelemetry observability | Accepted |
+| [0017](0017-optional-ai-user-credentials.md) | Optional AI with user-supplied credentials only | Accepted |
+| [0018](0018-go-cli-deferred.md) | Go CLI deferred until after the web MVP | Accepted |
 
 Still open before implementation (not covered by the table above): authentication mechanism, session lockout/MFA, credential KEK/KMS, finer RBAC than the four roles, and a dedicated `packages/application` split. See [open-decisions.md](../architecture/open-decisions.md).

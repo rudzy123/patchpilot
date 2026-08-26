@@ -1,6 +1,6 @@
 # ADR 0018: Go CLI deferred until after the web MVP
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-26
 - Deciders: PatchPilot maintainers
 - Supersedes: none

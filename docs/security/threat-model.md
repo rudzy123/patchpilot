@@ -293,7 +293,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Premature closure.
 
-**Mitigation:** Finding `resolved` only from `absent` observation; UI separates workflow from rescan.
+**Mitigation:** Finding `resolved` only with stored evidence (adequate `absent` or out-of-range); UI separates workflow from rescan; incomplete coverage → `inconclusive`.
 
 ### AI data leakage (if optional AI is introduced later)
 
@@ -302,6 +302,104 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 **Impact:** Evidence exfil; unauthorized scoring.
 
 **Mitigation:** AI disabled by default; user-supplied keys only; never authoritative scores; never send originals without explicit future ADR ([ADR 0017](../adr/0017-optional-ai-user-credentials.md)). v0.1 sends nothing to AI providers.
+
+### Privilege escalation
+
+**Threat:** `member` approves risk acceptance or rotates credentials.
+
+**Impact:** Unauthorized residual-risk decisions or credential theft.
+
+**Mitigation:** Role matrix in [tenant-isolation.md](../architecture/tenant-isolation.md); API tests.
+
+### Duplicate or malicious bom-ref
+
+**Threat:** Repeated or colliding `bom-ref` values to confuse the graph.
+
+**Impact:** Wrong dependency edges; parser crash.
+
+**Mitigation:** Duplicate `bom-ref` → `rejected`.
+
+### Concurrent ingestion
+
+**Threat:** Two SBOMs for one asset processed at once.
+
+**Impact:** Races on finding current state.
+
+**Mitigation:** Unique constraints; latest **completed** ingestion wins for compare; append-only calculations.
+
+### Job lease theft / clock skew
+
+**Threat:** Two workers run the same job after lease expiry.
+
+**Impact:** Duplicate side effects if not idempotent.
+
+**Mitigation:** Idempotent handlers; org-scoped unique keys.
+
+### Missing provider data
+
+**Threat:** OSV/KEV gap presented as "not vulnerable."
+
+**Impact:** False safety.
+
+**Mitigation:** Freshness display; no match ≠ proof of safety; KEV absence is not proof of non-exploitation.
+
+### Incorrect vulnerability matching
+
+**Threat:** Wrong ecosystem or range evaluation.
+
+**Impact:** False findings or misses.
+
+**Mitigation:** Adapter-based versions; no fuzzy match; record method; tests with fixtures.
+
+### Incomplete SBOM coverage
+
+**Threat:** Smaller new SBOM treated as full remediation.
+
+**Impact:** False `resolved`.
+
+**Mitigation:** Coverage heuristic → `inconclusive`; see [finding-lifecycle.md](../architecture/finding-lifecycle.md).
+
+## Control table (material threats)
+
+For each row: preventive / detective / recovery / test / residual / owner. Text above remains the narrative if the table is not rendered.
+
+| Threat | Asset | Attack path | Impact | Preventive | Detective | Recovery | Test | Residual | Owner |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| IDOR | Findings, SBOMs | UUID in URL without membership | Cross-tenant read | Org predicate, deny default | Authz deny metrics | Isolation incident runbook | Cross-tenant tests | Until code exists | `packages/domain`, API |
+| Broken tenancy | All tenant data | Missing WHERE; digest-only keys | Systematic leak | Prefixed keys; job reload | Anomalous org access | Isolate, rotate | Isolation + job tamper | Operator disk | Tenancy |
+| Privilege escalation | Acceptance, creds | Role not checked | Bad accept / leak | Role matrix | Audit | Revoke session | API authz tests | Insider owner | Authz |
+| Malicious SBOM | Parser, UI | Hostile JSON | XSS, crash, SSRF | No fetch, limits, escape | Quarantine metrics | Quarantine runbook | Parser tests | GIGO | `packages/sbom` |
+| Oversized JSON | API memory | Huge body | DoS | 20 MiB proposal cap | 413 metrics | Rate limit | Size tests | Volumetric DoS | API |
+| Deep JSON | Worker | Nesting | Crash loop | Depth 32 proposal | Quarantine | DLQ | Depth tests | Novel parser bugs | Parser |
+| Component explosion | DB | Huge component list | Fill disk | 10k proposal | Reject metrics | Reject | Generated fixture | Tuned limits | Ingest |
+| Edge explosion | DB | Huge deps | Hang | 50k proposal | Reject | Reject | Generated fixture | Tuned limits | Ingest |
+| Bad bom-ref | Graph | Duplicates | Wrong graph | Reject duplicates | Reject | User re-upload | Fixture | — | Parser |
+| Name/ecosystem confusion | Findings | Cross-eco match | False finding | No fuzzy match | Match method | Recalc | Near-miss fixtures | Uploader GIGO | Intel |
+| Range manipulation | Findings | Crafted versions | False abs/pres | Record method; adapters | Factors | Recalc | Version fixtures | GIGO | Intel |
+| Poisoned feeds | Catalog | MITM/compromise | Wrong priority | HTTPS, hashes, additive | Stale/degraded | Keep last good | Fixture conflicts | Public catalogs lie | Intel |
+| Stolen provider/storage creds | Storage, feeds | Leak | Theft | Encrypt, config | Audit creds | Rotate | Redaction tests | Operator keys | Integrations |
+| Webhook forgery/replay | Future | Fake callback | Confused deputy | No listeners in v0.1 | — | — | When added | Future | API |
+| SSRF | Cloud metadata | URL fetch | Cred theft | No SBOM URLs; allowlist | Egress logs | Block | Adapter tests | Mis-allowlist | Integrations |
+| SQLi | DB | Concat SQL | Takeover | Prisma | — | Restore | — | Raw SQL mistakes | Database |
+| XSS | Sessions | Component names | Session theft | Escape, CSP later | — | Rotate | UI tests | New sinks | Web |
+| CSRF | Mutations | Cross-site POST | Unwanted upload | SameSite + token | — | Revoke | API tests | OD-1 | API |
+| Cred/secret logging | Logs | Header in Pino | Restricted leak | Redaction | Log review | Rotate | Redaction tests | Sink bypass | Logger |
+| Audit alteration | Accountability | UPDATE audit | Lost history | Insert-only | Integrity runbook | Restore | Update-fail test | Superuser | Audit |
+| Public bucket | SBOMs | ACL | Theft | Private + org keys | Cloud alerts | Make private | Adapter tests | Operator ACL | Storage |
+| Queue duplication | Findings | At-least-once | Dup rows | Idempotency | Unique violations | No-op | Replay tests | — | Worker |
+| Concurrent ingest | Finding state | Two SBOMs | Race | Constraints; completed wins | — | Recalc | Concurrency test | Rare races | Worker |
+| Stale jobs / lease | Tenant data | Crash + double run | Dup/corrupt | Lease + idempotency | Stale metric | Replay | Lease tests | Clock skew | Worker |
+| Dependency/CI compromise | Instance | Malicious npm/CI | RCE | Lockfile later | — | Rebuild | — | Supply chain | Process |
+| Dev adapters in prod | Authn | Misconfig | Bypass | Config gate | Boot fail | Disable | Production-config test | Human error | Config |
+| Backup exposure | All | Open dump | Mass leak | Operator encrypt | — | Rotate | — | Accepted operator | Deploy |
+| Insider | Tenant data | Privileged user | Expected | Audit, roles | Audit | — | — | Cannot prevent | Product |
+| DoS | Availability | Flood/parse | Outage | Limits, rates | Lag alerts | Shed load | Limit tests | Volumetric | API/worker |
+| Missing intel | Priority | Gap | False safety | Freshness UI | Stale alert | Retry sync | Fixture | Feeds incomplete | Intel |
+| Wrong matching | Findings | Adapter bug | False pos/neg | Adapters, tests | — | Recalc | Fixtures | Residual | Intel |
+| Wrong priority | Queue | Policy bug | Wrong work | Versioned policy | Factor UI | New version | Golden tests | Weights arbitrary | Policy |
+| False remediation | Finding state | Task complete | Premature close | Evidence rules | — | Reopen on present | State tests | Incomplete SBOMs | Findings |
+| Incomplete coverage | Finding state | Sparse SBOM | False resolved | Coverage heuristic | Inconclusive | Re-upload | Coverage test | Heuristic | Findings |
+| AI leakage (later) | Restricted | Model API | Exfil | Disabled; ADR 0017 | — | Disable | — | If enabled later | Future |
 
 ## Related documents
 

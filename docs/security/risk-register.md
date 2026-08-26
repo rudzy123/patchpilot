@@ -6,40 +6,43 @@ Status values: `open`, `mitigated-in-design`, `accepted`, `watch`.
 
 Mitigated-in-design means documents specify controls; **runtime residual remains until code, tests, and operations exist**.
 
-## Priority order
+Decision deadline: before the first implementing PR for that area, unless noted.
 
-| ID | Risk | L | I | Priority | Status | Treatment |
-| --- | --- | --- | --- | --- | --- | --- |
-| R1 | Cross-tenant IDOR or missing org predicate | M | H | P0 | mitigated-in-design | [tenant-isolation.md](../architecture/tenant-isolation.md); required tests |
-| R2 | Malicious or huge SBOM exhausts API/worker | H | H | P0 | mitigated-in-design | Limits, quarantine, no URL fetch |
-| R3 | Object storage public or guessable keys | M | H | P0 | mitigated-in-design | Private bucket; org-prefixed content-addressed keys |
-| R4 | Job replay duplicates findings/audit or ignores org | M | H | P0 | mitigated-in-design | Outbox, idempotency, reload org |
-| R5 | Development adapters enabled in production | M | H | P0 | mitigated-in-design | Config gating; tests |
-| R6 | Prototype pollution / parser crash loops | M | H | P1 | mitigated-in-design | Depth limits, time-box, DLQ |
-| R7 | Package/ecosystem confusion in correlation | M | H | P1 | mitigated-in-design | No fuzzy match; no ecosystem guess |
-| R8 | Poisoned or stale intel silently trusted | M | M | P1 | mitigated-in-design | Provenance, freshness UI, additive records |
-| R9 | XSS via component names | M | H | P1 | mitigated-in-design | Escape; no raw JSON; CSP when web exists |
-| R10 | CSRF on session cookie | M | H | P1 | mitigated-in-design | SameSite + CSRF token (OD-1 still open for auth ADR) |
-| R11 | Secret or SBOM logging | M | H | P1 | mitigated-in-design | Canonical redaction tests |
-| R12 | Audit UPDATE/DELETE or cascade evidence loss | L | H | P1 | mitigated-in-design | Insert-only; FK policy |
-| R13 | Incorrect priority / false "fixed" | M | H | P1 | mitigated-in-design | Factors, policy version, rescan ≠ task complete |
-| R14 | SSRF via future URL fetch or mis-allowlist | L | H | P1 | mitigated-in-design | No SBOM fetch; allowlists |
-| R15 | Authn mechanism underspecified (passwords, OIDC, lockout) | H | M | P1 | open | [OD-1](../architecture/open-decisions.md); needs ADR before implement |
-| R16 | Credential KEK management weak or lost | M | H | P1 | open | [OD-4](../architecture/open-decisions.md) |
-| R17 | Redis exposed to network → queue injection | M | H | P1 | mitigated-in-design | Network isolation; still operator duty |
-| R18 | Backup exposure | M | H | P1 | accepted | Operator control; documented |
-| R19 | Instance operator reads all DBs | H | H | P2 | accepted | Honest self-host model; no app bypass |
-| R20 | Supply-chain / CI compromise | M | H | P2 | watch | Process; lockfile later |
-| R21 | OSV rate limit blocks correlation | M | M | P2 | mitigated-in-design | Backoff, cache, degraded integration |
-| R22 | Org policy override mistakes ranking | M | M | P2 | mitigated-in-design | Immutable versions; history kept |
-| R23 | Duplicate SHA-256 handling across assets | L | M | P2 | mitigated-in-design | Duplicate only same org+asset |
-| R24 | Finding identity ignores version (two versions, one finding) | M | M | P2 | accepted | Documented; change needs ADR |
-| R25 | No inbound webhook yet but future forgery | L | H | P2 | watch | Dormant C10; GitHub not MVP |
-| R26 | Optional AI leakage | L | H | P2 | mitigated-in-design | Disabled; ADR 0017 |
-| R27 | Teams unused → later confused authz | L | L | P3 | watch | OD-11; owners are not authz |
-| R28 | Go CLI later skips API authz | L | H | P3 | watch | CLI deferred; must call API |
-| R29 | DoS of public feeds (external) | L | L | P3 | accepted | Out of product scope |
-| R30 | Compliance theater in UI copy | M | M | P2 | mitigated-in-design | Review checklist; non-goals |
+| ID | Description | L | I | Pri | Area | Planned mitigation | Residual | Deadline | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| R1 | Cross-tenant IDOR or missing org predicate | M | H | P0 | Tenancy | [tenant-isolation.md](../architecture/tenant-isolation.md); required tests | Until implemented | First tenant API PR | mitigated-in-design |
+| R2 | Malicious or huge SBOM exhausts API/worker | H | H | P0 | Ingestion | Configurable limit **proposals**; quarantine; no URL fetch | Limit values unvalidated | First upload PR | mitigated-in-design |
+| R3 | Object storage public or guessable keys | M | H | P0 | Storage | Private bucket; org-prefixed content-addressed keys | Operator ACL | First storage adapter | mitigated-in-design |
+| R4 | Job replay duplicates findings or ignores org | M | H | P0 | Jobs | Outbox, idempotency, reload org, leases | At-least-once | First worker PR | mitigated-in-design |
+| R5 | Development adapters enabled in production | M | H | P0 | Config | Config gating; tests | Human error | First config package | mitigated-in-design |
+| R6 | Prototype pollution / parser crash loops | M | H | P1 | Ingestion | Depth, time-box, DLQ | Novel payloads | First parser PR | mitigated-in-design |
+| R7 | Package/ecosystem confusion in correlation | M | H | P1 | Matching | No fuzzy match; adapters | GIGO SBOMs | First correlate PR | mitigated-in-design |
+| R8 | Poisoned or stale intel silently trusted | M | M | P1 | Intel | Provenance, freshness UI, additive records | Public catalogs | First intel PR | mitigated-in-design |
+| R9 | XSS via component names | M | H | P1 | Web | Escape; no raw JSON | New sinks | First UI PR | mitigated-in-design |
+| R10 | CSRF on session cookie | M | H | P1 | Authn | SameSite + CSRF token | **OD-1** open | Authn ADR + first session | mitigated-in-design |
+| R11 | Secret or SBOM logging | M | H | P1 | Telemetry | Canonical redaction tests | Sink bypass | First logger PR | mitigated-in-design |
+| R12 | Audit UPDATE/DELETE or cascade evidence loss | L | H | P1 | Audit | Insert-only; FK policy; DB role | Superuser | First audit table | mitigated-in-design |
+| R13 | Incorrect priority / false "fixed" / incomplete SBOM | M | H | P1 | Policy/findings | Factors, policy version, coverage heuristic, rescan ≠ task | Weights arbitrary; heuristic | First score + rescan PR | mitigated-in-design |
+| R14 | SSRF via future URL fetch or mis-allowlist | L | H | P1 | Egress | No SBOM fetch; allowlists | Misconfig | First HTTP adapter | mitigated-in-design |
+| R15 | Authn mechanism underspecified (lockout, MFA) | H | M | P1 | Authn | [OD-1](../architecture/open-decisions.md) | Interim only | **Before implementing login** | open |
+| R16 | Credential KEK management weak or lost | M | H | P1 | Secrets | [OD-4](../architecture/open-decisions.md) | Lost KEK = lost creds | Before tenant credentials | open |
+| R17 | Redis exposed → queue injection | M | H | P1 | Jobs | Network isolation | Operator duty | First compose | mitigated-in-design |
+| R18 | Backup exposure | M | H | P1 | Deploy | Operator encrypt; Restricted class | Accepted | Ongoing | accepted |
+| R19 | Instance operator reads all DBs | H | H | P2 | Tenancy | Honest self-host; no app bypass | Disk access | n/a | accepted |
+| R20 | Supply-chain / CI compromise | M | H | P2 | Process | Lockfile later; SECURITY.md | Residual | First dependencies | watch |
+| R21 | OSV rate limit blocks correlation | M | M | P2 | Intel | Backoff, cache, degraded | Delay | First intel PR | mitigated-in-design |
+| R22 | Org policy override mistakes ranking | M | M | P2 | Policy | Immutable versions; history | Operator error | First override PR | mitigated-in-design |
+| R23 | Duplicate SHA-256 across assets | L | M | P2 | Ingestion | Duplicate only same org+asset | Extra storage | First upload | mitigated-in-design |
+| R24 | Finding identity ignores version | M | M | P2 | Findings | Documented; ADR to change | Two versions one finding | Product review | accepted |
+| R25 | Future webhook forgery | L | H | P2 | Integrations | No listeners; GitHub not MVP | When added | GitHub ADR | watch |
+| R26 | Optional AI leakage | L | H | P2 | AI | Disabled; ADR 0017 | If enabled | Before any AI PR | mitigated-in-design |
+| R27 | Teams unused → confused authz | L | L | P3 | Domain | Owners are not authz | Misuse | n/a | watch |
+| R28 | Future CLI skips API authz | L | H | P3 | Clients | CLI deferred; must call API | If bypassed | CLI ADR | watch |
+| R29 | DoS of public feeds (external) | L | L | P3 | Intel | Out of product scope | n/a | n/a | accepted |
+| R30 | Compliance theater in UI copy | M | M | P2 | Product | Review checklist; non-goals | Copy drift | Every UI PR | mitigated-in-design |
+| R31 | Numeric ingestion limits unvalidated | H | M | P1 | Ingestion | Labelled proposals; perf tests | Too tight/loose | Before production-minded release | open |
+| R32 | Database-only audit not WORM | M | M | P1 | Audit | Document limitations; DB grants | Superuser | First audit table | mitigated-in-design |
+| R33 | Coverage heuristic false inconclusive/resolved | M | M | P2 | Findings | 50% drop proposal; tune | Heuristic | First rescan PR | watch |
 
 ## P0 meaning
 
@@ -47,12 +50,7 @@ P0 items must have tests and review on the first implementing PR for that area. 
 
 ## Open architecture decisions that drive risk
 
-See [open-decisions.md](../architecture/open-decisions.md). Highest coupling:
-
-- **OD-1** Authentication (R10, R15)
-- **OD-4** KEK (R16)
-- **OD-10** Instance operator identity (R19)
-- **OD-15** Matching (R7)
+See [open-decisions.md](../architecture/open-decisions.md). Highest coupling: **OD-1** (R10, R15), **OD-4** (R16), **OD-10** (R19), **OD-15** (R7).
 
 ## Related documents
 

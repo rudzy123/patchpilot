@@ -37,5 +37,11 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **Outbox** | Transactional outbox row used to schedule background work without I/O inside the same database transaction as the state change. |
 | **Idempotency** | Reprocessing the same job or retried mutation does not create duplicate side effects. For tenant-owned work, uniqueness is scoped to the organization. |
 | **Evidence** | Stored artifacts and records needed to reproduce a finding (SBOM hash, parsed identifiers, intel source, policy version). |
+| **Priority band** | Calculated grouping of **priority** (for example P1–P4). Not vulnerability severity. |
+| **Finding observation** | Per-SBOM record of whether a finding's component identity was `present`, `absent`, or `inconclusive`. |
+| **Incomplete SBOM coverage** | Calculated concern that a newer SBOM is too thin to treat missing components as remediated. |
+| **Processing lease** | Time-bounded claim a worker holds on a job or ingestion so another worker may take over after expiry. |
+| **False positive (finding)** | Authorized decision that the *match* is wrong. Does not mean the advisory is invalid globally. |
+| **Mitigated (finding)** | Compensating control recorded while the component is still observed. Not **resolved**. |
 
 When in doubt, label data as **observed fact** or **calculated conclusion**.
