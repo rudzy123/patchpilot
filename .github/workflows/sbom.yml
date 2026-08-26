@@ -37,7 +37,7 @@ jobs:
           format: cyclonedx-json
           output-file: patchpilot-sbom.cdx.json
           upload-artifact: false
-          upload-release-attachments: false
+          upload-release-assets: false
 
       - name: Inspect generated SBOM for credential-like strings
         run: |
