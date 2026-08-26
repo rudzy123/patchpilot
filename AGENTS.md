@@ -29,7 +29,7 @@ apps/
 packages/
   config/                      # typed configuration; only place that may read process.env
   contracts/
-  database/                    # Prisma and persistence adapters (SchemaFoundation placeholder)
+  database/                    # Prisma adapters; SchemaFoundation is technical scaffolding (remove at database-domain milestone)
   domain/                      # Result/error taxonomy; no product entities
   integrations/                # Object-storage and Redis ports; MinIO adapter deferred
   logger/

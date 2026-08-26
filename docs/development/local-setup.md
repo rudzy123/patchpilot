@@ -38,7 +38,7 @@ nvm use        # or install Node 24 another way
    pnpm infrastructure:up
    ```
 
-4. Apply the technical Prisma placeholder migration (no product tables).
+4. Apply the Prisma migration. It creates `SchemaFoundation` technical scaffolding only (no product tables). That model is unused by application code and is scheduled for removal at the database-domain milestone.
 
    ```bash
    pnpm db:generate
