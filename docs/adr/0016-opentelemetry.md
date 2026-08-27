@@ -21,7 +21,7 @@ Instrument with **OpenTelemetry** traces and metrics via `packages/observability
 
 ## Consequences
 
-Operators configure OTLP exporters. Local default may use console exporters. Sampling is config.
+Operators enable traces explicitly and, when exporting, supply an OTLP HTTP JSON traces endpoint through `@patchpilot/config`. Telemetry remains disabled by default. This iteration does **not** use console exporters, `@opentelemetry/sdk-node`, Prometheus, Jaeger, Zipkin, gRPC, proto exporters, metrics SDKs, log exporters, or automatic instrumentation. Sampling is explicit in code (`AlwaysOnSampler`) until a versioned sampling setting exists in config.
 
 ## Security and tenancy
 
@@ -33,4 +33,4 @@ Exporter down must not block requests (fail-open on export, fail-closed on redac
 
 ## Follow-up
 
-Logger redaction unit tests. Runbooks when apps exist.
+Logger redaction unit tests exist. Product HTTP, job, feed, and policy **metrics** remain future work in `packages/observability` after this trace-lifecycle security cut. Automatic instrumentation, parent-based production sampling, and operator-facing trace runbooks remain follow-up. Do not reintroduce `@opentelemetry/sdk-node` to restore those later; add only the specific trace, metric, or log packages required.

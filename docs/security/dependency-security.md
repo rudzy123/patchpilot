@@ -13,6 +13,10 @@ This document covers how PatchPilot reviews **its own** dependencies. It is not 
 
 A green Dependency Review or Dependabot alert state does not mean the repository is free of vulnerable or malicious packages. Advisories lag. Transitive packages can be compromised without a CVE. Reviewers still read the diff.
 
+## Unused observability SDKs
+
+PatchPilot traces use an explicit OpenTelemetry trace provider and optional OTLP HTTP JSON exporter. Do not add `@opentelemetry/sdk-node`, Prometheus, Jaeger, Zipkin, gRPC, or proto exporters to restore convenience. Those packages pulled unused attack surface (including `protobufjs@8.0.0` via `@opentelemetry/otlp-transformer@0.211.0`). Prefer removing unused exporters over `pnpm.overrides` for `protobufjs`.
+
 ## Review process for dependency pull requests
 
 1. Confirm the update is from Dependabot or a known maintainer, not an unexpected lockfile rewrite.
