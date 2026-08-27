@@ -1,6 +1,26 @@
 # Observability
 
-PatchPilot v0.1 uses **OpenTelemetry** for traces and metrics ([ADR 0016](../adr/0016-opentelemetry.md)) and structured **Pino** logs with correlation identifiers. Observability must not weaken [canonical redaction](../../.cursor/rules/security.mdc).
+PatchPilot v0.1 uses **OpenTelemetry** for traces ([ADR 0016](../adr/0016-opentelemetry.md)) and structured **Pino** logs with correlation identifiers. Metrics remain future work. Observability must not weaken [canonical redaction](../../.cursor/rules/security.mdc).
+
+## Current implementation (traces lifecycle only)
+
+`packages/observability` owns process-level trace SDK startup and shutdown. It is **disabled by default** (`OTEL_ENABLED=false`). When enabled, it provides lifecycle infrastructure only: there is no automatic HTTP or Fastify instrumentation and no broad product spans yet.
+
+| Capability | This iteration |
+| --- | --- |
+| Traces | Explicit `NodeTracerProvider` + optional OTLP **HTTP JSON** exporter |
+| Metrics export | Not implemented |
+| Log export | Not implemented (logs stay in Pino) |
+| Automatic instrumentation | Not implemented |
+| Prometheus / Jaeger / Zipkin / gRPC / proto exporters | Not used; `@opentelemetry/sdk-node` was removed |
+
+Configuration is read only in `@patchpilot/config` (`OTEL_ENABLED`, optional `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) and passed as `TelemetryOptions`. `packages/observability` does not read `process.env`. PatchPilot does not honor `OTEL_SDK_DISABLED`, `OTEL_TRACES_EXPORTER`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_RESOURCE_ATTRIBUTES`, `OTEL_SERVICE_NAME`, `OTEL_TRACES_SAMPLER`, `OTEL_PROPAGATORS`, `OTEL_METRICS_EXPORTER`, or `OTEL_LOGS_EXPORTER`.
+
+When telemetry is enabled without an endpoint, the process registers a trace provider with a no-op span processor and does not contact `localhost:4318` or construct an OTLP exporter. When an endpoint is supplied, PatchPilot constructs `OTLPTraceExporter` with that URL only.
+
+The upstream OTLP HTTP exporter may still merge unspecified transport fields from the process environment. PatchPilot minimizes that by constructing the exporter only when the typed traces endpoint is present and by supplying the URL and export timeouts explicitly. Do not set extra `OTEL_*` variables expecting PatchPilot to consume them.
+
+Exporter or collector failure must not fail product request processing (fail-open on export). Shutdown flushes with a bounded timeout and is idempotent. API and worker processes own SIGTERM/SIGINT; this package does not install signal handlers.
 
 ## Goals
 
@@ -29,7 +49,7 @@ Do not put raw authorization headers in trace attributes.
 - Component names may appear as **truncated** untrusted strings in debug logs only when needed; prefer ids and hashes (`sha256` prefix).
 - Log finding **priority** as a number plus policy version, not as "exploitable."
 
-## Metrics (minimum)
+## Metrics (minimum, future)
 
 | Signal | Purpose |
 | --- | --- |
@@ -45,9 +65,9 @@ Cardinality: label by `eventType` and `state`, not by tenant name or package nam
 
 ## Traces
 
-Span the HTTP handler, use case name, DB transaction (without SQL text containing user data), storage put/get (key **template**, not full key if it includes tenant ids in high-cardinality exporters—prefer hashed org id or omit), and outbound HTTP (host allowlist name, not full URL query).
+This iteration registers a trace provider only. Product spans (HTTP handler, use case, DB transaction, storage, outbound HTTP) are future work and must not include SQL text containing user data, full object-storage keys, or URL query strings.
 
-Sampling is operator-configured. Default local: always on. Production default: parent-based with a conservative ratio.
+Sampling is currently `AlwaysOnSampler` in `packages/observability`. Operator-configured parent-based sampling is future work.
 
 ## Health endpoints
 

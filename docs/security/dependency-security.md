@@ -13,6 +13,20 @@ This document covers how PatchPilot reviews **its own** dependencies. It is not 
 
 A green Dependency Review or Dependabot alert state does not mean the repository is free of vulnerable or malicious packages. Advisories lag. Transitive packages can be compromised without a CVE. Reviewers still read the diff.
 
+## Unused observability SDKs
+
+PatchPilot traces use an explicit OpenTelemetry trace provider and optional OTLP HTTP JSON exporter. Do not add `@opentelemetry/sdk-node`, Prometheus, Jaeger, Zipkin, gRPC, or proto exporters to restore convenience. Those packages pulled unused attack surface (including `protobufjs@8.0.0` via `@opentelemetry/otlp-transformer@0.211.0`). Prefer removing unused exporters over `pnpm.overrides` for `protobufjs`.
+
+## Remaining `pnpm audit` findings
+
+Observed on 2026-08-27 against this branch after the observability cut (`pnpm audit`; metadata: 1 high, 0 critical, 0 moderate, 0 low). No `pnpm.overrides` entry hides an advisory.
+
+| Advisory | Package | Severity | How it is reached | Residual status |
+| --- | --- | --- | --- | --- |
+| [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx) | `deepmerge-ts@7.1.5` (vulnerable `<8.0.0`, patched `>=8.0.0`) | high | `packages/database` → `@prisma/client` / `prisma` → `@prisma/config` | Unrelated to OpenTelemetry. Recursive object-graph merge can exhaust the stack (CWE-674). Do not add a `pnpm.overrides` entry to silence it. Prefer a Prisma release that depends on `deepmerge-ts>=8.0.0` when one exists. |
+
+Re-run `pnpm audit` after dependency changes. This table is a snapshot, not a claim that the tree is free of other unreported advisories.
+
 ## Review process for dependency pull requests
 
 1. Confirm the update is from Dependabot or a known maintainer, not an unexpected lockfile rewrite.
