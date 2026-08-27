@@ -12,6 +12,7 @@ import {
   REVIEWED_SESSION_5_MIGRATIONS,
   applyMigrationSqlAndResolve,
   applySession3Schema,
+  applyThroughAuditActorAnonymous,
   applyThroughPolicyCreatorMembership,
   applyThroughReviewedSession5,
   applyThroughSession5,
@@ -20,6 +21,7 @@ import {
   dropEphemeralDatabase,
   frozenMigrationFile,
   SESSION_6_PREAUTH_MIGRATIONS,
+  SESSION_6_THROUGH_ANONYMOUS_MIGRATIONS,
   sha256File,
 } from './integration-database.js';
 
@@ -689,6 +691,66 @@ describe('migrations', () => {
     }
   });
 
+  it('upgrades a database through anonymous actor by applying only the credentials and sessions migration', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughAuditActorAnonymous(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore).toEqual([...SESSION_6_THROUGH_ANONYMOUS_MIGRATIONS]);
+
+      const actorTypes = await names(
+        client,
+        `SELECT e.enumlabel AS name
+         FROM pg_enum e
+         JOIN pg_type t ON t.oid = e.enumtypid
+         JOIN pg_namespace n ON n.oid = t.typnamespace
+         WHERE n.nspname = 'public' AND t.typname = 'audit_actor_type'`,
+      );
+      expect(actorTypes).toContain('anonymous');
+
+      const tablesBefore = await names(
+        client,
+        `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'`,
+      );
+      expect(tablesBefore).not.toContain('local_credential');
+      expect(tablesBefore).not.toContain('session');
+
+      const auditColumnsBefore = await names(
+        client,
+        `SELECT column_name AS name FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'audit_event'`,
+      );
+      expect(auditColumnsBefore).not.toContain('actor_user_id');
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        '20260827180000_local_credentials_and_sessions',
+      ]);
+      await assertFinalMigratedSchema(client);
+
+      const appendOnly = await client.$queryRaw<Array<{ tgenabled: string }>>`
+        SELECT tgenabled
+        FROM pg_trigger
+        WHERE tgname = 'audit_event_append_only' AND NOT tgisinternal
+      `;
+      expect(appendOnly[0]?.tgenabled).toBe('O');
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
   it('creates authentication tables and the final audit actor CHECK in migration 180000', async () => {
     const ephemeral = await createEphemeralDatabase('migrate');
     const client = new PrismaClient({
@@ -731,6 +793,18 @@ describe('migrations', () => {
 
     try {
       await applyThroughPolicyCreatorMembership(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore).toEqual([...SESSION_6_PREAUTH_MIGRATIONS]);
+      const auditColumnsBefore = await names(
+        client,
+        `SELECT column_name AS name FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'audit_event'`,
+      );
+      expect(auditColumnsBefore).not.toContain('actor_user_id');
+
       await client.$executeRaw`
         INSERT INTO "organization" ("id", "slug", "name", "updated_at")
         VALUES (CAST(${orgId} AS UUID), 'auth-backfill-org', 'Auth Backfill Org', CURRENT_TIMESTAMP)
@@ -769,6 +843,14 @@ describe('migrations', () => {
       `;
 
       await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        '20260827170000_audit_actor_anonymous',
+        '20260827180000_local_credentials_and_sessions',
+      ]);
       await assertFinalMigratedSchema(client);
 
       const backfilled = await client.auditEvent.findUniqueOrThrow({ where: { id: auditId } });

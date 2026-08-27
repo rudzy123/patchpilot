@@ -206,3 +206,13 @@ export async function applyThroughPolicyCreatorMembership(databaseUrl: string): 
   await applyThroughReviewedSession5(databaseUrl);
   await applyMigrationSqlAndResolve(databaseUrl, '20260827160000_policy_creator_membership');
 }
+
+export const SESSION_6_THROUGH_ANONYMOUS_MIGRATIONS = [
+  ...SESSION_6_PREAUTH_MIGRATIONS,
+  '20260827170000_audit_actor_anonymous',
+] as const;
+
+export async function applyThroughAuditActorAnonymous(databaseUrl: string): Promise<void> {
+  await applyThroughPolicyCreatorMembership(databaseUrl);
+  await applyMigrationSqlAndResolve(databaseUrl, '20260827170000_audit_actor_anonymous');
+}
