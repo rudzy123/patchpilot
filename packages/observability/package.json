@@ -2,7 +2,7 @@
   "name": "@patchpilot/observability",
   "version": "0.0.0",
   "private": true,
-  "description": "OpenTelemetry lifecycle boundary. No product metrics in this iteration.",
+  "description": "OpenTelemetry trace lifecycle boundary. No product metrics or auto-instrumentation in this iteration.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -25,8 +25,11 @@
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.211.0",
-    "@opentelemetry/sdk-node": "^0.211.0"
+    "@opentelemetry/exporter-trace-otlp-http": "^0.221.0",
+    "@opentelemetry/resources": "^2.10.0",
+    "@opentelemetry/sdk-trace": "^2.10.0",
+    "@opentelemetry/sdk-trace-node": "^2.10.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0"
   },
   "devDependencies": {
     "@patchpilot/eslint-config": "workspace:*",

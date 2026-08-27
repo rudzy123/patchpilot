@@ -26,8 +26,8 @@ Copy [`.env.example`](../../.env.example) to `.env`. Example values are **develo
 | `OBJECT_STORAGE_SECRET_KEY` | Object-storage secret. |
 | `OBJECT_STORAGE_BUCKET` | Bucket name. Bucket creation is deferred until object operations exist. |
 | `OBJECT_STORAGE_USE_SSL` | `true` or `false`. |
-| `OTEL_ENABLED` | Enables OpenTelemetry SDK initialization. |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Optional OTLP HTTP traces endpoint. |
+| `OTEL_ENABLED` | Enables OpenTelemetry **trace** SDK initialization. Default `false`. Does not enable metrics, log export, or automatic instrumentation. |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Optional OTLP **HTTP JSON** traces endpoint. Required only when exporting. When unset, enabled telemetry uses a no-op span processor and does not contact a collector. Other `OTEL_*` variables are not read by PatchPilot. |
 | `READINESS_TIMEOUT_MS` | Budget for readiness probes. |
 | `SHUTDOWN_TIMEOUT_MS` | Graceful shutdown budget. |
 | `REQUEST_BODY_LIMIT_BYTES` | Fastify body limit. |
