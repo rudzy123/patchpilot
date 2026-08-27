@@ -31,7 +31,7 @@ function collectLogs(): { stream: Writable; text: () => string } {
 }
 
 describe('@patchpilot/auth', () => {
-  it('exports the package boundary without hashing services', () => {
+  it('exports the package boundary and selected hashing library', () => {
     expect(packageBoundary).toBe('@patchpilot/auth');
     expect(passwordHashingLibrary).toBe('argon2');
   });

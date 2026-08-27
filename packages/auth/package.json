@@ -2,7 +2,7 @@
   "name": "@patchpilot/auth",
   "version": "0.0.0",
   "private": true,
-  "description": "Authentication adapter boundary. Argon2id library installed; hashing and session services are not implemented yet.",
+  "description": "Authentication and organization-authorization application logic. Argon2id hashing, opaque sessions, and permission checks; HTTP adapters are not in this package.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -25,7 +25,6 @@
   },
   "devDependencies": {
     "@patchpilot/eslint-config": "workspace:*",
-    "@patchpilot/logger": "workspace:*",
     "@patchpilot/typescript-config": "workspace:*",
     "@types/node": "^24.10.1",
     "eslint": "^9.39.1",
@@ -33,6 +32,9 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
+    "@patchpilot/config": "workspace:*",
+    "@patchpilot/domain": "workspace:*",
+    "@patchpilot/logger": "workspace:*",
     "argon2": "0.45.1"
   }
 }

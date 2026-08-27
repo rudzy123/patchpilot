@@ -197,6 +197,15 @@ importers:
 
   packages/auth:
     dependencies:
+      '@patchpilot/config':
+        specifier: workspace:*
+        version: link:../config
+      '@patchpilot/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@patchpilot/logger':
+        specifier: workspace:*
+        version: link:../logger
       argon2:
         specifier: 0.45.1
         version: 0.45.1
@@ -204,9 +213,6 @@ importers:
       '@patchpilot/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
-      '@patchpilot/logger':
-        specifier: workspace:*
-        version: link:../logger
       '@patchpilot/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
