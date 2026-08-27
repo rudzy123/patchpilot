@@ -24,9 +24,10 @@ Application roles cannot "correct" an audit row. Corrections are new events.
 | Field (logical) | Notes |
 | --- | --- |
 | `id` | UUID (event id) |
-| `organizationId` | Required for tenant operations; null only for system catalog events |
-| `actorMembershipId` | Required for tenant `user` actors; null for `system` / `instance_operator` |
-| `actorType` | `user`, `system`, `instance_operator` |
+| `organizationId` | Required for tenant operations; null for system catalog events and instance-level authentication events |
+| `actorUserId` | Optional; set for instance-level and tenant `user` actors ([ADR 0019](../adr/0019-local-password-sessions.md)). Schema change is a later forward-only migration. |
+| `actorMembershipId` | Required for tenant `user` actors; null for `anonymous`, `system`, `instance_operator`, and instance-level `user` |
+| `actorType` | `user`, `system`, `instance_operator`, `anonymous` |
 | `action` | Stable dotted name |
 | `subjectType` / `subjectId` | Target type / target id |
 | `correlationId` | Request or job id |
@@ -65,7 +66,7 @@ At minimum, emit events for:
 | `risk_acceptance.created` / `expired` / `revoked` / `superseded` / `review_due` | Acceptance including requester/approver ids |
 | `finding.false_positive` / `finding.mitigated` | Specialized transitions |
 | `priority.override` | Manual override |
-| `auth.session_revoked` / `auth.login_failed` | Authentication-sensitive (no secrets in payload) |
+| `auth.login_succeeded` / `auth.login_failed` / `auth.logout` / `auth.session_revoked` / `auth.organization_selected` | Authentication ([ADR 0019](../adr/0019-local-password-sessions.md)); no secrets in payload. Anonymous failures use `actorType=anonymous`. Successful login uses instance-level `user`, not `system`. |
 | `admin.access` | Instance-operator actions on system integrations |
 | `compensating_control.recorded` | Evidence of a control claim |
 | `export.created` | Exports |

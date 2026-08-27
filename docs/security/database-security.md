@@ -10,7 +10,7 @@ PostgreSQL stores tenant metadata, findings, audit events, and outbox ids. Origi
 - Check constraints for slugs, SHA-256, byte sizes, timestamp order, risk-policy scope and publication, risk-acceptance fields, outbox leases, evidence targets, and asset-owner identity.
 - Append-only triggers on audit, observations, calculations, source records, and evidence.
 - No plaintext credential columns. `external_credential` stores a secret **reference** and key version only. Encryption and secret-manager integration are future infrastructure ([OD-4](../architecture/open-decisions.md)).
-- No password hash columns in this session ([OD-1](../architecture/open-decisions.md) is still open).
+- Password hash and session digest columns are specified in [ADR 0019](../adr/0019-local-password-sessions.md) and are **not** in the schema until a later forward-only migration. Do not edit existing migrations.
 - Destructive scripts require loopback host, allowed database name, and `PATCHPILOT_ALLOW_DESTRUCTIVE_DATABASE=true`.
 - Development seed is synthetic and production-rejected.
 

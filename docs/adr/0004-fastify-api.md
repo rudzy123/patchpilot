@@ -34,4 +34,4 @@ API down: no mutations. Readiness fails if PostgreSQL is down. Validation failur
 
 ## Follow-up
 
-OpenAPI spec when routes exist. CSRF for cookie sessions (OD-1).
+OpenAPI spec when routes exist. CSRF for cookie sessions is specified in [ADR 0019](0019-local-password-sessions.md).

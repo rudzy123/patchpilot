@@ -70,9 +70,9 @@ Per architecture invariants, validate with Zod (or equivalent schema) at the bou
 
 ### Browser → web / API
 
-- Session cookie is `HttpOnly`, `Secure` (production), `SameSite=Lax`.
-- CSRF: synchronizer token on cookie-authenticated mutations (interim [OD-1](open-decisions.md)).
-- Rate limits on auth, upload, and export.
+- Session cookie is `HttpOnly`, `Secure` (production `__Host-patchpilot.sid`), `SameSite=Lax`.
+- CSRF: synchronizer token plus exact Origin validation on cookie-authenticated mutations ([ADR 0019](../adr/0019-local-password-sessions.md)).
+- Rate limits on auth, upload, and export. Login limiting is fail-closed and uses the direct socket peer IP.
 - Do not treat `organizationId` in the body or path as authorization.
 
 ### Web → API
@@ -123,8 +123,9 @@ v0.1 has **no** inbound webhook listener. [RepositoryConnection](domain-model.md
 
 | Secret | Boundary | Rule |
 | --- | --- | --- |
-| User password | API | Argon2id hash; never log |
-| Session id | Cookie | Opaque; server-side session row |
+| User password | API | Argon2id PHC hash; never log |
+| Dummy Argon2id PHC | API | Fixed server-only constant for unknown-email verify; never log or return |
+| Session id | Cookie | Opaque; server stores SHA-256 digest only |
 | ExternalCredential | Adapter | Encrypt at rest; decrypt only in adapter |
 | Object-storage keys | Config | Operator-supplied |
 | Feed access (if any) | Config | Not tenant-scoped for OSV/KEV public HTTP |

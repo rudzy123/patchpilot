@@ -40,8 +40,8 @@ If the diagram is not rendered, the numbered flows below are complete.
 
 ## 1. Create an organization
 
-1. Unauthenticated **first-user** path (empty instance: zero **User** rows) creates a **User** (interim local accounts, [OD-1](open-decisions.md)). There is **no** open self-service signup after that. Later users are invited into an organization by `admin`/`owner`. Creating additional organizations requires an authenticated user.
-2. Use case creates **Organization**, **Membership** (`owner`), default **Environment** options (optional), and an **AuditEvent** (`organization.created`, `membership.created`).
+1. There is **no** unauthenticated signup ([ADR 0019](../adr/0019-local-password-sessions.md)). Existing users authenticate with local email and password. First-user HTTP bootstrap and invitations are deferred. Development seed may attach synthetic credentials and is rejected in production.
+2. Use case creates **Organization**, **Membership** (`owner`), default **Environment** options (optional), and an **AuditEvent** (`organization.created`, `membership.created`) — when those product routes exist.
 3. Session is bound to that user. Subsequent commands use membership, not a client-supplied organization id as authority.
 
 ## 2. Register an asset

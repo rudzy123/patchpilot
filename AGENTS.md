@@ -17,7 +17,7 @@ Do not treat product, styling, or convenience guidance as permission to bypass d
 
 ## Current repository state
 
-The Session 3 **development foundation** and Session 4 CI/governance are in place. Session 5 adds the PostgreSQL tenant schema, repository adapters, migrations, and database integration tests. Product APIs, authentication, live SBOM ingestion, live vulnerability-provider calls, and risk-scoring logic are **not** implemented. v0.1 architecture, security design, and operational runbooks exist under `docs/architecture/`, `docs/security/`, and `docs/runbooks/`. ADRs 0001–0018 are **Accepted**. The layout below is the modular monolith. Do not invent a different topology without an accepted ADR.
+The Session 3 **development foundation** and Session 4 CI/governance are in place. Session 5 adds the PostgreSQL tenant schema, repository adapters, migrations, and database integration tests. Session 6 Batch 1 accepts [ADR 0019](docs/adr/0019-local-password-sessions.md) (local passwords, opaque sessions, CSRF, interim permissions) and typed auth configuration. Login, hashing, session tables, and auth routes are **not** implemented yet. Product APIs, live SBOM ingestion, live vulnerability-provider calls, and risk-scoring logic are **not** implemented. v0.1 architecture, security design, and operational runbooks exist under `docs/architecture/`, `docs/security/`, and `docs/runbooks/`. ADRs 0001–0019 are **Accepted**. The layout below is the modular monolith. Do not invent a different topology without an accepted ADR.
 
 ## Target repository layout
 

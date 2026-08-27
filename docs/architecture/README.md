@@ -2,7 +2,7 @@
 
 This directory is the v0.1 architecture design for PatchPilot. Sessions 3–4 scaffolded application shells, CI, and governance. Session 5 adds the PostgreSQL tenant schema and persistence adapters. Product APIs, SBOM parsing, live feeds, and scoring are **not** implemented yet.
 
-Decisions in this directory follow the Architecture Decision Records under [docs/adr/](../adr/README.md). ADRs 0001–0018 are **Accepted** for v0.1. Remaining gaps are listed in [open-decisions.md](open-decisions.md).
+Decisions in this directory follow the Architecture Decision Records under [docs/adr/](../adr/README.md). ADRs 0001–0019 are **Accepted** for v0.1. Remaining gaps are listed in [open-decisions.md](open-decisions.md). OD-1, OD-2, and OD-3 are closed by [ADR 0019](../adr/0019-local-password-sessions.md).
 
 ## How to read this set
 
@@ -33,13 +33,14 @@ When two documents describe the same rule, treat this table as the source of tru
 | Remediation tasks and risk acceptance | [remediation-lifecycle.md](remediation-lifecycle.md) |
 | Audit event types and immutability | [audit-model.md](audit-model.md) |
 | Organization context and repository scoping | [tenant-isolation.md](tenant-isolation.md) |
+| Authentication, sessions, CSRF, interim permissions | [ADR 0019](../adr/0019-local-password-sessions.md) |
 | Outbox, retries, poison jobs | [reliability-model.md](reliability-model.md) |
 | Classification labels | [data-classification.md](data-classification.md) |
 | Physical schema, constraints, indexes, JSON versioning | [database-model.md](database-model.md) |
 
 ## What this design set does not claim
 
-- Product workflows (authentication, SBOM processing, scoring, remediation) are specified here. Session 5 persists the schema for those workflows; the workflows themselves are **not** implemented yet.
+- Product workflows (authentication runtime, SBOM processing, scoring, remediation) are specified here. [ADR 0019](../adr/0019-local-password-sessions.md) is accepted; login and session tables are **not** implemented in Batch 1. Session 5 persists the tenant schema; those workflows themselves are **not** implemented yet.
 - The foundation does not claim SOC 2, ISO 27001, FedRAMP, PCI, HIPAA, or any other compliance status.
 
 ## Open decisions

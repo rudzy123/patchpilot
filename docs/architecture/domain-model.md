@@ -148,13 +148,13 @@ A person who can authenticate to the instance.
 | Field (logical) | Notes |
 | --- | --- |
 | `id` | UUID |
-| `email` | Unique at instance level for local accounts (interim [OD-1](open-decisions.md)). Stored lowercase. Uniqueness does not fully canonicalize plus-addressing or Unicode lookalikes. |
+| `email` | Unique at instance level for local accounts ([ADR 0019](../adr/0019-local-password-sessions.md)). Stored lowercase. Uniqueness does not fully canonicalize plus-addressing or Unicode lookalikes. |
 | `displayName` | Untrusted text |
 | `status` | `active` or `disabled` |
 | `createdAt` | UTC |
 | `disabledAt` | Required when disabled |
 
-Password hashes are **not** persisted in Session 5. OD-1 remains open; this session does not add authentication secrets.
+Password hashes are **not** in the Session 5 schema. [ADR 0019](../adr/0019-local-password-sessions.md) requires a later forward-only `LocalCredential` and `Session` migration. This documentation batch does not add those tables.
 
 A user without membership cannot access tenant-owned data. Instance operator bootstrap is separate ([OD-10](open-decisions.md)).
 

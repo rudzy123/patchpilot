@@ -19,12 +19,12 @@ Decision deadline: before the first implementing PR for that area, unless noted.
 | R7 | Package/ecosystem confusion in correlation | M | H | P1 | Matching | No fuzzy match; adapters | GIGO SBOMs | First correlate PR | mitigated-in-design |
 | R8 | Poisoned or stale intel silently trusted | M | M | P1 | Intel | Provenance, freshness UI, additive records | Public catalogs | First intel PR | mitigated-in-design |
 | R9 | XSS via component names | M | H | P1 | Web | Escape; no raw JSON | New sinks | First UI PR | mitigated-in-design |
-| R10 | CSRF on session cookie | M | H | P1 | Authn | SameSite + CSRF token | **OD-1** open | Authn ADR + first session | mitigated-in-design |
+| R10 | CSRF on session cookie | M | H | P1 | Authn | [ADR 0019](../adr/0019-local-password-sessions.md) SameSite + Origin + synchronizer token | Runtime residual until session routes exist | First session PR | mitigated-in-design |
 | R11 | Secret or SBOM logging | M | H | P1 | Telemetry | Canonical redaction tests | Sink bypass | First logger PR | mitigated-in-design |
 | R12 | Audit UPDATE/DELETE or cascade evidence loss | L | H | P1 | Audit | Insert-only; FK policy; DB role | Superuser | First audit table | mitigated-in-design |
 | R13 | Incorrect priority / false "fixed" / incomplete SBOM | M | H | P1 | Policy/findings | Factors, policy version, coverage heuristic, rescan ≠ task | Weights arbitrary; heuristic | First score + rescan PR | mitigated-in-design |
 | R14 | SSRF via future URL fetch or mis-allowlist | L | H | P1 | Egress | No SBOM fetch; allowlists | Misconfig | First HTTP adapter | mitigated-in-design |
-| R15 | Authn mechanism underspecified (lockout, MFA) | H | M | P1 | Authn | [OD-1](../architecture/open-decisions.md) | Interim only | **Before implementing login** | open |
+| R15 | Authn lockout and MFA unspecified | H | M | P1 | Authn | Rate limits in [ADR 0019](../adr/0019-local-password-sessions.md); [OD-17](../architecture/open-decisions.md) | No MFA | Before treating stuffing resistance as complete | open |
 | R16 | Credential KEK management weak or lost | M | H | P1 | Secrets | [OD-4](../architecture/open-decisions.md) | Lost KEK = lost creds | Before tenant credentials | open |
 | R17 | Redis exposed → queue injection | M | H | P1 | Jobs | Network isolation | Operator duty | First compose | mitigated-in-design |
 | R18 | Backup exposure | M | H | P1 | Deploy | Operator encrypt; Restricted class | Accepted | Ongoing | accepted |
@@ -47,7 +47,7 @@ Decision deadline: before the first implementing PR for that area, unless noted.
 | R35 | Derived graph keyed only by SBOM (reprocess / observations) | M | H | P1 | Ingestion | Key occurrences and observations by `sbomIngestionId` | Extra rows | First parser persist PR | mitigated-in-design |
 | R36 | Older SBOM completing last becomes current | M | H | P1 | Findings | Current = max `receivedAt` among `completed` | Clock skew on upload time (server sets `receivedAt`) | First rescan PR | mitigated-in-design |
 | R37 | Divergent RiskCalculation idempotency keys | M | M | P1 | Jobs | Single `inputFingerprint` in [reliability-model.md](../architecture/reliability-model.md) | Fingerprint bugs | First score PR | mitigated-in-design |
-| R38 | Unauthenticated org signup on exposed instance | M | H | P1 | Authn | First-user only ([OD-1](../architecture/open-decisions.md)) | Lockout still open | Before implementing login | open |
+| R38 | Unauthenticated org signup on exposed instance | M | H | P1 | Authn | No public registration ([ADR 0019](../adr/0019-local-password-sessions.md)) | First-user HTTP still deferred | Before invite/bootstrap PR | mitigated-in-design |
 
 ## P0 meaning
 
@@ -55,7 +55,7 @@ P0 items must have tests and review on the first implementing PR for that area. 
 
 ## Open architecture decisions that drive risk
 
-See [open-decisions.md](../architecture/open-decisions.md). Highest coupling: **OD-1** (R10, R15, R38), **OD-4** (R16), **OD-10** (R19), **OD-15** (R7).
+See [open-decisions.md](../architecture/open-decisions.md). Highest coupling: **OD-17** (R15), **OD-4** (R16), **OD-10** (R19), **OD-15** (R7), **OD-18** (proxy trust). OD-1, OD-2, and OD-3 are closed by [ADR 0019](../adr/0019-local-password-sessions.md).
 
 ## Related documents
 

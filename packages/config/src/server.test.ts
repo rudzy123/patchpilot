@@ -2,6 +2,44 @@ import { describe, expect, it } from 'vitest';
 
 import { ConfigValidationError, loadServerConfigFrom } from './server.js';
 import { loadPublicConfigFrom } from './public.js';
+import { DEVELOPMENT_SESSION_COOKIE_NAME, PRODUCTION_SESSION_COOKIE_NAME } from './auth.js';
+
+function developmentAuthEnv(): Record<string, string> {
+  return {
+    AUTH_SESSION_ABSOLUTE_TTL_SECONDS: '604800',
+    AUTH_SESSION_IDLE_TTL_SECONDS: '43200',
+    AUTH_SESSION_LAST_SEEN_MIN_INTERVAL_SECONDS: '60',
+    AUTH_COOKIE_NAME: DEVELOPMENT_SESSION_COOKIE_NAME,
+    AUTH_COOKIE_SECURE: 'false',
+    AUTH_CSRF_HEADER_NAME: 'x-csrf-token',
+    AUTH_PASSWORD_MIN_LENGTH: '12',
+    AUTH_PASSWORD_MAX_BYTES: '128',
+    AUTH_ARGON2_MEMORY_KIB: '19456',
+    AUTH_ARGON2_TIME_COST: '2',
+    AUTH_ARGON2_PARALLELISM: '1',
+    AUTH_LOGIN_RATE_LIMIT_IP_MAX: '10',
+    AUTH_LOGIN_RATE_LIMIT_IP_WINDOW_SECONDS: '900',
+    AUTH_LOGIN_RATE_LIMIT_ACCOUNT_MAX: '5',
+    AUTH_LOGIN_RATE_LIMIT_ACCOUNT_WINDOW_SECONDS: '900',
+    AUTH_RATE_LIMIT_REDIS_TIMEOUT_MS: '200',
+  };
+}
+
+function productionAuthEnv(): Record<string, string> {
+  return {
+    ...developmentAuthEnv(),
+    AUTH_COOKIE_NAME: PRODUCTION_SESSION_COOKIE_NAME,
+    AUTH_COOKIE_SECURE: 'true',
+  };
+}
+
+function testAuthEnv(): Record<string, string> {
+  return {
+    ...developmentAuthEnv(),
+    AUTH_ARGON2_MEMORY_KIB: '8192',
+    AUTH_ARGON2_TIME_COST: '1',
+  };
+}
 
 function validDevelopmentEnv(): Record<string, string> {
   return {
@@ -27,6 +65,7 @@ function validDevelopmentEnv(): Record<string, string> {
     REQUEST_BODY_LIMIT_BYTES: '1048576',
     REQUEST_ID_HEADER: 'x-request-id',
     CORRELATION_ID_HEADER: 'x-correlation-id',
+    ...developmentAuthEnv(),
   };
 }
 
@@ -53,6 +92,16 @@ function validProductionEnv(): Record<string, string> {
     REQUEST_BODY_LIMIT_BYTES: '1048576',
     REQUEST_ID_HEADER: 'x-request-id',
     CORRELATION_ID_HEADER: 'x-correlation-id',
+    ...productionAuthEnv(),
+  };
+}
+
+function validTestEnv(): Record<string, string> {
+  return {
+    ...validDevelopmentEnv(),
+    PATCHPILOT_DEPLOYMENT_ENVIRONMENT: 'test',
+    LOG_PRETTY: 'false',
+    ...testAuthEnv(),
   };
 }
 
@@ -115,6 +164,77 @@ describe('loadServerConfigFrom', () => {
     const env = validDevelopmentEnv();
     delete env['DATABASE_URL'];
     expect(() => loadServerConfigFrom(env)).toThrow(/DATABASE_URL/);
+  });
+
+  it('accepts valid production authentication configuration', () => {
+    const config = loadServerConfigFrom(validProductionEnv());
+    expect(config.auth.cookieName).toBe(PRODUCTION_SESSION_COOKIE_NAME);
+    expect(config.auth.cookieSecure).toBe(true);
+    expect(config.auth.argon2MemoryKib).toBe(19456);
+    expect(config.auth.csrfHeaderName).toBe('x-csrf-token');
+    expect(config.corsAllowedOrigins).toEqual(['https://patchpilot.example']);
+  });
+
+  it('accepts valid development authentication configuration', () => {
+    const config = loadServerConfigFrom(validDevelopmentEnv());
+    expect(config.auth.cookieName).toBe(DEVELOPMENT_SESSION_COOKIE_NAME);
+    expect(config.auth.cookieSecure).toBe(false);
+    expect(config.auth.sessionAbsoluteTtlSeconds).toBe(604800);
+    expect(config.auth.sessionIdleTtlSeconds).toBe(43200);
+  });
+
+  it('accepts valid test authentication configuration with guarded cheaper Argon2', () => {
+    const config = loadServerConfigFrom(validTestEnv());
+    expect(config.deploymentEnvironment).toBe('test');
+    expect(config.auth.argon2MemoryKib).toBe(8192);
+    expect(config.auth.argon2TimeCost).toBe(1);
+    expect(config.auth.cookieName).toBe(DEVELOPMENT_SESSION_COOKIE_NAME);
+  });
+
+  it('rejects insecure production cookies', () => {
+    const env = validProductionEnv();
+    env['AUTH_COOKIE_SECURE'] = 'false';
+    expect(() => loadServerConfigFrom(env)).toThrow(ConfigValidationError);
+    expect(() => loadServerConfigFrom(env)).toThrow(/Secure=true/);
+  });
+
+  it('rejects the loopback development cookie name in production', () => {
+    const env = validProductionEnv();
+    env['AUTH_COOKIE_NAME'] = DEVELOPMENT_SESSION_COOKIE_NAME;
+    expect(() => loadServerConfigFrom(env)).toThrow(/loopback development cookie name/);
+  });
+
+  it('rejects below-minimum Argon2 production parameters', () => {
+    const env = validProductionEnv();
+    env['AUTH_ARGON2_MEMORY_KIB'] = '8192';
+    env['AUTH_ARGON2_TIME_COST'] = '1';
+    expect(() => loadServerConfigFrom(env)).toThrow(/Production Argon2 memory/);
+  });
+
+  it('rejects an excessive password UTF-8 byte limit', () => {
+    const env = validDevelopmentEnv();
+    env['AUTH_PASSWORD_MAX_BYTES'] = '1024';
+    expect(() => loadServerConfigFrom(env)).toThrow(ConfigValidationError);
+    expect(() => loadServerConfigFrom(env)).toThrow(/passwordMaxBytes|128/);
+  });
+
+  it('rejects idle TTL greater than absolute TTL', () => {
+    const env = validDevelopmentEnv();
+    env['AUTH_SESSION_IDLE_TTL_SECONDS'] = '700000';
+    env['AUTH_SESSION_ABSOLUTE_TTL_SECONDS'] = '604800';
+    expect(() => loadServerConfigFrom(env)).toThrow(/Idle session TTL/);
+  });
+
+  it('rejects invalid production origins', () => {
+    const env = validProductionEnv();
+    env['CORS_ALLOWED_ORIGINS'] = 'http://patchpilot.example';
+    expect(() => loadServerConfigFrom(env)).toThrow(/https URLs/);
+  });
+
+  it('rejects unsafe login rate-limit thresholds', () => {
+    const env = validDevelopmentEnv();
+    env['AUTH_LOGIN_RATE_LIMIT_IP_MAX'] = '0';
+    expect(() => loadServerConfigFrom(env)).toThrow(/Login IP rate-limit max attempts/);
   });
 });
 

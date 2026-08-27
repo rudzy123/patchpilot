@@ -17,7 +17,7 @@ Copy [`.env.example`](../../.env.example) to `.env`. Example values are **develo
 | `API_HOST` | Fastify bind address. Local default `127.0.0.1`. |
 | `API_PORT` | Fastify bind port. Local default `3001`. |
 | `WEB_PORT` | Documented Next.js port. Local default `3000`. |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated exact origin allowlist. `*` is rejected. |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated exact origin allowlist used for CORS and CSRF Origin checks. `*` is rejected. Production origins must be `https://` URLs. |
 | `DATABASE_URL` | PostgreSQL URL. Never logged. |
 | `PATCHPILOT_ALLOW_DESTRUCTIVE_DATABASE` | Must be `true` for `pnpm db:reset` and ephemeral integration-test databases. Never set in production. `NODE_ENV` alone is not a safety grant. |
 | `REDIS_URL` | Redis URL. Never logged. |
@@ -33,6 +33,29 @@ Copy [`.env.example`](../../.env.example) to `.env`. Example values are **develo
 | `REQUEST_BODY_LIMIT_BYTES` | Fastify body limit. |
 | `REQUEST_ID_HEADER` | Incoming/outgoing request id header. Default `x-request-id`. |
 | `CORRELATION_ID_HEADER` | Incoming/outgoing correlation id header. Default `x-correlation-id`. |
+
+## Authentication ([ADR 0019](../adr/0019-local-password-sessions.md))
+
+Required. There is **no** dummy password-hash environment variable. Login, hashing, and session runtime are not implemented in Batch 1; these variables are validated at process start so later batches cannot boot with unsafe defaults.
+
+| Variable | Purpose |
+| --- | --- |
+| `AUTH_SESSION_ABSOLUTE_TTL_SECONDS` | Absolute session lifetime. Default example `604800` (7 days). Must stay greater than or equal to the idle TTL. |
+| `AUTH_SESSION_IDLE_TTL_SECONDS` | Idle session lifetime. Default example `43200` (12 hours). Must not exceed the absolute TTL. |
+| `AUTH_SESSION_LAST_SEEN_MIN_INTERVAL_SECONDS` | Minimum seconds between `lastSeenAt` writes. Default example `60`. Must not exceed the idle TTL. |
+| `AUTH_COOKIE_NAME` | Session cookie name. Development/test: `patchpilot.sid`. Production: `__Host-patchpilot.sid`. |
+| `AUTH_COOKIE_SECURE` | `true` or `false`. Production must be `true`. `false` is allowed only for explicit loopback HTTP development/test. |
+| `AUTH_CSRF_HEADER_NAME` | Header carrying the synchronizer token. Example `x-csrf-token`. |
+| `AUTH_PASSWORD_MIN_LENGTH` | Minimum password characters. Must be at least `12`. |
+| `AUTH_PASSWORD_MAX_BYTES` | Maximum password UTF-8 bytes. Must be at least the minimum length and at most `128`. |
+| `AUTH_ARGON2_MEMORY_KIB` | Argon2id memory in KiB. Production minimum `19456`. Guarded test/development may use `8192`. Maximum `262144`. |
+| `AUTH_ARGON2_TIME_COST` | Argon2id time cost. Production minimum `2`. Guarded test/development may use `1`. Maximum `6`. |
+| `AUTH_ARGON2_PARALLELISM` | Argon2id parallelism. `1`–`4`. |
+| `AUTH_LOGIN_RATE_LIMIT_IP_MAX` | Max `POST /auth/login` attempts per direct peer IP per window. `1`–`20`. |
+| `AUTH_LOGIN_RATE_LIMIT_IP_WINDOW_SECONDS` | IP limiter window. `30`–`3600`. |
+| `AUTH_LOGIN_RATE_LIMIT_ACCOUNT_MAX` | Max attempts per normalized account digest per window. `1`–`20`. |
+| `AUTH_LOGIN_RATE_LIMIT_ACCOUNT_WINDOW_SECONDS` | Account limiter window. `30`–`3600`. |
+| `AUTH_RATE_LIMIT_REDIS_TIMEOUT_MS` | Bounded Redis limiter operation timeout. `50`–`2000`. Login fails closed if Redis exceeds this. |
 
 ## Public (web)
 
@@ -55,4 +78,4 @@ If you change these, also change `DATABASE_URL`, `REDIS_URL`, and `OBJECT_STORAG
 
 ## Production notes
 
-Production configuration must set `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`, `PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS=false`, `LOG_PRETTY=false`, operator-supplied credentials (not `patchpilot-dev`, `not-for-production`, `minioadmin`, `changeme`, or `password` fragments), a Redis URL that includes a password, and an exact CORS allowlist. Bind addresses and TLS are operator responsibilities.
+Production configuration must set `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`, `PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS=false`, `LOG_PRETTY=false`, operator-supplied credentials (not `patchpilot-dev`, `not-for-production`, `minioadmin`, `changeme`, or `password` fragments), a Redis URL that includes a password, `AUTH_COOKIE_NAME=__Host-patchpilot.sid`, `AUTH_COOKIE_SECURE=true`, Argon2 parameters at or above OWASP minimums, and an exact **https** CORS allowlist. Bind addresses and TLS are operator responsibilities. Fastify `trustProxy` remains false; do not expect `X-Forwarded-For` to select the login rate-limit key.

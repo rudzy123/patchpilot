@@ -124,6 +124,8 @@ Triggers and revoked DML are not WORM storage. Superusers can still rewrite hist
 
 Organization `slug` uniqueness does not reserve product route names (`api`, `health`, `login`, and similar). Do not treat the current unique index as URL-routing protection. Reserved slugs stay deferred until URL routing is implemented.
 
+[ADR 0019](../adr/0019-local-password-sessions.md) specifies `LocalCredential` and `Session` tables and audit-actor changes. Those objects are **not** in this schema yet and must arrive in a new forward-only migration. Do not edit the Session 5 migrations.
+
 ## Related documents
 
 - [Tenant isolation](tenant-isolation.md)

@@ -25,7 +25,7 @@ Operators deploy a Node Next.js app. Playwright covers user-visible journeys. Cl
 
 ## Security and tenancy
 
-Browser is untrusted. Session cookies follow [open decision OD-1](../architecture/open-decisions.md). No organization id in the client as authority.
+Browser is untrusted. Session cookies follow [ADR 0019](0019-local-password-sessions.md). No organization id in the client as authority.
 
 ## Operational failure plan
 
