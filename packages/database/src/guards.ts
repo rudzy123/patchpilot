@@ -5,7 +5,8 @@ export type PrismaClientLike = PrismaClient | Prisma.TransactionClient;
 
 export const SHA256_HEX = /^[a-f0-9]{64}$/;
 export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Local @ dotted-domain. Labels exclude `.` so quantifiers do not overlap (CodeQL js/polynomial-redos). */
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 
 export function requireSha256(value: string, fieldName: string): string {
   if (!SHA256_HEX.test(value)) {
@@ -34,7 +35,8 @@ export function normalizeSlug(value: string, fieldName: string): string {
 
 export function normalizeEmail(value: string): string {
   const email = value.trim().toLowerCase();
-  if (!EMAIL_PATTERN.test(email) || email.length > 320) {
+  // Length-cap before the regex so adversarial input cannot drive backtracking.
+  if (email.length > 320 || !EMAIL_PATTERN.test(email)) {
     throw new Error('email must be a valid instance-level address.');
   }
 

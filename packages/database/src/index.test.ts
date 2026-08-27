@@ -31,6 +31,20 @@ describe('input guards', () => {
     expect(normalizeEmail('Owner@Synthetic.PatchPilot.Test')).toBe(
       'owner@synthetic.patchpilot.test',
     );
+    expect(() => normalizeEmail('owner@synthetic..patchpilot.test')).toThrow(/email/);
+    expect(() => normalizeEmail('owner@nodot')).toThrow(/email/);
+  });
+
+  it('rejects oversized email input before regex matching', () => {
+    const oversized = `${'a'.repeat(321)}@example.test`;
+    const started = Date.now();
+    expect(() => normalizeEmail(oversized)).toThrow(/email/);
+    expect(Date.now() - started).toBeLessThan(1000);
+
+    const adversarial = `!@${'!.'.repeat(50_000)}`;
+    const attackStarted = Date.now();
+    expect(() => normalizeEmail(adversarial)).toThrow(/email/);
+    expect(Date.now() - attackStarted).toBeLessThan(1000);
   });
 });
 
