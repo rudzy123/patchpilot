@@ -93,12 +93,12 @@ describe('session 5 review corrections', () => {
     expect(await repos.riskPolicies.findById(orgB.id, orgPolicy.id)).toBeUndefined();
     expect((await repos.riskPolicies.findById(orgA.id, orgPolicy.id))?.id).toBe(orgPolicy.id);
     expect((await repos.riskPolicies.findBuiltinById(builtin.id))?.id).toBe(builtin.id);
-    expect(
-      (await repos.riskPolicies.findBuiltinByKeyVersion('patchpilot.builtin.v0', 1))?.id,
-    ).toBe(builtin.id);
-    expect((await repos.riskPolicies.listBuiltins()).items.some((row) => row.id === builtin.id)).toBe(
-      true,
+    expect((await repos.riskPolicies.findBuiltinByKeyVersion('patchpilot.builtin.v0', 1))?.id).toBe(
+      builtin.id,
     );
+    expect(
+      (await repos.riskPolicies.listBuiltins()).items.some((row) => row.id === builtin.id),
+    ).toBe(true);
     expect(
       (await repos.riskPolicies.listForOrganization(orgA.id)).items.some(
         (row) => row.id === builtin.id,
@@ -183,8 +183,12 @@ describe('session 5 review corrections', () => {
   it('rejects cross-organization and builtin membership creators for risk policies', async () => {
     const orgA = await createOrg(`creator-a-${randomUUID().slice(0, 8)}`);
     const orgB = await createOrg(`creator-b-${randomUUID().slice(0, 8)}`);
-    const userA = await createUser(`creator-a-${randomUUID().slice(0, 8)}@synthetic.patchpilot.test`);
-    const userB = await createUser(`creator-b-${randomUUID().slice(0, 8)}@synthetic.patchpilot.test`);
+    const userA = await createUser(
+      `creator-a-${randomUUID().slice(0, 8)}@synthetic.patchpilot.test`,
+    );
+    const userB = await createUser(
+      `creator-b-${randomUUID().slice(0, 8)}@synthetic.patchpilot.test`,
+    );
     const membershipA = await createMembership(orgA.id, userA.id);
     const membershipB = await createMembership(orgB.id, userB.id);
     const definition = {
@@ -281,24 +285,36 @@ describe('session 5 review corrections', () => {
 
   it('keeps system intelligence sources distinct from tenant integrations', async () => {
     const org = await createOrg(`int-${randomUUID().slice(0, 8)}`);
-    const osv = await prisma.intelligenceSource.findUniqueOrThrow({ where: { providerKey: 'osv' } });
+    const osv = await prisma.intelligenceSource.findUniqueOrThrow({
+      where: { providerKey: 'osv' },
+    });
     expect(osv).toMatchObject({ providerKey: 'osv' });
     await expect(
       prisma.intelligenceSource.create({
         data: {
           providerKey: 'reserved',
-          config: { schemaVersion: JSON_SCHEMA_VERSION_V1, refreshIntervalSeconds: null, endpointAllowlist: [] },
+          config: {
+            schemaVersion: JSON_SCHEMA_VERSION_V1,
+            refreshIntervalSeconds: null,
+            endpointAllowlist: [],
+          },
         },
       }),
     ).rejects.toThrow();
     await expect(
       prisma.integration.create({
         data: {
-          providerId: (await prisma.integrationProvider.findUniqueOrThrow({
-            where: { providerKey: 'osv' },
-          })).id,
+          providerId: (
+            await prisma.integrationProvider.findUniqueOrThrow({
+              where: { providerKey: 'osv' },
+            })
+          ).id,
           displayName: 'Null org install',
-          config: { schemaVersion: JSON_SCHEMA_VERSION_V1, refreshIntervalSeconds: null, endpointAllowlist: [] },
+          config: {
+            schemaVersion: JSON_SCHEMA_VERSION_V1,
+            refreshIntervalSeconds: null,
+            endpointAllowlist: [],
+          },
         } as never,
       }),
     ).rejects.toThrow();
@@ -311,7 +327,11 @@ describe('session 5 review corrections', () => {
         organizationId: org.id,
         providerId: reserved.id,
         displayName: 'Tenant reserved',
-        config: { schemaVersion: JSON_SCHEMA_VERSION_V1, refreshIntervalSeconds: null, endpointAllowlist: [] },
+        config: {
+          schemaVersion: JSON_SCHEMA_VERSION_V1,
+          refreshIntervalSeconds: null,
+          endpointAllowlist: [],
+        },
       },
     });
     expect(install.organizationId).toBe(org.id);
@@ -384,10 +404,20 @@ describe('session 5 review corrections', () => {
     ).rejects.toThrow();
 
     const componentA = await prisma.component.create({
-      data: { organizationId: org.id, identityKey: 'npm|graph-a', ecosystem: 'npm', name: 'graph-a' },
+      data: {
+        organizationId: org.id,
+        identityKey: 'npm|graph-a',
+        ecosystem: 'npm',
+        name: 'graph-a',
+      },
     });
     const componentB = await prisma.component.create({
-      data: { organizationId: org.id, identityKey: 'npm|graph-b', ecosystem: 'npm', name: 'graph-b' },
+      data: {
+        organizationId: org.id,
+        identityKey: 'npm|graph-b',
+        ecosystem: 'npm',
+        name: 'graph-b',
+      },
     });
     const occA = await prisma.componentOccurrence.create({
       data: {
@@ -654,7 +684,12 @@ describe('session 5 review corrections', () => {
         retrievedAt: new Date(),
         payloadSha256: SHA_A,
         normalizationVersion: 'norm-1',
-        normalized: { schemaVersion: JSON_SCHEMA_VERSION_V1, summary: 'one', severity: null, affectedPackages: [] },
+        normalized: {
+          schemaVersion: JSON_SCHEMA_VERSION_V1,
+          summary: 'one',
+          severity: null,
+          affectedPackages: [],
+        },
       },
     });
     const renormalized = await prisma.vulnerabilitySourceRecord.create({
@@ -666,7 +701,12 @@ describe('session 5 review corrections', () => {
         payloadSha256: SHA_A,
         normalizationVersion: 'norm-2',
         supersedesRecordId: first.id,
-        normalized: { schemaVersion: JSON_SCHEMA_VERSION_V1, summary: 'two', severity: null, affectedPackages: [] },
+        normalized: {
+          schemaVersion: JSON_SCHEMA_VERSION_V1,
+          summary: 'two',
+          severity: null,
+          affectedPackages: [],
+        },
       },
     });
     expect(renormalized.supersedesRecordId).toBe(first.id);
@@ -679,7 +719,12 @@ describe('session 5 review corrections', () => {
           retrievedAt: new Date(),
           payloadSha256: SHA_A,
           normalizationVersion: 'norm-1',
-          normalized: { schemaVersion: JSON_SCHEMA_VERSION_V1, summary: 'dup', severity: null, affectedPackages: [] },
+          normalized: {
+            schemaVersion: JSON_SCHEMA_VERSION_V1,
+            summary: 'dup',
+            severity: null,
+            affectedPackages: [],
+          },
         },
       }),
     ).rejects.toThrow();
@@ -697,7 +742,12 @@ describe('session 5 review corrections', () => {
           payloadSha256: SHA_B,
           normalizationVersion: 'norm-1',
           supersedesRecordId: first.id,
-          normalized: { schemaVersion: JSON_SCHEMA_VERSION_V1, summary: 'cross', severity: null, affectedPackages: [] },
+          normalized: {
+            schemaVersion: JSON_SCHEMA_VERSION_V1,
+            summary: 'cross',
+            severity: null,
+            affectedPackages: [],
+          },
         },
       }),
     ).rejects.toThrow();
@@ -849,7 +899,9 @@ describe('session 5 review corrections', () => {
   });
 
   it('pins security-sensitive trigger functions to a controlled search_path', async () => {
-    const functions = await prisma.$queryRaw<Array<{ proname: string; proconfig: string[] | null }>>`
+    const functions = await prisma.$queryRaw<
+      Array<{ proname: string; proconfig: string[] | null }>
+    >`
       SELECT proname, proconfig
       FROM pg_proc
       WHERE proname LIKE 'patchpilot_%'

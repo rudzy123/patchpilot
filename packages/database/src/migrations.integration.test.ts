@@ -215,7 +215,9 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
     expect(functions).toContain(fn);
   }
 
-  const searchPaths = await client.$queryRaw<Array<{ proname: string; proconfig: string[] | null }>>`
+  const searchPaths = await client.$queryRaw<
+    Array<{ proname: string; proconfig: string[] | null }>
+  >`
     SELECT proname, proconfig
     FROM pg_proc
     JOIN pg_namespace n ON n.oid = pg_proc.pronamespace

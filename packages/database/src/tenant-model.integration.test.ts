@@ -151,9 +151,11 @@ describe('tenant model persistence', () => {
     const integrationB = await prisma.integration.create({
       data: {
         organizationId: orgB.id,
-        providerId: (await prisma.integrationProvider.findUniqueOrThrow({
-          where: { providerKey: 'reserved' },
-        })).id,
+        providerId: (
+          await prisma.integrationProvider.findUniqueOrThrow({
+            where: { providerKey: 'reserved' },
+          })
+        ).id,
         displayName: 'Synthetic B',
         config: {
           schemaVersion: JSON_SCHEMA_VERSION_V1,
