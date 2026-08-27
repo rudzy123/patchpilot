@@ -17,7 +17,7 @@ Do not treat product, styling, or convenience guidance as permission to bypass d
 
 ## Current repository state
 
-The Session 3 **development foundation** and Session 4 CI/governance are in place. Session 5 adds the PostgreSQL tenant schema, repository adapters, migrations, and database integration tests. Session 6 Batch 1 accepts [ADR 0019](docs/adr/0019-local-password-sessions.md) (local passwords, opaque sessions, CSRF, interim permissions) and typed auth configuration. Login, hashing, session tables, and auth routes are **not** implemented yet. Product APIs, live SBOM ingestion, live vulnerability-provider calls, and risk-scoring logic are **not** implemented. v0.1 architecture, security design, and operational runbooks exist under `docs/architecture/`, `docs/security/`, and `docs/runbooks/`. ADRs 0001–0019 are **Accepted**. The layout below is the modular monolith. Do not invent a different topology without an accepted ADR.
+The Session 3 **development foundation** and Session 4 CI/governance are in place. Session 5 adds the PostgreSQL tenant schema, repository adapters, migrations, and database integration tests. Session 6 Batch 1 accepts [ADR 0019](docs/adr/0019-local-password-sessions.md) (local passwords, opaque sessions, CSRF, interim permissions) and typed auth configuration. `packages/auth` installs `argon2@0.45.1`; hashing services, session tables, login routes, and the web login UI are **not** implemented yet. Product APIs, live SBOM ingestion, live vulnerability-provider calls, and risk-scoring logic are **not** implemented. v0.1 architecture, security design, and operational runbooks exist under `docs/architecture/`, `docs/security/`, and `docs/runbooks/`. ADRs 0001–0019 are **Accepted**. The layout below is the modular monolith. Do not invent a different topology without an accepted ADR.
 
 ## Target repository layout
 
@@ -28,6 +28,7 @@ apps/
   worker/                      # Node.js TypeScript workers (empty job registry)
 packages/
   config/                      # typed configuration; only place that may read process.env
+  auth/                        # argon2 installed; hashing and session services deferred
   contracts/
   database/                    # Prisma adapters, tenant schema, repository implementations
   domain/                      # Result/error taxonomy; persistence ports; no Prisma types

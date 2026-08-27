@@ -13,3 +13,4 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true
   unrs-resolver: true
+  argon2: true

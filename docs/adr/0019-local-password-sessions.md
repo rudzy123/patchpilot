@@ -22,17 +22,30 @@ Generic public login failures: unknown email, wrong password, and disabled user 
 
 ### Password hashing
 
-Store Argon2id hashes in PHC form using **one** library: `argon2` (node-argon2). Do not install `@node-rs/argon2` or invent a KDF. Use the library `hash`, `verify`, and `needsRehash` APIs. Reject passwords shorter than the configured minimum character length (default 12) and longer than 128 UTF-8 bytes **before** hashing. Do not compare Booleans with `timingSafeEqual`.
+Store Argon2id hashes in PHC form using **one** library: `argon2` (node-argon2) **0.45.1**, declared only on `@patchpilot/auth`. Do not install `@node-rs/argon2`, JWT, Passport, Better Auth, bcrypt, or OIDC libraries. Use the library `hash`, `verify`, and `needsRehash` APIs. Reject passwords shorter than the configured minimum character length (default 12) and longer than 128 UTF-8 bytes **before** hashing. Do not compare Booleans with `timingSafeEqual`.
 
-**Library selection (investigation, not installed in this batch):**
+**Library selection (installed 2026-08-27; sources: npm registry `argon2@0.45.1` and `@node-rs/argon2@2.1.0`, node-argon2 README, published `index.d.ts`):**
 
-| Candidate | Node 24 / Linux CI / containers | PHC + `needsRehash` | Notes |
-| --- | --- | --- | --- |
-| `argon2` 0.45.x | Documents Node ≥ 22; Ubuntu and Alpine prebuilds | Yes | Selected |
-| `@node-rs/argon2` | NAPI prebuilds, Node 24 benchmarks | No first-class `needsRehash` | Rejected so a second hasher is not added |
-| `node:crypto.argon2` | Built into Node 24.7+ | No PHC helpers | Unsuitable as the password-store API |
+| Criterion | `argon2` 0.45.1 | `@node-rs/argon2` 2.1.0 |
+| --- | --- | --- |
+| Node.js 24 | `engines.node` ≥ 16.17.0; README tests Node ≥ 22; 0.45.x CI includes Node 24 | `engines.node` ≥ 10; README benches Node 24 |
+| Linux GitHub-hosted runners | Ubuntu 22.04 glibc prebuilds; compatible with `ubuntu-latest` (24.04) | NAPI `linux-x64-gnu` optional package |
+| Local developer install | `node-gyp-build` loads prebuilds | optional platform package, no postinstall compile |
+| Prebuilt binaries | Ubuntu, macOS, Windows, Alpine musl, FreeBSD | 15 optional platform packages plus wasm |
+| Source-build fallback | yes (`node-gyp` / `--build-from-source`) | no C++ fallback; missing optional native package fails |
+| Supply-chain footprint | four runtime JS deps; npm provenance attestation | zero JS runtime deps; fifteen optional native packages |
+| Argon2id | default `type` is `argon2id` | default `Algorithm.Argon2id` |
+| PHC strings | yes (`@phc/format`) | `hash()` returns an encoded string; no PHC helper API |
+| `verify` | `Promise<boolean>` | `Promise<boolean>` |
+| `needsRehash` / parameter inspection | first-class `needsRehash` | not in the published TypeScript API |
+| TypeScript | shipped `argon2.d.cts` | shipped `index.d.ts` |
+| Containers | Alpine musl prebuilds; rebuild if libc mismatches the prebuild | `linux-*-musl` optional packages |
+| Maintenance | published 2026-07-21; Node 24 CI | published 2026-08-13 |
+| License | MIT (compatible with Apache-2.0) | MIT |
+| Testability | `hash` / `verify` / `needsRehash` | `hash` / `verify` only |
+| Transitive runtime deps | `@phc/format` (MIT), `cross-env`, `node-addon-api`, `node-gyp-build` | platform `@node-rs/argon2-*` optionalDependencies |
 
-Pin `argon2` when hashing code is implemented. Add it to pnpm `allowBuilds` if native compilation is required. Tests may inject a cheap fake hasher. Production and unguarded development must use at least OWASP minimum parameters (m=19456 KiB, t=2, p=1). Cheaper parameters are allowed only in `test` or development with `allowDevelopmentAdapters=true`. Config rejects below-minimum production parameters and unreasonable upper bounds.
+Selected **`argon2@0.45.1`**. pnpm `allowBuilds.argon2` is enabled so `node-gyp-build` can load or compile the native addon. Hashing, dummy-PHC, and session services remain unimplemented. Tests may inject a cheap fake hasher later. Production and unguarded development must use at least OWASP minimum parameters (m=19456 KiB, t=2, p=1). Cheaper parameters are allowed only in `test` or development with `allowDevelopmentAdapters=true`. Config rejects below-minimum production parameters and unreasonable upper bounds. Never log PHC strings; the logger redacts `passwordHash`, `phc`, and related credential-hash fields.
 
 ### Sessions
 
@@ -114,7 +127,7 @@ Do not record successful login as `system`. Forthcoming schema (forward-only mig
 - **JWT access and refresh tokens:** theft and replay without server-side revocation; unnecessary for a first-party cookie browser app.
 - **Redis session store:** rejected for authority; Redis remains queue and login limiter only.
 - **Better Auth / Passport / social login:** would become a second HTTP/identity stack across Fastify and Next.js and would pull provider-specific identity tables.
-- **`@node-rs/argon2` or custom hashing:** extra dependency or custom cryptography; `argon2` already provides PHC and `needsRehash`.
+- **`@node-rs/argon2` or custom hashing:** extra dependency or custom cryptography; published 2.1.0 has no `needsRehash`. `argon2` 0.45.1 already provides PHC and `needsRehash`.
 - **Operator-supplied dummy PHC in env:** secret sprawl and accidental logging; a fixed server-only constant is enough because it authenticates nobody.
 - **Public registration / first-user HTTP in this milestone:** open instance abuse ([threat model](../security/threat-model.md)); deferred.
 - **Session listing / remote revoke:** extra IDOR surface; logout current session only.
@@ -122,7 +135,7 @@ Do not record successful login as `system`. Forthcoming schema (forward-only mig
 
 ## Consequences
 
-Operators get a documented, config-gated authn design that works offline. Runtime login is not available until later batches. Login will fail closed if Redis is down. Stolen cookies last until idle/absolute expiry or logout on that device. Native `argon2` prebuilds must be confirmed on Linux CI when the dependency is added. Audit actor constraint changes require a new migration, not an edit of Session 5 SQL.
+Operators get a documented, config-gated authn design that works offline. Runtime login is not available until later batches. Login will fail closed if Redis is down. Stolen cookies last until idle/absolute expiry or logout on that device. `argon2@0.45.1` is installed on `@patchpilot/auth` with `allowBuilds`; GitHub-hosted Linux CI must still load the same prebuild. Audit actor constraint changes require a new migration, not an edit of Session 5 SQL.
 
 ## Security and tenancy
 
@@ -140,8 +153,8 @@ Runtime failure runbooks land with the implementing batches, not this documentat
 ## Follow-up
 
 - Forward-only migration for `LocalCredential`, `Session`, and audit actors.
-- `packages/auth`, API plugins, five routes, guarded seed credentials, minimal login UI.
-- Confirm `argon2` prebuilds on Node 24 Linux CI when installing.
+- Password hashing adapter, session services, API plugins, five routes, guarded seed credentials, minimal login UI.
+- Confirm `argon2` 0.45.1 prebuilds on GitHub-hosted Node 24 Linux CI (local Linux install already succeeded).
 - Future: OIDC as another `authenticationMethod` on the same session row; MFA; lockout beyond rate limits; first-user bootstrap; session listing; `trustProxy` after a documented proxy topology; password change (column `passwordRevision` is reserved).
 
-Required tests for this batch: typed config accept/reject cases in `packages/config`. Runtime auth tests belong to later batches.
+Required tests for the library-install batch: Argon2id hash/verify of a synthetic password and proof that the PHC string is not logged. Runtime auth tests belong to later batches.
