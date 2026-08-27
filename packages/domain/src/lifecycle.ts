@@ -152,8 +152,14 @@ export type EvidenceKind = (typeof evidenceKinds)[number];
 export const riskPolicyScopes = ['builtin', 'organization'] as const;
 export type RiskPolicyScope = (typeof riskPolicyScopes)[number];
 
-export const auditActorTypes = ['user', 'system', 'instance_operator'] as const;
+export const auditActorTypes = ['user', 'system', 'instance_operator', 'anonymous'] as const;
 export type AuditActorType = (typeof auditActorTypes)[number];
+
+export const passwordHashAlgorithms = ['argon2id'] as const;
+export type PasswordHashAlgorithm = (typeof passwordHashAlgorithms)[number];
+
+export const sessionAuthenticationMethods = ['password'] as const;
+export type SessionAuthenticationMethod = (typeof sessionAuthenticationMethods)[number];
 
 export const auditRetentionCategories = ['security'] as const;
 export type AuditRetentionCategory = (typeof auditRetentionCategories)[number];

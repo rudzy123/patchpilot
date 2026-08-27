@@ -19,6 +19,9 @@ export function Landing({ publicConfig }: { publicConfig: PublicConfig }): React
         Public environment label: <span>{publicConfig.deploymentEnvironment}</span>
       </p>
       <p>
+        <a href="/login">Sign in</a>
+      </p>
+      <p>
         <a href="/health">Service health</a>
       </p>
     </main>

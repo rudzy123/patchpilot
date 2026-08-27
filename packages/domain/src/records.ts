@@ -23,6 +23,7 @@ import type {
   MembershipStatus,
   OrganizationStatus,
   OutboxEventStatus,
+  PasswordHashAlgorithm,
   RemediationTaskStatus,
   RepositoryConnectionStatus,
   RepositoryProvider,
@@ -35,6 +36,7 @@ import type {
   SbomSpecificationType,
   SbomSpecificationVersion,
   SecretStorageProvider,
+  SessionAuthenticationMethod,
   TeamStatus,
   UserStatus,
   VulnerabilitySource,
@@ -88,6 +90,33 @@ export type MembershipRecord = {
   version: number;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type LocalCredentialRecord = {
+  id: string;
+  userId: string;
+  passwordHash: string;
+  passwordRevision: number;
+  algorithm: PasswordHashAlgorithm;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type SessionRecord = {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  csrfTokenHash: string;
+  activeOrganizationId: string | null;
+  authenticationMethod: SessionAuthenticationMethod;
+  passwordRevision: number;
+  createdAt: Date;
+  lastSeenAt: Date;
+  idleExpiresAt: Date;
+  absoluteExpiresAt: Date;
+  revokedAt: Date | null;
+  revokeReason: string | null;
+  userAgent: string | null;
 };
 
 export type TeamRecord = {
@@ -418,6 +447,7 @@ export type EvidenceRecord = {
 export type AuditEventRecord = {
   id: string;
   organizationId: string | null;
+  actorUserId: string | null;
   actorMembershipId: string | null;
   actorType: AuditActorType;
   action: string;

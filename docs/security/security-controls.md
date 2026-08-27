@@ -67,11 +67,13 @@ Canonical rules: [security.mdc](../../.cursor/rules/security.mdc). Threats: [thr
 - No listeners in v0.1.
 - Future: signatures, replay window, unsigned denied, 1:1 installation mapping.
 
-### C11 Session and CSRF (interim OD-1)
+### C11 Session and CSRF ([ADR 0019](../adr/0019-local-password-sessions.md))
 
-- Opaque server-side sessions.
-- `HttpOnly` / `Secure` / `SameSite=Lax` cookies.
-- Synchronizer tokens on mutations.
+- Opaque server-side PostgreSQL sessions; SHA-256 domain-separated token digests.
+- Production `__Host-` `HttpOnly` / `Secure` / `SameSite=Lax` cookies.
+- Synchronizer CSRF token plus exact Origin validation on mutations.
+- Fail-closed Redis login rate limits; `trustProxy` remains false.
+- In-memory HTTP rate limiting on `/auth` via `@fastify/rate-limit` (direct socket peer IP; no Redis).
 
 ### C12 Injection and XSS
 
@@ -100,6 +102,8 @@ Canonical rules: [security.mdc](../../.cursor/rules/security.mdc). Threats: [thr
 ### C16 Rate limiting
 
 - Stricter limits on auth, upload, export.
+- Auth HTTP: in-memory `@fastify/rate-limit` on `/auth` routes, keyed by direct socket peer IP. Does not trust `X-Forwarded-For`. Authenticated reads and logout do not require Redis.
+- Login: Redis-backed, fail-closed, direct peer IP plus account digest ([ADR 0019](../adr/0019-local-password-sessions.md)). The HTTP limiter is additional coarse protection and does not replace Redis.
 - Outbound feed rate limits.
 
 ## Error taxonomy (API)

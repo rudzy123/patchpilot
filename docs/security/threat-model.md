@@ -173,7 +173,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Upload, accept risk, export as the user.
 
-**Mitigation:** `SameSite=Lax` + synchronizer token on mutations ([OD-1](../architecture/open-decisions.md)).
+**Mitigation:** `SameSite=Lax`, exact Origin allowlist, and a synchronizer CSRF token on authenticated mutations ([ADR 0019](../adr/0019-local-password-sessions.md)).
 
 ### Credential leakage
 
@@ -349,7 +349,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Shared-catalog query abuse, disk fill, unintended multi-tenant hosting.
 
-**Mitigation:** First user on an empty instance only; later users invited ([OD-1](../architecture/open-decisions.md)). Residual until the authn ADR adds lockout.
+**Mitigation:** No public registration ([ADR 0019](../adr/0019-local-password-sessions.md)). Existing users only; development seed is production-rejected. Residual: MFA and durable lockout remain [OD-17](../architecture/open-decisions.md).
 
 ### Incorrect vulnerability matching
 
@@ -390,7 +390,7 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 | SSRF | Cloud metadata | URL fetch | Cred theft | No SBOM URLs; allowlist | Egress logs | Block | Adapter tests | Mis-allowlist | Integrations |
 | SQLi | DB | Concat SQL | Takeover | Prisma | — | Restore | — | Raw SQL mistakes | Database |
 | XSS | Sessions | Component names | Session theft | Escape, CSP later | — | Rotate | UI tests | New sinks | Web |
-| CSRF | Mutations | Cross-site POST | Unwanted upload | SameSite + token | — | Revoke | API tests | OD-1 | API |
+| CSRF | Mutations | Cross-site POST | Unwanted upload | SameSite + Origin + token | — | Revoke | API tests | Runtime not in Batch 1 | API |
 | Cred/secret logging | Logs | Header in Pino | Restricted leak | Redaction | Log review | Rotate | Redaction tests | Sink bypass | Logger |
 | Audit alteration | Accountability | UPDATE audit | Lost history | Insert-only | Integrity runbook | Restore | Update-fail test | Superuser | Audit |
 | Public bucket | SBOMs | ACL | Theft | Private + org keys | Cloud alerts | Make private | Adapter tests | Operator ACL | Storage |
@@ -407,7 +407,7 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 | Wrong priority | Queue | Policy bug | Wrong work | Versioned policy | Factor UI | New version | Golden tests | Weights arbitrary | Policy |
 | False remediation | Finding state | Task complete; stale completion order | Premature close | Evidence rules; current=`receivedAt` | — | Reopen on present | State + race tests | Incomplete SBOMs | Findings |
 | Incomplete coverage | Finding state | Sparse SBOM | False resolved | Coverage heuristic | Inconclusive | Re-upload | Coverage test | Heuristic | Findings |
-| Open registration | Instance | Unauthenticated org create | Abuse | First-user only | Auth metrics | Disable signup | Authn tests | OD-1 lockout | Authn |
+| Open registration | Instance | Unauthenticated org create | Abuse | No public registration (ADR 0019) | Auth metrics | Disable signup | Authn tests | OD-17 lockout | Authn |
 | AI leakage (later) | Restricted | Model API | Exfil | Disabled; ADR 0017 | — | Disable | — | If enabled later | Future |
 
 ## Related documents

@@ -106,7 +106,7 @@ Prisma Client is generated, then `pnpm db:migrate:deploy` applies committed migr
 
 Playwright is **not** a repository dependency. `pnpm test:e2e` currently prints that browser journeys are not wired and exits 0. It is kept as a documented local command interface only. GitHub Actions does **not** run it. Do not describe that placeholder as end-to-end validation.
 
-Landing copy and `/health` remain unit-tested. GitHub-hosted E2E coverage is deferred until actual Playwright tests exist ([CI-DEFER-1](#deferred-ci-work)).
+Landing copy, `/health`, and Session 6 authentication UI remain unit-tested. GitHub-hosted E2E coverage is deferred until actual Playwright tests exist ([CI-DEFER-1](#deferred-ci-work)).
 
 ## CodeQL
 

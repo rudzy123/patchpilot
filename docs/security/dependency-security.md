@@ -19,11 +19,11 @@ PatchPilot traces use an explicit OpenTelemetry trace provider and optional OTLP
 
 ## Remaining `pnpm audit` findings
 
-Observed on 2026-08-27 against this branch after the observability cut (`pnpm audit`; metadata: 1 high, 0 critical, 0 moderate, 0 low). No `pnpm.overrides` entry hides an advisory.
+Re-run on 2026-08-27 against `feat/authentication-authorization` after Session 6 local verification (`pnpm audit` exit 1; metadata: 1 high, 0 critical, 0 moderate, 0 low; 686 total dependencies). No `pnpm.overrides` entry hides an advisory. This is the same Prisma-transitive finding recorded after the observability cut; Session 6 did not add a second advisory.
 
 | Advisory | Package | Severity | How it is reached | Residual status |
 | --- | --- | --- | --- | --- |
-| [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx) | `deepmerge-ts@7.1.5` (vulnerable `<8.0.0`, patched `>=8.0.0`) | high | `packages/database` → `@prisma/client` / `prisma` → `@prisma/config` | Unrelated to OpenTelemetry. Recursive object-graph merge can exhaust the stack (CWE-674). Do not add a `pnpm.overrides` entry to silence it. Prefer a Prisma release that depends on `deepmerge-ts>=8.0.0` when one exists. |
+| [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx) | `deepmerge-ts@7.1.5` (vulnerable `<8.0.0`, patched `>=8.0.0`) | high | Two paths, both through Prisma 6.19.x in `packages/database`: `@prisma/client` → `prisma` → `@prisma/config` → `deepmerge-ts`, and `prisma` → `@prisma/config` → `deepmerge-ts` | Unrelated to OpenTelemetry and unrelated to PatchPilot password hashing or session tokens. The advisory is stack exhaustion when merging recursive object graphs (CWE-674). PatchPilot does not depend on `deepmerge-ts` directly. Do not add a `pnpm.overrides` entry to silence it. Prefer a Prisma release that depends on `deepmerge-ts>=8.0.0` when one exists. |
 
 Re-run `pnpm audit` after dependency changes. This table is a snapshot, not a claim that the tree is free of other unreported advisories.
 

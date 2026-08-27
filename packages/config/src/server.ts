@@ -1,5 +1,24 @@
 import { z } from 'zod';
 
+import {
+  AUTH_ARGON2_MEMORY_KIB_MAX,
+  AUTH_ARGON2_MEMORY_KIB_MIN_DEVELOPMENT,
+  AUTH_ARGON2_MEMORY_KIB_MIN_PRODUCTION,
+  AUTH_ARGON2_PARALLELISM_MAX,
+  AUTH_ARGON2_PARALLELISM_MIN,
+  AUTH_ARGON2_TIME_COST_MAX,
+  AUTH_ARGON2_TIME_COST_MIN_DEVELOPMENT,
+  AUTH_ARGON2_TIME_COST_MIN_PRODUCTION,
+  AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS_MAX,
+  AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS_MIN,
+  AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS_MAX,
+  AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS_MIN,
+  AUTH_RATE_LIMIT_REDIS_TIMEOUT_MS_MAX,
+  AUTH_RATE_LIMIT_REDIS_TIMEOUT_MS_MIN,
+  DEVELOPMENT_SESSION_COOKIE_NAME,
+  PRODUCTION_SESSION_COOKIE_NAME,
+  authConfigSchema,
+} from './auth.js';
 import { hydrateProcessEnvFromDevelopmentFiles } from './load-env-files.js';
 import { parseBoolean, parseInteger, readOptional, readRequired } from './read-env.js';
 
@@ -42,6 +61,7 @@ export const serverConfigSchema = z
     requestBodyLimitBytes: z.number().int().positive(),
     requestIdHeader: z.string().min(1),
     correlationIdHeader: z.string().min(1),
+    auth: authConfigSchema,
   })
   .superRefine((value, context) => {
     if (value.deploymentEnvironment === 'production' && value.allowDevelopmentAdapters) {
@@ -86,6 +106,8 @@ export const serverConfigSchema = z
         message: 'CORS origins must be an exact allowlist. Wildcard origins are not permitted.',
       });
     }
+
+    refineAuthConfig(value, context);
   });
 
 export type ServerConfig = z.infer<typeof serverConfigSchema>;
@@ -145,6 +167,63 @@ export function loadServerConfigFrom(
       ),
       requestIdHeader: readRequired(env, 'REQUEST_ID_HEADER'),
       correlationIdHeader: readRequired(env, 'CORRELATION_ID_HEADER'),
+      auth: {
+        sessionAbsoluteTtlSeconds: parseInteger(
+          readRequired(env, 'AUTH_SESSION_ABSOLUTE_TTL_SECONDS'),
+          'AUTH_SESSION_ABSOLUTE_TTL_SECONDS',
+        ),
+        sessionIdleTtlSeconds: parseInteger(
+          readRequired(env, 'AUTH_SESSION_IDLE_TTL_SECONDS'),
+          'AUTH_SESSION_IDLE_TTL_SECONDS',
+        ),
+        lastSeenMinIntervalSeconds: parseInteger(
+          readRequired(env, 'AUTH_SESSION_LAST_SEEN_MIN_INTERVAL_SECONDS'),
+          'AUTH_SESSION_LAST_SEEN_MIN_INTERVAL_SECONDS',
+        ),
+        cookieName: readRequired(env, 'AUTH_COOKIE_NAME'),
+        cookieSecure: parseBoolean(readRequired(env, 'AUTH_COOKIE_SECURE'), 'AUTH_COOKIE_SECURE'),
+        csrfHeaderName: readRequired(env, 'AUTH_CSRF_HEADER_NAME'),
+        passwordMinLength: parseInteger(
+          readRequired(env, 'AUTH_PASSWORD_MIN_LENGTH'),
+          'AUTH_PASSWORD_MIN_LENGTH',
+        ),
+        passwordMaxBytes: parseInteger(
+          readRequired(env, 'AUTH_PASSWORD_MAX_BYTES'),
+          'AUTH_PASSWORD_MAX_BYTES',
+        ),
+        argon2MemoryKib: parseInteger(
+          readRequired(env, 'AUTH_ARGON2_MEMORY_KIB'),
+          'AUTH_ARGON2_MEMORY_KIB',
+        ),
+        argon2TimeCost: parseInteger(
+          readRequired(env, 'AUTH_ARGON2_TIME_COST'),
+          'AUTH_ARGON2_TIME_COST',
+        ),
+        argon2Parallelism: parseInteger(
+          readRequired(env, 'AUTH_ARGON2_PARALLELISM'),
+          'AUTH_ARGON2_PARALLELISM',
+        ),
+        loginRateLimitIpMaxAttempts: parseInteger(
+          readRequired(env, 'AUTH_LOGIN_RATE_LIMIT_IP_MAX'),
+          'AUTH_LOGIN_RATE_LIMIT_IP_MAX',
+        ),
+        loginRateLimitIpWindowSeconds: parseInteger(
+          readRequired(env, 'AUTH_LOGIN_RATE_LIMIT_IP_WINDOW_SECONDS'),
+          'AUTH_LOGIN_RATE_LIMIT_IP_WINDOW_SECONDS',
+        ),
+        loginRateLimitAccountMaxAttempts: parseInteger(
+          readRequired(env, 'AUTH_LOGIN_RATE_LIMIT_ACCOUNT_MAX'),
+          'AUTH_LOGIN_RATE_LIMIT_ACCOUNT_MAX',
+        ),
+        loginRateLimitAccountWindowSeconds: parseInteger(
+          readRequired(env, 'AUTH_LOGIN_RATE_LIMIT_ACCOUNT_WINDOW_SECONDS'),
+          'AUTH_LOGIN_RATE_LIMIT_ACCOUNT_WINDOW_SECONDS',
+        ),
+        rateLimitRedisTimeoutMs: parseInteger(
+          readRequired(env, 'AUTH_RATE_LIMIT_REDIS_TIMEOUT_MS'),
+          'AUTH_RATE_LIMIT_REDIS_TIMEOUT_MS',
+        ),
+      },
     };
 
     const parsed = serverConfigSchema.safeParse(candidate);
@@ -175,6 +254,201 @@ export function loadServerConfigFrom(
 export function loadServerConfig(): ServerConfig {
   hydrateProcessEnvFromDevelopmentFiles(process.env, { moduleUrl: import.meta.url });
   return loadServerConfigFrom(process.env);
+}
+
+function refineAuthConfig(value: ServerConfig, context: z.RefinementCtx): void {
+  const { auth } = value;
+  const production = value.deploymentEnvironment === 'production';
+  const guardedCheapArgon2 = !production && value.allowDevelopmentAdapters === true;
+
+  if (auth.sessionIdleTtlSeconds > auth.sessionAbsoluteTtlSeconds) {
+    context.addIssue({
+      code: 'custom',
+      path: ['auth', 'sessionIdleTtlSeconds'],
+      message: 'Idle session TTL must not exceed absolute session TTL.',
+    });
+  }
+
+  if (auth.lastSeenMinIntervalSeconds > auth.sessionIdleTtlSeconds) {
+    context.addIssue({
+      code: 'custom',
+      path: ['auth', 'lastSeenMinIntervalSeconds'],
+      message: 'lastSeenAt update interval must not exceed idle session TTL.',
+    });
+  }
+
+  if (auth.passwordMinLength > auth.passwordMaxBytes) {
+    context.addIssue({
+      code: 'custom',
+      path: ['auth', 'passwordMinLength'],
+      message: 'Password minimum character length must not exceed the maximum UTF-8 byte length.',
+    });
+  }
+
+  if (auth.cookieName.startsWith('__Host-') && !auth.cookieSecure) {
+    context.addIssue({
+      code: 'custom',
+      path: ['auth', 'cookieSecure'],
+      message: 'Cookies with the __Host- prefix must set Secure=true.',
+    });
+  }
+
+  if (production) {
+    if (!auth.cookieSecure) {
+      context.addIssue({
+        code: 'custom',
+        path: ['auth', 'cookieSecure'],
+        message:
+          'Production cookies must set Secure=true. Plaintext HTTP session cookies are not permitted.',
+      });
+    }
+
+    if (auth.cookieName === DEVELOPMENT_SESSION_COOKIE_NAME) {
+      context.addIssue({
+        code: 'custom',
+        path: ['auth', 'cookieName'],
+        message:
+          'Production must not use the loopback development cookie name. Use the __Host- production cookie name.',
+      });
+    }
+
+    if (auth.cookieName !== PRODUCTION_SESSION_COOKIE_NAME) {
+      context.addIssue({
+        code: 'custom',
+        path: ['auth', 'cookieName'],
+        message: `Production cookie name must be ${PRODUCTION_SESSION_COOKIE_NAME}.`,
+      });
+    }
+
+    for (const [index, origin] of value.corsAllowedOrigins.entries()) {
+      if (!origin.startsWith('https://')) {
+        context.addIssue({
+          code: 'custom',
+          path: ['corsAllowedOrigins', index],
+          message:
+            'Production approved origins must be https URLs. HTTP and wildcard origins are not permitted.',
+        });
+      }
+    }
+  } else if (auth.cookieName !== DEVELOPMENT_SESSION_COOKIE_NAME) {
+    context.addIssue({
+      code: 'custom',
+      path: ['auth', 'cookieName'],
+      message: `Development and test cookie name must be ${DEVELOPMENT_SESSION_COOKIE_NAME}.`,
+    });
+  }
+
+  const argon2MemoryMin = guardedCheapArgon2
+    ? AUTH_ARGON2_MEMORY_KIB_MIN_DEVELOPMENT
+    : AUTH_ARGON2_MEMORY_KIB_MIN_PRODUCTION;
+  const argon2TimeMin = guardedCheapArgon2
+    ? AUTH_ARGON2_TIME_COST_MIN_DEVELOPMENT
+    : AUTH_ARGON2_TIME_COST_MIN_PRODUCTION;
+
+  if (auth.argon2MemoryKib < argon2MemoryMin) {
+    context.addIssue({
+      code: 'custom',
+      path: ['auth', 'argon2MemoryKib'],
+      message: production
+        ? `Production Argon2 memory must be at least ${AUTH_ARGON2_MEMORY_KIB_MIN_PRODUCTION} KiB.`
+        : `Argon2 memory must be at least ${argon2MemoryMin} KiB.`,
+    });
+  }
+
+  if (auth.argon2MemoryKib > AUTH_ARGON2_MEMORY_KIB_MAX) {
+    context.addIssue({
+      code: 'custom',
+      path: ['auth', 'argon2MemoryKib'],
+      message: `Argon2 memory must not exceed ${AUTH_ARGON2_MEMORY_KIB_MAX} KiB.`,
+    });
+  }
+
+  if (auth.argon2TimeCost < argon2TimeMin) {
+    context.addIssue({
+      code: 'custom',
+      path: ['auth', 'argon2TimeCost'],
+      message: production
+        ? `Production Argon2 time cost must be at least ${AUTH_ARGON2_TIME_COST_MIN_PRODUCTION}.`
+        : `Argon2 time cost must be at least ${argon2TimeMin}.`,
+    });
+  }
+
+  if (auth.argon2TimeCost > AUTH_ARGON2_TIME_COST_MAX) {
+    context.addIssue({
+      code: 'custom',
+      path: ['auth', 'argon2TimeCost'],
+      message: `Argon2 time cost must not exceed ${AUTH_ARGON2_TIME_COST_MAX}.`,
+    });
+  }
+
+  if (
+    auth.argon2Parallelism < AUTH_ARGON2_PARALLELISM_MIN ||
+    auth.argon2Parallelism > AUTH_ARGON2_PARALLELISM_MAX
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['auth', 'argon2Parallelism'],
+      message: `Argon2 parallelism must be between ${AUTH_ARGON2_PARALLELISM_MIN} and ${AUTH_ARGON2_PARALLELISM_MAX}.`,
+    });
+  }
+
+  refineRateLimit(
+    auth.loginRateLimitIpMaxAttempts,
+    ['auth', 'loginRateLimitIpMaxAttempts'],
+    AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS_MIN,
+    AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS_MAX,
+    'Login IP rate-limit max attempts',
+    context,
+  );
+  refineRateLimit(
+    auth.loginRateLimitAccountMaxAttempts,
+    ['auth', 'loginRateLimitAccountMaxAttempts'],
+    AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS_MIN,
+    AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS_MAX,
+    'Login account rate-limit max attempts',
+    context,
+  );
+  refineRateLimit(
+    auth.loginRateLimitIpWindowSeconds,
+    ['auth', 'loginRateLimitIpWindowSeconds'],
+    AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS_MIN,
+    AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS_MAX,
+    'Login IP rate-limit window seconds',
+    context,
+  );
+  refineRateLimit(
+    auth.loginRateLimitAccountWindowSeconds,
+    ['auth', 'loginRateLimitAccountWindowSeconds'],
+    AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS_MIN,
+    AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS_MAX,
+    'Login account rate-limit window seconds',
+    context,
+  );
+  refineRateLimit(
+    auth.rateLimitRedisTimeoutMs,
+    ['auth', 'rateLimitRedisTimeoutMs'],
+    AUTH_RATE_LIMIT_REDIS_TIMEOUT_MS_MIN,
+    AUTH_RATE_LIMIT_REDIS_TIMEOUT_MS_MAX,
+    'Login rate-limit Redis timeout',
+    context,
+  );
+}
+
+function refineRateLimit(
+  value: number,
+  path: Array<string | number>,
+  min: number,
+  max: number,
+  label: string,
+  context: z.RefinementCtx,
+): void {
+  if (value < min || value > max) {
+    context.addIssue({
+      code: 'custom',
+      path,
+      message: `${label} must be between ${min} and ${max}.`,
+    });
+  }
 }
 
 function redisUrlHasPassword(redisUrl: string): boolean {

@@ -26,7 +26,7 @@ Users with multiple memberships select one org per request. Tests must prove A c
 
 ## Security and tenancy
 
-This ADR *is* the tenancy decision. Roles (`owner`, `admin`, `member`, `viewer`) are interim until a finer permission ADR ([OD-3](../architecture/open-decisions.md)).
+This ADR *is* the tenancy decision. Roles (`owner`, `admin`, `member`, `viewer`) and the interim permission catalog are accepted in [ADR 0019](0019-local-password-sessions.md).
 
 ## Operational failure plan
 
@@ -34,4 +34,4 @@ Mis-seeded org ids on jobs: dead-letter, no mutation. Backup restore does not ad
 
 ## Follow-up
 
-Authn mechanism ADR (OD-1) before implementation. Isolation tests on first tenant APIs.
+Isolation tests on first tenant APIs. Authentication follows [ADR 0019](0019-local-password-sessions.md).

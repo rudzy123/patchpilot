@@ -4,6 +4,7 @@ import type {
   AssetOwnerRecord,
   AssetRepository,
   AuditAppendRepository,
+  ClearActiveOrganizationInput,
   CreateAssetInput,
   CreateEnvironmentInput,
   CreateFindingInput,
@@ -14,26 +15,44 @@ import type {
   CreateBuiltinRiskPolicyInput,
   CreateOrganizationRiskPolicyInput,
   CreateSbomInput,
+  CreateSessionInput,
   CreateTeamInput,
   EnvironmentRepository,
   FindingRepository,
   IdempotencyRepository,
+  LocalCredentialRepository,
   MembershipRepository,
   OrganizationRepository,
   OutboxRepository,
   PageRequest,
   PersistenceUnitOfWork,
   RemediationRepository,
+  ReplaceCsrfTokenInput,
   RepositoryBundle,
+  RevokeAllSessionsForUserInput,
+  RevokeCurrentSessionInput,
   RiskPolicyRepository,
+  RotateSessionInput,
   SbomMetadataRepository,
+  SessionRepository,
   TeamRepository,
+  UpdateLocalCredentialPasswordHashInput,
+  UpdateThrottledLastSeenInput,
   UpsertIdempotencyRecordInput,
+  UserRepository,
 } from '@patchpilot/domain';
-import { JSON_SCHEMA_VERSION_V1 } from '@patchpilot/domain';
+import { JSON_SCHEMA_VERSION_V1, MAX_PAGE_SIZE } from '@patchpilot/domain';
 
 import type { PrismaClientLike } from './guards.js';
-import { asJsonObject, normalizeSlug, requirePositiveByteLength, requireSha256 } from './guards.js';
+import {
+  asJsonObject,
+  normalizeEmail,
+  normalizeSlug,
+  requireArgon2idPhc,
+  requirePasswordRevision,
+  requirePositiveByteLength,
+  requireSha256,
+} from './guards.js';
 import {
   mapAsset,
   mapAssetOwner,
@@ -41,14 +60,17 @@ import {
   mapEnvironment,
   mapFinding,
   mapIdempotencyRecord,
+  mapLocalCredential,
   mapMembership,
   mapOrganization,
   mapOutboxEvent,
   mapRemediationTask,
   mapRiskPolicy,
   mapSbom,
+  mapSession,
   mapTeam,
   mapTeamMembership,
+  mapUser,
 } from './mappers.js';
 import { afterIdWhere, paginateById } from './paging.js';
 import { getPrismaClient } from './client.js';
@@ -60,7 +82,10 @@ function tenantWhere(organizationId: string, id: string): { organizationId: stri
 export function createRepositories(client: PrismaClientLike): RepositoryBundle {
   return {
     organizations: new PrismaOrganizationRepository(client),
+    users: new PrismaUserRepository(client),
     memberships: new PrismaMembershipRepository(client),
+    localCredentials: new PrismaLocalCredentialRepository(client),
+    sessions: new PrismaSessionRepository(client),
     teams: new PrismaTeamRepository(client),
     environments: new PrismaEnvironmentRepository(client),
     assets: new PrismaAssetRepository(client),
@@ -140,6 +165,179 @@ class PrismaOrganizationRepository implements OrganizationRepository {
   }
 }
 
+class PrismaUserRepository implements UserRepository {
+  public constructor(private readonly client: PrismaClientLike) {}
+
+  public async findById(userId: string) {
+    const row = await this.client.user.findFirst({
+      where: { id: userId },
+    });
+    return row === null ? undefined : mapUser(row);
+  }
+
+  public async findByNormalizedEmail(email: string) {
+    const row = await this.client.user.findFirst({
+      where: { email: normalizeEmail(email) },
+    });
+    return row === null ? undefined : mapUser(row);
+  }
+}
+
+class PrismaLocalCredentialRepository implements LocalCredentialRepository {
+  public constructor(private readonly client: PrismaClientLike) {}
+
+  public async findByUserId(userId: string) {
+    const row = await this.client.localCredential.findFirst({
+      where: { userId },
+    });
+    return row === null ? undefined : mapLocalCredential(row);
+  }
+
+  public async updatePasswordHash(input: UpdateLocalCredentialPasswordHashInput) {
+    const passwordHash = requireArgon2idPhc(input.passwordHash, 'passwordHash');
+    const passwordRevision = requirePasswordRevision(input.passwordRevision, 'passwordRevision');
+    const updated = await this.client.localCredential.updateMany({
+      where: { userId: input.userId },
+      data: { passwordHash, passwordRevision },
+    });
+    if (updated.count === 0) {
+      return undefined;
+    }
+
+    return this.findByUserId(input.userId);
+  }
+}
+
+class PrismaSessionRepository implements SessionRepository {
+  public constructor(private readonly client: PrismaClientLike) {}
+
+  public async create(input: CreateSessionInput) {
+    const tokenHash = requireSha256(input.tokenHash, 'tokenHash');
+    const csrfTokenHash = requireSha256(input.csrfTokenHash, 'csrfTokenHash');
+    const passwordRevision = requirePasswordRevision(input.passwordRevision, 'passwordRevision');
+    const row = await this.client.session.create({
+      data: {
+        userId: input.userId,
+        tokenHash,
+        csrfTokenHash,
+        passwordRevision,
+        lastSeenAt: input.lastSeenAt,
+        createdAt: input.lastSeenAt,
+        idleExpiresAt: input.idleExpiresAt,
+        absoluteExpiresAt: input.absoluteExpiresAt,
+        ...(input.activeOrganizationId === undefined
+          ? {}
+          : { activeOrganizationId: input.activeOrganizationId }),
+        ...(input.authenticationMethod === undefined
+          ? {}
+          : { authenticationMethod: input.authenticationMethod }),
+        ...(input.userAgent === undefined ? {} : { userAgent: input.userAgent }),
+      },
+    });
+    return mapSession(row);
+  }
+
+  public async findByTokenHash(tokenHash: string) {
+    const digest = requireSha256(tokenHash, 'tokenHash');
+    const row = await this.client.session.findUnique({
+      where: { tokenHash: digest },
+    });
+    return row === null ? undefined : mapSession(row);
+  }
+
+  public async updateThrottledLastSeen(input: UpdateThrottledLastSeenInput) {
+    const tokenHash = requireSha256(input.tokenHash, 'tokenHash');
+    const updated = await this.client.session.updateMany({
+      where: {
+        tokenHash,
+        revokedAt: null,
+        lastSeenAt: { lte: input.minLastSeenAt },
+      },
+      data: {
+        lastSeenAt: input.lastSeenAt,
+        idleExpiresAt: input.idleExpiresAt,
+      },
+    });
+    if (updated.count === 0) {
+      return undefined;
+    }
+
+    return this.findByTokenHash(tokenHash);
+  }
+
+  public async rotate(input: RotateSessionInput) {
+    const currentTokenHash = requireSha256(input.currentTokenHash, 'currentTokenHash');
+    const nextTokenHash = requireSha256(input.nextTokenHash, 'nextTokenHash');
+    const nextCsrfTokenHash = requireSha256(input.nextCsrfTokenHash, 'nextCsrfTokenHash');
+    const updated = await this.client.session.updateMany({
+      where: { tokenHash: currentTokenHash, revokedAt: null },
+      data: {
+        tokenHash: nextTokenHash,
+        csrfTokenHash: nextCsrfTokenHash,
+        lastSeenAt: input.lastSeenAt,
+        idleExpiresAt: input.idleExpiresAt,
+        ...(input.activeOrganizationId === undefined
+          ? {}
+          : { activeOrganizationId: input.activeOrganizationId }),
+      },
+    });
+    if (updated.count === 0) {
+      return undefined;
+    }
+
+    return this.findByTokenHash(nextTokenHash);
+  }
+
+  public async replaceCsrfToken(input: ReplaceCsrfTokenInput) {
+    const tokenHash = requireSha256(input.tokenHash, 'tokenHash');
+    const nextCsrfTokenHash = requireSha256(input.nextCsrfTokenHash, 'nextCsrfTokenHash');
+    const updated = await this.client.session.updateMany({
+      where: { tokenHash, revokedAt: null },
+      data: { csrfTokenHash: nextCsrfTokenHash },
+    });
+    if (updated.count === 0) {
+      return undefined;
+    }
+
+    return this.findByTokenHash(tokenHash);
+  }
+
+  public async revokeCurrent(input: RevokeCurrentSessionInput) {
+    const tokenHash = requireSha256(input.tokenHash, 'tokenHash');
+    const updated = await this.client.session.updateMany({
+      where: { tokenHash, revokedAt: null },
+      data: {
+        revokedAt: input.revokedAt,
+        revokeReason: input.revokeReason,
+      },
+    });
+    if (updated.count === 0) {
+      return undefined;
+    }
+
+    return this.findByTokenHash(tokenHash);
+  }
+
+  public async revokeAllForUser(input: RevokeAllSessionsForUserInput) {
+    const updated = await this.client.session.updateMany({
+      where: { userId: input.userId, revokedAt: null },
+      data: {
+        revokedAt: input.revokedAt,
+        revokeReason: input.revokeReason,
+      },
+    });
+    return updated.count;
+  }
+
+  public async clearActiveOrganization(input: ClearActiveOrganizationInput) {
+    const updated = await this.client.session.updateMany({
+      where: { userId: input.userId, activeOrganizationId: input.organizationId },
+      data: { activeOrganizationId: null },
+    });
+    return updated.count;
+  }
+}
+
 class PrismaMembershipRepository implements MembershipRepository {
   public constructor(private readonly client: PrismaClientLike) {}
 
@@ -179,6 +377,43 @@ class PrismaMembershipRepository implements MembershipRepository {
       });
       return rows.map(mapMembership);
     }, page);
+  }
+
+  public async listActiveInActiveOrganizationsForUser(userId: string) {
+    const rows = await this.client.membership.findMany({
+      where: {
+        userId,
+        status: 'active',
+        organization: { status: 'active' },
+      },
+      include: { organization: true },
+      orderBy: [{ organizationId: 'asc' }, { id: 'asc' }],
+      take: MAX_PAGE_SIZE,
+    });
+    return rows.map((row) => ({
+      membership: mapMembership(row),
+      organization: mapOrganization(row.organization),
+    }));
+  }
+
+  public async findActiveInActiveOrganization(userId: string, organizationId: string) {
+    const row = await this.client.membership.findFirst({
+      where: {
+        userId,
+        organizationId,
+        status: 'active',
+        organization: { status: 'active' },
+      },
+      include: { organization: true },
+    });
+    if (row === null) {
+      return undefined;
+    }
+
+    return {
+      membership: mapMembership(row),
+      organization: mapOrganization(row.organization),
+    };
   }
 }
 
@@ -575,6 +810,7 @@ class PrismaAuditAppendRepository implements AuditAppendRepository {
         payload: asJsonObject(input.payload as unknown as Prisma.JsonValue, 'payload'),
         schemaVersion: input.schemaVersion ?? JSON_SCHEMA_VERSION_V1,
         ...(input.organizationId === undefined ? {} : { organizationId: input.organizationId }),
+        ...(input.actorUserId === undefined ? {} : { actorUserId: input.actorUserId }),
         ...(input.actorMembershipId === undefined
           ? {}
           : { actorMembershipId: input.actorMembershipId }),

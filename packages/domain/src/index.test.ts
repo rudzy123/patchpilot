@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  auditActorTypes,
   boundPageSize,
   DEFAULT_PAGE_SIZE,
   err,
@@ -12,7 +13,9 @@ import {
   MIN_PAGE_SIZE,
   ok,
   organizationStatuses,
+  passwordHashAlgorithms,
   riskPolicyScopes,
+  sessionAuthenticationMethods,
   type FindingRepository,
   type OrganizationRepository,
 } from './index.js';
@@ -37,6 +40,9 @@ describe('lifecycle catalogs', () => {
     expect(findingStates).not.toContain('assigned');
     expect(riskPolicyScopes).toEqual(['builtin', 'organization']);
     expect(evidenceKinds).toContain('export_snapshot');
+    expect(auditActorTypes).toEqual(['user', 'system', 'instance_operator', 'anonymous']);
+    expect(passwordHashAlgorithms).toEqual(['argon2id']);
+    expect(sessionAuthenticationMethods).toEqual(['password']);
   });
 });
 

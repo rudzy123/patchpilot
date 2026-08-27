@@ -6,14 +6,17 @@ import type {
   EnvironmentRecord,
   FindingRecord,
   IdempotencyRecordRecord,
+  LocalCredentialRecord,
   MembershipRecord,
   OrganizationRecord,
   OutboxEventRecord,
   RemediationTaskRecord,
   RiskPolicyRecord,
   SbomRecord,
+  SessionRecord,
   TeamMembershipRecord,
   TeamRecord,
+  UserRecord,
 } from './records.js';
 import type {
   AssetDataClassification,
@@ -32,6 +35,7 @@ import type {
   OutboxEventStatus,
   RemediationTaskStatus,
   RiskPolicyStatus,
+  SessionAuthenticationMethod,
   TeamStatus,
 } from './lifecycle.js';
 import type {
@@ -148,6 +152,7 @@ export type CreateRemediationTaskInput = {
 
 export type AppendAuditEventInput = {
   organizationId?: string;
+  actorUserId?: string;
   actorMembershipId?: string;
   actorType: AuditActorType;
   action: string;
@@ -198,11 +203,114 @@ export type OrganizationRepository = {
   ): Promise<Page<OrganizationRecord>>;
 };
 
+export type UserRepository = {
+  findById(userId: string): Promise<UserRecord | undefined>;
+  findByNormalizedEmail(email: string): Promise<UserRecord | undefined>;
+};
+
+export type UpdateLocalCredentialPasswordHashInput = {
+  userId: string;
+  passwordHash: string;
+  passwordRevision: number;
+};
+
+export type LocalCredentialRepository = {
+  findByUserId(userId: string): Promise<LocalCredentialRecord | undefined>;
+  updatePasswordHash(
+    input: UpdateLocalCredentialPasswordHashInput,
+  ): Promise<LocalCredentialRecord | undefined>;
+};
+
+export type CreateSessionInput = {
+  userId: string;
+  tokenHash: string;
+  csrfTokenHash: string;
+  activeOrganizationId?: string;
+  authenticationMethod?: SessionAuthenticationMethod;
+  passwordRevision: number;
+  lastSeenAt: Date;
+  idleExpiresAt: Date;
+  absoluteExpiresAt: Date;
+  userAgent?: string;
+};
+
+export type UpdateThrottledLastSeenInput = {
+  tokenHash: string;
+  lastSeenAt: Date;
+  idleExpiresAt: Date;
+  minLastSeenAt: Date;
+};
+
+export type RotateSessionInput = {
+  currentTokenHash: string;
+  nextTokenHash: string;
+  nextCsrfTokenHash: string;
+  lastSeenAt: Date;
+  idleExpiresAt: Date;
+  activeOrganizationId?: string | null;
+};
+
+export type ReplaceCsrfTokenInput = {
+  tokenHash: string;
+  nextCsrfTokenHash: string;
+};
+
+export type RevokeCurrentSessionInput = {
+  tokenHash: string;
+  revokedAt: Date;
+  revokeReason: string;
+};
+
+export type RevokeAllSessionsForUserInput = {
+  userId: string;
+  revokedAt: Date;
+  revokeReason: string;
+};
+
+export type ClearActiveOrganizationInput = {
+  userId: string;
+  organizationId: string;
+};
+
+export type SessionRepository = {
+  create(input: CreateSessionInput): Promise<SessionRecord>;
+  findByTokenHash(tokenHash: string): Promise<SessionRecord | undefined>;
+  updateThrottledLastSeen(input: UpdateThrottledLastSeenInput): Promise<SessionRecord | undefined>;
+  rotate(input: RotateSessionInput): Promise<SessionRecord | undefined>;
+  replaceCsrfToken(input: ReplaceCsrfTokenInput): Promise<SessionRecord | undefined>;
+  revokeCurrent(input: RevokeCurrentSessionInput): Promise<SessionRecord | undefined>;
+  revokeAllForUser(input: RevokeAllSessionsForUserInput): Promise<number>;
+  clearActiveOrganization(input: ClearActiveOrganizationInput): Promise<number>;
+};
+
+/** Authentication-boundary join of an active membership in an active organization. */
+export type ActiveMembershipWithOrganization = {
+  membership: MembershipRecord;
+  organization: OrganizationRecord;
+};
+
 export type MembershipRepository = {
   create(input: CreateMembershipInput): Promise<MembershipRecord>;
   findById(organizationId: string, id: string): Promise<MembershipRecord | undefined>;
   findByUser(organizationId: string, userId: string): Promise<MembershipRecord | undefined>;
   listForOrganization(organizationId: string, page?: PageRequest): Promise<Page<MembershipRecord>>;
+  /**
+   * Authentication-boundary query. Lists active Memberships in active
+   * Organizations for one User. Callers must pass the authenticated user id.
+   * This is not a tenant-scoped lookup and does not replace findByUser.
+   */
+  listActiveInActiveOrganizationsForUser(
+    userId: string,
+  ): Promise<readonly ActiveMembershipWithOrganization[]>;
+  /**
+   * Authentication-boundary query. Resolves one active Membership in one
+   * active Organization for one User. Callers must pass the authenticated
+   * user id. This is not a tenant-scoped lookup and does not replace findByUser.
+   */
+  findActiveInActiveOrganization(
+    userId: string,
+    organizationId: string,
+  ): Promise<ActiveMembershipWithOrganization | undefined>;
 };
 
 export type TeamRepository = {
@@ -295,7 +403,10 @@ export type IdempotencyRepository = {
 
 export type RepositoryBundle = {
   organizations: OrganizationRepository;
+  users: UserRepository;
   memberships: MembershipRepository;
+  localCredentials: LocalCredentialRepository;
+  sessions: SessionRepository;
   teams: TeamRepository;
   environments: EnvironmentRepository;
   assets: AssetRepository;

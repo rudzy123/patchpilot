@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
+import { LOGIN_RATE_LIMITED, type TrustedActor } from '@patchpilot/auth';
 import { type ServerConfig } from '@patchpilot/config';
 import {
   healthLiveResponseSchema,
@@ -12,7 +14,12 @@ import {
 } from '@patchpilot/contracts';
 import { type Logger, createChildLogger } from '@patchpilot/logger';
 import Fastify, { type FastifyInstance } from 'fastify';
+import type { SessionRecord } from '@patchpilot/domain';
 
+import { registerAuthRoutes } from './auth-routes.js';
+import type { AuthRuntime } from './auth-runtime.js';
+import { readSingleHeader } from './headers.js';
+import { AUTH_HTTP_RATE_LIMITED } from './http-errors.js';
 import { resolveRequestIdentifiers } from './ids.js';
 
 export type DatabaseReadyCheck = (timeoutMs: number) => Promise<{ ok: boolean }>;
@@ -21,6 +28,7 @@ export type ApiDependencies = {
   config: ServerConfig;
   logger: Logger;
   checkDatabaseReady: DatabaseReadyCheck;
+  auth: AuthRuntime;
   now?: () => string;
   generateId?: () => string;
 };
@@ -29,6 +37,9 @@ declare module 'fastify' {
   interface FastifyRequest {
     requestId: string;
     correlationId: string;
+    actor: TrustedActor | null;
+    authSession: SessionRecord | null;
+    sessionToken: string | null;
   }
 }
 
@@ -49,6 +60,9 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
 
   app.decorateRequest('requestId', '');
   app.decorateRequest('correlationId', '');
+  app.decorateRequest('actor', null);
+  app.decorateRequest('authSession', null);
+  app.decorateRequest('sessionToken', null);
 
   await app.register(helmet, {
     global: true,
@@ -56,17 +70,25 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     xPoweredBy: false,
   });
 
+  await app.register(cookie);
+
   await app.register(cors, {
     origin: dependencies.config.corsAllowedOrigins,
     credentials: true,
+    allowedHeaders: [
+      'content-type',
+      dependencies.config.requestIdHeader,
+      dependencies.config.correlationIdHeader,
+      dependencies.config.auth.csrfHeaderName,
+    ],
   });
 
   app.addHook('onRequest', async (request, reply) => {
     const headerName = dependencies.config.requestIdHeader.toLowerCase();
     const correlationHeaderName = dependencies.config.correlationIdHeader.toLowerCase();
     const identifiers = resolveRequestIdentifiers({
-      requestIdHeader: headerValue(request.headers[headerName]),
-      correlationIdHeader: headerValue(request.headers[correlationHeaderName]),
+      requestIdHeader: readSingleHeader(request.headers[headerName]),
+      correlationIdHeader: readSingleHeader(request.headers[correlationHeaderName]),
       generateId,
     });
     request.requestId = identifiers.requestId;
@@ -89,17 +111,22 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
   app.setErrorHandler((error, request, reply) => {
     const statusCode = fastifyStatusCode(error);
     const isPayloadTooLarge = statusCode === 413;
+    const isRateLimited = statusCode === 429;
     const code = isPayloadTooLarge
       ? 'validation'
-      : statusCode >= 400 && statusCode < 500
-        ? 'validation'
-        : 'internal';
+      : isRateLimited
+        ? 'rate_limited'
+        : statusCode >= 400 && statusCode < 500
+          ? 'validation'
+          : 'internal';
     const publicMessage =
       dependencies.config.deploymentEnvironment === 'production' && code === 'internal'
         ? 'An internal error occurred.'
         : isPayloadTooLarge
           ? 'Request body is too large.'
-          : errorMessage(error);
+          : isRateLimited
+            ? rateLimitedPublicMessage(error)
+            : errorMessage(error);
 
     dependencies.logger.error(
       {
@@ -153,6 +180,12 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     return parsed;
   });
 
+  await registerAuthRoutes(app, {
+    config: dependencies.config,
+    logger: dependencies.logger,
+    auth: dependencies.auth,
+  });
+
   app.addHook('onSend', async (request, _reply, payload) => {
     createChildLogger(dependencies.logger, {
       requestId: request.requestId,
@@ -173,18 +206,6 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
   return app;
 }
 
-function headerValue(value: string | string[] | undefined): string | undefined {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (Array.isArray(value) && typeof value[0] === 'string') {
-    return value[0];
-  }
-
-  return undefined;
-}
-
 function fastifyStatusCode(error: unknown): number {
   if (typeof error === 'object' && error !== null && 'statusCode' in error) {
     const statusCode = error['statusCode'];
@@ -202,4 +223,13 @@ function errorMessage(error: unknown): string {
 
 function errorName(error: unknown): string {
   return error instanceof Error ? error.name : 'Error';
+}
+
+function rateLimitedPublicMessage(error: unknown): string {
+  const message = errorMessage(error);
+  if (message === LOGIN_RATE_LIMITED.message || message === AUTH_HTTP_RATE_LIMITED.message) {
+    return message;
+  }
+
+  return AUTH_HTTP_RATE_LIMITED.message;
 }

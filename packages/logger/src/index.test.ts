@@ -57,6 +57,15 @@ describe('logger redaction', () => {
         secretKey: 'object-storage-secret',
         signedUrl: 'https://minio.example/object?X-Amz-Signature=abc',
         password: 'plaintext-db-password',
+        passwordHash: '$argon2id$v=19$m=19456,t=2,p=1$compattesthash',
+        phc: '$argon2id$v=19$m=19456,t=2,p=1$compattesthash',
+        csrfToken: 'raw-csrf-token-value',
+        csrfTokenHash: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        tokenHash: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+        sessionToken: 'raw-session-token-value',
+        peerIp: '192.0.2.10',
+        accountDigest: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+        credential: { passwordHash: '$argon2id$v=19$m=19456,p=1,t=2$nestedcredhashvalue' },
         databaseUrl: 'postgresql://patchpilot:operator-secret@db.internal:5432/patchpilot',
         DATABASE_URL: 'postgresql://patchpilot:operator-secret@db.internal:5432/patchpilot',
         redisUrl: 'redis://:operator-redis-secret@redis.internal:6379',
@@ -79,6 +88,20 @@ describe('logger redaction', () => {
     expect(output).not.toContain('object-storage-secret');
     expect(output).not.toContain('X-Amz-Signature=abc');
     expect(output).not.toContain('plaintext-db-password');
+    expect(output).not.toContain('$argon2id$v=19$m=19456,t=2,p=1$compattesthash');
+    expect(output).not.toContain('raw-csrf-token-value');
+    expect(output).not.toContain('raw-session-token-value');
+    expect(output).not.toContain('192.0.2.10');
+    expect(output).not.toContain(
+      'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+    );
+    expect(output).not.toContain(
+      'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+    );
+    expect(output).not.toContain(
+      'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+    );
+    expect(output).not.toContain('nestedcredhashvalue');
     expect(output).not.toContain('operator-secret');
     expect(output).not.toContain('operator-redis-secret');
     expect(output).not.toContain('postgresql://');

@@ -1,0 +1,40 @@
+{
+  "name": "@patchpilot/auth",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Authentication and organization-authorization application logic. Argon2id hashing, opaque sessions, permission checks, and session use cases; HTTP adapters live in apps/api.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "devDependencies": {
+    "@patchpilot/eslint-config": "workspace:*",
+    "@patchpilot/typescript-config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "@patchpilot/config": "workspace:*",
+    "@patchpilot/domain": "workspace:*",
+    "@patchpilot/logger": "workspace:*",
+    "argon2": "0.45.1"
+  }
+}

@@ -6,25 +6,23 @@ This document is the canonical tenancy design for v0.1 ([ADR 0013](../adr/0013-o
 
 ## How organization context is established
 
-1. The user authenticates (interim: session cookie bound to a **User** id, [OD-1](open-decisions.md)).
+1. The user authenticates with a session cookie bound to a **User** id ([ADR 0019](../adr/0019-local-password-sessions.md)).
 2. The API loads **Membership** rows that are not revoked.
-3. The request names a target organization only as a **selector** among memberships the user already has (for example path `/organizations/{organizationId}/...` where `{organizationId}` must match a membership).
-4. If the user has no membership for that id, the API returns **not found** for tenant-owned resources (same as a missing id). It does **not** return `forbidden` in a way that confirms another organization exists. `forbidden` is reserved for an authenticated member of **this** organization who lacks the role for the operation.
-5. Use cases receive `AuthorizedContext { userId, organizationId, role }`. They never receive a raw client id as proof.
+3. Active organization is stored on the **session** after membership verification. Later product paths may repeat an organization id only as a **selector** that must match that session organization.
+4. If the user has no membership for that id, the API returns **not found** for tenant-owned resources (same as a missing id). It does **not** return `forbidden` in a way that confirms another organization exists. `forbidden` is reserved for an authenticated member of **this** organization who lacks the permission for the operation.
+5. Use cases receive a `TrustedActor` that includes `userId`, `sessionId`, and when selected `organizationId`, `membershipId`, `role`, and permissions. They never receive a raw client id as proof.
 
 A client-supplied `organizationId` that does not match membership is ignored for authorization. GitHub accounts, webhook fields, and job payloads are not membership.
 
 ### Multi-organization users
 
-A user may belong to several organizations. Switching org in the UI changes which membership is selected. It does not grant a union query across organizations.
+A user may belong to several organizations. Switching org in the UI changes which membership is selected on the session. It does not grant a union query across organizations.
 
-After the first user exists, creating a user requires an invitation (or equivalent authenticated path). The instance must not offer unauthenticated organization signup ([OD-1](open-decisions.md)).
+There is no public registration ([ADR 0019](../adr/0019-local-password-sessions.md)). Existing users only. Invitation and first-user HTTP bootstrap are deferred. The instance must not offer unauthenticated organization signup.
 
 ## How authorization is enforced
 
-Authorization is **server-side** in use cases and repository adapters, not solely in React.
-
-### Roles (interim OD-3)
+Authorization is **server-side** in use cases and repository adapters, not solely in React. Use deny-by-default **permission constants** from [ADR 0019](../adr/0019-local-password-sessions.md). Do not scatter role comparisons in routes. The table below remains the operator-facing summary of those roles.
 
 | Role | Inventory and SBOM | Findings and exports | Remediation | Risk acceptance | Membership and policy override | Credentials |
 | --- | --- | --- | --- | --- | --- | --- |

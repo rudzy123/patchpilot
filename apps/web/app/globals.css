@@ -10,7 +10,40 @@ body {
   padding: 1.5rem;
 }
 
-a:focus-visible {
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
   outline: 0.15rem solid currentColor;
   outline-offset: 0.15rem;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.auth-alert {
+  margin-bottom: 1rem;
+}
+
+nav[aria-label='Account'] {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

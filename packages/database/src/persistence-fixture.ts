@@ -7,6 +7,7 @@ export async function persistTenantChangeWithAuditAndOutbox(
     organizationId: string;
     assetName: string;
     assetType: 'application';
+    actorUserId: string;
     actorMembershipId: string;
     correlationId: string;
   },
@@ -19,6 +20,7 @@ export async function persistTenantChangeWithAuditAndOutbox(
 
   const audit = await repos.auditEvents.append({
     organizationId: input.organizationId,
+    actorUserId: input.actorUserId,
     actorMembershipId: input.actorMembershipId,
     actorType: 'user',
     action: 'asset.created',

@@ -1,6 +1,6 @@
 # Testing
 
-Vitest is the unit and integration runner. Playwright is **not** wired in this foundation; the landing page and health contract are covered by unit tests. Browser journeys belong to a later milestone when product UI exists. GitHub-hosted E2E testing is deferred until actual Playwright tests exist; see [CI-DEFER-1](ci.md#deferred-ci-work). Do not treat the local `pnpm test:e2e` placeholder as end-to-end validation.
+Vitest is the unit and integration runner. Playwright is **not** wired in this foundation; the landing page, health contract, and Session 6 authentication UI are covered by unit and component tests. Browser journeys belong to a later milestone when product UI exists. GitHub-hosted E2E testing is deferred until actual Playwright tests exist; see [CI-DEFER-1](ci.md#deferred-ci-work). Do not treat the local `pnpm test:e2e` placeholder as end-to-end validation.
 
 ## Labels
 
@@ -27,16 +27,17 @@ pnpm infrastructure:down
 - Config validation, including production rejection of development adapters and placeholder credentials.
 - Logger redaction of authorization, cookies, tokens, and env dumps.
 - Health contract shapes (no URLs or credentials).
-- API factory: live/ready, request ids, error envelope, CORS allowlist, body limit, header redaction.
+- API factory: live/ready, request ids, error envelope, CORS allowlist, body limit, header redaction, `trustProxy=false`.
+- Authentication routes (Fastify inject): login/logout/session/organizations/select-organization, cookie attributes, Origin, CSRF, rotation, tenancy, audit redaction, limiter failure.
 - Worker factory: fake Redis/database, idempotent shutdown, init failure.
-- Web landing copy, landmarks, and `/health` contract.
+- Web landing copy, landmarks, `/health` contract, and Session 6 authentication UI (login, session bootstrap, organization selector, logout, expired-session, access-denied). Web auth tests use jsdom and Testing Library; they do not start Next.js or the API.
 
 ## What integration tests cover
 
 - PostgreSQL `SELECT 1` readiness through `@patchpilot/database`.
 - Redis `PING` through the worker ioredis adapter.
 - MinIO `/minio/health/live` over HTTP (no MinIO SDK).
-- Session 5: clean and Session 3 upgrade migrations, tenant constraints, repository `organizationId` scoping, append-only audit, outbox checks, seed idempotency, and atomic tenant+audit+outbox transactions.
+- Session 6: authentication persistence (digest-only sessions, audit actors) and API authentication routes against PostgreSQL (valid/invalid auth, cookie attributes, Origin, CSRF, rotation, tenancy, audit redaction, limiter failure). Redis login limiter adapter.
 
 They use the same development placeholder URLs as Compose defaults. Constraint tests create ephemeral `patchpilot_it_*` / `patchpilot_migrate_*` databases and drop them. They do not upload SBOMs or call vulnerability feeds.
 

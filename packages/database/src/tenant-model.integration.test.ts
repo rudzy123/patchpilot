@@ -854,6 +854,7 @@ describe('tenant model persistence', () => {
         assetName: 'atomic-asset',
         assetType: 'application',
         actorMembershipId: membership.id,
+        actorUserId: user.id,
         correlationId: randomUUID(),
       }),
     );
@@ -878,6 +879,7 @@ describe('tenant model persistence', () => {
           assetName: 'rollback-asset',
           assetType: 'application',
           actorMembershipId: membership.id,
+          actorUserId: user.id,
           correlationId: randomUUID(),
         });
         throw new Error('force rollback');

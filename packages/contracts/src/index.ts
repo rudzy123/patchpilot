@@ -1,5 +1,27 @@
 import { z } from 'zod';
 
+export {
+  errorCodeSchema,
+  errorEnvelopeSchema,
+  type ErrorCode,
+  type ErrorEnvelope,
+} from './errors.js';
+export {
+  loginRequestSchema,
+  membershipRoleSchema,
+  organizationsResponseSchema,
+  publicAuthOrganizationSchema,
+  publicAuthUserSchema,
+  selectOrganizationRequestSchema,
+  sessionResponseSchema,
+  type LoginRequest,
+  type OrganizationsResponse,
+  type PublicAuthOrganization,
+  type PublicAuthUser,
+  type SelectOrganizationRequest,
+  type SessionResponse,
+} from './auth.js';
+
 export const healthServiceSchema = z.enum(['api', 'web', 'worker']);
 
 export const healthLiveResponseSchema = z.object({

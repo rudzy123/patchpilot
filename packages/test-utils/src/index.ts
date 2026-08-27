@@ -42,7 +42,9 @@ export function createFoundationTestEnv(): Readonly<Record<string, string>> {
     REQUEST_ID_HEADER: 'x-request-id',
     CORRELATION_ID_HEADER: 'x-correlation-id',
     NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'test',
+    NEXT_PUBLIC_API_BASE_URL: 'http://127.0.0.1:3001',
     PATCHPILOT_ALLOW_DESTRUCTIVE_DATABASE: 'true',
+    ...foundationAuthEnv('test'),
   });
 }
 
@@ -52,6 +54,7 @@ export function createFoundationProductionTestEnv(): Readonly<Record<string, str
     PATCHPILOT_DEPLOYMENT_ENVIRONMENT: 'production',
     PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS: 'false',
     LOG_PRETTY: 'false',
+    CORS_ALLOWED_ORIGINS: 'https://patchpilot.example',
     DATABASE_URL: 'postgresql://patchpilot:operator-secret@db.internal:5432/patchpilot',
     REDIS_URL: 'redis://:operator-redis-secret@redis.internal:6379',
     OBJECT_STORAGE_ENDPOINT: 'https://objects.internal:9000',
@@ -60,7 +63,45 @@ export function createFoundationProductionTestEnv(): Readonly<Record<string, str
     OBJECT_STORAGE_BUCKET: 'patchpilot',
     OBJECT_STORAGE_USE_SSL: 'true',
     NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'production',
+    NEXT_PUBLIC_API_BASE_URL: 'https://api.patchpilot.example',
+    ...foundationAuthEnv('production'),
   });
+}
+
+function foundationAuthEnv(mode: 'test' | 'production'): Record<string, string> {
+  const shared = {
+    AUTH_SESSION_ABSOLUTE_TTL_SECONDS: '604800',
+    AUTH_SESSION_IDLE_TTL_SECONDS: '43200',
+    AUTH_SESSION_LAST_SEEN_MIN_INTERVAL_SECONDS: '60',
+    AUTH_CSRF_HEADER_NAME: 'x-csrf-token',
+    AUTH_PASSWORD_MIN_LENGTH: '12',
+    AUTH_PASSWORD_MAX_BYTES: '128',
+    AUTH_LOGIN_RATE_LIMIT_IP_MAX: '10',
+    AUTH_LOGIN_RATE_LIMIT_IP_WINDOW_SECONDS: '900',
+    AUTH_LOGIN_RATE_LIMIT_ACCOUNT_MAX: '5',
+    AUTH_LOGIN_RATE_LIMIT_ACCOUNT_WINDOW_SECONDS: '900',
+    AUTH_RATE_LIMIT_REDIS_TIMEOUT_MS: '200',
+  };
+
+  if (mode === 'production') {
+    return {
+      ...shared,
+      AUTH_COOKIE_NAME: '__Host-patchpilot.sid',
+      AUTH_COOKIE_SECURE: 'true',
+      AUTH_ARGON2_MEMORY_KIB: '19456',
+      AUTH_ARGON2_TIME_COST: '2',
+      AUTH_ARGON2_PARALLELISM: '1',
+    };
+  }
+
+  return {
+    ...shared,
+    AUTH_COOKIE_NAME: 'patchpilot.sid',
+    AUTH_COOKIE_SECURE: 'false',
+    AUTH_ARGON2_MEMORY_KIB: '8192',
+    AUTH_ARGON2_TIME_COST: '1',
+    AUTH_ARGON2_PARALLELISM: '1',
+  };
 }
 
 export function createSyntheticTenantPair(): {
