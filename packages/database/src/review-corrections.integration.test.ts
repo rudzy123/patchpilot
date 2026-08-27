@@ -180,6 +180,105 @@ describe('session 5 review corrections', () => {
     await prisma.riskPolicy.delete({ where: { id: draft.id } });
   });
 
+  it('rejects cross-organization and builtin membership creators for risk policies', async () => {
+    const orgA = await createOrg(`creator-a-${randomUUID().slice(0, 8)}`);
+    const orgB = await createOrg(`creator-b-${randomUUID().slice(0, 8)}`);
+    const userA = await createUser(`creator-a-${randomUUID().slice(0, 8)}@synthetic.patchpilot.test`);
+    const userB = await createUser(`creator-b-${randomUUID().slice(0, 8)}@synthetic.patchpilot.test`);
+    const membershipA = await createMembership(orgA.id, userA.id);
+    const membershipB = await createMembership(orgB.id, userB.id);
+    const definition = {
+      schemaVersion: JSON_SCHEMA_VERSION_V1,
+      policyKey: 'org.creator',
+      factorCatalog: [],
+      weights: {},
+    } satisfies RiskPolicyDefinitionJson;
+
+    await expect(
+      prisma.riskPolicy.create({
+        data: {
+          scope: 'builtin',
+          policyKey: 'builtin.with-membership',
+          name: 'Invalid builtin creator',
+          version: 1,
+          status: 'draft',
+          policySchemaVersion: 1,
+          definition: { ...definition, policyKey: 'builtin.with-membership' },
+          createdByMembershipId: membershipA.id,
+        },
+      }),
+    ).rejects.toThrow();
+
+    await expect(
+      prisma.riskPolicy.create({
+        data: {
+          organizationId: orgA.id,
+          scope: 'organization',
+          policyKey: 'org.cross-creator',
+          name: 'Cross-org creator',
+          version: 1,
+          status: 'draft',
+          policySchemaVersion: 1,
+          definition: { ...definition, policyKey: 'org.cross-creator' },
+          createdByMembershipId: membershipB.id,
+        },
+      }),
+    ).rejects.toThrow();
+
+    await prisma.membership.update({
+      where: { id: membershipA.id },
+      data: { status: 'revoked', revokedAt: new Date('2026-03-01T00:00:00.000Z') },
+    });
+    const created = await prisma.riskPolicy.create({
+      data: {
+        organizationId: orgA.id,
+        scope: 'organization',
+        policyKey: 'org.revoked-creator',
+        name: 'Revoked membership still attributes',
+        version: 1,
+        status: 'draft',
+        policySchemaVersion: 1,
+        definition: { ...definition, policyKey: 'org.revoked-creator' },
+        createdByMembershipId: membershipA.id,
+      },
+    });
+    expect(created.createdByMembershipId).toBe(membershipA.id);
+  });
+
+  it('allows the same SBOM SHA-256 on different assets in one organization', async () => {
+    const org = await createOrg(`hash-${randomUUID().slice(0, 8)}`);
+    const assetA = await prisma.asset.create({
+      data: { organizationId: org.id, name: 'hash-a', assetType: 'application' },
+    });
+    const assetB = await prisma.asset.create({
+      data: { organizationId: org.id, name: 'hash-b', assetType: 'application' },
+    });
+    await prisma.sbom.create({
+      data: {
+        organizationId: org.id,
+        assetId: assetA.id,
+        objectKey: `org/${org.id}/hash-a`,
+        sha256: SHA_A,
+        byteLength: 16,
+        declaredContentType: 'application/json',
+        receivedAt: new Date(),
+      },
+    });
+    const second = await prisma.sbom.create({
+      data: {
+        organizationId: org.id,
+        assetId: assetB.id,
+        objectKey: `org/${org.id}/hash-b`,
+        sha256: SHA_A,
+        byteLength: 16,
+        declaredContentType: 'application/json',
+        receivedAt: new Date(),
+      },
+    });
+    expect(second.sha256).toBe(SHA_A);
+    expect(second.assetId).toBe(assetB.id);
+  });
+
   it('keeps system intelligence sources distinct from tenant integrations', async () => {
     const org = await createOrg(`int-${randomUUID().slice(0, 8)}`);
     const osv = await prisma.intelligenceSource.findUniqueOrThrow({ where: { providerKey: 'osv' } });

@@ -338,7 +338,7 @@ export type RiskPolicyRecord = {
   definition: RiskPolicyDefinitionJson;
   publishedAt: Date | null;
   retiredAt: Date | null;
-  createdByUserId: string | null;
+  createdByMembershipId: string | null;
   createdAt: Date;
 };
 

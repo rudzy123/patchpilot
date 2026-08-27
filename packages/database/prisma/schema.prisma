@@ -399,7 +399,6 @@ model User {
 
   memberships          Membership[]
   assetOwners          AssetOwner[]
-  createdRiskPolicies  RiskPolicy[]            @relation("RiskPolicyCreatedBy")
   teamMemberships      TeamMembership[]
 
   @@index([status], map: "user_status_idx")
@@ -430,6 +429,7 @@ model Membership {
   approvedRiskAcceptances  RiskAcceptance[]      @relation("RiskAcceptanceApproverMembership")
   submittedEvidence        Evidence[]            @relation("EvidenceSubmittedByMembership")
   auditEvents              AuditEvent[]          @relation("AuditActorMembership")
+  createdRiskPolicies      RiskPolicy[]          @relation("RiskPolicyCreatedByMembership")
 
   @@unique([organizationId, id], map: "membership_org_id_key")
   @@unique([organizationId, userId], map: "membership_org_user_key")
@@ -906,14 +906,14 @@ model RiskPolicy {
   policySchemaVersion Int              @map("policy_schema_version")
   /// Versioned policy definition JSON. schemaVersion required. Published rows are immutable.
   definition          Json
-  publishedAt         DateTime?        @map("published_at") @db.Timestamptz(6)
-  retiredAt           DateTime?        @map("retired_at") @db.Timestamptz(6)
-  createdByUserId     String?          @map("created_by_user_id") @db.Uuid
-  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  publishedAt             DateTime?        @map("published_at") @db.Timestamptz(6)
+  retiredAt               DateTime?        @map("retired_at") @db.Timestamptz(6)
+  createdByMembershipId   String?          @map("created_by_membership_id") @db.Uuid
+  createdAt               DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdBy    User?             @relation("RiskPolicyCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  calculations RiskCalculation[]
+  organization        Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdByMembership Membership?   @relation("RiskPolicyCreatedByMembership", fields: [organizationId, createdByMembershipId], references: [organizationId, id], onDelete: Restrict)
+  calculations        RiskCalculation[]
 
   @@unique([organizationId, id], map: "risk_policy_org_id_key")
   @@index([organizationId, policyKey, version], map: "risk_policy_org_key_version_idx")

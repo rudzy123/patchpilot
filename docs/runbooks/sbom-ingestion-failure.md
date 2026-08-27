@@ -58,7 +58,7 @@ List keys under `org/{organizationId}/...` with no **SBOM** row. After the grace
 
 ### Partial graph persist
 
-If `stage` is `correlate` or later and components exist, resume from that stage. Do not delete the graph. Do not mark `completed` until correlate, enrich, and score finish. Do not run a job for another organization. Do not apply finding-state updates unless this ingestion is **current** (greatest SBOM `uploadedAt` among `completed`).
+If `stage` is `correlate` or later and components exist, resume from that stage. Do not delete the graph. Do not mark `completed` until correlate, enrich, and score finish. Do not run a job for another organization. Do not apply finding-state updates unless this ingestion is **current** (greatest SBOM `receivedAt` among `completed`).
 
 ## Verification
 

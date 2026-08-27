@@ -121,7 +121,6 @@ export type CreateBuiltinRiskPolicyInput = {
   policySchemaVersion: number;
   definition: RiskPolicyDefinitionJson;
   publishedAt?: Date;
-  createdByUserId?: string;
 };
 
 export type CreateOrganizationRiskPolicyInput = {
@@ -133,7 +132,7 @@ export type CreateOrganizationRiskPolicyInput = {
   policySchemaVersion: number;
   definition: RiskPolicyDefinitionJson;
   publishedAt?: Date;
-  createdByUserId?: string;
+  createdByMembershipId?: string;
 };
 
 export type CreateRemediationTaskInput = {

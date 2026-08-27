@@ -452,7 +452,6 @@ class PrismaRiskPolicyRepository implements RiskPolicyRepository {
         policySchemaVersion: input.policySchemaVersion,
         definition: asJsonObject(input.definition as unknown as Prisma.JsonValue, 'definition'),
         ...(input.publishedAt === undefined ? {} : { publishedAt: input.publishedAt }),
-        ...(input.createdByUserId === undefined ? {} : { createdByUserId: input.createdByUserId }),
       },
     });
     return mapRiskPolicy(row);
@@ -470,7 +469,9 @@ class PrismaRiskPolicyRepository implements RiskPolicyRepository {
         policySchemaVersion: input.policySchemaVersion,
         definition: asJsonObject(input.definition as unknown as Prisma.JsonValue, 'definition'),
         ...(input.publishedAt === undefined ? {} : { publishedAt: input.publishedAt }),
-        ...(input.createdByUserId === undefined ? {} : { createdByUserId: input.createdByUserId }),
+        ...(input.createdByMembershipId === undefined
+          ? {}
+          : { createdByMembershipId: input.createdByMembershipId }),
       },
     });
     return mapRiskPolicy(row);

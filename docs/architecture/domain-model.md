@@ -208,8 +208,8 @@ Lifecycle: `active` ↔ `archived`. Creation enters `active`. No hard delete in 
 | `deploymentContext` | Optional untrusted text |
 | `externalIdentifiers` | Optional map of vendor keys |
 | `tags` | Optional short labels; length-capped |
-| `lastObservedAt` | UTC `uploadedAt` of the **current** completed ingestion (see below), not the wall-clock of whichever worker finished last |
-| `lastSuccessfulSbomIngestionId` | FK to the **current** completed ingestion: among `completed` ingestions for this asset, the one whose SBOM `uploadedAt` is greatest (tie-break `SBOMIngestion.createdAt`, then `SBOMIngestion.id`). A late-finishing **older** upload must not overwrite this pointer. |
+| `lastObservedAt` | UTC `receivedAt` of the **current** completed ingestion (see below), not the wall-clock of whichever worker finished last |
+| `lastSuccessfulSbomIngestionId` | FK to the **current** completed ingestion: among `completed` ingestions for this asset, the one whose SBOM `receivedAt` is greatest (tie-break `SBOMIngestion.createdAt`, then `SBOMIngestion.id`). A late-finishing **older** upload must not overwrite this pointer. |
 
 Context changes (environment, criticality, exposure, classification) emit audit events and enqueue **RiskCalculation** with `calculationReason: asset_change`. History is not erased.
 
@@ -270,7 +270,9 @@ The original document as **evidence**, plus identifiers needed to retrieve it.
 | `cycloneDxSpecVersion` | Allowlisted value recorded after validation |
 | `objectKey` | Storage key including organization and digest |
 | `uploadedByMembershipId` | Optional historical membership of the uploader |
-| `uploadedAt` | UTC |
+| `receivedAt` | Server UTC when PatchPilot accepted the object. Canonical current-ingestion clock. |
+| `capturedAt` | Optional producer-supplied generation time. Not used to choose current ingestion. |
+| `createdAt` | Database row creation time. |
 | `parserVersionLastSucceeded` | Optional; from last completed ingestion |
 
 Original bytes live in object storage, not as a substitute parsed graph. The parsed graph is derived data.
@@ -398,7 +400,7 @@ Per-**SBOMIngestion** compare result for whether the finding's **versionless** c
 | `method` | For example `exact_purl`, `ecosystem_name_version`, `version_out_of_affected_range`, `missing_identity`, `incomplete_sbom_coverage` |
 | `observedAt` | UTC |
 
-`resolved` on the finding is a conclusion over the **current** ingestion's observation (latest `uploadedAt` among `completed` ingestions), not a ticket field and not whichever ingestion finished last.
+`resolved` on the finding is a conclusion over the **current** ingestion's observation (latest SBOM `receivedAt` among `completed` ingestions), not a ticket field and not whichever ingestion finished last.
 
 ## RiskPolicy
 
@@ -415,8 +417,9 @@ Versioned rules that turn **observed facts** into **priority**. Shared table. `s
 | `definition` | Weights and factor catalog (JSON, validated) |
 | `publishedAt` | Required when published or retired |
 | `retiredAt` | Required when retired; null otherwise |
+| `createdByMembershipId` | Optional. Organization policies only. Historical membership; revocation does not clear it. Null for built-ins. |
 
-Published definitions are immutable: identity (`policyKey`, `version`, `scope`, `organizationId`), `publishedAt`, and `definition` cannot change. Deletion of a published policy is rejected. The only allowed published-status change is `published` → `retired`. Edits that need a new definition publish a new version. Historical **RiskCalculation** rows keep the old version. See [risk-policy.md](risk-policy.md).
+Published definitions are immutable: identity (`policyKey`, `version`, `scope`, `organizationId`), `publishedAt`, and `definition` cannot change. Deletion of a published policy is rejected. The only allowed published-status change is `published` → `retired`. Organization-policy `createdByMembershipId` is optional and must belong to that organization, including after revocation. Built-in policies have no membership creator. Edits that need a new definition publish a new version. Historical **RiskCalculation** rows keep the old version. See [risk-policy.md](risk-policy.md).
 
 ## RiskCalculation
 

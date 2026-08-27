@@ -79,7 +79,7 @@ Foreign keys use `ON DELETE RESTRICT`. Evidentiary tables are not cascade-delete
 
 ## SchemaFoundation
 
-Session 3 created a technical `SchemaFoundation` table. Migration `20260827120000_tenant_model` drops it. Migration `20260827140000_review_corrections` is a forward-only correction of Session 5 review findings. `20260827150000_evidence_export_snapshot_chk` commits the `export_snapshot` evidence-target CHECK after the enum value exists. The Session 3 and original Session 5 migration files are unchanged.
+Session 3 created a technical `SchemaFoundation` table. Migration `20260827120000_tenant_model` drops it. Later forward-only corrections are `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, and `20260827160000_policy_creator_membership`. Committed `migration.sql` files are authoritative, including SQL extras Prisma cannot express. Duplicate `prisma/sql` extras files are not applied independently and are not kept. The Session 3, Session 5, and committed correction migration files are unchanged.
 
 ## Row-Level Security
 
@@ -87,7 +87,7 @@ RLS is **not** enabled. Application predicates and compound FKs are the v0.1 con
 
 ## Check constraints (SQL extras)
 
-Prisma cannot express every invariant. Migrations `20260827120000_tenant_model`, `20260827140000_review_corrections`, and `20260827150000_evidence_export_snapshot_chk` add named checks, including:
+Prisma cannot express every invariant. Those extras are defined only in committed `migration.sql` files. Migrations `20260827120000_tenant_model`, `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, and `20260827160000_policy_creator_membership` add named checks, including:
 
 | Constraint | Invariant |
 | --- | --- |
@@ -97,6 +97,7 @@ Prisma cannot express every invariant. Migrations `20260827120000_tenant_model`,
 | `dependency_relationship_not_self_chk` | Source ≠ target occurrence |
 | `risk_policy_scope_ownership_chk` | `builtin` requires null org; `organization` requires a non-null org |
 | `risk_policy_status_timestamps_chk` | Draft/published/retired timestamps stay consistent |
+| `risk_policy_creator_scope_chk` | Built-ins have no membership creator; org policies may |
 | `risk_acceptance_expiration_chk` | `expires_at > starts_at` |
 | `risk_acceptance_approval_chk` / `*_active_approval_chk` / `*_revocation_chk` | Approver/timestamp and revocation fields stay consistent |
 | `outbox_event_attempt_chk` / `*_lease_chk` / `*_processed_ts_chk` | Nonnegative attempts; lease and processed timestamps match status |

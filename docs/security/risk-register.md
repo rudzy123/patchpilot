@@ -45,7 +45,7 @@ Decision deadline: before the first implementing PR for that area, unless noted.
 | R33 | Coverage heuristic false inconclusive/resolved | M | M | P2 | Findings | 50% drop proposal; tune | Heuristic | First rescan PR | watch |
 | R34 | Exclusive finding states clobber acceptance/mitigation/FP | M | H | P1 | Findings | Occupancy rules in [finding-lifecycle.md](../architecture/finding-lifecycle.md) | UI still must show both records | First finding state PR | mitigated-in-design |
 | R35 | Derived graph keyed only by SBOM (reprocess / observations) | M | H | P1 | Ingestion | Key occurrences and observations by `sbomIngestionId` | Extra rows | First parser persist PR | mitigated-in-design |
-| R36 | Older SBOM completing last becomes current | M | H | P1 | Findings | Current = max `uploadedAt` among `completed` | Clock skew on upload time (server sets `uploadedAt`) | First rescan PR | mitigated-in-design |
+| R36 | Older SBOM completing last becomes current | M | H | P1 | Findings | Current = max `receivedAt` among `completed` | Clock skew on upload time (server sets `receivedAt`) | First rescan PR | mitigated-in-design |
 | R37 | Divergent RiskCalculation idempotency keys | M | M | P1 | Jobs | Single `inputFingerprint` in [reliability-model.md](../architecture/reliability-model.md) | Fingerprint bugs | First score PR | mitigated-in-design |
 | R38 | Unauthenticated org signup on exposed instance | M | H | P1 | Authn | First-user only ([OD-1](../architecture/open-decisions.md)) | Lockout still open | Before implementing login | open |
 

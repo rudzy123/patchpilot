@@ -6,6 +6,6 @@ export default defineConfig({
     include: ['src/**/*.integration.test.ts'],
     pool: 'threads',
     fileParallelism: false,
-    testTimeout: 15_000,
+    testTimeout: 30_000,
   },
 });

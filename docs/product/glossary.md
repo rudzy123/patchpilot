@@ -30,7 +30,7 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **Risk acceptance** | An explicit, auditable decision to accept a finding for a defined reason and period. |
 | **Compensating control** | A recorded control that reduces risk without removing the vulnerable component. It is evidence of a claim, not automatic score override unless policy says so. |
 | **Re-scan** | Processing a newer SBOM for an asset and comparing prior findings. |
-| **Resolved (on rescan)** | A calculated conclusion that the affected component is no longer observed **in range** on the **current** completed ingestion (greatest SBOM `uploadedAt`, not last worker to finish) with **adequate coverage**. Requires stored observation evidence; not implied by ticket status or KEV absence. |
+| **Resolved (on rescan)** | A calculated conclusion that the affected component is no longer observed **in range** on the **current** completed ingestion (greatest SBOM `receivedAt`, not last worker to finish) with **adequate coverage**. Requires stored observation evidence; not implied by ticket status or KEV absence. |
 | **Audit event** | Append-only record of a security- or remediation-sensitive operation (see `security.mdc`). Never updated in place. |
 | **Shared catalog** | Non-tenant data such as vulnerability intelligence and KEV snapshots. May be global. Findings that use it remain tenant-owned. |
 | **Provenance** | Source, retrieved-at (UTC), and source identity for intelligence or evidence. Updates are versioned or additive, never a silent in-place replace. |

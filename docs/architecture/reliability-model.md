@@ -77,7 +77,7 @@ Replay of the same job twice produces one tenant-visible effect (required test).
 
 ## Queue duplication and races
 
-- Two uploads of different hashes for one asset: both proceed; rescan compare and `lastSuccessfulSbomIngestionId` use the `completed` ingestion whose SBOM `uploadedAt` is greatest, **not** the last worker to finish.
+- Two uploads of different hashes for one asset: both proceed; rescan compare and `lastSuccessfulSbomIngestionId` use the `completed` ingestion whose SBOM `receivedAt` is greatest, **not** the last worker to finish.
 - Two workers correlating the same SBOM: unique constraints prevent duplicate findings; second worker updates observations idempotently.
 - Risk acceptance vs rescan: last completed transaction wins; both leave audit rows.
 - Intel refresh vs ingest: calculations are append-only; last `currentRiskCalculationId` update is a compare-and-set on finding row version if needed.

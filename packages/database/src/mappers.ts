@@ -234,7 +234,7 @@ export function mapRiskPolicy(row: {
   definition: unknown;
   publishedAt: Date | null;
   retiredAt: Date | null;
-  createdByUserId: string | null;
+  createdByMembershipId: string | null;
   createdAt: Date;
 }): RiskPolicyRecord {
   return {

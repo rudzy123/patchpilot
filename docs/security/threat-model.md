@@ -293,7 +293,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Premature closure or duplicate findings that never resolve.
 
-**Mitigation:** Finding `resolved` only with stored evidence (adequate `absent` or out-of-range) on the **current** ingestion (max `uploadedAt` among `completed`); UI separates workflow from rescan; incomplete coverage → `inconclusive`; workflow states `risk_accepted`/`mitigated`/`false_positive` are not overwritten by inconclusive compare; identity is versionless + OSV id.
+**Mitigation:** Finding `resolved` only with stored evidence (adequate `absent` or out-of-range) on the **current** ingestion (max `receivedAt` among `completed`); UI separates workflow from rescan; incomplete coverage → `inconclusive`; workflow states `risk_accepted`/`mitigated`/`false_positive` are not overwritten by inconclusive compare; identity is versionless + OSV id.
 
 ### AI data leakage (if optional AI is introduced later)
 
@@ -405,7 +405,7 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 | Missing intel | Priority | Gap | False safety | Freshness UI | Stale alert | Retry sync | Fixture | Feeds incomplete | Intel |
 | Wrong matching | Findings | Adapter bug | False pos/neg | Adapters, tests | — | Recalc | Fixtures | Residual | Intel |
 | Wrong priority | Queue | Policy bug | Wrong work | Versioned policy | Factor UI | New version | Golden tests | Weights arbitrary | Policy |
-| False remediation | Finding state | Task complete; stale completion order | Premature close | Evidence rules; current=`uploadedAt` | — | Reopen on present | State + race tests | Incomplete SBOMs | Findings |
+| False remediation | Finding state | Task complete; stale completion order | Premature close | Evidence rules; current=`receivedAt` | — | Reopen on present | State + race tests | Incomplete SBOMs | Findings |
 | Incomplete coverage | Finding state | Sparse SBOM | False resolved | Coverage heuristic | Inconclusive | Re-upload | Coverage test | Heuristic | Findings |
 | Open registration | Instance | Unauthenticated org create | Abuse | First-user only | Auth metrics | Disable signup | Authn tests | OD-1 lockout | Authn |
 | AI leakage (later) | Restricted | Model API | Exfil | Disabled; ADR 0017 | — | Disable | — | If enabled later | Future |

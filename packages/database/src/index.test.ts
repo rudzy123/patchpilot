@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import * as databasePublic from './index.js';
 import { boundPageSize, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './paging.js';
 import {
   normalizeEmail,
@@ -37,5 +38,11 @@ describe('page bounds', () => {
   it('clamps repository page sizes', () => {
     expect(boundPageSize(undefined)).toBe(DEFAULT_PAGE_SIZE);
     expect(boundPageSize(500)).toBe(MAX_PAGE_SIZE);
+  });
+});
+
+describe('public package surface', () => {
+  it('does not export the persistence fixture as application API', () => {
+    expect('persistTenantChangeWithAuditAndOutbox' in databasePublic).toBe(false);
   });
 });
