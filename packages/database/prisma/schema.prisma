@@ -255,8 +255,16 @@ enum EvidenceKind {
   intel_record
   policy_snapshot
   compensating_control
+  export_snapshot
 
   @@map("evidence_kind")
+}
+
+enum RiskPolicyScope {
+  builtin
+  organization
+
+  @@map("risk_policy_scope")
 }
 
 enum AuditActorType {
@@ -389,17 +397,10 @@ model User {
   createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships                 Membership[]
-  uploadedSboms               Sbom[]                       @relation("SbomUploadedBy")
-  assetOwners                 AssetOwner[]
-  assignedFindings            Finding[]                    @relation("FindingAssignedUser")
-  createdRiskPolicies         RiskPolicy[]                 @relation("RiskPolicyCreatedBy")
-  assignedRemediationTasks    RemediationTask[]            @relation("RemediationAssignedUser")
-  requestedRiskAcceptances    RiskAcceptance[]             @relation("RiskAcceptanceRequester")
-  approvedRiskAcceptances     RiskAcceptance[]             @relation("RiskAcceptanceApprover")
-  submittedEvidence           Evidence[]                   @relation("EvidenceSubmittedBy")
-  auditEvents                 AuditEvent[]
-  teamMemberships             TeamMembership[]
+  memberships          Membership[]
+  assetOwners          AssetOwner[]
+  createdRiskPolicies  RiskPolicy[]            @relation("RiskPolicyCreatedBy")
+  teamMemberships      TeamMembership[]
 
   @@index([status], map: "user_status_idx")
   @@map("user")
@@ -418,10 +419,17 @@ model Membership {
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
-  teamMemberships TeamMembership[]
-  assetOwners     AssetOwner[]     @relation("AssetOwnerMembership")
+  organization             Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user                     User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  teamMemberships          TeamMembership[]
+  assetOwners              AssetOwner[]          @relation("AssetOwnerMembership")
+  uploadedSboms            Sbom[]                @relation("SbomUploadedByMembership")
+  assignedFindings         Finding[]             @relation("FindingAssignedMembership")
+  assignedRemediationTasks RemediationTask[]     @relation("RemediationAssignedMembership")
+  requestedRiskAcceptances RiskAcceptance[]      @relation("RiskAcceptanceRequesterMembership")
+  approvedRiskAcceptances  RiskAcceptance[]      @relation("RiskAcceptanceApproverMembership")
+  submittedEvidence        Evidence[]            @relation("EvidenceSubmittedByMembership")
+  auditEvents              AuditEvent[]          @relation("AuditActorMembership")
 
   @@unique([organizationId, id], map: "membership_org_id_key")
   @@unique([organizationId, userId], map: "membership_org_user_key")
@@ -518,13 +526,14 @@ model Asset {
   organization                Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   environment                 Environment?                 @relation(fields: [organizationId, environmentId], references: [organizationId, id], onDelete: Restrict)
   owningTeam                  Team?                        @relation("AssetOwningTeam", fields: [organizationId, owningTeamId], references: [organizationId, id], onDelete: Restrict)
-  lastSuccessfulSbomIngestion SbomIngestion?               @relation("AssetCurrentIngestion", fields: [organizationId, lastSuccessfulSbomIngestionId], references: [organizationId, id], onDelete: Restrict)
+  lastSuccessfulSbomIngestion SbomIngestion?               @relation("AssetCurrentIngestion", fields: [organizationId, lastSuccessfulSbomIngestionId, id], references: [organizationId, id, assetId], onDelete: Restrict)
   owners                      AssetOwner[]
   tags                        AssetTag[]
   externalIdentifiers         AssetExternalIdentifier[]
   repositoryConnection        RepositoryConnection?
   sboms                       Sbom[]
   sbomIngestions              SbomIngestion[]              @relation("AssetIngestions")
+  componentOccurrences        ComponentOccurrence[]
   findings                    Finding[]
   evidence                    Evidence[]
 
@@ -553,7 +562,6 @@ model AssetOwner {
   membership   Membership?  @relation("AssetOwnerMembership", fields: [organizationId, userId], references: [organizationId, userId], onDelete: Restrict)
 
   @@unique([organizationId, id], map: "asset_owner_org_id_key")
-  @@unique([organizationId, assetId, role, userId, teamId], map: "asset_owner_identity_key")
   @@index([organizationId, userId], map: "asset_owner_org_user_idx")
   @@index([organizationId, teamId], map: "asset_owner_org_team_idx")
   @@map("asset_owner")
@@ -623,7 +631,7 @@ model Sbom {
   specificationVersion        String?                @map("specification_version") @db.VarChar(16)
   source                      SbomSource             @default(upload)
   originalFilename            String?                @map("original_filename") @db.VarChar(255)
-  uploadedByUserId            String?                @map("uploaded_by_user_id") @db.Uuid
+  uploadedByMembershipId      String?                @map("uploaded_by_membership_id") @db.Uuid
   capturedAt                  DateTime?              @map("captured_at") @db.Timestamptz(6)
   receivedAt                  DateTime               @map("received_at") @db.Timestamptz(6)
   parserVersionLastSucceeded  String?                @map("parser_version_last_succeeded") @db.VarChar(64)
@@ -631,7 +639,7 @@ model Sbom {
 
   organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   asset                Asset                 @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
-  uploadedBy           User?                 @relation("SbomUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  uploadedByMembership Membership?           @relation("SbomUploadedByMembership", fields: [organizationId, uploadedByMembershipId], references: [organizationId, id], onDelete: Restrict)
   ingestions           SbomIngestion[]
   componentOccurrences ComponentOccurrence[]
   dependencyEdges      DependencyRelationship[]
@@ -639,6 +647,7 @@ model Sbom {
   evidence             Evidence[]
 
   @@unique([organizationId, id], map: "sbom_org_id_key")
+  @@unique([organizationId, id, assetId], map: "sbom_org_id_asset_key")
   @@unique([organizationId, assetId, sha256], map: "sbom_org_asset_sha256_key")
   @@index([organizationId, assetId, receivedAt], map: "sbom_org_asset_received_idx")
   @@map("sbom")
@@ -665,7 +674,7 @@ model SbomIngestion {
   updatedAt        DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  sbom                 Sbom                     @relation(fields: [organizationId, sbomId], references: [organizationId, id], onDelete: Restrict)
+  sbom                 Sbom                     @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict)
   asset                Asset                    @relation("AssetIngestions", fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
   currentForAssets     Asset[]                  @relation("AssetCurrentIngestion")
   componentOccurrences ComponentOccurrence[]
@@ -674,6 +683,8 @@ model SbomIngestion {
   riskCalculations     RiskCalculation[]
 
   @@unique([organizationId, id], map: "sbom_ingestion_org_id_key")
+  @@unique([organizationId, id, sbomId], map: "sbom_ingestion_org_id_sbom_key")
+  @@unique([organizationId, id, assetId], map: "sbom_ingestion_org_id_asset_key")
   @@index([organizationId, state, createdAt], map: "sbom_ingestion_org_state_idx")
   @@index([organizationId, sbomId, parserVersion], map: "sbom_ingestion_org_sbom_parser_idx")
   @@map("sbom_ingestion")
@@ -703,6 +714,7 @@ model Component {
 model ComponentOccurrence {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId  String   @map("organization_id") @db.Uuid
+  assetId         String   @map("asset_id") @db.Uuid
   sbomId          String   @map("sbom_id") @db.Uuid
   sbomIngestionId String   @map("sbom_ingestion_id") @db.Uuid
   componentId     String   @map("component_id") @db.Uuid
@@ -713,8 +725,9 @@ model ComponentOccurrence {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   organization     Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  sbom             Sbom                      @relation(fields: [organizationId, sbomId], references: [organizationId, id], onDelete: Restrict)
-  sbomIngestion    SbomIngestion             @relation(fields: [organizationId, sbomIngestionId], references: [organizationId, id], onDelete: Restrict)
+  asset            Asset                     @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
+  sbom             Sbom                      @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict)
+  sbomIngestion    SbomIngestion             @relation(fields: [organizationId, sbomIngestionId, sbomId], references: [organizationId, id, sbomId], onDelete: Restrict)
   component        Component                 @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict)
   outgoingEdges    DependencyRelationship[]  @relation("DependencyFrom")
   incomingEdges    DependencyRelationship[]  @relation("DependencyTo")
@@ -722,6 +735,8 @@ model ComponentOccurrence {
   observations     FindingObservation[]
 
   @@unique([organizationId, id], map: "component_occurrence_org_id_key")
+  @@unique([organizationId, id, sbomIngestionId], map: "component_occurrence_org_id_ingestion_key")
+  @@unique([organizationId, id, assetId, componentId], map: "component_occurrence_org_id_asset_component_key")
   @@unique([organizationId, sbomIngestionId, componentId, version], map: "component_occurrence_identity_key")
   @@index([organizationId, sbomId], map: "component_occurrence_org_sbom_idx")
   @@index([organizationId, componentId], map: "component_occurrence_org_component_idx")
@@ -741,8 +756,8 @@ model DependencyRelationship {
   organization  Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   sbom          Sbom                 @relation(fields: [organizationId, sbomId], references: [organizationId, id], onDelete: Restrict)
   sbomIngestion SbomIngestion        @relation(fields: [organizationId, sbomIngestionId], references: [organizationId, id], onDelete: Restrict)
-  fromOccurrence ComponentOccurrence @relation("DependencyFrom", fields: [organizationId, fromOccurrenceId], references: [organizationId, id], onDelete: Restrict)
-  toOccurrence   ComponentOccurrence @relation("DependencyTo", fields: [organizationId, toOccurrenceId], references: [organizationId, id], onDelete: Restrict)
+  fromOccurrence ComponentOccurrence @relation("DependencyFrom", fields: [organizationId, fromOccurrenceId, sbomIngestionId], references: [organizationId, id, sbomIngestionId], onDelete: Restrict)
+  toOccurrence   ComponentOccurrence @relation("DependencyTo", fields: [organizationId, toOccurrenceId, sbomIngestionId], references: [organizationId, id, sbomIngestionId], onDelete: Restrict)
 
   @@unique([organizationId, sbomIngestionId, fromOccurrenceId, toOccurrenceId, relationshipType], map: "dependency_relationship_edge_key")
   @@index([organizationId, fromOccurrenceId], map: "dependency_relationship_from_idx")
@@ -801,10 +816,11 @@ model VulnerabilitySourceRecord {
   createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
 
   vulnerability    Vulnerability              @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict)
-  supersedesRecord VulnerabilitySourceRecord? @relation("SourceRecordRevision", fields: [supersedesRecordId], references: [id], onDelete: Restrict)
+  supersedesRecord VulnerabilitySourceRecord? @relation("SourceRecordRevision", fields: [supersedesRecordId, vulnerabilityId, source, sourceIdentity], references: [id, vulnerabilityId, source, sourceIdentity], onDelete: Restrict)
   supersededBy     VulnerabilitySourceRecord[] @relation("SourceRecordRevision")
 
-  @@unique([source, sourceIdentity, payloadSha256], map: "vulnerability_source_record_provenance_key")
+  @@unique([id, vulnerabilityId, source, sourceIdentity], map: "vulnerability_source_record_revision_key")
+  @@unique([source, sourceIdentity, payloadSha256, normalizationVersion], map: "vulnerability_source_record_provenance_key")
   @@index([vulnerabilityId, retrievedAt], map: "vulnerability_source_record_vuln_retrieved_idx")
   @@index([source, sourceIdentity], map: "vulnerability_source_record_provider_idx")
   @@map("vulnerability_source_record")
@@ -822,7 +838,7 @@ model Finding {
   lastObservedAt           DateTime      @map("last_observed_at") @db.Timestamptz(6)
   resolvedAt               DateTime?     @map("resolved_at") @db.Timestamptz(6)
   reopenedAt               DateTime?     @map("reopened_at") @db.Timestamptz(6)
-  assignedUserId           String?       @map("assigned_user_id") @db.Uuid
+  assignedMembershipId     String?       @map("assigned_membership_id") @db.Uuid
   assignedTeamId           String?       @map("assigned_team_id") @db.Uuid
   dueAt                    DateTime?     @map("due_at") @db.Timestamptz(6)
   currentRiskCalculationId String?       @map("current_risk_calculation_id") @db.Uuid
@@ -834,8 +850,8 @@ model Finding {
   asset                  Asset                 @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
   vulnerability          Vulnerability         @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict)
   component              Component             @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict)
-  componentOccurrence    ComponentOccurrence?  @relation(fields: [organizationId, componentOccurrenceId], references: [organizationId, id], onDelete: Restrict)
-  assignedUser           User?                 @relation("FindingAssignedUser", fields: [assignedUserId], references: [id], onDelete: Restrict)
+  componentOccurrence    ComponentOccurrence?  @relation(fields: [organizationId, componentOccurrenceId, assetId, componentId], references: [organizationId, id, assetId, componentId], onDelete: Restrict)
+  assignedMembership     Membership?           @relation("FindingAssignedMembership", fields: [organizationId, assignedMembershipId], references: [organizationId, id], onDelete: Restrict)
   assignedTeam           Team?                 @relation("FindingAssignedTeam", fields: [organizationId, assignedTeamId], references: [organizationId, id], onDelete: Restrict)
   currentRiskCalculation RiskCalculation?      @relation("FindingCurrentCalculation", fields: [organizationId, currentRiskCalculationId], references: [organizationId, id], onDelete: Restrict)
   observations           FindingObservation[]
@@ -849,7 +865,7 @@ model Finding {
   @@index([organizationId, state], map: "finding_org_state_idx")
   @@index([organizationId, assetId], map: "finding_org_asset_idx")
   @@index([organizationId, vulnerabilityId], map: "finding_org_vulnerability_idx")
-  @@index([organizationId, assignedUserId], map: "finding_org_assignee_idx")
+  @@index([organizationId, assignedMembershipId], map: "finding_org_assignee_idx")
   @@index([organizationId, dueAt], map: "finding_org_due_idx")
   @@map("finding")
 }
@@ -882,6 +898,7 @@ model FindingObservation {
 model RiskPolicy {
   id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId      String?          @map("organization_id") @db.Uuid
+  scope               RiskPolicyScope
   policyKey           String           @map("policy_key") @db.VarChar(128)
   name                String           @db.VarChar(200)
   version             Int
@@ -901,6 +918,7 @@ model RiskPolicy {
   @@unique([organizationId, id], map: "risk_policy_org_id_key")
   @@index([organizationId, policyKey, version], map: "risk_policy_org_key_version_idx")
   @@index([organizationId, status], map: "risk_policy_org_status_idx")
+  @@index([scope, policyKey, version], map: "risk_policy_scope_key_version_idx")
   @@map("risk_policy")
 }
 
@@ -941,7 +959,7 @@ model RemediationTask {
   status                   RemediationTaskStatus  @default(open)
   title                    String                 @db.VarChar(200)
   description              String?                @db.VarChar(4000)
-  assignedUserId           String?                @map("assigned_user_id") @db.Uuid
+  assignedMembershipId     String?                @map("assigned_membership_id") @db.Uuid
   assignedTeamId           String?                @map("assigned_team_id") @db.Uuid
   dueAt                    DateTime?              @map("due_at") @db.Timestamptz(6)
   startedAt                DateTime?              @map("started_at") @db.Timestamptz(6)
@@ -955,12 +973,12 @@ model RemediationTask {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   finding      Finding      @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
-  assignedUser User?        @relation("RemediationAssignedUser", fields: [assignedUserId], references: [id], onDelete: Restrict)
+  assignedMembership Membership? @relation("RemediationAssignedMembership", fields: [organizationId, assignedMembershipId], references: [organizationId, id], onDelete: Restrict)
   assignedTeam Team?        @relation("RemediationAssignedTeam", fields: [organizationId, assignedTeamId], references: [organizationId, id], onDelete: Restrict)
 
   @@unique([organizationId, id], map: "remediation_task_org_id_key")
   @@index([organizationId, status], map: "remediation_task_org_status_idx")
-  @@index([organizationId, assignedUserId], map: "remediation_task_org_assignee_idx")
+  @@index([organizationId, assignedMembershipId], map: "remediation_task_org_assignee_idx")
   @@index([organizationId, dueAt], map: "remediation_task_org_due_idx")
   @@map("remediation_task")
 }
@@ -970,8 +988,8 @@ model RiskAcceptance {
   organizationId       String                @map("organization_id") @db.Uuid
   findingId            String                @map("finding_id") @db.Uuid
   status               RiskAcceptanceStatus  @default(active)
-  requestedByUserId    String                @map("requested_by_user_id") @db.Uuid
-  approvedByUserId     String?               @map("approved_by_user_id") @db.Uuid
+  requestedByMembershipId String                @map("requested_by_membership_id") @db.Uuid
+  approvedByMembershipId  String?               @map("approved_by_membership_id") @db.Uuid
   reason               String                @db.VarChar(4000)
   compensatingControls String?               @map("compensating_controls") @db.VarChar(4000)
   startsAt             DateTime              @map("starts_at") @db.Timestamptz(6)
@@ -985,8 +1003,8 @@ model RiskAcceptance {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   finding      Finding      @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
-  requestedBy  User         @relation("RiskAcceptanceRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
-  approvedBy   User?        @relation("RiskAcceptanceApprover", fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  requestedBy Membership  @relation("RiskAcceptanceRequesterMembership", fields: [organizationId, requestedByMembershipId], references: [organizationId, id], onDelete: Restrict)
+  approvedBy  Membership? @relation("RiskAcceptanceApproverMembership", fields: [organizationId, approvedByMembershipId], references: [organizationId, id], onDelete: Restrict)
 
   @@unique([organizationId, id], map: "risk_acceptance_org_id_key")
   @@index([organizationId, findingId, status], map: "risk_acceptance_org_finding_status_idx")
@@ -1006,7 +1024,7 @@ model Evidence {
   byteLength        Int?         @map("byte_length")
   contentType       String?      @map("content_type") @db.VarChar(255)
   description       String?      @db.VarChar(2000)
-  submittedByUserId String?      @map("submitted_by_user_id") @db.Uuid
+  submittedByMembershipId String?      @map("submitted_by_membership_id") @db.Uuid
   /// Extensible evidence metadata. schemaVersion required. No secrets or raw SBOM bodies.
   metadata          Json
   createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1015,7 +1033,7 @@ model Evidence {
   finding      Finding?     @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
   sbom         Sbom?        @relation(fields: [organizationId, sbomId], references: [organizationId, id], onDelete: Restrict)
   asset        Asset?       @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
-  submittedBy  User?        @relation("EvidenceSubmittedBy", fields: [submittedByUserId], references: [id], onDelete: Restrict)
+  submittedBy  Membership?  @relation("EvidenceSubmittedByMembership", fields: [organizationId, submittedByMembershipId], references: [organizationId, id], onDelete: Restrict)
 
   @@unique([organizationId, id], map: "evidence_org_id_key")
   @@index([organizationId, kind, createdAt], map: "evidence_org_kind_idx")
@@ -1025,7 +1043,7 @@ model Evidence {
 model AuditEvent {
   id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId    String?                 @map("organization_id") @db.Uuid
-  actorUserId       String?                 @map("actor_user_id") @db.Uuid
+  actorMembershipId String?                 @map("actor_membership_id") @db.Uuid
   actorType         AuditActorType          @map("actor_type")
   action            String                  @db.VarChar(128)
   subjectType       String                  @map("subject_type") @db.VarChar(64)
@@ -1040,35 +1058,66 @@ model AuditEvent {
   schemaVersion     Int                     @map("schema_version")
   retentionCategory AuditRetentionCategory  @default(security) @map("retention_category")
 
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  actorUser    User?         @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actorMembership Membership?   @relation("AuditActorMembership", fields: [organizationId, actorMembershipId], references: [organizationId, id], onDelete: Restrict)
 
   @@index([organizationId, occurredAt], map: "audit_event_org_time_idx")
   @@index([organizationId, subjectType, subjectId], map: "audit_event_org_subject_idx")
   @@map("audit_event")
 }
 
-model Integration {
+model IntegrationProvider {
+  id          String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerKey IntegrationProviderKey  @unique @map("provider_key")
+  displayName String                  @map("display_name") @db.VarChar(200)
+  createdAt   DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  intelligenceSource IntelligenceSource?
+  integrations       Integration[]
+
+  @@map("integration_provider")
+}
+
+model IntelligenceSource {
   id                   String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId       String?                 @map("organization_id") @db.Uuid
-  providerKey          IntegrationProviderKey  @map("provider_key")
-  displayName          String                  @map("display_name") @db.VarChar(200)
+  providerKey          IntegrationProviderKey  @unique @map("provider_key")
   state                IntegrationState        @default(disabled)
-  /// Non-secret configuration. schemaVersion required. No tokens.
+  /// Non-secret sync configuration. schemaVersion required. No tokens.
   config               Json
-  externalAccountId    String?                 @map("external_account_id") @db.VarChar(256)
   lastSuccessfulSyncAt DateTime?               @map("last_successful_sync_at") @db.Timestamptz(6)
   lastFailureAt        DateTime?               @map("last_failure_at") @db.Timestamptz(6)
   version              Int                     @default(1)
   createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization          Organization?           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  provider IntegrationProvider @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
+
+  @@map("intelligence_source")
+}
+
+model Integration {
+  id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String           @map("organization_id") @db.Uuid
+  providerId           String           @map("provider_id") @db.Uuid
+  displayName          String           @map("display_name") @db.VarChar(200)
+  state                IntegrationState @default(disabled)
+  /// Non-secret configuration. schemaVersion required. No tokens.
+  config               Json
+  externalAccountId    String?          @map("external_account_id") @db.VarChar(256)
+  lastSuccessfulSyncAt DateTime?        @map("last_successful_sync_at") @db.Timestamptz(6)
+  lastFailureAt        DateTime?        @map("last_failure_at") @db.Timestamptz(6)
+  version              Int              @default(1)
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization          Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  provider              IntegrationProvider     @relation(fields: [providerId], references: [id], onDelete: Restrict)
   credentials           ExternalCredential[]
   repositoryConnections RepositoryConnection[]
 
   @@unique([organizationId, id], map: "integration_org_id_key")
-  @@index([organizationId, providerKey], map: "integration_org_provider_idx")
+  @@unique([organizationId, providerId], map: "integration_org_provider_key")
+  @@index([organizationId, state], map: "integration_org_state_idx")
   @@map("integration")
 }
 

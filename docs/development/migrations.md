@@ -7,17 +7,18 @@ PatchPilot uses **forward-only** Prisma migrations against PostgreSQL.
 1. Never edit a migration that has been applied to shared environments.
 2. The Session 3 migration `20260826120000_schema_foundation` is immutable.
 3. Session 5 adds `20260827120000_tenant_model`, which creates product tables and drops `SchemaFoundation`.
-4. There is no down migration. Rollback is restore-from-backup or a **forward-fix** migration.
+4. Session 5 review corrections are `20260827140000_review_corrections`. `export_snapshot` evidence targeting is `20260827150000_evidence_export_snapshot_chk` because PostgreSQL must commit a new enum value before a CHECK may use it. Do not edit the earlier Session 3 or Session 5 files.
+5. There is no down migration. Rollback is restore-from-backup or a **forward-fix** migration.
 
 ## Paths
 
 ### Clean database
 
-`pnpm db:migrate:deploy` on an empty database applies Session 3 then Session 5. The placeholder table exists only between those two migrations.
+`pnpm db:migrate:deploy` on an empty database applies Session 3, Session 5, then the review-correction migration. The placeholder table exists only between Session 3 and Session 5.
 
 ### Upgrade from Session 3
 
-A database that already has `SchemaFoundation` applies only `20260827120000_tenant_model`. That migration drops the placeholder. No product data existed in Session 3, so this is not a data-loss event for tenant evidence.
+A database that already has `SchemaFoundation` applies `20260827120000_tenant_model`, then `20260827140000_review_corrections`, then `20260827150000_evidence_export_snapshot_chk`. The first of those drops the placeholder. No product data existed in Session 3, so this is not a data-loss event for tenant evidence.
 
 ## Locks and transactions
 

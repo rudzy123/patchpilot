@@ -5,12 +5,14 @@ import {
   DEFAULT_PAGE_SIZE,
   err,
   errorCodes,
+  evidenceKinds,
   findingStates,
   MAX_PAGE_SIZE,
   membershipRoles,
   MIN_PAGE_SIZE,
   ok,
   organizationStatuses,
+  riskPolicyScopes,
   type FindingRepository,
   type OrganizationRepository,
 } from './index.js';
@@ -33,6 +35,8 @@ describe('lifecycle catalogs', () => {
     expect(membershipRoles).toEqual(['owner', 'admin', 'member', 'viewer']);
     expect(findingStates).not.toContain('reopened');
     expect(findingStates).not.toContain('assigned');
+    expect(riskPolicyScopes).toEqual(['builtin', 'organization']);
+    expect(evidenceKinds).toContain('export_snapshot');
   });
 });
 

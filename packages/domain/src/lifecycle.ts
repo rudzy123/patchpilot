@@ -145,8 +145,12 @@ export const evidenceKinds = [
   'intel_record',
   'policy_snapshot',
   'compensating_control',
+  'export_snapshot',
 ] as const;
 export type EvidenceKind = (typeof evidenceKinds)[number];
+
+export const riskPolicyScopes = ['builtin', 'organization'] as const;
+export type RiskPolicyScope = (typeof riskPolicyScopes)[number];
 
 export const auditActorTypes = ['user', 'system', 'instance_operator'] as const;
 export type AuditActorType = (typeof auditActorTypes)[number];

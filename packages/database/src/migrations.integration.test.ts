@@ -25,6 +25,8 @@ describe('migrations', () => {
       expect(names).toContain('organization');
       expect(names).toContain('audit_event');
       expect(names).toContain('outbox_event');
+      expect(names).toContain('integration_provider');
+      expect(names).toContain('intelligence_source');
       expect(names).not.toContain('SchemaFoundation');
     } finally {
       await client.$disconnect();

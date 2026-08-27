@@ -94,7 +94,7 @@ export type CreateSbomInput = {
   declaredContentType: string;
   specificationVersion?: string;
   originalFilename?: string;
-  uploadedByUserId?: string;
+  uploadedByMembershipId?: string;
   capturedAt?: Date;
   receivedAt?: Date;
 };
@@ -108,12 +108,23 @@ export type CreateFindingInput = {
   state?: FindingState;
   firstObservedAt: Date;
   lastObservedAt: Date;
-  assignedUserId?: string;
+  assignedMembershipId?: string;
   assignedTeamId?: string;
   dueAt?: Date;
 };
 
-export type CreateRiskPolicyInput = {
+export type CreateBuiltinRiskPolicyInput = {
+  policyKey: string;
+  name: string;
+  version: number;
+  status: RiskPolicyStatus;
+  policySchemaVersion: number;
+  definition: RiskPolicyDefinitionJson;
+  publishedAt?: Date;
+  createdByUserId?: string;
+};
+
+export type CreateOrganizationRiskPolicyInput = {
   organizationId: string;
   policyKey: string;
   name: string;
@@ -131,14 +142,14 @@ export type CreateRemediationTaskInput = {
   title: string;
   description?: string;
   status?: RemediationTaskStatus;
-  assignedUserId?: string;
+  assignedMembershipId?: string;
   assignedTeamId?: string;
   dueAt?: Date;
 };
 
 export type AppendAuditEventInput = {
   organizationId?: string;
-  actorUserId?: string;
+  actorMembershipId?: string;
   actorType: AuditActorType;
   action: string;
   subjectType: string;
@@ -237,8 +248,15 @@ export type FindingRepository = {
 };
 
 export type RiskPolicyRepository = {
-  create(input: CreateRiskPolicyInput): Promise<RiskPolicyRecord>;
+  createBuiltin(input: CreateBuiltinRiskPolicyInput): Promise<RiskPolicyRecord>;
+  createForOrganization(input: CreateOrganizationRiskPolicyInput): Promise<RiskPolicyRecord>;
+  findBuiltinById(id: string): Promise<RiskPolicyRecord | undefined>;
+  findBuiltinByKeyVersion(
+    policyKey: string,
+    version: number,
+  ): Promise<RiskPolicyRecord | undefined>;
   findById(organizationId: string, id: string): Promise<RiskPolicyRecord | undefined>;
+  listBuiltins(page?: PageRequest): Promise<Page<RiskPolicyRecord>>;
   listForOrganization(organizationId: string, page?: PageRequest): Promise<Page<RiskPolicyRecord>>;
 };
 

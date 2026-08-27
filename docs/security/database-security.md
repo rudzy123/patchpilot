@@ -5,8 +5,9 @@ PostgreSQL stores tenant metadata, findings, audit events, and outbox ids. Origi
 ## Controls in Session 5
 
 - UUID primary keys; organization predicates on tenant tables.
-- Compound foreign keys for same-organization relationships.
-- Check constraints for slugs, SHA-256, byte sizes, timestamp order, risk-acceptance fields, outbox leases, and evidence targets.
+- Compound foreign keys for same-organization relationships and evidence-graph consistency (ingestion/occurrence/finding/dependency/asset current ingestion).
+- Membership-scoped actors for tenant-sensitive user references.
+- Check constraints for slugs, SHA-256, byte sizes, timestamp order, risk-policy scope and publication, risk-acceptance fields, outbox leases, evidence targets, and asset-owner identity.
 - Append-only triggers on audit, observations, calculations, source records, and evidence.
 - No plaintext credential columns. `external_credential` stores a secret **reference** and key version only. Encryption and secret-manager integration are future infrastructure ([OD-4](../architecture/open-decisions.md)).
 - No password hash columns in this session ([OD-1](../architecture/open-decisions.md) is still open).

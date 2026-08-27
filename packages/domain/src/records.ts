@@ -39,6 +39,7 @@ import type {
   UserStatus,
   VulnerabilitySource,
   VulnerabilityStatus,
+  RiskPolicyScope,
 } from './lifecycle.js';
 import type {
   AuditPayloadJson,
@@ -188,7 +189,7 @@ export type SbomRecord = {
   specificationVersion: SbomSpecificationVersion | null;
   source: SbomSource;
   originalFilename: string | null;
-  uploadedByUserId: string | null;
+  uploadedByMembershipId: string | null;
   capturedAt: Date | null;
   receivedAt: Date;
   parserVersionLastSucceeded: string | null;
@@ -231,6 +232,7 @@ export type ComponentRecord = {
 export type ComponentOccurrenceRecord = {
   id: string;
   organizationId: string;
+  assetId: string;
   sbomId: string;
   sbomIngestionId: string;
   componentId: string;
@@ -301,7 +303,7 @@ export type FindingRecord = {
   lastObservedAt: Date;
   resolvedAt: Date | null;
   reopenedAt: Date | null;
-  assignedUserId: string | null;
+  assignedMembershipId: string | null;
   assignedTeamId: string | null;
   dueAt: Date | null;
   currentRiskCalculationId: string | null;
@@ -327,6 +329,7 @@ export type FindingObservationRecord = {
 export type RiskPolicyRecord = {
   id: string;
   organizationId: string | null;
+  scope: RiskPolicyScope;
   policyKey: string;
   name: string;
   version: number;
@@ -363,7 +366,7 @@ export type RemediationTaskRecord = {
   status: RemediationTaskStatus;
   title: string;
   description: string | null;
-  assignedUserId: string | null;
+  assignedMembershipId: string | null;
   assignedTeamId: string | null;
   dueAt: Date | null;
   startedAt: Date | null;
@@ -381,8 +384,8 @@ export type RiskAcceptanceRecord = {
   organizationId: string;
   findingId: string;
   status: RiskAcceptanceStatus;
-  requestedByUserId: string;
-  approvedByUserId: string | null;
+  requestedByMembershipId: string;
+  approvedByMembershipId: string | null;
   reason: string;
   compensatingControls: string | null;
   startsAt: Date;
@@ -407,7 +410,7 @@ export type EvidenceRecord = {
   byteLength: number | null;
   contentType: string | null;
   description: string | null;
-  submittedByUserId: string | null;
+  submittedByMembershipId: string | null;
   metadata: EvidenceMetadataJson;
   createdAt: Date;
 };
@@ -415,7 +418,7 @@ export type EvidenceRecord = {
 export type AuditEventRecord = {
   id: string;
   organizationId: string | null;
-  actorUserId: string | null;
+  actorMembershipId: string | null;
   actorType: AuditActorType;
   action: string;
   subjectType: string;
@@ -430,10 +433,29 @@ export type AuditEventRecord = {
   retentionCategory: AuditRetentionCategory;
 };
 
+export type IntegrationProviderRecord = {
+  id: string;
+  providerKey: IntegrationProviderKey;
+  displayName: string;
+  createdAt: Date;
+};
+
+export type IntelligenceSourceRecord = {
+  id: string;
+  providerKey: IntegrationProviderKey;
+  state: IntegrationState;
+  config: IntegrationConfigJson;
+  lastSuccessfulSyncAt: Date | null;
+  lastFailureAt: Date | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type IntegrationRecord = {
   id: string;
-  organizationId: string | null;
-  providerKey: IntegrationProviderKey;
+  organizationId: string;
+  providerId: string;
   displayName: string;
   state: IntegrationState;
   config: IntegrationConfigJson;

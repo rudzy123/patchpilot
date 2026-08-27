@@ -15,11 +15,12 @@ None of these defaults weaken [tenant isolation](tenant-isolation.md) or [securi
 | OD-7 | Priority vs risk score split | Glossary treats them as the same until an ADR splits them. | Keep **priority** as the stored calculated ranking. **Risk score** is a synonym. Do not introduce a second authoritative number. |
 | OD-8 | Exact outbound rate-limit numbers | OSV and KEV provider limits change. | Configured limits with conservative defaults in [vulnerability-intelligence.md](vulnerability-intelligence.md); operators may tighten. |
 | OD-9 | Notification channels | Email, chat, or in-app-only is unspecified. | In-app state and exports only for MVP. No outbound notification provider. |
-| OD-10 | Instance operator identity | How a self-hosted admin authenticates separately from organization membership. | A config-gated bootstrap user that can manage **system** integrations and shared catalogs only. No cross-organization read of tenant evidence. A bypass ADR is required before any cross-org operator console. |
+| OD-10 | Instance operator identity | How a self-hosted admin authenticates separately from organization membership. | A config-gated bootstrap user that can manage **IntelligenceSource** rows and shared catalogs only. No cross-organization read of tenant evidence. A bypass ADR is required before any cross-org operator console. |
 | OD-11 | Team semantics | Teams are in the domain model; MVP journey does not require them. | Persist Team and optional AssetOwner.teamId. Do not block the MVP journey on teams. |
 | OD-12 | RepositoryConnection provider | GitHub is not MVP. | Persist the entity with status `not_configured`. No webhooks, no tokens, no repo API calls. |
 | OD-13 | Backup encryption and off-site copies | Operator responsibility for a self-hosted system. | Document duties in [deployment-model.md](deployment-model.md) and [retention-and-deletion.md](retention-and-deletion.md). Do not ship a hosted backup service. |
 | OD-14 | CycloneDX minor versions beyond 1.6 | Spec will evolve. | Allowlist 1.4, 1.5, and 1.6. New versions need an ADR and parser tests. |
 | OD-15 | Matching algorithm details beyond OSV ranges | PURL aliases, CPE, and fuzzy name match are high-risk. | Exact ecosystem + package + version using OSV ranges and PURL when present. No fuzzy name match in MVP. |
+| OD-16 | Reserved organization slugs | Product URL routing is not implemented. A unique slug is not enough to keep `api`, `health`, `login`, and similar names off tenant routes. | Document the gap; do not invent a reserved-slug list in the database until routing exists. |
 
 Related: [ADR index](../adr/README.md), [architecture risk register](../security/risk-register.md).

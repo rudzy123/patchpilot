@@ -25,7 +25,7 @@ Application roles cannot "correct" an audit row. Corrections are new events.
 | --- | --- |
 | `id` | UUID (event id) |
 | `organizationId` | Required for tenant operations; null only for system catalog events |
-| `actorUserId` | Null for system jobs; then `actorType = system` |
+| `actorMembershipId` | Required for tenant `user` actors; null for `system` / `instance_operator` |
 | `actorType` | `user`, `system`, `instance_operator` |
 | `action` | Stable dotted name |
 | `subjectType` / `subjectId` | Target type / target id |

@@ -151,7 +151,9 @@ describe('tenant model persistence', () => {
     const integrationB = await prisma.integration.create({
       data: {
         organizationId: orgB.id,
-        providerKey: 'reserved',
+        providerId: (await prisma.integrationProvider.findUniqueOrThrow({
+          where: { providerKey: 'reserved' },
+        })).id,
         displayName: 'Synthetic B',
         config: {
           schemaVersion: JSON_SCHEMA_VERSION_V1,
@@ -291,6 +293,7 @@ describe('tenant model persistence', () => {
     const occA1 = await prisma.componentOccurrence.create({
       data: {
         organizationId: orgA.id,
+        assetId: assetA.id,
         sbomId: sbomA.id,
         sbomIngestionId: ingestionA.id,
         componentId: componentA.id,
@@ -300,6 +303,7 @@ describe('tenant model persistence', () => {
     const occA2 = await prisma.componentOccurrence.create({
       data: {
         organizationId: orgA.id,
+        assetId: assetA.id,
         sbomId: sbomA.id,
         sbomIngestionId: ingestionA.id,
         componentId: componentA.id,
@@ -340,6 +344,7 @@ describe('tenant model persistence', () => {
           prisma.componentOccurrence.create({
             data: {
               organizationId: orgA.id,
+              assetId: assetA.id,
               sbomId: sbomA.id,
               sbomIngestionId: ingestionA.id,
               componentId: componentB.id,
@@ -523,6 +528,7 @@ describe('tenant model persistence', () => {
     const policy = await prisma.riskPolicy.create({
       data: {
         organizationId: org.id,
+        scope: 'organization',
         policyKey: 'org.override',
         name: 'Org override',
         version: 1,
@@ -599,10 +605,10 @@ describe('tenant model persistence', () => {
       `ra-r-${randomUUID().slice(0, 8)}@synthetic.patchpilot.test`,
     );
     const approver = await createUser(`ra-a-${randomUUID().slice(0, 8)}@synthetic.patchpilot.test`);
-    await prisma.membership.create({
+    const requesterMembership = await prisma.membership.create({
       data: { organizationId: org.id, userId: requester.id, role: 'member' },
     });
-    await prisma.membership.create({
+    const approverMembership = await prisma.membership.create({
       data: { organizationId: org.id, userId: approver.id, role: 'admin' },
     });
     const asset = await prisma.asset.create({
@@ -637,7 +643,7 @@ describe('tenant model persistence', () => {
         data: {
           organizationId: org.id,
           findingId: finding.id,
-          requestedByUserId: requester.id,
+          requestedByMembershipId: requesterMembership.id,
           reason: 'synthetic',
           startsAt,
           expiresAt: startsAt,
@@ -651,7 +657,7 @@ describe('tenant model persistence', () => {
           organizationId: org.id,
           findingId: finding.id,
           status: 'active',
-          requestedByUserId: requester.id,
+          requestedByMembershipId: requesterMembership.id,
           reason: 'synthetic',
           startsAt,
           expiresAt,
@@ -664,8 +670,8 @@ describe('tenant model persistence', () => {
         organizationId: org.id,
         findingId: finding.id,
         status: 'active',
-        requestedByUserId: requester.id,
-        approvedByUserId: approver.id,
+        requestedByMembershipId: requesterMembership.id,
+        approvedByMembershipId: approverMembership.id,
         approvedAt: new Date('2026-01-01T01:00:00.000Z'),
         reason: 'synthetic',
         startsAt,
@@ -835,6 +841,9 @@ describe('tenant model persistence', () => {
       data: { slug: `tx-${randomUUID().slice(0, 8)}`, name: 'Tx Org' },
     });
     const user = await createUser(`tx-${randomUUID().slice(0, 8)}@synthetic.patchpilot.test`);
+    const membership = await prisma.membership.create({
+      data: { organizationId: org.id, userId: user.id, role: 'owner' },
+    });
     const unitOfWork = createPrismaUnitOfWork({ client: prisma });
 
     const committed = await unitOfWork.runInTransaction(async (repos) =>
@@ -842,7 +851,7 @@ describe('tenant model persistence', () => {
         organizationId: org.id,
         assetName: 'atomic-asset',
         assetType: 'application',
-        actorUserId: user.id,
+        actorMembershipId: membership.id,
         correlationId: randomUUID(),
       }),
     );
@@ -866,7 +875,7 @@ describe('tenant model persistence', () => {
           organizationId: org.id,
           assetName: 'rollback-asset',
           assetType: 'application',
-          actorUserId: user.id,
+          actorMembershipId: membership.id,
           correlationId: randomUUID(),
         });
         throw new Error('force rollback');

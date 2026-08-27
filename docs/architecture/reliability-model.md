@@ -93,7 +93,7 @@ Dead-lettered jobs retain payload **ids** only (no raw SBOM). Operators replay a
 | PostgreSQL | Unavailable | API 503, worker lag | Operator restore; do not skip migrations |
 | Redis | Unavailable | Relay lag, publish errors | Outbox remains; drain when Redis returns. PostgreSQL is source of truth |
 | Object storage | Unavailable | Upload 503 | No SBOM row; user retries |
-| OSV/KEV | Outage | Integration `degraded` | Use last snapshot; see [vulnerability intelligence](vulnerability-intelligence.md) |
+| OSV/KEV | Outage | IntelligenceSource `degraded` | Use last snapshot; see [vulnerability intelligence](vulnerability-intelligence.md) |
 
 ## Partial parse
 
@@ -109,7 +109,7 @@ Delivery is **at-least-once**. PatchPilot does **not** claim exactly-once proces
 
 ## Retry
 
-Exponential backoff **with jitter**. Classify retryable vs not (see table above). Circuit-breaking: after consecutive feed failures, system **Integration** → `degraded`; stop hammering; probe on a slow timer.
+Exponential backoff **with jitter**. Classify retryable vs not (see table above). Circuit-breaking: after consecutive feed failures, **IntelligenceSource** → `degraded`; stop hammering; probe on a slow timer.
 
 ## Timeouts and shutdown
 

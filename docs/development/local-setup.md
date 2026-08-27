@@ -38,7 +38,7 @@ nvm use        # or install Node 24 another way
    pnpm infrastructure:up
    ```
 
-4. Apply Prisma migrations. Session 3 created `SchemaFoundation`; Session 5 replaces it with the tenant schema (`20260827120000_tenant_model`).
+4. Apply Prisma migrations. Session 3 created `SchemaFoundation`; Session 5 replaces it with the tenant schema (`20260827120000_tenant_model`). Review corrections are `20260827140000_review_corrections`.
 
    ```bash
    pnpm db:generate

@@ -11,7 +11,8 @@ import type {
   CreateOrganizationInput,
   CreateOutboxEventInput,
   CreateRemediationTaskInput,
-  CreateRiskPolicyInput,
+  CreateBuiltinRiskPolicyInput,
+  CreateOrganizationRiskPolicyInput,
   CreateSbomInput,
   CreateTeamInput,
   EnvironmentRepository,
@@ -352,9 +353,9 @@ class PrismaSbomMetadataRepository implements SbomMetadataRepository {
         ...(input.originalFilename === undefined
           ? {}
           : { originalFilename: input.originalFilename }),
-        ...(input.uploadedByUserId === undefined
+        ...(input.uploadedByMembershipId === undefined
           ? {}
-          : { uploadedByUserId: input.uploadedByUserId }),
+          : { uploadedByMembershipId: input.uploadedByMembershipId }),
         ...(input.capturedAt === undefined ? {} : { capturedAt: input.capturedAt }),
       },
     });
@@ -407,7 +408,9 @@ class PrismaFindingRepository implements FindingRepository {
         ...(input.componentOccurrenceId === undefined
           ? {}
           : { componentOccurrenceId: input.componentOccurrenceId }),
-        ...(input.assignedUserId === undefined ? {} : { assignedUserId: input.assignedUserId }),
+        ...(input.assignedMembershipId === undefined
+          ? {}
+          : { assignedMembershipId: input.assignedMembershipId }),
         ...(input.assignedTeamId === undefined ? {} : { assignedTeamId: input.assignedTeamId }),
         ...(input.dueAt === undefined ? {} : { dueAt: input.dueAt }),
       },
@@ -437,10 +440,11 @@ class PrismaFindingRepository implements FindingRepository {
 class PrismaRiskPolicyRepository implements RiskPolicyRepository {
   public constructor(private readonly client: PrismaClientLike) {}
 
-  public async create(input: CreateRiskPolicyInput) {
+  public async createBuiltin(input: CreateBuiltinRiskPolicyInput) {
     const row = await this.client.riskPolicy.create({
       data: {
-        organizationId: input.organizationId,
+        organizationId: null,
+        scope: 'builtin',
         policyKey: input.policyKey,
         name: input.name,
         version: input.version,
@@ -454,17 +458,60 @@ class PrismaRiskPolicyRepository implements RiskPolicyRepository {
     return mapRiskPolicy(row);
   }
 
-  public async findById(organizationId: string, id: string) {
+  public async createForOrganization(input: CreateOrganizationRiskPolicyInput) {
+    const row = await this.client.riskPolicy.create({
+      data: {
+        organizationId: input.organizationId,
+        scope: 'organization',
+        policyKey: input.policyKey,
+        name: input.name,
+        version: input.version,
+        status: input.status,
+        policySchemaVersion: input.policySchemaVersion,
+        definition: asJsonObject(input.definition as unknown as Prisma.JsonValue, 'definition'),
+        ...(input.publishedAt === undefined ? {} : { publishedAt: input.publishedAt }),
+        ...(input.createdByUserId === undefined ? {} : { createdByUserId: input.createdByUserId }),
+      },
+    });
+    return mapRiskPolicy(row);
+  }
+
+  public async findBuiltinById(id: string) {
     const row = await this.client.riskPolicy.findFirst({
-      where: { organizationId, id },
+      where: { id, scope: 'builtin', organizationId: null },
     });
     return row === null ? undefined : mapRiskPolicy(row);
+  }
+
+  public async findBuiltinByKeyVersion(policyKey: string, version: number) {
+    const row = await this.client.riskPolicy.findFirst({
+      where: { policyKey, version, scope: 'builtin', organizationId: null },
+    });
+    return row === null ? undefined : mapRiskPolicy(row);
+  }
+
+  public async findById(organizationId: string, id: string) {
+    const row = await this.client.riskPolicy.findFirst({
+      where: { organizationId, id, scope: 'organization' },
+    });
+    return row === null ? undefined : mapRiskPolicy(row);
+  }
+
+  public async listBuiltins(page?: PageRequest) {
+    return paginateById(async ({ take, cursorId }) => {
+      const rows = await this.client.riskPolicy.findMany({
+        where: { scope: 'builtin', organizationId: null, ...afterIdWhere(cursorId) },
+        orderBy: { id: 'asc' },
+        take,
+      });
+      return rows.map(mapRiskPolicy);
+    }, page);
   }
 
   public async listForOrganization(organizationId: string, page?: PageRequest) {
     return paginateById(async ({ take, cursorId }) => {
       const rows = await this.client.riskPolicy.findMany({
-        where: { organizationId, ...afterIdWhere(cursorId) },
+        where: { organizationId, scope: 'organization', ...afterIdWhere(cursorId) },
         orderBy: { id: 'asc' },
         take,
       });
@@ -484,7 +531,9 @@ class PrismaRemediationRepository implements RemediationRepository {
         title: input.title,
         ...(input.description === undefined ? {} : { description: input.description }),
         ...(input.status === undefined ? {} : { status: input.status }),
-        ...(input.assignedUserId === undefined ? {} : { assignedUserId: input.assignedUserId }),
+        ...(input.assignedMembershipId === undefined
+          ? {}
+          : { assignedMembershipId: input.assignedMembershipId }),
         ...(input.assignedTeamId === undefined ? {} : { assignedTeamId: input.assignedTeamId }),
         ...(input.dueAt === undefined ? {} : { dueAt: input.dueAt }),
       },
@@ -525,7 +574,9 @@ class PrismaAuditAppendRepository implements AuditAppendRepository {
         payload: asJsonObject(input.payload as unknown as Prisma.JsonValue, 'payload'),
         schemaVersion: input.schemaVersion ?? JSON_SCHEMA_VERSION_V1,
         ...(input.organizationId === undefined ? {} : { organizationId: input.organizationId }),
-        ...(input.actorUserId === undefined ? {} : { actorUserId: input.actorUserId }),
+        ...(input.actorMembershipId === undefined
+          ? {}
+          : { actorMembershipId: input.actorMembershipId }),
         ...(input.occurredAt === undefined ? {} : { occurredAt: input.occurredAt }),
         ...(input.requestId === undefined ? {} : { requestId: input.requestId }),
         ...(input.sourceIp === undefined ? {} : { sourceIp: input.sourceIp }),

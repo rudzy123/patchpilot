@@ -175,7 +175,7 @@ export function mapSbom(row: {
   specificationVersion: string | null;
   source: SbomRecord['source'];
   originalFilename: string | null;
-  uploadedByUserId: string | null;
+  uploadedByMembershipId: string | null;
   capturedAt: Date | null;
   receivedAt: Date;
   parserVersionLastSucceeded: string | null;
@@ -211,7 +211,7 @@ export function mapFinding(row: {
   lastObservedAt: Date;
   resolvedAt: Date | null;
   reopenedAt: Date | null;
-  assignedUserId: string | null;
+  assignedMembershipId: string | null;
   assignedTeamId: string | null;
   dueAt: Date | null;
   currentRiskCalculationId: string | null;
@@ -225,6 +225,7 @@ export function mapFinding(row: {
 export function mapRiskPolicy(row: {
   id: string;
   organizationId: string | null;
+  scope: RiskPolicyRecord['scope'];
   policyKey: string;
   name: string;
   version: number;
@@ -249,7 +250,7 @@ export function mapRemediationTask(row: {
   status: RemediationTaskRecord['status'];
   title: string;
   description: string | null;
-  assignedUserId: string | null;
+  assignedMembershipId: string | null;
   assignedTeamId: string | null;
   dueAt: Date | null;
   startedAt: Date | null;
@@ -267,7 +268,7 @@ export function mapRemediationTask(row: {
 export function mapAuditEvent(row: {
   id: string;
   organizationId: string | null;
-  actorUserId: string | null;
+  actorMembershipId: string | null;
   actorType: AuditEventRecord['actorType'];
   action: string;
   subjectType: string;

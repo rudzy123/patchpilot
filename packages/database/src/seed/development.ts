@@ -92,10 +92,11 @@ export async function seedDevelopmentData(options: {
 
   await client.vulnerabilitySourceRecord.upsert({
     where: {
-      source_sourceIdentity_payloadSha256: {
+      source_sourceIdentity_payloadSha256_normalizationVersion: {
         source: 'osv',
         sourceIdentity: 'PATCHPILOT-SYNTH-VULN-1',
         payloadSha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        normalizationVersion: 'test-1',
       },
     },
     update: {},

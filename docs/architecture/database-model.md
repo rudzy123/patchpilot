@@ -11,12 +11,12 @@ Opaque IDs are UUIDs (`gen_random_uuid()`). Timestamps are `TIMESTAMPTZ` stored 
 | `vulnerability` | `organization`, `membership`, `team`, `team_membership` |
 | `vulnerability_alias` | `environment`, `asset`, `asset_owner`, `asset_tag` |
 | `vulnerability_source_record` | `repository_connection`, `sbom`, `sbom_ingestion` |
-| Built-in `risk_policy` (`organization_id` null) | `component`, `component_occurrence`, `dependency_relationship` |
-| System `integration` (`organization_id` null) | `finding`, `finding_observation`, org `risk_policy` |
-| | `risk_calculation`, `remediation_task`, `risk_acceptance` |
-| | `evidence`, tenant `audit_event`, tenant `integration` |
-| | `external_credential`, tenant `outbox_event` |
-| | `background_job` (when org set), `idempotency_record` |
+| Built-in `risk_policy` (`scope = builtin`, `organization_id` null) | `component`, `component_occurrence`, `dependency_relationship` |
+| `integration_provider` | `finding`, `finding_observation`, org `risk_policy` (`scope = organization`) |
+| `intelligence_source` (OSV / CISA KEV sync state) | `risk_calculation`, `remediation_task`, `risk_acceptance` |
+| | `evidence`, tenant `audit_event` |
+| | `integration` (`organization_id` required), `external_credential` |
+| | tenant `outbox_event`, `background_job` (when org set), `idempotency_record` |
 
 `user` is instance-level. Access to tenant data is via `membership`. Listing users is still scoped by membership in a later API session.
 
@@ -37,8 +37,16 @@ Related tenant rows must share an organization. Prisma unique `(organization_id,
 - Asset owner → asset, optional membership, optional team in the same org
 - Repository connection → asset and optional tenant integration
 - SBOM / ingestion / occurrence / dependency / finding / observation / calculation / task / acceptance / evidence → parents in the same org
+- Ingestion → the same asset as its SBOM
+- Occurrence → the same SBOM as its ingestion and the same asset as that SBOM
+- Finding occurrence pointer → the same asset and component as the occurrence
+- Dependency endpoints → occurrences from the same ingestion
+- Asset `last_successful_sbom_ingestion_id` → an ingestion for that same asset
+- Tenant user actions (assignee, uploader, acceptance actors, evidence submitter, tenant audit actor) → `membership` in the same organization
 
-Built-in risk policies and system integrations have null `organization_id`. A trigger rejects a `risk_calculation` whose policy belongs to a different organization. Tenant credentials cannot attach to system integrations because the compound FK requires a non-null matching org.
+Built-in risk policies use `scope = builtin` and `organization_id` null. Organization policies use `scope = organization` and a non-null `organization_id`. A check constraint ties those two columns. A trigger rejects a `risk_calculation` whose policy belongs to a different organization. Published policies cannot be deleted; identity and definition cannot change after `published_at` is set. The only allowed published-status change is `published` → `retired`.
+
+OSV and CISA KEV synchronization is `intelligence_source`, not a tenant `integration`. `integration.organization_id` is required. Tenant credentials attach only to an organization-owned `integration`.
 
 ## Identifiers, time, and concurrency
 
@@ -58,9 +66,9 @@ JSON is allowed only where the field is versioned and not the primary query key.
 | `audit_event.payload` | Redacted metadata | `schemaVersion` plus `audit_event.schema_version` |
 | `outbox_event.payload` | Opaque ids and safe metadata | `event_schema_version` and payload `schemaVersion` |
 | `evidence.metadata` | Extensible non-secret metadata | `schemaVersion` |
-| `vulnerability_source_record.normalized` | Provider-normalized subset | `normalization_version` plus `schemaVersion` |
+| `vulnerability_source_record.normalized` | Immutable normalized source revision | uniqueness includes `normalization_version`; `schemaVersion` in JSON |
 | `finding_observation.evidence` | Safe compare metadata | `schemaVersion` |
-| `integration.config` | Non-secret endpoints/intervals | `schemaVersion` |
+| `integration.config` / `intelligence_source.config` | Non-secret endpoints/intervals | `schemaVersion` |
 | `idempotency_record.response` | Bounded response metadata | `schemaVersion` |
 
 Do not store raw SBOM bytes, provider payloads, tokens, or source code in JSON.
@@ -71,7 +79,7 @@ Foreign keys use `ON DELETE RESTRICT`. Evidentiary tables are not cascade-delete
 
 ## SchemaFoundation
 
-Session 3 created a technical `SchemaFoundation` table. Migration `20260827120000_tenant_model` drops it. The Session 3 migration file is unchanged.
+Session 3 created a technical `SchemaFoundation` table. Migration `20260827120000_tenant_model` drops it. Migration `20260827140000_review_corrections` is a forward-only correction of Session 5 review findings. `20260827150000_evidence_export_snapshot_chk` commits the `export_snapshot` evidence-target CHECK after the enum value exists. The Session 3 and original Session 5 migration files are unchanged.
 
 ## Row-Level Security
 
@@ -79,7 +87,7 @@ RLS is **not** enabled. Application predicates and compound FKs are the v0.1 con
 
 ## Check constraints (SQL extras)
 
-Prisma cannot express every invariant. Migration `20260827120000_tenant_model` adds named checks, including:
+Prisma cannot express every invariant. Migrations `20260827120000_tenant_model`, `20260827140000_review_corrections`, and `20260827150000_evidence_export_snapshot_chk` add named checks, including:
 
 | Constraint | Invariant |
 | --- | --- |
@@ -87,14 +95,19 @@ Prisma cannot express every invariant. Migration `20260827120000_tenant_model` a
 | `sbom_sha256_chk` / evidence and intel SHA checks | 64 lowercase hex characters |
 | `sbom_byte_length_chk` | Positive byte size |
 | `dependency_relationship_not_self_chk` | Source ≠ target occurrence |
+| `risk_policy_scope_ownership_chk` | `builtin` requires null org; `organization` requires a non-null org |
+| `risk_policy_status_timestamps_chk` | Draft/published/retired timestamps stay consistent |
 | `risk_acceptance_expiration_chk` | `expires_at > starts_at` |
 | `risk_acceptance_approval_chk` / `*_active_approval_chk` / `*_revocation_chk` | Approver/timestamp and revocation fields stay consistent |
 | `outbox_event_attempt_chk` / `*_lease_chk` / `*_processed_ts_chk` | Nonnegative attempts; lease and processed timestamps match status |
-| `evidence_one_target_chk` | Exactly one supported evidence target |
+| `evidence_one_target_chk` | Exactly one supported target; `export_snapshot` is the only asset-targeted kind |
+| `asset_owner_target_chk` | Exactly one of `user_id` or `team_id` |
+| `audit_event_actor_scope_chk` | Tenant `user` actors require membership; `system` / `instance_operator` must not |
+| `intelligence_source_provider_chk` | Global sync rows are `osv` or `cisa_kev` only |
 | `*_version_chk` | Optimistic concurrency version ≥ 1 |
 | Archive / completed / failure-code timestamp consistency | Status and timestamps agree |
 
-Partial unique indexes cover active asset names per organization, builtin vs org risk-policy versions, one active risk acceptance per finding, outbox/audit replay keys, and available outbox work.
+Partial unique indexes cover active asset names per organization, builtin vs org risk-policy versions, NULL-safe asset-owner identity, non-null SBOM ingestion idempotency keys, one active risk acceptance per finding, outbox/audit replay keys, and available outbox work. Ingestion uniqueness is **not** `(sbom_id, parser_version)`: retries keep history via `attempt_number`, and a newer parser may reprocess the same SBOM.
 
 ## Indexes
 
@@ -102,11 +115,13 @@ Every index maps to a documented access or uniqueness need: organization slug; m
 
 ## Append-only enforcement
 
-`BEFORE UPDATE OR DELETE` triggers reject mutation of `audit_event`, `finding_observation`, `risk_calculation`, `vulnerability_source_record`, and `evidence`. Published `risk_policy` rows are immutable via trigger. These controls do not prevent a superuser from rewriting history.
+`BEFORE UPDATE OR DELETE` triggers reject mutation of `audit_event`, `finding_observation`, `risk_calculation`, `vulnerability_source_record`, and `evidence`. Published `risk_policy` rows cannot change identity or definition; they cannot be deleted; they may only move `published` → `retired`. Trigger functions set `search_path = pg_catalog, public` so they do not inherit the caller search path. These controls do not prevent a superuser from rewriting history.
 
 ## Limitations
 
 Triggers and revoked DML are not WORM storage. Superusers can still rewrite history. Hash chaining is not implemented; this database does not claim non-repudiation.
+
+Organization `slug` uniqueness does not reserve product route names (`api`, `health`, `login`, and similar). Do not treat the current unique index as URL-routing protection. Reserved slugs stay deferred until URL routing is implemented.
 
 ## Related documents
 

@@ -48,7 +48,9 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **Environment** | Controlled deployment context (`production` / `non_production` sensitivity), unique per organization slug. |
 | **SBOM ingestion** | One processing attempt against an SBOM artifact. Prior attempts are retained. |
 | **Component occurrence** | Tenant-owned observation of a versionless **Component** in a specific SBOM ingestion. |
-| **Risk policy** | Versioned scoring definition. Built-in rows may have null organization; tenant overrides are organization-owned. Published versions are immutable. |
+| **Risk policy** | Versioned scoring definition. Shared table with `scope` `builtin` (null organization) or `organization`. Published versions are immutable and cannot be deleted. |
+| **Intelligence source** | Global OSV/CISA KEV synchronization state. Not a tenant installation. |
+| **Integration** | Organization-owned installation of a provider catalog entry. `organizationId` is required. |
 | **Risk calculation** | Append-only stored priority snapshot with factors, policy version, and engine version. |
 | **Outbox event** | Transactional outbox row (`pending` → `claimed` → `processed`, or `failed` / `dead_lettered`). At-least-once; not exactly-once. |
 | **Idempotency record** | Tenant-scoped hashed key for future mutation endpoints. Stores no raw bearer tokens. |

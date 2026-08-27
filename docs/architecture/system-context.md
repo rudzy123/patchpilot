@@ -37,7 +37,7 @@ C4Context
 | Actor | Relationship | What they can do in v0.1 |
 | --- | --- | --- |
 | Organization user | Authenticated member of exactly the organizations they belong to | Complete the MVP journey for **authorized organization** data only |
-| Instance operator | Runs the deployment | Configure system integrations (OSV, KEV refresh), backups, and runtime secrets. Cannot read another organization's SBOMs, findings, or credentials unless they are also a member of that organization |
+| Instance operator | Runs the deployment | Configure **IntelligenceSource** (OSV, KEV refresh), backups, and runtime secrets. Cannot read another organization's SBOMs, findings, or credentials unless they are also a member of that organization |
 | Later reviewer | Reads exports and audit history | Sees stored evidence; does not receive a compliance certificate |
 
 Users are described in [target users](../product/target-users.md). Personas do not expand MVP scope.

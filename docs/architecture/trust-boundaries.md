@@ -133,7 +133,7 @@ Canonical log redaction: never log authorization headers, cookies, API tokens, G
 
 ## Administrative plane
 
-Instance operator actions (enable system **Integration**, intel refresh interval, restore from backup) stay outside tenant data APIs. There is **no** cross-organization application bypass. See [tenant isolation](tenant-isolation.md).
+Instance operator actions (enable **IntelligenceSource**, intel refresh interval, restore from backup) stay outside tenant data APIs. There is **no** cross-organization application bypass. See [tenant isolation](tenant-isolation.md).
 
 ## Related documents
 
