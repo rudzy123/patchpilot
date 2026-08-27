@@ -2,14 +2,17 @@ import { assertDevelopmentSeedAllowed, type DatabaseUrlSafety } from '@patchpilo
 import { JSON_SCHEMA_VERSION_V1 } from '@patchpilot/domain';
 
 import { getPrismaClient } from '../client.js';
-import type { PrismaClientLike } from '../guards.js';
-import { normalizeEmail, normalizeSlug } from '../guards.js';
+import { asJsonObject, normalizeEmail, normalizeSlug, type PrismaClientLike } from '../guards.js';
 
 const ORG_A_ID = '11111111-1111-4111-8111-111111111111';
 const ORG_B_ID = '22222222-2222-4222-8222-222222222222';
 const USER_A_ID = '11111111-1111-4111-8111-1111111111aa';
 const USER_B_ID = '22222222-2222-4222-8222-2222222222bb';
 const VULN_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const BUILTIN_POLICY_ID = '33333333-3333-4333-8333-333333333333';
+const ORG_A_POLICY_ID = '44444444-4444-4444-8444-444444444444';
+const BUILTIN_POLICY_KEY = 'patchpilot.builtin.v0';
+const ORG_A_POLICY_KEY = 'patchpilot.synthetic.org-a.v0';
 
 export const developmentSeedIds = {
   organizationA: ORG_A_ID,
@@ -17,6 +20,8 @@ export const developmentSeedIds = {
   userA: USER_A_ID,
   userB: USER_B_ID,
   vulnerability: VULN_ID,
+  builtinRiskPolicy: BUILTIN_POLICY_ID,
+  organizationARiskPolicy: ORG_A_POLICY_ID,
 } as const;
 
 export async function seedDevelopmentData(options: {
@@ -60,8 +65,10 @@ export async function seedDevelopmentData(options: {
   await upsertOrganization(client, ORG_A_ID, 'synthetic-org-a', 'Synthetic Organization A');
   await upsertOrganization(client, ORG_B_ID, 'synthetic-org-b', 'Synthetic Organization B');
 
-  await upsertMembership(client, ORG_A_ID, USER_A_ID);
+  const membershipA = await upsertMembership(client, ORG_A_ID, USER_A_ID);
   await upsertMembership(client, ORG_B_ID, USER_B_ID);
+  await ensureBuiltinRiskPolicy(client);
+  await ensureOrganizationRiskPolicy(client, ORG_A_ID, membershipA.id);
 
   await client.vulnerability.upsert({
     where: { id: VULN_ID },
@@ -142,8 +149,8 @@ async function upsertMembership(
   client: PrismaClientLike,
   organizationId: string,
   userId: string,
-): Promise<void> {
-  await client.membership.upsert({
+): Promise<{ id: string }> {
+  return client.membership.upsert({
     where: {
       organizationId_userId: {
         organizationId,
@@ -160,6 +167,88 @@ async function upsertMembership(
       userId,
       role: 'owner',
       joinedAt: new Date('2026-01-01T00:00:00.000Z'),
+    },
+    select: { id: true },
+  });
+}
+
+async function ensureBuiltinRiskPolicy(client: PrismaClientLike): Promise<void> {
+  const existing = await client.riskPolicy.findFirst({
+    where: {
+      scope: 'builtin',
+      organizationId: null,
+      policyKey: BUILTIN_POLICY_KEY,
+      version: 1,
+    },
+    select: { id: true },
+  });
+  if (existing !== null) {
+    return;
+  }
+
+  await client.riskPolicy.create({
+    data: {
+      id: BUILTIN_POLICY_ID,
+      organizationId: null,
+      scope: 'builtin',
+      policyKey: BUILTIN_POLICY_KEY,
+      name: 'Synthetic built-in risk policy',
+      version: 1,
+      status: 'published',
+      policySchemaVersion: JSON_SCHEMA_VERSION_V1,
+      publishedAt: new Date('2026-01-01T00:00:00.000Z'),
+      definition: asJsonObject(
+        {
+          schemaVersion: JSON_SCHEMA_VERSION_V1,
+          policyKey: BUILTIN_POLICY_KEY,
+          factorCatalog: [],
+          weights: {},
+        },
+        'definition',
+      ),
+    },
+  });
+}
+
+async function ensureOrganizationRiskPolicy(
+  client: PrismaClientLike,
+  organizationId: string,
+  createdByMembershipId: string,
+): Promise<void> {
+  const existing = await client.riskPolicy.findFirst({
+    where: {
+      scope: 'organization',
+      organizationId,
+      policyKey: ORG_A_POLICY_KEY,
+      version: 1,
+    },
+    select: { id: true },
+  });
+  if (existing !== null) {
+    return;
+  }
+
+  await client.riskPolicy.create({
+    data: {
+      id: ORG_A_POLICY_ID,
+      organizationId,
+      scope: 'organization',
+      policyKey: ORG_A_POLICY_KEY,
+      name: 'Synthetic organization A risk policy',
+      version: 1,
+      status: 'published',
+      policySchemaVersion: JSON_SCHEMA_VERSION_V1,
+      publishedAt: new Date('2026-01-01T00:00:00.000Z'),
+      createdByMembershipId,
+      definition: asJsonObject(
+        {
+          schemaVersion: JSON_SCHEMA_VERSION_V1,
+          policyKey: ORG_A_POLICY_KEY,
+          factorCatalog: [],
+          weights: {},
+        },
+        'definition',
+      ),
     },
   });
 }

@@ -13,7 +13,7 @@ import {
 } from './integration-database.js';
 import { persistTenantChangeWithAuditAndOutbox } from './persistence-fixture.js';
 import { createPrismaUnitOfWork, createRepositories } from './repositories.js';
-import { seedDevelopmentData } from './seed/development.js';
+import { seedDevelopmentData, developmentSeedIds } from './seed/development.js';
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -920,5 +920,52 @@ describe('tenant model persistence', () => {
     expect(await prisma.user.count({ where: { email: 'owner-a@synthetic.patchpilot.test' } })).toBe(
       1,
     );
+    expect(
+      await prisma.membership.count({
+        where: {
+          organizationId: {
+            in: [developmentSeedIds.organizationA, developmentSeedIds.organizationB],
+          },
+        },
+      }),
+    ).toBe(2);
+    expect(
+      await prisma.riskPolicy.count({
+        where: { id: developmentSeedIds.builtinRiskPolicy },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.riskPolicy.count({
+        where: {
+          organizationId: developmentSeedIds.organizationA,
+          policyKey: 'patchpilot.synthetic.org-a.v0',
+          version: 1,
+        },
+      }),
+    ).toBe(1);
+
+    const builtin = await prisma.riskPolicy.findFirst({
+      where: { scope: 'builtin', policyKey: 'patchpilot.builtin.v0', version: 1 },
+    });
+    expect(builtin?.createdByMembershipId).toBeNull();
+    expect(builtin?.organizationId).toBeNull();
+
+    const orgPolicy = await prisma.riskPolicy.findFirst({
+      where: {
+        organizationId: developmentSeedIds.organizationA,
+        policyKey: 'patchpilot.synthetic.org-a.v0',
+        version: 1,
+      },
+    });
+    const membershipA = await prisma.membership.findUnique({
+      where: {
+        organizationId_userId: {
+          organizationId: developmentSeedIds.organizationA,
+          userId: developmentSeedIds.userA,
+        },
+      },
+    });
+    expect(membershipA).not.toBeNull();
+    expect(orgPolicy?.createdByMembershipId).toBe(membershipA?.id);
   });
 });

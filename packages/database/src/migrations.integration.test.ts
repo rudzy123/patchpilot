@@ -9,7 +9,9 @@ import { PrismaClient } from '@prisma/client';
 import {
   EXPECTED_APPLIED_MIGRATIONS,
   FROZEN_MIGRATIONS,
+  REVIEWED_SESSION_5_MIGRATIONS,
   applySession3Schema,
+  applyThroughReviewedSession5,
   applyThroughSession5,
   createEphemeralDatabase,
   deployMigrations,
@@ -226,7 +228,7 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
 }
 
 describe('frozen migrations', () => {
-  it('keeps Session 3, Session 5, and committed correction SQL byte-stable', async () => {
+  it('keeps Session 3, Session 5, correction, and policy-creator SQL byte-stable', async () => {
     for (const frozen of FROZEN_MIGRATIONS) {
       const digest = await sha256File(frozenMigrationFile(frozen.directory));
       expect(digest).toBe(frozen.sha256);
@@ -303,6 +305,207 @@ describe('migrations', () => {
 
       await deployMigrations(ephemeral.databaseUrl);
       await assertFinalMigratedSchema(client);
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades a reviewed Session 5 database by applying only the policy creator membership migration', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    const orgAId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+    const orgBId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+    const matchedUserId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+    const unmatchedUserId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+    const builtinUserId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3';
+    const orgBUserId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4';
+    const matchedMembershipId = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
+    const builtinPolicyId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
+    const matchedPolicyId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
+    const unmatchedPolicyId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3';
+
+    try {
+      await applyThroughReviewedSession5(ephemeral.databaseUrl);
+
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore).toEqual([...REVIEWED_SESSION_5_MIGRATIONS]);
+      expect(appliedBefore).not.toContain('20260827160000_policy_creator_membership');
+
+      const tablesBefore = await names(
+        client,
+        `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'`,
+      );
+      expect(tablesBefore).not.toContain('SchemaFoundation');
+      expect(tablesBefore).toContain('integration_provider');
+      expect(tablesBefore).toContain('intelligence_source');
+
+      const policyColumnsBefore = await names(
+        client,
+        `SELECT column_name AS name FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'risk_policy'`,
+      );
+      expect(policyColumnsBefore).toContain('created_by_user_id');
+      expect(policyColumnsBefore).not.toContain('created_by_membership_id');
+      expect(policyColumnsBefore).toContain('scope');
+
+      const evidenceKindsBefore = await names(
+        client,
+        `SELECT e.enumlabel AS name
+         FROM pg_enum e
+         JOIN pg_type t ON t.oid = e.enumtypid
+         JOIN pg_namespace n ON n.oid = t.typnamespace
+         WHERE n.nspname = 'public' AND t.typname = 'evidence_kind'`,
+      );
+      expect(evidenceKindsBefore).toContain('export_snapshot');
+
+      const checksBefore = await names(
+        client,
+        `SELECT conname AS name FROM pg_constraint WHERE contype = 'c'`,
+      );
+      expect(checksBefore).toContain('risk_policy_scope_ownership_chk');
+      expect(checksBefore).toContain('risk_policy_status_timestamps_chk');
+
+      const triggersBefore = await names(
+        client,
+        `SELECT tgname AS name FROM pg_trigger WHERE NOT tgisinternal`,
+      );
+      expect(triggersBefore).toContain('risk_policy_published_immutable');
+      expect(triggersBefore).toContain('risk_policy_published_delete_forbidden');
+
+      await client.$executeRaw`
+        INSERT INTO "organization" ("id", "slug", "name", "updated_at")
+        VALUES
+          (CAST(${orgAId} AS UUID), 'path4-synthetic-org-a', 'Path 4 Synthetic Org A', CURRENT_TIMESTAMP)
+      `;
+      await client.$executeRaw`
+        INSERT INTO "user" ("id", "email", "display_name", "updated_at")
+        VALUES
+          (CAST(${matchedUserId} AS UUID), 'path4-matched@synthetic.patchpilot.test', 'Path 4 Matched User', CURRENT_TIMESTAMP),
+          (CAST(${unmatchedUserId} AS UUID), 'path4-unmatched@synthetic.patchpilot.test', 'Path 4 Unmatched User', CURRENT_TIMESTAMP),
+          (CAST(${builtinUserId} AS UUID), 'path4-builtin@synthetic.patchpilot.test', 'Path 4 Builtin User', CURRENT_TIMESTAMP)
+      `;
+      await client.$executeRaw`
+        INSERT INTO "membership" ("id", "organization_id", "user_id", "role", "updated_at")
+        VALUES (
+          CAST(${matchedMembershipId} AS UUID),
+          CAST(${orgAId} AS UUID),
+          CAST(${matchedUserId} AS UUID),
+          'owner',
+          CURRENT_TIMESTAMP
+        )
+      `;
+      await client.$executeRaw`
+        INSERT INTO "risk_policy" (
+          "id",
+          "organization_id",
+          "scope",
+          "policy_key",
+          "name",
+          "version",
+          "status",
+          "policy_schema_version",
+          "definition",
+          "created_by_user_id"
+        )
+        VALUES
+          (
+            CAST(${builtinPolicyId} AS UUID),
+            NULL,
+            'builtin',
+            'path4.synthetic.builtin',
+            'Path 4 synthetic builtin',
+            1,
+            'draft',
+            1,
+            '{"schemaVersion":1,"policyKey":"path4.synthetic.builtin","factorCatalog":[],"weights":{}}'::jsonb,
+            CAST(${builtinUserId} AS UUID)
+          ),
+          (
+            CAST(${matchedPolicyId} AS UUID),
+            CAST(${orgAId} AS UUID),
+            'organization',
+            'path4.synthetic.org-matched',
+            'Path 4 synthetic matched creator',
+            1,
+            'draft',
+            1,
+            '{"schemaVersion":1,"policyKey":"path4.synthetic.org-matched","factorCatalog":[],"weights":{}}'::jsonb,
+            CAST(${matchedUserId} AS UUID)
+          ),
+          (
+            CAST(${unmatchedPolicyId} AS UUID),
+            CAST(${orgAId} AS UUID),
+            'organization',
+            'path4.synthetic.org-unmatched',
+            'Path 4 synthetic unmatched creator',
+            1,
+            'draft',
+            1,
+            '{"schemaVersion":1,"policyKey":"path4.synthetic.org-unmatched","factorCatalog":[],"weights":{}}'::jsonb,
+            CAST(${unmatchedUserId} AS UUID)
+          )
+      `;
+
+      const membershipCountBefore = await client.membership.count();
+      expect(membershipCountBefore).toBe(1);
+
+      await deployMigrations(ephemeral.databaseUrl);
+
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        '20260827160000_policy_creator_membership',
+      ]);
+      expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
+
+      await assertFinalMigratedSchema(client);
+
+      const builtin = await client.riskPolicy.findUniqueOrThrow({ where: { id: builtinPolicyId } });
+      const matched = await client.riskPolicy.findUniqueOrThrow({ where: { id: matchedPolicyId } });
+      const unmatched = await client.riskPolicy.findUniqueOrThrow({
+        where: { id: unmatchedPolicyId },
+      });
+      expect(builtin.createdByMembershipId).toBeNull();
+      expect(builtin.organizationId).toBeNull();
+      expect(matched.createdByMembershipId).toBe(matchedMembershipId);
+      expect(unmatched.createdByMembershipId).toBeNull();
+      expect(await client.membership.count()).toBe(membershipCountBefore);
+
+      await client.organization.create({
+        data: { id: orgBId, slug: 'path4-synthetic-org-b', name: 'Path 4 Synthetic Org B' },
+      });
+      await client.user.create({
+        data: {
+          id: orgBUserId,
+          email: 'path4-org-b@synthetic.patchpilot.test',
+          displayName: 'Path 4 Org B User',
+        },
+      });
+      const orgBMembership = await client.membership.create({
+        data: { organizationId: orgBId, userId: orgBUserId, role: 'member' },
+      });
+
+      await expect(
+        client.riskPolicy.update({
+          where: { id: matchedPolicyId },
+          data: { createdByMembershipId: orgBMembership.id },
+        }),
+      ).rejects.toThrow();
+      await expect(
+        client.riskPolicy.update({
+          where: { id: builtinPolicyId },
+          data: { createdByMembershipId: matchedMembershipId },
+        }),
+      ).rejects.toThrow();
     } finally {
       await client.$disconnect();
       await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
