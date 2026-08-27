@@ -12,13 +12,16 @@ import { argon2ParametersFromAuthConfig, type PasswordHasher } from './password-
 import { addSeconds, type Clock } from './clock.js';
 import { DUMMY_ARGON2ID_PHC } from './dummy-phc.js';
 import { PUBLIC_LOGIN_FAILURE, passwordMaxBytesError, passwordMinLengthError } from './errors.js';
+import type { LoginRateLimiter } from './login-rate-limiter.js';
 import { SESSION_TOKEN_BYTES, type RandomTokenGenerator } from './random-token-generator.js';
-import { digestCsrfToken, digestSessionToken } from './token-digests.js';
+import { digestCsrfToken, digestLoginAccount, digestSessionToken } from './token-digests.js';
 import { createTrustedActor, type TrustedActor } from './trusted-actor.js';
 
 export type LoginInput = {
   email: string;
   password: string;
+  /** Direct socket peer IP. Do not pass X-Forwarded-For. */
+  peerIp: string;
   userAgent?: string;
 };
 
@@ -43,6 +46,7 @@ export type LoginDependencies = {
   clock: Clock;
   auth: AuthConfig;
   logger: Logger;
+  limiter: LoginRateLimiter;
 };
 
 export function createLoginUseCase(dependencies: LoginDependencies) {
@@ -60,6 +64,14 @@ async function executeLogin(
   const lengthError = validatePasswordLength(input.password, dependencies.auth);
   if (lengthError !== undefined) {
     return err(lengthError);
+  }
+
+  const limitResult = await dependencies.limiter.consume({
+    peerIp: input.peerIp,
+    accountDigest: digestLoginAccount(input.email),
+  });
+  if (!limitResult.ok) {
+    return limitResult;
   }
 
   const user = await dependencies.users.findByNormalizedEmail(input.email);

@@ -226,4 +226,25 @@ describe('api application factory', () => {
     });
     await app.close();
   });
+
+  it('keeps trustProxy disabled so X-Forwarded-For cannot select the login key', async () => {
+    const logs = collectingLogger();
+    const app = await buildApi({
+      config: testConfig(),
+      logger: logs.logger,
+      checkDatabaseReady: async () => ({ ok: true }),
+    });
+    app.get('/__peer-ip', async (request) => ({ ip: request.ip }));
+    const response = await app.inject({
+      method: 'GET',
+      url: '/__peer-ip',
+      remoteAddress: '192.0.2.10',
+      headers: {
+        'x-forwarded-for': '203.0.113.9',
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ip: '192.0.2.10' });
+    await app.close();
+  });
 });

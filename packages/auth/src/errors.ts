@@ -22,6 +22,21 @@ export const PERMISSION_DENIED: AppError = Object.freeze({
   message: 'Permission denied.',
 });
 
+/** Public response when either login limiter bucket is exhausted. */
+export const LOGIN_RATE_LIMITED: AppError = Object.freeze({
+  code: 'rate_limited',
+  message: 'Too many login attempts. Try again later.',
+});
+
+/**
+ * Fail-closed login when the limiter cannot decide. Same public error for every
+ * account so Redis outages do not reveal whether an email exists.
+ */
+export const LOGIN_UNAVAILABLE: AppError = Object.freeze({
+  code: 'internal',
+  message: 'Login is temporarily unavailable.',
+});
+
 export function passwordMinLengthError(minLength: number): AppError {
   return {
     code: 'validation',

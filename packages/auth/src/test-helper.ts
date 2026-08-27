@@ -24,13 +24,14 @@ import type { RandomTokenGenerator } from './random-token-generator.js';
 
 export const TEST_NOW_ISO = '2026-08-27T16:00:00.000Z';
 export const VALID_PASSWORD = 'correct-horse-battery';
+export const TEST_PEER_IP = '192.0.2.10';
 export const STORED_PASSWORD_HASH = '$argon2id$v=19$m=8192,p=1,t=1$stored-local-credential-hash';
 export const RAW_SESSION_TOKEN = 'RAW_SESSION_TOKEN_VALUE_NOT_A_DIGEST';
 export const RAW_CSRF_TOKEN = 'RAW_CSRF_TOKEN_VALUE_NOT_A_DIGEST';
 export const ROTATED_SESSION_TOKEN = 'RAW_ROTATED_SESSION_TOKEN_NOT_DIGEST';
 export const ROTATED_CSRF_TOKEN = 'RAW_ROTATED_CSRF_TOKEN_NOT_A_DIGEST';
 
-export function createTestAuthConfig(): AuthConfig {
+export function createTestAuthConfig(overrides: Partial<AuthConfig> = {}): AuthConfig {
   return {
     sessionAbsoluteTtlSeconds: 604_800,
     sessionIdleTtlSeconds: 43_200,
@@ -48,6 +49,7 @@ export function createTestAuthConfig(): AuthConfig {
     loginRateLimitAccountMaxAttempts: 5,
     loginRateLimitAccountWindowSeconds: 900,
     rateLimitRedisTimeoutMs: 200,
+    ...overrides,
   };
 }
 

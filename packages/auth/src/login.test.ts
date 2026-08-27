@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { addSeconds } from './clock.js';
 import { DUMMY_ARGON2ID_PHC } from './dummy-phc.js';
-import { PUBLIC_LOGIN_FAILURE } from './errors.js';
+import { LOGIN_UNAVAILABLE, PUBLIC_LOGIN_FAILURE } from './errors.js';
+import { createFakeLoginRateLimiter } from './fake-login-rate-limiter.js';
 import { createLoginUseCase } from './login.js';
-import { digestCsrfToken, digestSessionToken } from './token-digests.js';
+import { digestCsrfToken, digestLoginAccount, digestSessionToken } from './token-digests.js';
 import {
   createAdjustableClock,
   createCollectingLogger,
@@ -23,6 +24,7 @@ import {
   RAW_SESSION_TOKEN,
   STORED_PASSWORD_HASH,
   TEST_NOW_ISO,
+  TEST_PEER_IP,
   VALID_PASSWORD,
   type FakePasswordHasher,
 } from './test-helper.js';
@@ -32,6 +34,7 @@ function loginHarness(options?: {
   disabled?: boolean;
   needsRehash?: boolean;
   membershipCount?: 0 | 1 | 2;
+  limiterUnavailable?: boolean;
 }) {
   const user = createUserRecord({
     status: options?.disabled === true ? 'disabled' : 'active',
@@ -58,6 +61,12 @@ function loginHarness(options?: {
   const sessions = createMemorySessionRepository();
   const membershipRepo = createMemoryMembershipRepository(memberships);
   const auth = createTestAuthConfig();
+  const limiter = createFakeLoginRateLimiter({
+    auth,
+    logger: logs.logger,
+    clock,
+    ...(options?.limiterUnavailable === true ? { unavailable: true } : {}),
+  });
   const login = createLoginUseCase({
     users,
     localCredentials: credentials,
@@ -68,6 +77,7 @@ function loginHarness(options?: {
     clock,
     auth,
     logger: logs.logger,
+    limiter,
   });
   return {
     login,
@@ -81,6 +91,7 @@ function loginHarness(options?: {
     memberships,
     auth,
     organizations,
+    limiter,
   };
 }
 
@@ -104,6 +115,7 @@ describe('login use case', () => {
     const result = await harness.login.execute({
       email: harness.user.email,
       password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -136,6 +148,7 @@ describe('login use case', () => {
     const result = await harness.login.execute({
       email: 'missing@synthetic.patchpilot.test',
       password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
     });
     expect(result).toEqual({ ok: false, error: PUBLIC_LOGIN_FAILURE });
     expect(harness.hasher.verifyCalls).toEqual([
@@ -151,6 +164,7 @@ describe('login use case', () => {
     const result = await harness.login.execute({
       email: harness.user.email,
       password: 'wrong-password-12',
+      peerIp: TEST_PEER_IP,
     });
     expect(result).toEqual({ ok: false, error: PUBLIC_LOGIN_FAILURE });
     expect(harness.hasher.verifyCalls).toEqual([
@@ -165,6 +179,7 @@ describe('login use case', () => {
     const result = await harness.login.execute({
       email: harness.user.email,
       password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
     });
     expect(result).toEqual({ ok: false, error: PUBLIC_LOGIN_FAILURE });
     expect(harness.hasher.verifyCalls).toEqual([
@@ -181,14 +196,17 @@ describe('login use case', () => {
     const unknownResult = await unknown.login.execute({
       email: 'missing@synthetic.patchpilot.test',
       password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
     });
     const wrongResult = await wrong.login.execute({
       email: wrong.user.email,
       password: 'wrong-password-12',
+      peerIp: TEST_PEER_IP,
     });
     const disabledResult = await disabled.login.execute({
       email: disabled.user.email,
       password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
     });
     expect(unknownResult).toEqual(wrongResult);
     expect(wrongResult).toEqual(disabledResult);
@@ -205,6 +223,7 @@ describe('login use case', () => {
     const result = await harness.login.execute({
       email: harness.user.email,
       password: 'shortpass11',
+      peerIp: TEST_PEER_IP,
     });
     expect(result.ok).toBe(false);
     if (result.ok) {
@@ -224,6 +243,7 @@ describe('login use case', () => {
     const result = await harness.login.execute({
       email: harness.user.email,
       password,
+      peerIp: TEST_PEER_IP,
     });
     expect(result.ok).toBe(false);
     if (result.ok) {
@@ -239,6 +259,7 @@ describe('login use case', () => {
     const result = await harness.login.execute({
       email: harness.user.email,
       password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
     });
     expect(result.ok).toBe(true);
     expect(harness.hasher.needsRehashCalls).toEqual([STORED_PASSWORD_HASH]);
@@ -252,6 +273,7 @@ describe('login use case', () => {
     const result = await harness.login.execute({
       email: harness.user.email,
       password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
     });
     expect(result.ok).toBe(true);
     expect(harness.hasher.verifyCalls).toHaveLength(1);
@@ -272,6 +294,7 @@ describe('login use case', () => {
     const result = await harness.login.execute({
       email: harness.user.email,
       password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -286,6 +309,7 @@ describe('login use case', () => {
     const result = await harness.login.execute({
       email: harness.user.email,
       password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -303,6 +327,7 @@ describe('login use case', () => {
     const result = await harness.login.execute({
       email: harness.user.email,
       password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -310,5 +335,46 @@ describe('login use case', () => {
     }
     expect(result.value.actor.organizationId).toBeNull();
     expect(harness.sessions.createCalls[0]?.activeOrganizationId).toBeUndefined();
+  });
+
+  it('fails closed on limiter outage without revealing account existence', async () => {
+    const known = loginHarness({ limiterUnavailable: true });
+    const unknown = loginHarness({ includeUser: false, limiterUnavailable: true });
+    const knownResult = await known.login.execute({
+      email: known.user.email,
+      password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
+    });
+    const unknownResult = await unknown.login.execute({
+      email: 'missing@synthetic.patchpilot.test',
+      password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
+    });
+    expect(knownResult).toEqual(unknownResult);
+    expect(knownResult).toEqual({ ok: false, error: LOGIN_UNAVAILABLE });
+    expect(known.hasher.verifyCalls).toEqual([]);
+    expect(unknown.hasher.verifyCalls).toEqual([]);
+    expect(known.sessions.createCalls).toEqual([]);
+    expect(JSON.stringify(known.limiter.consumeCalls)).not.toContain(VALID_PASSWORD);
+    expect(JSON.stringify(known.limiter.incrementKeys).toLowerCase()).not.toContain(
+      known.user.email.toLowerCase(),
+    );
+  });
+
+  it('does not pass password, Session token, or CSRF token to the limiter', async () => {
+    const harness = loginHarness();
+    await harness.login.execute({
+      email: harness.user.email,
+      password: VALID_PASSWORD,
+      peerIp: TEST_PEER_IP,
+    });
+    expect(harness.limiter.consumeCalls).toEqual([
+      { peerIp: TEST_PEER_IP, accountDigest: digestLoginAccount(harness.user.email) },
+    ]);
+    const serialized = JSON.stringify(harness.limiter.consumeCalls);
+    expect(serialized).not.toContain(VALID_PASSWORD);
+    expect(serialized).not.toContain(RAW_SESSION_TOKEN);
+    expect(serialized).not.toContain(RAW_CSRF_TOKEN);
+    expect(serialized).not.toContain(harness.user.email);
   });
 });

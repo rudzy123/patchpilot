@@ -5,7 +5,11 @@ import { describe, expect, it } from 'vitest';
 import {
   CSRF_TOKEN_DIGEST_PREFIX,
   digestCsrfToken,
+  digestLoginAccount,
+  digestLoginPeerIp,
   digestSessionToken,
+  LOGIN_ACCOUNT_DIGEST_PREFIX,
+  LOGIN_IP_DIGEST_PREFIX,
   SESSION_TOKEN_DIGEST_PREFIX,
 } from './token-digests.js';
 
@@ -26,5 +30,23 @@ describe('token digests', () => {
     expect(csrfDigest).not.toBe(sha256Hex(rawToken));
     expect(sessionDigest).toMatch(/^[a-f0-9]{64}$/);
     expect(csrfDigest).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('domain-separates login account and peer-IP digests from raw values', () => {
+    const email = 'Owner@Synthetic.PatchPilot.Test';
+    const peerIp = '192.0.2.10';
+    const account = digestLoginAccount(email);
+    const ip = digestLoginPeerIp(peerIp);
+
+    expect(account).toBe(
+      sha256Hex(`${LOGIN_ACCOUNT_DIGEST_PREFIX}owner@synthetic.patchpilot.test`),
+    );
+    expect(ip).toBe(sha256Hex(`${LOGIN_IP_DIGEST_PREFIX}${peerIp}`));
+    expect(account).not.toBe(sha256Hex(email));
+    expect(account).not.toBe(digestLoginAccount('other@synthetic.patchpilot.test'));
+    expect(digestLoginAccount(email)).toBe(
+      digestLoginAccount('  owner@synthetic.patchpilot.test  '),
+    );
+    expect(account).not.toContain('owner@');
   });
 });
