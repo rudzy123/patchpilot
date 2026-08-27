@@ -5,6 +5,8 @@ import { boundPageSize, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './paging.js';
 import {
   normalizeEmail,
   normalizeSlug,
+  requireArgon2idPhc,
+  requirePasswordRevision,
   requirePositiveByteLength,
   requireSha256,
 } from './guards.js';
@@ -18,6 +20,17 @@ describe('input guards', () => {
   it('rejects uppercase or short SHA-256 values', () => {
     expect(() => requireSha256('A'.repeat(64), 'sha256')).toThrow(/64 lowercase/);
     expect(() => requireSha256('abc', 'sha256')).toThrow(/64 lowercase/);
+  });
+
+  it('accepts Argon2id PHC strings and password revisions >= 1', () => {
+    const phc =
+      '$argon2id$v=19$m=19456,p=1,t=2$c3ludGhldGljc2FsdA$c3ludGhldGljaGFzaGZvcmxvY2FsY3JlZGU';
+    expect(requireArgon2idPhc(phc, 'passwordHash')).toBe(phc);
+    expect(() =>
+      requireArgon2idPhc('plaintext-password-value-long-enough', 'passwordHash'),
+    ).toThrow(/Argon2id PHC/);
+    expect(requirePasswordRevision(1, 'passwordRevision')).toBe(1);
+    expect(() => requirePasswordRevision(0, 'passwordRevision')).toThrow(/>= 1/);
   });
 
   it('requires positive byte lengths', () => {

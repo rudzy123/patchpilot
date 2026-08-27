@@ -12,6 +12,9 @@ Observed facts and calculated conclusions are separate records. A ticket status 
 erDiagram
   Organization ||--o{ Membership : has
   User ||--o{ Membership : has
+  User ||--o| LocalCredential : authenticates
+  User ||--o{ Session : holds
+  Session }o--o| Organization : may_select
   Organization ||--o{ Team : has
   Organization ||--o{ Asset : has
   Organization ||--o{ Environment : has
@@ -64,6 +67,8 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Organization | | yes | yes | | yes | | yes | Tenant boundary |
 | User | instance | | yes | | yes | | | Not a tenant table; listed only via membership |
+| LocalCredential | instance | | yes | | yes | | | One Argon2id PHC per User; no plaintext |
+| Session | instance | | yes | | yes | | | Opaque digest row; `activeOrganizationId` is a selector |
 | Membership | | yes | yes | | revoke only | | yes | Revoke, do not hard-delete |
 | Team | | yes | | | yes | | yes | Not an authz substitute |
 | Asset | | yes | | | yes | | yes | See [asset-model](asset-model.md) |
@@ -85,7 +90,7 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | RemediationTask | | yes | | | until terminal | | yes | Completion ≠ resolved |
 | RiskAcceptance | | yes | yes | yes | state only | amendments = new row | yes | Expiration required |
 | Evidence | | yes | yes | yes | no | yes | yes | |
-| AuditEvent | system or T | tenant when org set | yes | yes | **no** | yes | keep in v0.1 | Tenant `user` actors are memberships |
+| AuditEvent | system or T | tenant when org set | yes | yes | **no** | yes | keep in v0.1 | Tenant `user` actors require membership; instance auth uses `actorUserId` |
 | IntegrationProvider | yes | | | | | | | Global provider catalog |
 | IntelligenceSource | yes | | yes | | yes | | | OSV/KEV system sync state |
 | Integration | | yes | yes | | yes | | | Organization-owned installation; `organizationId` required |
@@ -154,9 +159,42 @@ A person who can authenticate to the instance.
 | `createdAt` | UTC |
 | `disabledAt` | Required when disabled |
 
-Password hashes are **not** in the Session 5 schema. [ADR 0019](../adr/0019-local-password-sessions.md) requires a later forward-only `LocalCredential` and `Session` migration. This documentation batch does not add those tables.
+Password hashes live on **LocalCredential**. Opaque sessions live on **Session**. See those entities below.
 
 A user without membership cannot access tenant-owned data. Instance operator bootstrap is separate ([OD-10](open-decisions.md)).
+
+## LocalCredential
+
+Instance-level Argon2id password hash for one **User** ([ADR 0019](../adr/0019-local-password-sessions.md)). Not tenant-owned.
+
+| Field (logical) | Notes |
+| --- | --- |
+| `id` | UUID |
+| `userId` | Unique; `ON DELETE RESTRICT` |
+| `passwordHash` | Argon2id PHC string only. Never plaintext, hint, reversible encryption, recovery token, or history |
+| `passwordRevision` | Integer ≥ 1. Incremented when the hash changes |
+| `algorithm` | `argon2id` only |
+| `createdAt` / `updatedAt` | UTC |
+
+Repositories must not accept plaintext passwords. Hashing remains in `@patchpilot/auth` (not implemented in this batch).
+
+## Session
+
+Opaque server-side session row. PostgreSQL is session authority. Persist **digests only**: SHA-256 of domain-separated raw tokens. The row UUID is separate for audit. `activeOrganizationId` is a selector cache, not authorization; membership and organization are reloaded on every authenticated request. Expiration cleanup is deferred; idle and absolute indexes ship with the table.
+
+| Field (logical) | Notes |
+| --- | --- |
+| `id` | UUID |
+| `userId` | `ON DELETE RESTRICT` |
+| `tokenHash` / `csrfTokenHash` | Unique 64-character lowercase hex. Never raw cookies or CSRF tokens |
+| `activeOrganizationId` | Optional selector. `ON DELETE RESTRICT` |
+| `authenticationMethod` | `password` in v0.1 |
+| `passwordRevision` | Snapshot at create/rotate; mismatch invalidates at read time (service, later) |
+| `createdAt` / `lastSeenAt` / `idleExpiresAt` / `absoluteExpiresAt` | UTC |
+| `revokedAt` / `revokeReason` | Both null or both set |
+| `userAgent` | Optional, bounded |
+
+No required client IP, device fingerprint, or Authorization header. Login HTTP, cookies, and CSRF are **not** implemented in this batch.
 
 ## Membership
 
@@ -172,6 +210,8 @@ Binds a **User** to an **Organization** with a role.
 | `revokedAt` | Optional UTC |
 
 Revoked memberships remain for audit history. They no longer authorize access.
+
+Authentication-boundary queries `listActiveInActiveOrganizationsForUser` and `findActiveInActiveOrganization` list only active memberships in active organizations for one user. They are not tenant-scoped lookups and do not replace `findByUser(organizationId, userId)`. Callers must pass the authenticated user id.
 
 ## Team
 
@@ -480,7 +520,7 @@ Tenant-owned artifact or structured claim needed to explain a finding later.
 
 Append-only security- or remediation-sensitive record. Never updated or deleted in place. See [audit-model.md](audit-model.md).
 
-System-level events (shared catalog import) may use a null `organizationId` and `actorType` `system` or `instance_operator` with no membership. Tenant `user` events require `organizationId` and `actorMembershipId`.
+System-level events (shared catalog import) may use a null `organizationId` and `actorType` `system` or `instance_operator` with no User or Membership. Anonymous login failures use `actorType` `anonymous` with all actor ids null. Instance-level authentication uses `actorType` `user` with `actorUserId` set and null org/membership. Tenant `user` events require `organizationId`, `actorUserId`, and `actorMembershipId` for the same membership.
 
 ## IntegrationProvider
 

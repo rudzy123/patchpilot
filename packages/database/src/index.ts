@@ -11,6 +11,8 @@ export { boundPageSize } from './paging.js';
 export {
   normalizeEmail,
   normalizeSlug,
+  requireArgon2idPhc,
+  requirePasswordRevision,
   requirePositiveByteLength,
   requireSha256,
   SHA256_HEX,

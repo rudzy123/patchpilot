@@ -9,14 +9,15 @@ PatchPilot uses **forward-only** Prisma migrations against PostgreSQL.
 3. Session 5 adds `20260827120000_tenant_model`, which creates product tables and drops `SchemaFoundation`.
 4. Session 5 review corrections are `20260827140000_review_corrections`. `export_snapshot` evidence targeting is `20260827150000_evidence_export_snapshot_chk` because PostgreSQL must commit a new enum value before a CHECK may use it.
 5. Organization risk-policy creators are `20260827160000_policy_creator_membership`.
-6. Do not edit Session 3, Session 5, or the committed correction migration files. Those SQL files are the authoritative extras (checks, partial unique indexes, triggers). There is no separately applied `prisma/sql/*.sql` extras source.
-7. There is no down migration. Rollback is restore-from-backup or a **forward-fix** migration.
+6. Session 6 authentication persistence is two forward-only migrations: `20260827170000_audit_actor_anonymous` (adds `anonymous` to `audit_actor_type` only) and `20260827180000_local_credentials_and_sessions` (`LocalCredential`, `Session`, restored `actor_user_id`, replacement audit actor CHECK). Do not combine them: PostgreSQL cannot use a newly added enum label in a CHECK in the same transaction.
+7. Do not edit Session 3, Session 5, or the committed correction migration files. Those SQL files are the authoritative extras (checks, partial unique indexes, triggers). There is no separately applied `prisma/sql/*.sql` extras source.
+8. There is no down migration. Rollback is restore-from-backup or a **forward-fix** migration.
 
 ## Paths
 
 ### Clean database
 
-`pnpm db:migrate:deploy` on an empty database applies Session 3, Session 5, then the forward-only corrective migrations. The placeholder table exists only between Session 3 and Session 5.
+`pnpm db:migrate:deploy` on an empty database applies Session 3, Session 5, the Session 5 corrective migrations, then Session 6 authentication persistence. The placeholder table exists only between Session 3 and Session 5.
 
 ### Upgrade from Session 3
 
@@ -24,7 +25,11 @@ A database that already has `SchemaFoundation` applies `20260827120000_tenant_mo
 
 ### Upgrade from Session 5
 
-A database that already has `20260827120000_tenant_model` applies `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, and `20260827160000_policy_creator_membership`. Do not reset the database or delete Docker volumes.
+A database that already has `20260827120000_tenant_model` applies `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, `20260827160000_policy_creator_membership`, `20260827170000_audit_actor_anonymous`, and `20260827180000_local_credentials_and_sessions`. Do not reset the database or delete Docker volumes.
+
+### Upgrade from Session 5 after policy-creator membership
+
+A database that already has `20260827160000_policy_creator_membership` applies only the two Session 6 authentication migrations. Existing tenant `user` audit rows receive `actor_user_id` from `membership` during that migration. The append-only trigger is disabled only for that backfill and is re-enabled before the migration completes. Runtime UPDATE/DELETE of `audit_event` remains forbidden.
 
 ## Locks and transactions
 

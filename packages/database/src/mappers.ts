@@ -9,6 +9,7 @@ import type {
   FindingRecord,
   IdempotencyRecordRecord,
   IdempotencyResponseJson,
+  LocalCredentialRecord,
   MembershipRecord,
   OrganizationRecord,
   OutboxEventRecord,
@@ -17,6 +18,7 @@ import type {
   RiskPolicyDefinitionJson,
   RiskPolicyRecord,
   SbomRecord,
+  SessionRecord,
   TeamMembershipRecord,
   TeamRecord,
   UserRecord,
@@ -85,6 +87,37 @@ export function mapMembership(row: {
   createdAt: Date;
   updatedAt: Date;
 }): MembershipRecord {
+  return { ...row };
+}
+
+export function mapLocalCredential(row: {
+  id: string;
+  userId: string;
+  passwordHash: string;
+  passwordRevision: number;
+  algorithm: LocalCredentialRecord['algorithm'];
+  createdAt: Date;
+  updatedAt: Date;
+}): LocalCredentialRecord {
+  return { ...row };
+}
+
+export function mapSession(row: {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  csrfTokenHash: string;
+  activeOrganizationId: string | null;
+  authenticationMethod: SessionRecord['authenticationMethod'];
+  passwordRevision: number;
+  createdAt: Date;
+  lastSeenAt: Date;
+  idleExpiresAt: Date;
+  absoluteExpiresAt: Date;
+  revokedAt: Date | null;
+  revokeReason: string | null;
+  userAgent: string | null;
+}): SessionRecord {
   return { ...row };
 }
 
@@ -268,6 +301,7 @@ export function mapRemediationTask(row: {
 export function mapAuditEvent(row: {
   id: string;
   organizationId: string | null;
+  actorUserId: string | null;
   actorMembershipId: string | null;
   actorType: AuditEventRecord['actorType'];
   action: string;

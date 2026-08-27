@@ -42,6 +42,14 @@ export const FROZEN_MIGRATIONS = [
     directory: '20260827160000_policy_creator_membership',
     sha256: '1b4bdd7217fb31c7bb456cceb419916f0b3312f8fe7dfd78cc97c10115bb1c14',
   },
+  {
+    directory: '20260827170000_audit_actor_anonymous',
+    sha256: 'aad9e6c54e073514638aac6f13c4ba09e9018a7645356aa5d0bc8bc0ce683d5d',
+  },
+  {
+    directory: '20260827180000_local_credentials_and_sessions',
+    sha256: '3a5a9adb12dbf0fea656c225056cdef8f2fc048229ad10cf1ba81b14265eedd0',
+  },
 ] as const;
 
 export const EXPECTED_APPLIED_MIGRATIONS = [
@@ -50,6 +58,8 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260827140000_review_corrections',
   '20260827150000_evidence_export_snapshot_chk',
   '20260827160000_policy_creator_membership',
+  '20260827170000_audit_actor_anonymous',
+  '20260827180000_local_credentials_and_sessions',
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
@@ -185,4 +195,14 @@ export async function applyThroughReviewedSession5(databaseUrl: string): Promise
   await applyMigrationSqlAndResolve(databaseUrl, '20260827120000_tenant_model');
   await applyMigrationSqlAndResolve(databaseUrl, '20260827140000_review_corrections');
   await applyMigrationSqlAndResolve(databaseUrl, '20260827150000_evidence_export_snapshot_chk');
+}
+
+export const SESSION_6_PREAUTH_MIGRATIONS = [
+  ...REVIEWED_SESSION_5_MIGRATIONS,
+  '20260827160000_policy_creator_membership',
+] as const;
+
+export async function applyThroughPolicyCreatorMembership(databaseUrl: string): Promise<void> {
+  await applyThroughReviewedSession5(databaseUrl);
+  await applyMigrationSqlAndResolve(databaseUrl, '20260827160000_policy_creator_membership');
 }

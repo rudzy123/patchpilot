@@ -10,13 +10,16 @@ import {
   EXPECTED_APPLIED_MIGRATIONS,
   FROZEN_MIGRATIONS,
   REVIEWED_SESSION_5_MIGRATIONS,
+  applyMigrationSqlAndResolve,
   applySession3Schema,
+  applyThroughPolicyCreatorMembership,
   applyThroughReviewedSession5,
   applyThroughSession5,
   createEphemeralDatabase,
   deployMigrations,
   dropEphemeralDatabase,
   frozenMigrationFile,
+  SESSION_6_PREAUTH_MIGRATIONS,
   sha256File,
 } from './integration-database.js';
 
@@ -48,6 +51,8 @@ const PRISMA_TABLES = [
   'risk_acceptance',
   'evidence',
   'audit_event',
+  'local_credential',
+  'session',
   'integration_provider',
   'intelligence_source',
   'integration',
@@ -68,6 +73,10 @@ const PRISMA_FOREIGN_KEYS = [
   'vulnerability_source_record_supersedes_revision_fkey',
   'risk_policy_created_by_membership_fkey',
   'finding_organization_id_assigned_membership_id_fkey',
+  'local_credential_user_id_fkey',
+  'session_user_id_fkey',
+  'session_active_organization_id_fkey',
+  'audit_event_actor_user_id_fkey',
 ] as const;
 
 const SQL_ONLY_CHECKS = [
@@ -77,6 +86,20 @@ const SQL_ONLY_CHECKS = [
   'asset_owner_target_chk',
   'evidence_one_target_chk',
   'audit_event_actor_scope_chk',
+  'local_credential_revision_chk',
+  'local_credential_algorithm_chk',
+  'local_credential_phc_chk',
+  'session_token_hash_chk',
+  'session_csrf_token_hash_chk',
+  'session_revision_chk',
+  'session_authentication_method_chk',
+  'session_absolute_after_created_chk',
+  'session_idle_after_created_chk',
+  'session_idle_within_absolute_chk',
+  'session_last_seen_window_chk',
+  'session_revoke_consistency_chk',
+  'session_revoke_not_before_created_chk',
+  'session_revoke_reason_shape_chk',
   'intelligence_source_provider_chk',
   'sbom_sha256_chk',
   'organization_slug_shape_chk',
@@ -89,10 +112,15 @@ const SQL_ONLY_INDEXES = [
   'risk_policy_builtin_key_version_uidx',
   'risk_policy_org_key_version_uidx',
   'asset_active_name_org_idx',
+  'membership_user_active_idx',
+  'session_idle_cleanup_idx',
+  'session_absolute_cleanup_idx',
+  'session_active_org_idx',
 ] as const;
 
 const SQL_ONLY_TRIGGERS = [
   'audit_event_append_only',
+  'audit_event_actor_membership_user',
   'finding_observation_append_only',
   'risk_calculation_append_only',
   'vulnerability_source_record_append_only',
@@ -111,6 +139,7 @@ const SQL_ONLY_FUNCTIONS = [
   'patchpilot_protect_sbom_identity',
   'patchpilot_risk_policy_org_consistency',
   'patchpilot_job_outbox_org_consistency',
+  'patchpilot_audit_actor_membership_user',
 ] as const;
 
 async function names(client: PrismaClient, sql: string): Promise<string[]> {
@@ -173,6 +202,46 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
   );
   expect(policyScopes).toEqual(expect.arrayContaining(['builtin', 'organization']));
 
+  const auditActorTypes = await names(
+    client,
+    `SELECT e.enumlabel AS name
+     FROM pg_enum e
+     JOIN pg_type t ON t.oid = e.enumtypid
+     JOIN pg_namespace n ON n.oid = t.typnamespace
+     WHERE n.nspname = 'public' AND t.typname = 'audit_actor_type'`,
+  );
+  expect(auditActorTypes).toEqual(
+    expect.arrayContaining(['user', 'system', 'instance_operator', 'anonymous']),
+  );
+
+  const hashAlgorithms = await names(
+    client,
+    `SELECT e.enumlabel AS name
+     FROM pg_enum e
+     JOIN pg_type t ON t.oid = e.enumtypid
+     JOIN pg_namespace n ON n.oid = t.typnamespace
+     WHERE n.nspname = 'public' AND t.typname = 'password_hash_algorithm'`,
+  );
+  expect(hashAlgorithms).toEqual(['argon2id']);
+
+  const sessionMethods = await names(
+    client,
+    `SELECT e.enumlabel AS name
+     FROM pg_enum e
+     JOIN pg_type t ON t.oid = e.enumtypid
+     JOIN pg_namespace n ON n.oid = t.typnamespace
+     WHERE n.nspname = 'public' AND t.typname = 'session_authentication_method'`,
+  );
+  expect(sessionMethods).toEqual(['password']);
+
+  const auditColumns = await names(
+    client,
+    `SELECT column_name AS name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'audit_event'`,
+  );
+  expect(auditColumns).toContain('actor_user_id');
+  expect(auditColumns).toContain('actor_membership_id');
+
   const foreignKeys = await names(
     client,
     `SELECT conname AS name FROM pg_constraint WHERE contype = 'f'`,
@@ -230,7 +299,7 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
 }
 
 describe('frozen migrations', () => {
-  it('keeps Session 3, Session 5, correction, and policy-creator SQL byte-stable', async () => {
+  it('keeps Session 3, Session 5, correction, policy-creator, and auth SQL byte-stable', async () => {
     for (const frozen of FROZEN_MIGRATIONS) {
       const digest = await sha256File(frozenMigrationFile(frozen.directory));
       expect(digest).toBe(frozen.sha256);
@@ -466,6 +535,8 @@ describe('migrations', () => {
       );
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         '20260827160000_policy_creator_membership',
+        '20260827170000_audit_actor_anonymous',
+        '20260827180000_local_credentials_and_sessions',
       ]);
       expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
 
@@ -508,6 +579,211 @@ describe('migrations', () => {
           data: { createdByMembershipId: matchedMembershipId },
         }),
       ).rejects.toThrow();
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades a database through policy-creator by applying only the two authentication migrations', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughPolicyCreatorMembership(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore).toEqual([...SESSION_6_PREAUTH_MIGRATIONS]);
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        '20260827170000_audit_actor_anonymous',
+        '20260827180000_local_credentials_and_sessions',
+      ]);
+      await assertFinalMigratedSchema(client);
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('adds anonymous in migration 170000 without changing the audit actor CHECK', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughPolicyCreatorMembership(ephemeral.databaseUrl);
+      const checksBefore = await names(
+        client,
+        `SELECT pg_get_constraintdef(oid) AS name FROM pg_constraint WHERE conname = 'audit_event_actor_scope_chk'`,
+      );
+      expect(checksBefore[0]).toContain("actor_type = 'user'");
+      expect(checksBefore[0]).not.toContain('anonymous');
+
+      await applyMigrationSqlAndResolve(
+        ephemeral.databaseUrl,
+        '20260827170000_audit_actor_anonymous',
+      );
+
+      const actorTypes = await names(
+        client,
+        `SELECT e.enumlabel AS name
+         FROM pg_enum e
+         JOIN pg_type t ON t.oid = e.enumtypid
+         JOIN pg_namespace n ON n.oid = t.typnamespace
+         WHERE n.nspname = 'public' AND t.typname = 'audit_actor_type'`,
+      );
+      expect(actorTypes).toContain('anonymous');
+
+      const checksAfter = await names(
+        client,
+        `SELECT pg_get_constraintdef(oid) AS name FROM pg_constraint WHERE conname = 'audit_event_actor_scope_chk'`,
+      );
+      expect(checksAfter[0]).toBe(checksBefore[0]);
+      expect(checksAfter[0]).not.toContain('anonymous');
+
+      const tables = await names(
+        client,
+        `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'`,
+      );
+      expect(tables).not.toContain('local_credential');
+      expect(tables).not.toContain('session');
+
+      const auditColumns = await names(
+        client,
+        `SELECT column_name AS name FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'audit_event'`,
+      );
+      expect(auditColumns).not.toContain('actor_user_id');
+
+      await expect(
+        client.$executeRaw`
+          INSERT INTO "audit_event" (
+            "actor_type", "action", "subject_type", "subject_id",
+            "correlation_id", "payload", "schema_version"
+          )
+          VALUES (
+            'anonymous',
+            'auth.login_failed',
+            'auth',
+            '00000000-0000-4000-8000-000000000001',
+            'corr-anonymous-170000',
+            '{"schemaVersion":1}'::jsonb,
+            1
+          )
+        `,
+      ).rejects.toThrow();
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('creates authentication tables and the final audit actor CHECK in migration 180000', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughPolicyCreatorMembership(ephemeral.databaseUrl);
+      await applyMigrationSqlAndResolve(
+        ephemeral.databaseUrl,
+        '20260827170000_audit_actor_anonymous',
+      );
+      await applyMigrationSqlAndResolve(
+        ephemeral.databaseUrl,
+        '20260827180000_local_credentials_and_sessions',
+      );
+      await assertFinalMigratedSchema(client);
+
+      const checkDef = await names(
+        client,
+        `SELECT pg_get_constraintdef(oid) AS name FROM pg_constraint WHERE conname = 'audit_event_actor_scope_chk'`,
+      );
+      expect(checkDef[0]).toContain('anonymous');
+      expect(checkDef[0]).toContain('actor_user_id');
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('backfills actor_user_id from Membership and keeps audit append-only at runtime', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+    const orgId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9';
+    const userId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb9';
+    const membershipId = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd9';
+    const auditId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee9';
+
+    try {
+      await applyThroughPolicyCreatorMembership(ephemeral.databaseUrl);
+      await client.$executeRaw`
+        INSERT INTO "organization" ("id", "slug", "name", "updated_at")
+        VALUES (CAST(${orgId} AS UUID), 'auth-backfill-org', 'Auth Backfill Org', CURRENT_TIMESTAMP)
+      `;
+      await client.$executeRaw`
+        INSERT INTO "user" ("id", "email", "display_name", "updated_at")
+        VALUES (CAST(${userId} AS UUID), 'auth-backfill@synthetic.patchpilot.test', 'Auth Backfill User', CURRENT_TIMESTAMP)
+      `;
+      await client.$executeRaw`
+        INSERT INTO "membership" ("id", "organization_id", "user_id", "role", "updated_at")
+        VALUES (
+          CAST(${membershipId} AS UUID),
+          CAST(${orgId} AS UUID),
+          CAST(${userId} AS UUID),
+          'owner',
+          CURRENT_TIMESTAMP
+        )
+      `;
+      await client.$executeRaw`
+        INSERT INTO "audit_event" (
+          "id", "organization_id", "actor_membership_id", "actor_type", "action",
+          "subject_type", "subject_id", "correlation_id", "payload", "schema_version"
+        )
+        VALUES (
+          CAST(${auditId} AS UUID),
+          CAST(${orgId} AS UUID),
+          CAST(${membershipId} AS UUID),
+          'user',
+          'asset.created',
+          'asset',
+          CAST(${orgId} AS UUID),
+          'corr-auth-backfill',
+          '{"schemaVersion":1}'::jsonb,
+          1
+        )
+      `;
+
+      await deployMigrations(ephemeral.databaseUrl);
+      await assertFinalMigratedSchema(client);
+
+      const backfilled = await client.auditEvent.findUniqueOrThrow({ where: { id: auditId } });
+      expect(backfilled.actorUserId).toBe(userId);
+      expect(backfilled.actorMembershipId).toBe(membershipId);
+      expect(backfilled.organizationId).toBe(orgId);
+      expect(backfilled.actorType).toBe('user');
+
+      await expect(
+        client.auditEvent.update({
+          where: { id: auditId },
+          data: { action: 'asset.mutated' },
+        }),
+      ).rejects.toThrow();
+      await expect(client.auditEvent.delete({ where: { id: auditId } })).rejects.toThrow();
     } finally {
       await client.$disconnect();
       await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);

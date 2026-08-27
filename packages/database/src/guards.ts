@@ -4,6 +4,9 @@ import type { PrismaClient } from '@prisma/client';
 export type PrismaClientLike = PrismaClient | Prisma.TransactionClient;
 
 export const SHA256_HEX = /^[a-f0-9]{64}$/;
+export const ARGON2ID_PHC_PREFIX = '$argon2id$';
+export const ARGON2ID_PHC_MIN_LENGTH = 48;
+export const ARGON2ID_PHC_MAX_LENGTH = 255;
 export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 /** Local @ dotted-domain. Labels exclude `.` so quantifiers do not overlap (CodeQL js/polynomial-redos). */
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
@@ -11,6 +14,26 @@ export const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 export function requireSha256(value: string, fieldName: string): string {
   if (!SHA256_HEX.test(value)) {
     throw new Error(`${fieldName} must be 64 lowercase hexadecimal characters.`);
+  }
+
+  return value;
+}
+
+export function requireArgon2idPhc(value: string, fieldName: string): string {
+  if (
+    !value.startsWith(ARGON2ID_PHC_PREFIX) ||
+    value.length < ARGON2ID_PHC_MIN_LENGTH ||
+    value.length > ARGON2ID_PHC_MAX_LENGTH
+  ) {
+    throw new Error(`${fieldName} must be an Argon2id PHC string between 48 and 255 characters.`);
+  }
+
+  return value;
+}
+
+export function requirePasswordRevision(value: number, fieldName: string): number {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${fieldName} must be an integer >= 1.`);
   }
 
   return value;

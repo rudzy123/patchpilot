@@ -25,7 +25,7 @@ Application roles cannot "correct" an audit row. Corrections are new events.
 | --- | --- |
 | `id` | UUID (event id) |
 | `organizationId` | Required for tenant operations; null for system catalog events and instance-level authentication events |
-| `actorUserId` | Optional; set for instance-level and tenant `user` actors ([ADR 0019](../adr/0019-local-password-sessions.md)). Schema change is a later forward-only migration. |
+| `actorUserId` | Optional; set for instance-level and tenant `user` actors ([ADR 0019](../adr/0019-local-password-sessions.md)). Restored by a forward-only migration; existing tenant user rows were backfilled from Membership. The backfill disables `audit_event_append_only` only for that migration. |
 | `actorMembershipId` | Required for tenant `user` actors; null for `anonymous`, `system`, `instance_operator`, and instance-level `user` |
 | `actorType` | `user`, `system`, `instance_operator`, `anonymous` |
 | `action` | Stable dotted name |
@@ -39,6 +39,18 @@ Application roles cannot "correct" an audit row. Corrections are new events.
 | `payload` | Redacted structured metadata: ids, hashes, policy version, states |
 
 **Must not** appear in payload or logs: raw SBOM documents, external API tokens, authorization headers, cookies, full third-party payloads, source code, sensitive object-storage URLs (including presigned/signed URLs).
+
+### Actor truth table
+
+| `actorType` | `actorUserId` | `organizationId` | `actorMembershipId` |
+| --- | --- | --- | --- |
+| `anonymous` | null | null | null |
+| `user` (instance) | set | null | null |
+| `user` (tenant) | set; equals Membership.user_id | set; equals Membership.organization_id | set |
+| `system` | null | null or set | null |
+| `instance_operator` | null | null or set | null |
+
+A BEFORE INSERT trigger (`patchpilot_audit_actor_membership_user`) rejects tenant user events whose membership is not in `organizationId` or whose `actorUserId` is not `membership.user_id`. `instance_operator` is not a substitute for User authentication.
 
 ## Database-only immutability — limitations
 
@@ -66,7 +78,7 @@ At minimum, emit events for:
 | `risk_acceptance.created` / `expired` / `revoked` / `superseded` / `review_due` | Acceptance including requester/approver ids |
 | `finding.false_positive` / `finding.mitigated` | Specialized transitions |
 | `priority.override` | Manual override |
-| `auth.login_succeeded` / `auth.login_failed` / `auth.logout` / `auth.session_revoked` / `auth.organization_selected` | Authentication ([ADR 0019](../adr/0019-local-password-sessions.md)); no secrets in payload. Anonymous failures use `actorType=anonymous`. Successful login uses instance-level `user`, not `system`. |
+| `auth.login_succeeded` / `auth.login_failed` / `auth.logout` / `auth.session_revoked` / `auth.organization_selected` | Authentication ([ADR 0019](../adr/0019-local-password-sessions.md)); no secrets in payload. Anonymous failures use `actorType=anonymous`. Successful login uses instance-level `user`, not `system`. HTTP routes are not implemented in this batch. |
 | `admin.access` | Instance-operator actions on system integrations |
 | `compensating_control.recorded` | Evidence of a control claim |
 | `export.created` | Exports |

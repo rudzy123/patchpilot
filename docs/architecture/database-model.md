@@ -1,6 +1,6 @@
 # Database model
 
-This is the Session 5 persistence design for PatchPilot. It implements the v0.1 [domain model](domain-model.md) in PostgreSQL through Prisma in `packages/database`. Product APIs, parsers, and scoring are **not** implemented here.
+This is the Session 5–6 persistence design for PatchPilot. It implements the v0.1 [domain model](domain-model.md) in PostgreSQL through Prisma in `packages/database`. Product APIs, parsers, scoring, and authentication HTTP routes are **not** implemented here.
 
 Opaque IDs are UUIDs (`gen_random_uuid()`). Timestamps are `TIMESTAMPTZ` stored in UTC. Prisma lives only in `packages/database`. Domain ports in `packages/domain` do not import Prisma types.
 
@@ -18,13 +18,13 @@ Opaque IDs are UUIDs (`gen_random_uuid()`). Timestamps are `TIMESTAMPTZ` stored 
 | | `integration` (`organization_id` required), `external_credential` |
 | | tenant `outbox_event`, `background_job` (when org set), `idempotency_record` |
 
-`user` is instance-level. Access to tenant data is via `membership`. Listing users is still scoped by membership in a later API session.
+`user` is instance-level. Access to tenant data is via `membership`. Listing users is still scoped by membership in a later API session. `local_credential` and `session` are instance-level. `session.active_organization_id` is a selector only.
 
 A global `vulnerability` may be referenced by findings in many organizations. Tenant queries always include `organization_id` from the authorized organization argument. Repository methods do not trust that argument as authentication; they enforce scope.
 
 ## Repository method rules
 
-Tenant-owned ports require `organizationId` as a required argument (`findById(organizationId, id)`). There is no `findById(id)` for tenant aggregates. Global intelligence tables may be read without an organization id.
+Tenant-owned ports require `organizationId` as a required argument (`findById(organizationId, id)`). There is no `findById(id)` for tenant aggregates. Global intelligence tables may be read without an organization id. Authentication ports (`UserRepository`, `LocalCredentialRepository`, `SessionRepository`, and the membership auth-boundary queries) are instance-level: they take the authenticated user id or a token digest, never a client-supplied organization as authority.
 
 Adapters always add `WHERE organization_id = $organizationId` (or `id = $organizationId` for the organization row itself). Pagination is keyset by `id`, bounded to 1–100 rows (default 20).
 
@@ -87,7 +87,7 @@ RLS is **not** enabled. Application predicates and compound FKs are the v0.1 con
 
 ## Check constraints (SQL extras)
 
-Prisma cannot express every invariant. Those extras are defined only in committed `migration.sql` files. Migrations `20260827120000_tenant_model`, `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, and `20260827160000_policy_creator_membership` add named checks, including:
+Prisma cannot express every invariant. Those extras are defined only in committed `migration.sql` files. Migrations `20260827120000_tenant_model`, `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, `20260827160000_policy_creator_membership`, and `20260827180000_local_credentials_and_sessions` add named checks, including:
 
 | Constraint | Invariant |
 | --- | --- |
@@ -103,7 +103,9 @@ Prisma cannot express every invariant. Those extras are defined only in committe
 | `outbox_event_attempt_chk` / `*_lease_chk` / `*_processed_ts_chk` | Nonnegative attempts; lease and processed timestamps match status |
 | `evidence_one_target_chk` | Exactly one supported target; `export_snapshot` is the only asset-targeted kind |
 | `asset_owner_target_chk` | Exactly one of `user_id` or `team_id` |
-| `audit_event_actor_scope_chk` | Tenant `user` actors require membership; `system` / `instance_operator` must not |
+| `audit_event_actor_scope_chk` | Anonymous, instance user, tenant user, system, and instance_operator combinations from [audit-model.md](audit-model.md) |
+| `local_credential_phc_chk` / `*_revision_chk` / `*_algorithm_chk` | Argon2id PHC prefix and length; revision ≥ 1; algorithm `argon2id` |
+| `session_*_chk` | Lowercase hex digests, timestamp order, revoke pair consistency, `password` method |
 | `intelligence_source_provider_chk` | Global sync rows are `osv` or `cisa_kev` only |
 | `*_version_chk` | Optimistic concurrency version ≥ 1 |
 | Archive / completed / failure-code timestamp consistency | Status and timestamps agree |
@@ -112,11 +114,11 @@ Partial unique indexes cover active asset names per organization, builtin vs org
 
 ## Indexes
 
-Every index maps to a documented access or uniqueness need: organization slug; membership by org+user and active memberships; team/environment lookup; assets by org/status/owner/environment/last observation; SBOMs by asset+received time and org+asset+hash; ingestion by state; component identity; occurrences by SBOM and component; dependency traversal; vulnerability OSV/CVE/aliases and source provenance; findings by org/status/asset/vulnerability/assignee/due; observations by finding+time; policies by org+status; calculations by finding+time; tasks by assignee/status/due; expiring acceptances; audit by org+time and target; outbox claim; job lease; idempotency lookup and expiry.
+Every index maps to a documented access or uniqueness need: organization slug; membership by org+user and active memberships; team/environment lookup; assets by org/status/owner/environment/last observation; SBOMs by asset+received time and org+asset+hash; ingestion by state; component identity; occurrences by SBOM and component; dependency traversal; vulnerability OSV/CVE/aliases and source provenance; findings by org/status/asset/vulnerability/assignee/due; observations by finding+time; policies by org+status; calculations by finding+time; tasks by assignee/status/due; expiring acceptances; audit by org+time and target; outbox claim; job lease; idempotency lookup and expiry; session token/CSRF digests, user, idle/absolute cleanup (worker deferred), and optional active organization.
 
 ## Append-only enforcement
 
-`BEFORE UPDATE OR DELETE` triggers reject mutation of `audit_event`, `finding_observation`, `risk_calculation`, `vulnerability_source_record`, and `evidence`. Published `risk_policy` rows cannot change identity or definition; they cannot be deleted; they may only move `published` → `retired`. Trigger functions set `search_path = pg_catalog, public` so they do not inherit the caller search path. These controls do not prevent a superuser from rewriting history.
+`BEFORE UPDATE OR DELETE` triggers reject mutation of `audit_event`, `finding_observation`, `risk_calculation`, `vulnerability_source_record`, and `evidence`. A BEFORE INSERT trigger `patchpilot_audit_actor_membership_user` enforces that tenant audit actors match Membership user and organization. Published `risk_policy` rows cannot change identity or definition; they cannot be deleted; they may only move `published` → `retired`. Trigger functions set `search_path = pg_catalog, public` so they do not inherit the caller search path. These controls do not prevent a superuser from rewriting history.
 
 ## Limitations
 
@@ -124,7 +126,7 @@ Triggers and revoked DML are not WORM storage. Superusers can still rewrite hist
 
 Organization `slug` uniqueness does not reserve product route names (`api`, `health`, `login`, and similar). Do not treat the current unique index as URL-routing protection. Reserved slugs stay deferred until URL routing is implemented.
 
-[ADR 0019](../adr/0019-local-password-sessions.md) specifies `LocalCredential` and `Session` tables and audit-actor changes. Those objects are **not** in this schema yet and must arrive in a new forward-only migration. Do not edit the Session 5 migrations.
+[ADR 0019](../adr/0019-local-password-sessions.md) `LocalCredential` and `Session` tables, restored `actor_user_id`, and `anonymous` audit actors are in `20260827170000_audit_actor_anonymous` plus `20260827180000_local_credentials_and_sessions`. Session 5 migrations stay frozen. Authentication HTTP routes, cookies, CSRF, and seed passwords are not in this batch.
 
 ## Related documents
 
