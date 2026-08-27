@@ -8,7 +8,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { startTelemetry } from './index.js';
 
-const packageJsonPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+const packageRoot = dirname(fileURLToPath(import.meta.url));
+const packageJsonPath = join(packageRoot, '..', 'package.json');
+const lockfilePath = join(packageRoot, '..', '..', '..', 'pnpm-lock.yaml');
 
 const decoyEnvKeys = [
   'OTEL_SDK_DISABLED',
@@ -158,11 +160,28 @@ describe('telemetry lifecycle', () => {
     ).rejects.toThrow('provider construction failed');
   });
 
-  it('does not declare a direct dependency on @opentelemetry/sdk-node', () => {
+  it('does not declare banned OpenTelemetry exporters or sdk-node', () => {
     const manifest = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
       dependencies?: Record<string, string>;
     };
-    expect(manifest.dependencies).not.toHaveProperty('@opentelemetry/sdk-node');
+    const dependencies = manifest.dependencies ?? {};
+    expect(dependencies).not.toHaveProperty('@opentelemetry/sdk-node');
+    expect(dependencies).not.toHaveProperty('@opentelemetry/exporter-prometheus');
+    expect(dependencies).not.toHaveProperty('@opentelemetry/propagator-jaeger');
+    expect(dependencies).not.toHaveProperty('@opentelemetry/exporter-trace-otlp-grpc');
+    expect(dependencies).not.toHaveProperty('@opentelemetry/exporter-trace-otlp-proto');
+    expect(dependencies).not.toHaveProperty('@opentelemetry/exporter-zipkin');
+  });
+
+  it('does not lock protobufjs or banned OpenTelemetry packages', () => {
+    const lockfile = readFileSync(lockfilePath, 'utf8');
+    expect(lockfile).not.toContain('protobufjs');
+    expect(lockfile).not.toContain('@opentelemetry/sdk-node@');
+    expect(lockfile).not.toContain('@opentelemetry/exporter-prometheus@');
+    expect(lockfile).not.toContain('@opentelemetry/propagator-jaeger@');
+    expect(lockfile).not.toContain('@opentelemetry/exporter-trace-otlp-grpc@');
+    expect(lockfile).not.toContain('@opentelemetry/exporter-trace-otlp-proto@');
+    expect(lockfile).not.toContain('@opentelemetry/otlp-grpc-exporter-base@');
   });
 });
 
