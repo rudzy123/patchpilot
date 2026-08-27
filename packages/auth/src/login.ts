@@ -14,6 +14,12 @@ import { DUMMY_ARGON2ID_PHC } from './dummy-phc.js';
 import { PUBLIC_LOGIN_FAILURE, passwordMaxBytesError, passwordMinLengthError } from './errors.js';
 import type { LoginRateLimiter } from './login-rate-limiter.js';
 import { SESSION_TOKEN_BYTES, type RandomTokenGenerator } from './random-token-generator.js';
+import {
+  publicAuthOrganization,
+  sessionExpiresAt,
+  type PublicAuthOrganization,
+  type PublicAuthUser,
+} from './session-view.js';
 import { digestCsrfToken, digestLoginAccount, digestSessionToken } from './token-digests.js';
 import { createTrustedActor, type TrustedActor } from './trusted-actor.js';
 
@@ -34,6 +40,9 @@ export type LoginResult = {
   actor: TrustedActor;
   sessionId: string;
   tokens: IssuedSessionTokens;
+  user: PublicAuthUser;
+  organization: PublicAuthOrganization | null;
+  expiresAt: Date;
 };
 
 export type LoginDependencies = {
@@ -155,6 +164,15 @@ async function issueSession(
     actor,
     sessionId: session.id,
     tokens: { sessionToken, csrfToken },
+    user: { id: user.id, displayName: user.displayName },
+    organization:
+      selected === undefined
+        ? null
+        : publicAuthOrganization({
+            organization: selected.organization,
+            role: selected.membership.role,
+          }),
+    expiresAt: sessionExpiresAt(session),
   });
 }
 

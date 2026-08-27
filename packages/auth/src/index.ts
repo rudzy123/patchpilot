@@ -1,6 +1,6 @@
 /**
  * Authentication and organization-authorization application logic.
- * HTTP cookies, CSRF middleware, and web UI live in later adapters.
+ * HTTP cookies, CSRF plugins, and the web UI live in adapters.
  */
 export const packageBoundary = '@patchpilot/auth' as const;
 export const passwordHashingLibrary = 'argon2' as const;
@@ -25,6 +25,7 @@ export {
 export { SESSION_TOKEN_BYTES, type RandomTokenGenerator } from './random-token-generator.js';
 export { createNodeRandomTokenGenerator } from './node-random-token-generator.js';
 export {
+  csrfTokenMatchesDigest,
   CSRF_TOKEN_DIGEST_PREFIX,
   digestCsrfToken,
   digestLoginAccount,
@@ -65,7 +66,24 @@ export {
   type ResolveSessionInput,
   type ResolveSessionResult,
 } from './resolve-session.js';
-export { createLogoutUseCase, type LogoutDependencies, type LogoutInput } from './logout.js';
+export {
+  createLogoutUseCase,
+  type LogoutDependencies,
+  type LogoutInput,
+  type LogoutResult,
+} from './logout.js';
+export {
+  createReadSessionUseCase,
+  type ReadSessionDependencies,
+  type ReadSessionInput,
+  type ReadSessionResult,
+} from './read-session.js';
+export {
+  publicAuthOrganization,
+  sessionExpiresAt,
+  type PublicAuthOrganization,
+  type PublicAuthUser,
+} from './session-view.js';
 export {
   createSelectOrganizationUseCase,
   type SelectOrganizationDependencies,

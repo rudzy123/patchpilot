@@ -453,6 +453,35 @@ describe('authentication persistence', () => {
       ).rejects.toThrow(/64 lowercase/);
     });
 
+    it('replaces the CSRF digest without rotating the Session token digest', async () => {
+      const user = await createUser();
+      const repos = createRepositories(prisma);
+      const tokenHash = sha256Hex(`csrf-keep-session-${randomUUID()}`);
+      const created = await repos.sessions.create({
+        userId: user.id,
+        tokenHash,
+        csrfTokenHash: sha256Hex(`csrf-before-${randomUUID()}`),
+        passwordRevision: 1,
+        lastSeenAt: CREATED_AT,
+        idleExpiresAt: IDLE_EXPIRES_AT,
+        absoluteExpiresAt: ABSOLUTE_EXPIRES_AT,
+      });
+      const nextCsrf = sha256Hex(`csrf-after-${randomUUID()}`);
+      const replaced = await repos.sessions.replaceCsrfToken({
+        tokenHash,
+        nextCsrfTokenHash: nextCsrf,
+      });
+      expect(replaced?.id).toBe(created.id);
+      expect(replaced?.tokenHash).toBe(tokenHash);
+      expect(replaced?.csrfTokenHash).toBe(nextCsrf);
+      expect(
+        await repos.sessions.replaceCsrfToken({
+          tokenHash: sha256Hex(`missing-session-${randomUUID()}`),
+          nextCsrfTokenHash: sha256Hex(`missing-csrf-${randomUUID()}`),
+        }),
+      ).toBeUndefined();
+    });
+
     it('throttles lastSeen updates, rotates atomically, and revokes by digest or User', async () => {
       const user = await createUser();
       const other = await createUser();

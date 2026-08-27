@@ -13,6 +13,12 @@ import { AUTHENTICATION_REQUIRED, ORGANIZATION_NOT_FOUND } from './errors.js';
 import type { IssuedSessionTokens } from './login.js';
 import { SESSION_TOKEN_BYTES, type RandomTokenGenerator } from './random-token-generator.js';
 import { createResolveSessionUseCase, type ResolveSessionResult } from './resolve-session.js';
+import {
+  publicAuthOrganization,
+  sessionExpiresAt,
+  type PublicAuthOrganization,
+  type PublicAuthUser,
+} from './session-view.js';
 import { digestCsrfToken, digestSessionToken } from './token-digests.js';
 import { createTrustedActor, type TrustedActor } from './trusted-actor.js';
 
@@ -25,6 +31,9 @@ export type SelectOrganizationResult = {
   actor: TrustedActor;
   sessionId: string;
   tokens: IssuedSessionTokens;
+  user: PublicAuthUser;
+  organization: PublicAuthOrganization;
+  expiresAt: Date;
 };
 
 export type SelectOrganizationDependencies = {
@@ -103,5 +112,11 @@ async function rotateOntoOrganization(
     actor,
     sessionId: rotated.id,
     tokens: { sessionToken, csrfToken },
+    user: resolved.user,
+    organization: publicAuthOrganization({
+      organization: bound.organization,
+      role: bound.membership.role,
+    }),
+    expiresAt: sessionExpiresAt(rotated),
   });
 }

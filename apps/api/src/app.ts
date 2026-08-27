@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import { type ServerConfig } from '@patchpilot/config';
@@ -12,7 +13,12 @@ import {
 } from '@patchpilot/contracts';
 import { type Logger, createChildLogger } from '@patchpilot/logger';
 import Fastify, { type FastifyInstance } from 'fastify';
+import type { SessionRecord } from '@patchpilot/domain';
+import type { TrustedActor } from '@patchpilot/auth';
 
+import { registerAuthRoutes } from './auth-routes.js';
+import type { AuthRuntime } from './auth-runtime.js';
+import { readSingleHeader } from './headers.js';
 import { resolveRequestIdentifiers } from './ids.js';
 
 export type DatabaseReadyCheck = (timeoutMs: number) => Promise<{ ok: boolean }>;
@@ -21,6 +27,7 @@ export type ApiDependencies = {
   config: ServerConfig;
   logger: Logger;
   checkDatabaseReady: DatabaseReadyCheck;
+  auth: AuthRuntime;
   now?: () => string;
   generateId?: () => string;
 };
@@ -29,6 +36,9 @@ declare module 'fastify' {
   interface FastifyRequest {
     requestId: string;
     correlationId: string;
+    actor: TrustedActor | null;
+    authSession: SessionRecord | null;
+    sessionToken: string | null;
   }
 }
 
@@ -49,6 +59,9 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
 
   app.decorateRequest('requestId', '');
   app.decorateRequest('correlationId', '');
+  app.decorateRequest('actor', null);
+  app.decorateRequest('authSession', null);
+  app.decorateRequest('sessionToken', null);
 
   await app.register(helmet, {
     global: true,
@@ -56,17 +69,25 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     xPoweredBy: false,
   });
 
+  await app.register(cookie);
+
   await app.register(cors, {
     origin: dependencies.config.corsAllowedOrigins,
     credentials: true,
+    allowedHeaders: [
+      'content-type',
+      dependencies.config.requestIdHeader,
+      dependencies.config.correlationIdHeader,
+      dependencies.config.auth.csrfHeaderName,
+    ],
   });
 
   app.addHook('onRequest', async (request, reply) => {
     const headerName = dependencies.config.requestIdHeader.toLowerCase();
     const correlationHeaderName = dependencies.config.correlationIdHeader.toLowerCase();
     const identifiers = resolveRequestIdentifiers({
-      requestIdHeader: headerValue(request.headers[headerName]),
-      correlationIdHeader: headerValue(request.headers[correlationHeaderName]),
+      requestIdHeader: readSingleHeader(request.headers[headerName]),
+      correlationIdHeader: readSingleHeader(request.headers[correlationHeaderName]),
       generateId,
     });
     request.requestId = identifiers.requestId;
@@ -153,6 +174,12 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     return parsed;
   });
 
+  await registerAuthRoutes(app, {
+    config: dependencies.config,
+    logger: dependencies.logger,
+    auth: dependencies.auth,
+  });
+
   app.addHook('onSend', async (request, _reply, payload) => {
     createChildLogger(dependencies.logger, {
       requestId: request.requestId,
@@ -171,18 +198,6 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
   });
 
   return app;
-}
-
-function headerValue(value: string | string[] | undefined): string | undefined {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (Array.isArray(value) && typeof value[0] === 'string') {
-    return value[0];
-  }
-
-  return undefined;
 }
 
 function fastifyStatusCode(error: unknown): number {

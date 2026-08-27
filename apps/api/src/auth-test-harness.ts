@@ -1,10 +1,25 @@
 import { randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
 
-import type { AuthConfig } from '@patchpilot/config';
-import { createLogger, type Logger } from '@patchpilot/logger';
+import {
+  createFakeLoginRateLimiter,
+  createListActiveOrganizationsUseCase,
+  createLoginUseCase,
+  createLogoutUseCase,
+  createNodeRandomTokenGenerator,
+  createReadSessionUseCase,
+  createResolveSessionUseCase,
+  createSelectOrganizationUseCase,
+  createSystemClock,
+  type Clock,
+  type FakeLoginRateLimiter,
+  type PasswordHasher,
+} from '@patchpilot/auth';
+import { loadServerConfigFrom, type ServerConfig } from '@patchpilot/config';
 import type {
   ActiveMembershipWithOrganization,
+  AppendAuditEventInput,
+  AuditEventRecord,
   CreateSessionInput,
   LocalCredentialRecord,
   LocalCredentialRepository,
@@ -18,138 +33,211 @@ import type {
   UserRecord,
   UserRepository,
 } from '@patchpilot/domain';
+import { JSON_SCHEMA_VERSION_V1 } from '@patchpilot/domain';
+import { createLogger, type Logger } from '@patchpilot/logger';
+import { createFoundationTestEnv } from '@patchpilot/test-utils';
 
-import type { Clock } from './clock.js';
-import type { PasswordHasher } from './password-hasher.js';
-import type { RandomTokenGenerator } from './random-token-generator.js';
+import { buildApi } from './app.js';
+import type { AuthRuntime } from './auth-runtime.js';
+import type { DatabaseReadyCheck } from './app.js';
 
-export const TEST_NOW_ISO = '2026-08-27T16:00:00.000Z';
 export const VALID_PASSWORD = 'correct-horse-battery';
-export const TEST_PEER_IP = '192.0.2.10';
-export const STORED_PASSWORD_HASH = '$argon2id$v=19$m=8192,p=1,t=1$stored-local-credential-hash';
-export const RAW_SESSION_TOKEN = 'RAW_SESSION_TOKEN_VALUE_NOT_A_DIGEST';
-export const RAW_CSRF_TOKEN = 'RAW_CSRF_TOKEN_VALUE_NOT_A_DIGEST';
-export const ROTATED_SESSION_TOKEN = 'RAW_ROTATED_SESSION_TOKEN_NOT_DIGEST';
-export const ROTATED_CSRF_TOKEN = 'RAW_ROTATED_CSRF_TOKEN_NOT_A_DIGEST';
+export const TEST_ORIGIN = 'http://127.0.0.1:3000';
+const STORED_PASSWORD_HASH = '$argon2id$v=19$m=8192,p=1,t=1$stored-local-credential-hash';
 
-export function createTestAuthConfig(overrides: Partial<AuthConfig> = {}): AuthConfig {
+export type MemoryAuditAppend = {
+  events: AppendAuditEventInput[];
+  append: AuthRuntime['audit']['append'];
+};
+
+export type AuthTestHarness = {
+  config: ServerConfig;
+  logger: Logger;
+  logs: () => string;
+  users: MemoryUserRepository;
+  credentials: MemoryCredentialRepository;
+  sessions: MemorySessionRepository;
+  memberships: MemoryMembershipRepository;
+  limiter: FakeLoginRateLimiter;
+  audit: MemoryAuditAppend;
+  user: UserRecord;
+  organizations: OrganizationRecord[];
+  auth: AuthRuntime;
+};
+
+export async function buildTestApi(options?: {
+  config?: ServerConfig;
+  logger?: Logger;
+  membershipCount?: 0 | 1 | 2;
+  limiterUnavailable?: boolean;
+  now?: () => string;
+  generateId?: () => string;
+  checkDatabaseReady?: DatabaseReadyCheck;
+  harness?: AuthTestHarness;
+}) {
+  const harness = options?.harness ?? createAuthTestHarness(options);
+  const app = await buildApi({
+    config: options?.config ?? harness.config,
+    logger: options?.logger ?? harness.logger,
+    checkDatabaseReady: options?.checkDatabaseReady ?? (async () => ({ ok: true })),
+    auth: harness.auth,
+    ...(options?.now === undefined ? {} : { now: options.now }),
+    ...(options?.generateId === undefined ? {} : { generateId: options.generateId }),
+  });
+  return { app, harness };
+}
+
+export function createAuthTestHarness(options?: {
+  membershipCount?: 0 | 1 | 2;
+  limiterUnavailable?: boolean;
+  config?: ServerConfig;
+}): AuthTestHarness {
+  const config = options?.config ?? loadServerConfigFrom(createFoundationTestEnv());
+  const logs = collectingLogger();
+  const clock: Clock = createSystemClock();
+  const user = createUserRecord();
+  const organizations = [
+    createOrganizationRecord({ slug: 'org-one', name: 'One' }),
+    createOrganizationRecord({ slug: 'org-two', name: 'Two' }),
+  ];
+  const membershipCount = options?.membershipCount ?? 1;
+  const membershipRows = organizations.slice(0, membershipCount).map((organization, index) => ({
+    organization,
+    membership: createMembershipRecord(organization, user, {
+      role: index === 0 ? 'owner' : 'member',
+    }),
+  }));
+  const users = createMemoryUserRepository([user]);
+  const credentials = createMemoryCredentialRepository([createCredentialRecord(user)]);
+  const sessions = createMemorySessionRepository();
+  const memberships = createMemoryMembershipRepository(membershipRows);
+  const limiter = createFakeLoginRateLimiter({
+    auth: config.auth,
+    logger: logs.logger,
+    clock,
+    ...(options?.limiterUnavailable === true ? { unavailable: true } : {}),
+  });
+  const audit = createMemoryAuditAppend();
+  const hasher = createFakePasswordHasher();
+  const tokens = createNodeRandomTokenGenerator();
+  const shared = {
+    users,
+    localCredentials: credentials,
+    sessions,
+    memberships,
+    clock,
+    auth: config.auth,
+    logger: logs.logger,
+  };
+  const auth: AuthRuntime = {
+    login: createLoginUseCase({
+      ...shared,
+      hasher,
+      tokens,
+      limiter,
+    }),
+    logout: createLogoutUseCase({
+      sessions,
+      clock,
+      logger: logs.logger,
+    }),
+    resolveSession: createResolveSessionUseCase(shared),
+    readSession: createReadSessionUseCase({
+      ...shared,
+      tokens,
+    }),
+    selectOrganization: createSelectOrganizationUseCase({
+      ...shared,
+      tokens,
+    }),
+    listOrganizations: createListActiveOrganizationsUseCase(shared),
+    audit,
+  };
+
   return {
-    sessionAbsoluteTtlSeconds: 604_800,
-    sessionIdleTtlSeconds: 43_200,
-    lastSeenMinIntervalSeconds: 60,
-    cookieName: 'patchpilot.sid',
-    cookieSecure: false,
-    csrfHeaderName: 'x-csrf-token',
-    passwordMinLength: 12,
-    passwordMaxBytes: 128,
-    argon2MemoryKib: 8_192,
-    argon2TimeCost: 1,
-    argon2Parallelism: 1,
-    loginRateLimitIpMaxAttempts: 10,
-    loginRateLimitIpWindowSeconds: 900,
-    loginRateLimitAccountMaxAttempts: 5,
-    loginRateLimitAccountWindowSeconds: 900,
-    rateLimitRedisTimeoutMs: 200,
-    ...overrides,
+    config,
+    logger: logs.logger,
+    logs: logs.output,
+    users,
+    credentials,
+    sessions,
+    memberships,
+    limiter,
+    audit,
+    user,
+    organizations,
+    auth,
   };
 }
 
-export function createAdjustableClock(isoUtc: string = TEST_NOW_ISO): Clock & {
-  set(isoUtc: string): void;
-  advanceMs(milliseconds: number): void;
-} {
-  let current = new Date(isoUtc);
-  return {
-    now(): Date {
-      return new Date(current.getTime());
-    },
-    set(nextIsoUtc: string): void {
-      current = new Date(nextIsoUtc);
-    },
-    advanceMs(milliseconds: number): void {
-      current = new Date(current.getTime() + milliseconds);
-    },
-  };
-}
-
-export function createCollectingLogger(): { logger: Logger; text: () => string } {
-  const chunks: Array<Buffer | string> = [];
-  const stream = new Writable({
+function collectingLogger() {
+  const chunks: string[] = [];
+  const destination = new Writable({
     write(chunk, _encoding, callback) {
-      chunks.push(chunk as Buffer | string);
+      chunks.push(String(chunk));
       callback();
     },
   });
   return {
     logger: createLogger({
-      service: 'auth-test',
+      service: 'api-auth-test',
       level: 'info',
       pretty: false,
-      destination: stream,
+      destination,
     }),
-    text: () => chunks.join(''),
+    output: () => chunks.join(''),
   };
 }
 
-export type FakePasswordHasher = PasswordHasher & {
-  verifyCalls: Array<{ passwordHash: string; password: string }>;
-  hashCalls: string[];
-  needsRehashCalls: string[];
-  needsRehashResult: boolean;
-};
-
-export function createFakePasswordHasher(options?: {
-  needsRehashResult?: boolean;
-}): FakePasswordHasher {
+function createFakePasswordHasher(): PasswordHasher {
   const secrets = new Map<string, string>([[STORED_PASSWORD_HASH, VALID_PASSWORD]]);
-  const hasher: FakePasswordHasher = {
-    verifyCalls: [],
-    hashCalls: [],
-    needsRehashCalls: [],
-    needsRehashResult: options?.needsRehashResult ?? false,
+  return {
     async hash(password) {
-      hasher.hashCalls.push(password);
-      const next = `$argon2id$v=19$m=8192,p=1,t=1$rehashed-${hasher.hashCalls.length}`;
+      const next = `$argon2id$v=19$m=8192,p=1,t=1$rehashed-${secrets.size}`;
       secrets.set(next, password);
       return next;
     },
     async verify(passwordHash, password) {
-      hasher.verifyCalls.push({ passwordHash, password });
       return secrets.get(passwordHash) === password;
     },
-    needsRehash(passwordHash) {
-      hasher.needsRehashCalls.push(passwordHash);
-      return hasher.needsRehashResult;
+    needsRehash() {
+      return false;
     },
   };
-  return hasher;
 }
 
-export function createQueuedTokenGenerator(tokens: string[]): RandomTokenGenerator & {
-  generated: string[];
-} {
-  const generated: string[] = [];
+function createMemoryAuditAppend(): MemoryAuditAppend {
+  const events: AppendAuditEventInput[] = [];
   return {
-    generated,
-    generate(byteLength: number): string {
-      if (byteLength !== 32) {
-        throw new Error(`Unexpected token byte length: ${byteLength}`);
-      }
-      const next = tokens[generated.length];
-      if (next === undefined) {
-        throw new Error('Token generator queue exhausted.');
-      }
-      generated.push(next);
-      return next;
+    events,
+    async append(input) {
+      events.push(input);
+      const record: AuditEventRecord = {
+        id: randomUUID(),
+        organizationId: input.organizationId ?? null,
+        actorUserId: input.actorUserId ?? null,
+        actorMembershipId: input.actorMembershipId ?? null,
+        actorType: input.actorType,
+        action: input.action,
+        subjectType: input.subjectType,
+        subjectId: input.subjectId,
+        occurredAt: input.occurredAt ?? new Date(),
+        requestId: input.requestId ?? null,
+        correlationId: input.correlationId,
+        sourceIp: input.sourceIp ?? null,
+        userAgent: input.userAgent ?? null,
+        payload: input.payload,
+        schemaVersion: input.schemaVersion ?? JSON_SCHEMA_VERSION_V1,
+        retentionCategory: input.retentionCategory ?? 'security',
+      };
+      return record;
     },
   };
 }
 
-export type MemoryUserRepository = UserRepository & {
-  users: Map<string, UserRecord>;
-};
+type MemoryUserRepository = UserRepository & { users: Map<string, UserRecord> };
 
-export function createMemoryUserRepository(users: UserRecord[] = []): MemoryUserRepository {
+function createMemoryUserRepository(users: UserRecord[]): MemoryUserRepository {
   const byId = new Map(users.map((user) => [user.id, user]));
   return {
     users: byId,
@@ -163,33 +251,25 @@ export function createMemoryUserRepository(users: UserRecord[] = []): MemoryUser
   };
 }
 
-export type MemoryCredentialRepository = LocalCredentialRepository & {
-  credentials: Map<string, LocalCredentialRecord>;
-  updateCalls: Array<{ userId: string; passwordHash: string; passwordRevision: number }>;
-};
+type MemoryCredentialRepository = LocalCredentialRepository;
 
-export function createMemoryCredentialRepository(
-  records: LocalCredentialRecord[] = [],
+function createMemoryCredentialRepository(
+  records: LocalCredentialRecord[],
 ): MemoryCredentialRepository {
   const credentials = new Map(records.map((record) => [record.userId, record]));
-  const updateCalls: MemoryCredentialRepository['updateCalls'] = [];
   return {
-    credentials,
-    updateCalls,
     async findByUserId(userId) {
       return credentials.get(userId);
     },
     async updatePasswordHash(input) {
-      updateCalls.push(input);
       const current = credentials.get(input.userId);
       if (current === undefined) {
         return undefined;
       }
-      const updated: LocalCredentialRecord = {
+      const updated = {
         ...current,
         passwordHash: input.passwordHash,
         passwordRevision: input.passwordRevision,
-        updatedAt: new Date(current.updatedAt.getTime()),
       };
       credentials.set(input.userId, updated);
       return updated;
@@ -197,16 +277,14 @@ export function createMemoryCredentialRepository(
   };
 }
 
-export type MemorySessionRepository = SessionRepository & {
+type MemorySessionRepository = SessionRepository & {
   byTokenHash: Map<string, SessionRecord>;
   createCalls: CreateSessionInput[];
   rotateCalls: RotateSessionInput[];
   replaceCsrfCalls: ReplaceCsrfTokenInput[];
 };
 
-export function createMemorySessionRepository(
-  records: SessionRecord[] = [],
-): MemorySessionRepository {
+function createMemorySessionRepository(records: SessionRecord[] = []): MemorySessionRepository {
   const byTokenHash = new Map(records.map((record) => [record.tokenHash, record]));
   const createCalls: CreateSessionInput[] = [];
   const rotateCalls: RotateSessionInput[] = [];
@@ -254,7 +332,7 @@ export function createMemorySessionRepository(
       if (current.lastSeenAt.getTime() > input.minLastSeenAt.getTime()) {
         return undefined;
       }
-      const updated: SessionRecord = {
+      const updated = {
         ...current,
         lastSeenAt: input.lastSeenAt,
         idleExpiresAt: input.idleExpiresAt,
@@ -289,10 +367,7 @@ export function createMemorySessionRepository(
       if (current === undefined || current.revokedAt !== null) {
         return undefined;
       }
-      const updated: SessionRecord = {
-        ...current,
-        csrfTokenHash: input.nextCsrfTokenHash,
-      };
+      const updated = { ...current, csrfTokenHash: input.nextCsrfTokenHash };
       byTokenHash.set(input.tokenHash, updated);
       return { ...updated };
     },
@@ -301,7 +376,7 @@ export function createMemorySessionRepository(
       if (current === undefined || current.revokedAt !== null) {
         return undefined;
       }
-      const updated: SessionRecord = {
+      const updated = {
         ...current,
         revokedAt: input.revokedAt,
         revokeReason: input.revokeReason,
@@ -341,17 +416,17 @@ export function createMemorySessionRepository(
   };
 }
 
-export type MemoryMembershipRepository = MembershipRepository & {
+type MemoryMembershipRepository = MembershipRepository & {
   rows: ActiveMembershipWithOrganization[];
 };
 
-export function createMemoryMembershipRepository(
-  rows: ActiveMembershipWithOrganization[] = [],
+function createMemoryMembershipRepository(
+  rows: ActiveMembershipWithOrganization[],
 ): MemoryMembershipRepository {
   return {
     rows,
     async create() {
-      throw new Error('Membership create is not used by auth use cases.');
+      throw new Error('Membership create is not used by auth routes.');
     },
     async findById() {
       return undefined;
@@ -382,119 +457,64 @@ export function createMemoryMembershipRepository(
   };
 }
 
-export function createUserRecord(overrides: {
-  id?: string;
-  email?: string;
-  status?: UserRecord['status'];
-  disabledAt?: Date | null;
-}): UserRecord {
-  const now = new Date(TEST_NOW_ISO);
-  const status = overrides.status ?? 'active';
+function createUserRecord(): UserRecord {
+  const now = new Date('2026-08-27T16:00:00.000Z');
   return {
-    id: overrides.id ?? randomUUID(),
-    email: overrides.email ?? 'owner@synthetic.patchpilot.test',
+    id: randomUUID(),
+    email: 'owner@synthetic.patchpilot.test',
     displayName: 'Synthetic User',
-    status,
+    status: 'active',
     version: 1,
-    disabledAt: overrides.disabledAt ?? (status === 'disabled' ? now : null),
+    disabledAt: null,
     createdAt: now,
     updatedAt: now,
   };
 }
 
-export function createOrganizationRecord(overrides: {
-  id?: string;
-  slug?: string;
-  name?: string;
-  status?: OrganizationRecord['status'];
-  archivedAt?: Date | null;
-}): OrganizationRecord {
-  const now = new Date(TEST_NOW_ISO);
-  const status = overrides.status ?? 'active';
+function createOrganizationRecord(overrides: { slug: string; name: string }): OrganizationRecord {
+  const now = new Date('2026-08-27T16:00:00.000Z');
   return {
-    id: overrides.id ?? randomUUID(),
-    slug: overrides.slug ?? `org-${randomUUID().slice(0, 8)}`,
-    name: overrides.name ?? 'Synthetic Organization',
-    status,
+    id: randomUUID(),
+    slug: overrides.slug,
+    name: overrides.name,
+    status: 'active',
     version: 1,
-    archivedAt: overrides.archivedAt ?? (status === 'archived' ? now : null),
+    archivedAt: null,
     createdAt: now,
     updatedAt: now,
   };
 }
 
-export function createMembershipRecord(
+function createMembershipRecord(
   organization: OrganizationRecord,
   user: UserRecord,
-  overrides: {
-    id?: string;
-    role?: MembershipRecord['role'];
-    status?: MembershipRecord['status'];
-    revokedAt?: Date | null;
-  } = {},
+  overrides: { role: MembershipRecord['role'] },
 ): MembershipRecord {
-  const now = new Date(TEST_NOW_ISO);
-  const status = overrides.status ?? 'active';
+  const now = new Date('2026-08-27T16:00:00.000Z');
   return {
-    id: overrides.id ?? randomUUID(),
+    id: randomUUID(),
     organizationId: organization.id,
     userId: user.id,
-    role: overrides.role ?? 'owner',
-    status,
+    role: overrides.role,
+    status: 'active',
     invitedAt: null,
     joinedAt: now,
-    revokedAt: overrides.revokedAt ?? (status === 'revoked' ? now : null),
+    revokedAt: null,
     version: 1,
     createdAt: now,
     updatedAt: now,
   };
 }
 
-export function createCredentialRecord(
-  user: UserRecord,
-  overrides: { passwordRevision?: number; passwordHash?: string } = {},
-): LocalCredentialRecord {
-  const now = new Date(TEST_NOW_ISO);
+function createCredentialRecord(user: UserRecord): LocalCredentialRecord {
+  const now = new Date('2026-08-27T16:00:00.000Z');
   return {
     id: randomUUID(),
     userId: user.id,
-    passwordHash: overrides.passwordHash ?? STORED_PASSWORD_HASH,
-    passwordRevision: overrides.passwordRevision ?? 1,
+    passwordHash: STORED_PASSWORD_HASH,
+    passwordRevision: 1,
     algorithm: 'argon2id',
     createdAt: now,
     updatedAt: now,
-  };
-}
-
-export function createSessionRecord(
-  user: UserRecord,
-  overrides: {
-    tokenHash: string;
-    csrfTokenHash: string;
-    activeOrganizationId?: string | null;
-    passwordRevision?: number;
-    lastSeenAt?: Date;
-    idleExpiresAt?: Date;
-    absoluteExpiresAt?: Date;
-    revokedAt?: Date | null;
-    revokeReason?: string | null;
-  },
-): SessionRecord {
-  const now = new Date(TEST_NOW_ISO);
-  return {
-    id: randomUUID(),
-    userId: user.id,
-    tokenHash: overrides.tokenHash,
-    csrfTokenHash: overrides.csrfTokenHash,
-    activeOrganizationId: overrides.activeOrganizationId ?? null,
-    authenticationMethod: 'password',
-    passwordRevision: overrides.passwordRevision ?? 1,
-    createdAt: now,
-    lastSeenAt: overrides.lastSeenAt ?? now,
-    idleExpiresAt: overrides.idleExpiresAt ?? new Date('2026-08-28T04:00:00.000Z'),
-    absoluteExpiresAt: overrides.absoluteExpiresAt ?? new Date('2026-09-03T16:00:00.000Z'),
-    revokedAt: overrides.revokedAt ?? null,
-    revokeReason: overrides.revokeReason ?? null,
-    userAgent: null,
   };
 }

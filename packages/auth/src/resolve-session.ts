@@ -10,6 +10,11 @@ import type {
 
 import { addSeconds, type Clock } from './clock.js';
 import { AUTHENTICATION_REQUIRED } from './errors.js';
+import {
+  publicAuthOrganization,
+  type PublicAuthOrganization,
+  type PublicAuthUser,
+} from './session-view.js';
 import { digestSessionToken } from './token-digests.js';
 import { createTrustedActor, type TrustedActor } from './trusted-actor.js';
 
@@ -20,6 +25,8 @@ export type ResolveSessionInput = {
 export type ResolveSessionResult = {
   actor: TrustedActor;
   session: SessionRecord;
+  user: PublicAuthUser;
+  organization: PublicAuthOrganization | null;
 };
 
 export type ResolveSessionDependencies = {
@@ -95,7 +102,18 @@ async function executeResolveSession(
     activeOrganizationId: actor.organizationId,
   };
 
-  return ok({ actor, session: resolvedSession });
+  return ok({
+    actor,
+    session: resolvedSession,
+    user: { id: user.id, displayName: user.displayName },
+    organization:
+      organizationContext === undefined
+        ? null
+        : publicAuthOrganization({
+            organization: organizationContext.organization,
+            role: organizationContext.membership.role,
+          }),
+  });
 }
 
 async function resolveOrganizationContext(

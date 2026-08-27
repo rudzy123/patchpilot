@@ -1,9 +1,26 @@
+import {
+  createArgon2PasswordHasher,
+  createListActiveOrganizationsUseCase,
+  createLoginUseCase,
+  createLogoutUseCase,
+  createNodeRandomTokenGenerator,
+  createReadSessionUseCase,
+  createResolveSessionUseCase,
+  createSelectOrganizationUseCase,
+  createSystemClock,
+} from '@patchpilot/auth';
 import { loadServerConfig } from '@patchpilot/config';
-import { checkDatabaseReady, disconnectPrisma } from '@patchpilot/database';
+import {
+  checkDatabaseReady,
+  createRepositories,
+  disconnectPrisma,
+  getPrismaClient,
+} from '@patchpilot/database';
 import { createLogger } from '@patchpilot/logger';
 import { startTelemetry } from '@patchpilot/observability';
 
 import { buildApi } from './app.js';
+import { createRedisLoginRateLimiter } from './redis-login-rate-limiter.js';
 
 async function main(): Promise<void> {
   const config = loadServerConfig();
@@ -20,10 +37,53 @@ async function main(): Promise<void> {
       : { tracesEndpoint: config.openTelemetry.tracesEndpoint }),
   });
 
+  const repos = createRepositories(getPrismaClient({ databaseUrl: config.databaseUrl }));
+  const hasher = createArgon2PasswordHasher();
+  const tokens = createNodeRandomTokenGenerator();
+  const clock = createSystemClock();
+  const limiter = createRedisLoginRateLimiter({
+    redisUrl: config.redisUrl,
+    auth: config.auth,
+    logger,
+  });
+  const shared = {
+    users: repos.users,
+    localCredentials: repos.localCredentials,
+    sessions: repos.sessions,
+    memberships: repos.memberships,
+    clock,
+    auth: config.auth,
+    logger,
+  };
+
   const app = await buildApi({
     config,
     logger,
     checkDatabaseReady: (timeoutMs) => checkDatabaseReady(timeoutMs),
+    auth: {
+      login: createLoginUseCase({
+        ...shared,
+        hasher,
+        tokens,
+        limiter,
+      }),
+      logout: createLogoutUseCase({
+        sessions: repos.sessions,
+        clock,
+        logger,
+      }),
+      resolveSession: createResolveSessionUseCase(shared),
+      readSession: createReadSessionUseCase({
+        ...shared,
+        tokens,
+      }),
+      selectOrganization: createSelectOrganizationUseCase({
+        ...shared,
+        tokens,
+      }),
+      listOrganizations: createListActiveOrganizationsUseCase(shared),
+      audit: repos.auditEvents,
+    },
   });
 
   let shuttingDown = false;
@@ -40,6 +100,7 @@ async function main(): Promise<void> {
     }, config.shutdownTimeoutMs);
     try {
       await app.close();
+      await limiter.close();
       await disconnectPrisma();
       await telemetry.shutdown();
     } finally {

@@ -195,6 +195,7 @@ export type {
   RevokeAllSessionsForUserInput,
   RevokeCurrentSessionInput,
   RiskPolicyRepository,
+  ReplaceCsrfTokenInput,
   RotateSessionInput,
   SbomMetadataRepository,
   SessionRepository,

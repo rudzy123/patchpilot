@@ -2,7 +2,7 @@
   "name": "@patchpilot/auth",
   "version": "0.0.0",
   "private": true,
-  "description": "Authentication and organization-authorization application logic. Argon2id hashing, opaque sessions, and permission checks; HTTP adapters are not in this package.",
+  "description": "Authentication and organization-authorization application logic. Argon2id hashing, opaque sessions, permission checks, and session use cases; HTTP adapters live in apps/api.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {

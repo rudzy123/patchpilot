@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import {
+  csrfTokenMatchesDigest,
   CSRF_TOKEN_DIGEST_PREFIX,
   digestCsrfToken,
   digestLoginAccount,
@@ -48,5 +49,15 @@ describe('token digests', () => {
       digestLoginAccount('  owner@synthetic.patchpilot.test  '),
     );
     expect(account).not.toContain('owner@');
+  });
+
+  it('compares presented CSRF tokens to stored digests without accepting the raw value as a digest', () => {
+    const raw = 'RAW_CSRF_TOKEN_VALUE_NOT_A_DIGEST';
+    const stored = digestCsrfToken(raw);
+    expect(csrfTokenMatchesDigest(raw, stored)).toBe(true);
+    expect(csrfTokenMatchesDigest('other-raw-csrf-token-value', stored)).toBe(false);
+    expect(csrfTokenMatchesDigest(undefined, stored)).toBe(false);
+    expect(csrfTokenMatchesDigest('', stored)).toBe(false);
+    expect(csrfTokenMatchesDigest(stored, stored)).toBe(false);
   });
 });

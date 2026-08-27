@@ -2,7 +2,7 @@
   "name": "@patchpilot/api",
   "version": "0.0.0",
   "private": true,
-  "description": "Fastify HTTP API foundation. Health endpoints only in this iteration.",
+  "description": "Fastify HTTP API. Health endpoints and Session 6 authentication routes.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -16,12 +16,14 @@
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
+    "@fastify/cookie": "11.1.2",
     "@fastify/cors": "^11.3.0",
     "@fastify/helmet": "^13.0.2",
     "@patchpilot/auth": "workspace:*",
     "@patchpilot/config": "workspace:*",
     "@patchpilot/contracts": "workspace:*",
     "@patchpilot/database": "workspace:*",
+    "@patchpilot/domain": "workspace:*",
     "@patchpilot/logger": "workspace:*",
     "@patchpilot/observability": "workspace:*",
     "fastify": "^5.6.2",

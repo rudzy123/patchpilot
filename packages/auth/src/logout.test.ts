@@ -16,12 +16,11 @@ describe('logout use case', () => {
   it('revokes the current Session and is publicly idempotent', async () => {
     const user = createUserRecord({});
     const tokenHash = digestSessionToken(RAW_SESSION_TOKEN);
-    const sessions = createMemorySessionRepository([
-      createSessionRecord(user, {
-        tokenHash,
-        csrfTokenHash: digestCsrfToken(RAW_CSRF_TOKEN),
-      }),
-    ]);
+    const session = createSessionRecord(user, {
+      tokenHash,
+      csrfTokenHash: digestCsrfToken(RAW_CSRF_TOKEN),
+    });
+    const sessions = createMemorySessionRepository([session]);
     const logout = createLogoutUseCase({
       sessions,
       clock: createAdjustableClock(),
@@ -33,10 +32,13 @@ describe('logout use case', () => {
     const missing = await logout.execute({ sessionToken: 'unknown-raw-session-token' });
     const empty = await logout.execute({});
 
-    expect(first).toEqual({ ok: true, value: undefined });
-    expect(second).toEqual(first);
-    expect(missing).toEqual(first);
-    expect(empty).toEqual(first);
+    expect(first).toEqual({
+      ok: true,
+      value: { revoked: true, sessionId: session.id, userId: user.id },
+    });
+    expect(second).toEqual({ ok: true, value: { revoked: false } });
+    expect(missing).toEqual(second);
+    expect(empty).toEqual(second);
     const stored = await sessions.findByTokenHash(tokenHash);
     expect(stored?.revokedAt).not.toBeNull();
     expect(stored?.revokeReason).toBe('logout');

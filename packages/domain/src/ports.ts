@@ -250,6 +250,11 @@ export type RotateSessionInput = {
   activeOrganizationId?: string | null;
 };
 
+export type ReplaceCsrfTokenInput = {
+  tokenHash: string;
+  nextCsrfTokenHash: string;
+};
+
 export type RevokeCurrentSessionInput = {
   tokenHash: string;
   revokedAt: Date;
@@ -272,6 +277,7 @@ export type SessionRepository = {
   findByTokenHash(tokenHash: string): Promise<SessionRecord | undefined>;
   updateThrottledLastSeen(input: UpdateThrottledLastSeenInput): Promise<SessionRecord | undefined>;
   rotate(input: RotateSessionInput): Promise<SessionRecord | undefined>;
+  replaceCsrfToken(input: ReplaceCsrfTokenInput): Promise<SessionRecord | undefined>;
   revokeCurrent(input: RevokeCurrentSessionInput): Promise<SessionRecord | undefined>;
   revokeAllForUser(input: RevokeAllSessionsForUserInput): Promise<number>;
   clearActiveOrganization(input: ClearActiveOrganizationInput): Promise<number>;

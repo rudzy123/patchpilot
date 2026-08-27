@@ -27,6 +27,7 @@ import type {
   PageRequest,
   PersistenceUnitOfWork,
   RemediationRepository,
+  ReplaceCsrfTokenInput,
   RepositoryBundle,
   RevokeAllSessionsForUserInput,
   RevokeCurrentSessionInput,
@@ -285,6 +286,20 @@ class PrismaSessionRepository implements SessionRepository {
     }
 
     return this.findByTokenHash(nextTokenHash);
+  }
+
+  public async replaceCsrfToken(input: ReplaceCsrfTokenInput) {
+    const tokenHash = requireSha256(input.tokenHash, 'tokenHash');
+    const nextCsrfTokenHash = requireSha256(input.nextCsrfTokenHash, 'nextCsrfTokenHash');
+    const updated = await this.client.session.updateMany({
+      where: { tokenHash, revokedAt: null },
+      data: { csrfTokenHash: nextCsrfTokenHash },
+    });
+    if (updated.count === 0) {
+      return undefined;
+    }
+
+    return this.findByTokenHash(tokenHash);
   }
 
   public async revokeCurrent(input: RevokeCurrentSessionInput) {

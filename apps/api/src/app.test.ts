@@ -5,7 +5,7 @@ import { createFoundationProductionTestEnv, createFoundationTestEnv } from '@pat
 import { createLogger } from '@patchpilot/logger';
 import { describe, expect, it } from 'vitest';
 
-import { buildApi } from './app.js';
+import { buildTestApi } from './auth-test-harness.js';
 
 function testConfig() {
   return loadServerConfigFrom(createFoundationTestEnv());
@@ -33,12 +33,14 @@ function collectingLogger() {
 describe('api application factory', () => {
   it('starts in memory and reports live without infrastructure', async () => {
     const logs = collectingLogger();
-    const app = await buildApi({
-      config: testConfig(),
-      logger: logs.logger,
-      checkDatabaseReady: async () => ({ ok: false }),
-      now: () => '2026-08-26T16:00:00.000Z',
-    });
+    const app = (
+      await buildTestApi({
+        config: testConfig(),
+        logger: logs.logger,
+        checkDatabaseReady: async () => ({ ok: false }),
+        now: () => '2026-08-26T16:00:00.000Z',
+      })
+    ).app;
 
     const response = await app.inject({ method: 'GET', url: '/health/live' });
     expect(response.statusCode).toBe(200);
@@ -52,12 +54,14 @@ describe('api application factory', () => {
 
   it('reports ready when the database is healthy and not_ready when it is not', async () => {
     const logs = collectingLogger();
-    const readyApp = await buildApi({
-      config: testConfig(),
-      logger: logs.logger,
-      checkDatabaseReady: async () => ({ ok: true }),
-      now: () => '2026-08-26T16:00:00.000Z',
-    });
+    const readyApp = (
+      await buildTestApi({
+        config: testConfig(),
+        logger: logs.logger,
+        checkDatabaseReady: async () => ({ ok: true }),
+        now: () => '2026-08-26T16:00:00.000Z',
+      })
+    ).app;
     const ready = await readyApp.inject({ method: 'GET', url: '/health/ready' });
     expect(ready.statusCode).toBe(200);
     expect(ready.json()).toMatchObject({
@@ -67,12 +71,14 @@ describe('api application factory', () => {
     expect(JSON.stringify(ready.json())).not.toContain('postgresql://');
     await readyApp.close();
 
-    const downApp = await buildApi({
-      config: testConfig(),
-      logger: logs.logger,
-      checkDatabaseReady: async () => ({ ok: false }),
-      now: () => '2026-08-26T16:00:00.000Z',
-    });
+    const downApp = (
+      await buildTestApi({
+        config: testConfig(),
+        logger: logs.logger,
+        checkDatabaseReady: async () => ({ ok: false }),
+        now: () => '2026-08-26T16:00:00.000Z',
+      })
+    ).app;
     const down = await downApp.inject({ method: 'GET', url: '/health/ready' });
     expect(down.statusCode).toBe(503);
     expect(down.json()).toMatchObject({
@@ -84,12 +90,14 @@ describe('api application factory', () => {
 
   it('generates request and correlation ids and replaces unsafe values', async () => {
     const logs = collectingLogger();
-    const app = await buildApi({
-      config: testConfig(),
-      logger: logs.logger,
-      checkDatabaseReady: async () => ({ ok: true }),
-      generateId: () => 'generated-id',
-    });
+    const app = (
+      await buildTestApi({
+        config: testConfig(),
+        logger: logs.logger,
+        checkDatabaseReady: async () => ({ ok: true }),
+        generateId: () => 'generated-id',
+      })
+    ).app;
 
     const generated = await app.inject({ method: 'GET', url: '/health/live' });
     expect(generated.headers['x-request-id']).toBe('generated-id');
@@ -119,12 +127,14 @@ describe('api application factory', () => {
 
   it('returns a stable error envelope without stack traces', async () => {
     const logs = collectingLogger();
-    const app = await buildApi({
-      config: testConfig(),
-      logger: logs.logger,
-      checkDatabaseReady: async () => ({ ok: true }),
-      generateId: () => 'generated-id',
-    });
+    const app = (
+      await buildTestApi({
+        config: testConfig(),
+        logger: logs.logger,
+        checkDatabaseReady: async () => ({ ok: true }),
+        generateId: () => 'generated-id',
+      })
+    ).app;
     const response = await app.inject({ method: 'GET', url: '/missing' });
     expect(response.statusCode).toBe(404);
     const body = response.json() as {
@@ -138,15 +148,17 @@ describe('api application factory', () => {
 
   it('does not log configuration values from internal errors in production', async () => {
     const logs = collectingLogger();
-    const app = await buildApi({
-      config: loadServerConfigFrom(createFoundationProductionTestEnv()),
-      logger: logs.logger,
-      checkDatabaseReady: async () => {
-        throw new Error(
-          "Can't reach database server at postgresql://patchpilot:operator-secret@db.internal:5432/patchpilot",
-        );
-      },
-    });
+    const app = (
+      await buildTestApi({
+        config: loadServerConfigFrom(createFoundationProductionTestEnv()),
+        logger: logs.logger,
+        checkDatabaseReady: async () => {
+          throw new Error(
+            "Can't reach database server at postgresql://patchpilot:operator-secret@db.internal:5432/patchpilot",
+          );
+        },
+      })
+    ).app;
     const response = await app.inject({ method: 'GET', url: '/health/ready' });
     expect(response.statusCode).toBe(500);
     expect(response.json()).toMatchObject({
@@ -163,11 +175,13 @@ describe('api application factory', () => {
 
   it('redacts sensitive headers from logs', async () => {
     const logs = collectingLogger();
-    const app = await buildApi({
-      config: testConfig(),
-      logger: logs.logger,
-      checkDatabaseReady: async () => ({ ok: true }),
-    });
+    const app = (
+      await buildTestApi({
+        config: testConfig(),
+        logger: logs.logger,
+        checkDatabaseReady: async () => ({ ok: true }),
+      })
+    ).app;
     await app.inject({
       method: 'GET',
       url: '/health/live',
@@ -186,11 +200,13 @@ describe('api application factory', () => {
 
   it('rejects disallowed CORS origins', async () => {
     const logs = collectingLogger();
-    const app = await buildApi({
-      config: testConfig(),
-      logger: logs.logger,
-      checkDatabaseReady: async () => ({ ok: true }),
-    });
+    const app = (
+      await buildTestApi({
+        config: testConfig(),
+        logger: logs.logger,
+        checkDatabaseReady: async () => ({ ok: true }),
+      })
+    ).app;
     const response = await app.inject({
       method: 'GET',
       url: '/health/live',
@@ -205,11 +221,13 @@ describe('api application factory', () => {
   it('enforces the request body limit', async () => {
     const logs = collectingLogger();
     const config = testConfig();
-    const app = await buildApi({
-      config,
-      logger: logs.logger,
-      checkDatabaseReady: async () => ({ ok: true }),
-    });
+    const app = (
+      await buildTestApi({
+        config,
+        logger: logs.logger,
+        checkDatabaseReady: async () => ({ ok: true }),
+      })
+    ).app;
     const response = await app.inject({
       method: 'POST',
       url: '/health/live',
@@ -229,11 +247,13 @@ describe('api application factory', () => {
 
   it('keeps trustProxy disabled so X-Forwarded-For cannot select the login key', async () => {
     const logs = collectingLogger();
-    const app = await buildApi({
-      config: testConfig(),
-      logger: logs.logger,
-      checkDatabaseReady: async () => ({ ok: true }),
-    });
+    const app = (
+      await buildTestApi({
+        config: testConfig(),
+        logger: logs.logger,
+        checkDatabaseReady: async () => ({ ok: true }),
+      })
+    ).app;
     app.get('/__peer-ip', async (request) => ({ ip: request.ip }));
     const response = await app.inject({
       method: 'GET',

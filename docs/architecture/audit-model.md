@@ -78,7 +78,7 @@ At minimum, emit events for:
 | `risk_acceptance.created` / `expired` / `revoked` / `superseded` / `review_due` | Acceptance including requester/approver ids |
 | `finding.false_positive` / `finding.mitigated` | Specialized transitions |
 | `priority.override` | Manual override |
-| `auth.login_succeeded` / `auth.login_failed` / `auth.logout` / `auth.session_revoked` / `auth.organization_selected` | Authentication ([ADR 0019](../adr/0019-local-password-sessions.md)); no secrets in payload. Anonymous failures use `actorType=anonymous`. Successful login uses instance-level `user`, not `system`. HTTP routes are not implemented in this batch. |
+| `auth.login_succeeded` / `auth.login_failed` / `auth.logout` / `auth.session_revoked` / `auth.organization_selected` | Authentication ([ADR 0019](../adr/0019-local-password-sessions.md)); no secrets in payload. Anonymous failures use `actorType=anonymous`. Successful login uses instance-level `user`, not `system`. HTTP routes emit `login_succeeded`, `login_failed`, `logout`, and `organization_selected`. |
 | `admin.access` | Instance-operator actions on system integrations |
 | `compensating_control.recorded` | Evidence of a control claim |
 | `export.created` | Exports |

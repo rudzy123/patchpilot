@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 export const SESSION_TOKEN_DIGEST_PREFIX = 'patchpilot-session-v1:';
 export const CSRF_TOKEN_DIGEST_PREFIX = 'patchpilot-csrf-v1:';
@@ -11,6 +11,22 @@ export function digestSessionToken(rawToken: string): string {
 
 export function digestCsrfToken(rawToken: string): string {
   return sha256Hex(`${CSRF_TOKEN_DIGEST_PREFIX}${rawToken}`);
+}
+
+/** Timing-safe compare of a presented synchronizer token to the stored digest. */
+export function csrfTokenMatchesDigest(presented: string | undefined, storedHash: string): boolean {
+  if (presented === undefined || presented.length === 0) {
+    return false;
+  }
+
+  const presentedHash = digestCsrfToken(presented);
+  const left = Buffer.from(presentedHash, 'utf8');
+  const right = Buffer.from(storedHash, 'utf8');
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return timingSafeEqual(left, right);
 }
 
 /** Trim and lowercase so account limiter keys match User email uniqueness. */

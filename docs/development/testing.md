@@ -27,7 +27,8 @@ pnpm infrastructure:down
 - Config validation, including production rejection of development adapters and placeholder credentials.
 - Logger redaction of authorization, cookies, tokens, and env dumps.
 - Health contract shapes (no URLs or credentials).
-- API factory: live/ready, request ids, error envelope, CORS allowlist, body limit, header redaction.
+- API factory: live/ready, request ids, error envelope, CORS allowlist, body limit, header redaction, `trustProxy=false`.
+- Authentication routes (Fastify inject): login/logout/session/organizations/select-organization, cookie attributes, Origin, CSRF, rotation, tenancy, audit redaction, limiter failure.
 - Worker factory: fake Redis/database, idempotent shutdown, init failure.
 - Web landing copy, landmarks, and `/health` contract.
 
@@ -36,7 +37,7 @@ pnpm infrastructure:down
 - PostgreSQL `SELECT 1` readiness through `@patchpilot/database`.
 - Redis `PING` through the worker ioredis adapter.
 - MinIO `/minio/health/live` over HTTP (no MinIO SDK).
-- Session 5: clean and Session 3 upgrade migrations, tenant constraints, repository `organizationId` scoping, append-only audit, outbox checks, seed idempotency, and atomic tenant+audit+outbox transactions.
+- Session 6: authentication persistence (digest-only sessions, audit actors) and API authentication routes against PostgreSQL (valid/invalid auth, cookie attributes, Origin, CSRF, rotation, tenancy, audit redaction, limiter failure). Redis login limiter adapter.
 
 They use the same development placeholder URLs as Compose defaults. Constraint tests create ephemeral `patchpilot_it_*` / `patchpilot_migrate_*` databases and drop them. They do not upload SBOMs or call vulnerability feeds.
 

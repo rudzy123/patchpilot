@@ -9,6 +9,9 @@ export type LogoutInput = {
   sessionToken?: string;
 };
 
+export type LogoutResult =
+  { revoked: false } | { revoked: true; sessionId: string; userId: string };
+
 export type LogoutDependencies = {
   sessions: SessionRepository;
   clock: Clock;
@@ -17,7 +20,7 @@ export type LogoutDependencies = {
 
 export function createLogoutUseCase(dependencies: LogoutDependencies) {
   return {
-    execute(input: LogoutInput): Promise<Result<void>> {
+    execute(input: LogoutInput): Promise<Result<LogoutResult>> {
       return executeLogout(dependencies, input);
     },
   };
@@ -26,7 +29,7 @@ export function createLogoutUseCase(dependencies: LogoutDependencies) {
 async function executeLogout(
   dependencies: LogoutDependencies,
   input: LogoutInput,
-): Promise<Result<void>> {
+): Promise<Result<LogoutResult>> {
   const sessionToken = input.sessionToken;
   if (sessionToken !== undefined && sessionToken.length > 0) {
     const tokenHash = digestSessionToken(sessionToken);
@@ -40,8 +43,9 @@ async function executeLogout(
         { event: 'auth.logout', sessionId: revoked.id, userId: revoked.userId },
         'session revoked',
       );
+      return ok({ revoked: true, sessionId: revoked.id, userId: revoked.userId });
     }
   }
 
-  return ok(undefined);
+  return ok({ revoked: false });
 }

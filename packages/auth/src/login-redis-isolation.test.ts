@@ -57,12 +57,11 @@ describe('authenticated Session and logout Redis isolation', () => {
   it('logs out the current Session while the login limiter is unavailable', async () => {
     const user = createUserRecord({});
     const tokenHash = digestSessionToken(RAW_SESSION_TOKEN);
-    const sessions = createMemorySessionRepository([
-      createSessionRecord(user, {
-        tokenHash,
-        csrfTokenHash: digestCsrfToken(RAW_CSRF_TOKEN),
-      }),
-    ]);
+    const session = createSessionRecord(user, {
+      tokenHash,
+      csrfTokenHash: digestCsrfToken(RAW_CSRF_TOKEN),
+    });
+    const sessions = createMemorySessionRepository([session]);
     const clock = createAdjustableClock();
     const logs = createCollectingLogger();
     const limiter = createFakeLoginRateLimiter({
@@ -78,7 +77,10 @@ describe('authenticated Session and logout Redis isolation', () => {
     });
 
     const result = await logout.execute({ sessionToken: RAW_SESSION_TOKEN });
-    expect(result).toEqual({ ok: true, value: undefined });
+    expect(result).toEqual({
+      ok: true,
+      value: { revoked: true, sessionId: session.id, userId: user.id },
+    });
     expect((await sessions.findByTokenHash(tokenHash))?.revokeReason).toBe('logout');
     expect(limiter.consumeCalls).toEqual([]);
   });
