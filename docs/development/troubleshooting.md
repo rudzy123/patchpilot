@@ -46,7 +46,7 @@ If `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`, placeholder credentials, pret
 
 ## Prisma commands fail
 
-`pnpm db:*` runs in `@patchpilot/database`. `db:migrate`, `db:migrate:deploy`, and `db:reset` need a reachable `DATABASE_URL`. `db:generate` and `db:validate` do not need a live database. The only model is `SchemaFoundation`: technical scaffolding with no product fields and no application references. Prisma 6.19 does not require a model to generate a client; the table is kept so the existing Session 3 migration is not followed by a drop-only migration. Remove or replace it during the database-domain milestone. `db:reset` exits without running when `PATCHPILOT_DEPLOYMENT_ENVIRONMENT` or `NODE_ENV` is `production`. Use `pnpm db:migrate:deploy` in CI; `pnpm db:migrate` is interactive.
+`pnpm db:*` runs in `@patchpilot/database`. `db:migrate`, `db:migrate:deploy`, `db:reset`, and `db:seed` need a reachable `DATABASE_URL`. `db:generate` and `db:validate` do not need a live database. Session 5 defines the tenant schema; `SchemaFoundation` is removed by `20260827120000_tenant_model`. `db:reset` requires loopback host, an allowed `patchpilot` database name, and `PATCHPILOT_ALLOW_DESTRUCTIVE_DATABASE=true`. It is refused when `PATCHPILOT_DEPLOYMENT_ENVIRONMENT` or `NODE_ENV` is `production`. `db:seed` is refused in production. Use `pnpm db:migrate:deploy` in CI; `pnpm db:migrate` is interactive. See [database.md](database.md) and [migrations.md](migrations.md).
 
 ## `pnpm workflows:lint` fails
 

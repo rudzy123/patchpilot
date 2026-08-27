@@ -21,6 +21,7 @@
     "db:migrate": "node scripts/run-database-command.mjs migrate",
     "db:migrate:deploy": "node scripts/run-database-command.mjs migrate:deploy",
     "db:reset": "node scripts/run-database-command.mjs reset",
+    "db:seed": "node scripts/run-database-command.mjs seed",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint . && turbo run lint",
@@ -46,6 +47,7 @@
     "turbo": "^2.8.12",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "@patchpilot/config": "workspace:*"
   }
 }

@@ -17,7 +17,7 @@ Do not treat product, styling, or convenience guidance as permission to bypass d
 
 ## Current repository state
 
-The Session 3 **development foundation** is in place: pnpm workspaces, Turborepo, application shells (`apps/web`, `apps/api`, `apps/worker`), shared packages, Prisma placeholder schema, and local Compose for PostgreSQL, Redis, and MinIO. Session 4 adds GitHub Actions, Dependabot, CODEOWNERS, issue/PR templates, and CI/governance docs. Product functionality is **not** implemented. v0.1 architecture, security design, and operational runbooks exist under `docs/architecture/`, `docs/security/`, and `docs/runbooks/`. ADRs 0001–0018 are **Accepted**. The layout below is the modular monolith. Do not invent a different topology without an accepted ADR.
+The Session 3 **development foundation** and Session 4 CI/governance are in place. Session 5 adds the PostgreSQL tenant schema, repository adapters, migrations, and database integration tests. Product APIs, authentication, live SBOM ingestion, live vulnerability-provider calls, and risk-scoring logic are **not** implemented. v0.1 architecture, security design, and operational runbooks exist under `docs/architecture/`, `docs/security/`, and `docs/runbooks/`. ADRs 0001–0018 are **Accepted**. The layout below is the modular monolith. Do not invent a different topology without an accepted ADR.
 
 ## Target repository layout
 
@@ -29,8 +29,8 @@ apps/
 packages/
   config/                      # typed configuration; only place that may read process.env
   contracts/
-  database/                    # Prisma adapters; SchemaFoundation is technical scaffolding (remove at database-domain milestone)
-  domain/                      # Result/error taxonomy; no product entities
+  database/                    # Prisma adapters, tenant schema, repository implementations
+  domain/                      # Result/error taxonomy; persistence ports; no Prisma types
   integrations/                # Object-storage and Redis ports; MinIO adapter deferred
   logger/
   observability/

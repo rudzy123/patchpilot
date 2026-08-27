@@ -23,7 +23,7 @@ This strategy is for v0.1 architecture. Session 4 wires GitHub Actions for unit 
 | Unit | Domain, policy-engine, redaction, matching adapters with fixtures |
 | Domain state-machine | Finding, ingestion, task, acceptance, job, integration, credential |
 | Property-based | Policy determinism; idempotent replay; org predicate always present |
-| Repository integration | PostgreSQL constraints, org unique keys, no evidence cascade-delete |
+| Repository integration | PostgreSQL constraints, org unique keys, no evidence cascade-delete, Session 5 clean/upgrade migrations, append-only audit, outbox checks, seed isolation |
 | Redis/worker | Lease expiry, retry, DLQ, replay |
 | Object-storage adapter | Org-prefixed keys; private ACL assumptions |
 | Contract | OpenAPI vs handler Zod |

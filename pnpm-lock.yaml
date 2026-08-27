@@ -11,6 +11,9 @@ importers:
       '@eslint/js':
         specifier: ^9.39.1
         version: 9.39.5
+      '@patchpilot/config':
+        specifier: workspace:*
+        version: link:packages/config
       '@patchpilot/eslint-config':
         specifier: workspace:*
         version: link:packages/eslint-config
@@ -244,13 +247,16 @@ importers:
 
   packages/database:
     dependencies:
+      '@patchpilot/config':
+        specifier: workspace:*
+        version: link:../config
+      '@patchpilot/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@prisma/client':
         specifier: ^6.19.0
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
     devDependencies:
-      '@patchpilot/config':
-        specifier: workspace:*
-        version: link:../config
       '@patchpilot/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config

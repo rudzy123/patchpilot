@@ -9,8 +9,8 @@ Passing tests do not make a deployment production-ready. Each job type still nee
 1. Validate at the HTTP or scheduler boundary.
 2. Perform object-storage I/O **outside** a transaction (SBOM put).
 3. Transaction: domain state + **OutboxEvent** + **AuditEvent**.
-4. Relay publishes to BullMQ; marks outbox `publishedAt`.
-5. Worker runs; retries; dead-letters poison.
+4. Relay publishes to BullMQ; marks outbox `processedAt` (status `processed`). Outbox row statuses are `pending`, `claimed`, `processed`, `failed`, `dead_lettered`. Delivery is at-least-once; the schema does not claim exactly-once.
+5. Worker runs; retries; dead-letters poison. **BackgroundJob** statuses remain `pending`, `queued`, `running`, `succeeded`, `failed`, `dead_lettered`, `cancelled`.
 
 If step 3 fails after step 2, an orphan object may exist. A reconcile job lists unreferenced keys in the org prefix and does not delete until retention policy says so.
 
@@ -77,7 +77,7 @@ Replay of the same job twice produces one tenant-visible effect (required test).
 
 ## Queue duplication and races
 
-- Two uploads of different hashes for one asset: both proceed; rescan compare and `lastSuccessfulSbomIngestionId` use the `completed` ingestion whose SBOM `uploadedAt` is greatest, **not** the last worker to finish.
+- Two uploads of different hashes for one asset: both proceed; rescan compare and `lastSuccessfulSbomIngestionId` use the `completed` ingestion whose SBOM `receivedAt` is greatest, **not** the last worker to finish.
 - Two workers correlating the same SBOM: unique constraints prevent duplicate findings; second worker updates observations idempotently.
 - Risk acceptance vs rescan: last completed transaction wins; both leave audit rows.
 - Intel refresh vs ingest: calculations are append-only; last `currentRiskCalculationId` update is a compare-and-set on finding row version if needed.
@@ -93,7 +93,7 @@ Dead-lettered jobs retain payload **ids** only (no raw SBOM). Operators replay a
 | PostgreSQL | Unavailable | API 503, worker lag | Operator restore; do not skip migrations |
 | Redis | Unavailable | Relay lag, publish errors | Outbox remains; drain when Redis returns. PostgreSQL is source of truth |
 | Object storage | Unavailable | Upload 503 | No SBOM row; user retries |
-| OSV/KEV | Outage | Integration `degraded` | Use last snapshot; see [vulnerability intelligence](vulnerability-intelligence.md) |
+| OSV/KEV | Outage | IntelligenceSource `degraded` | Use last snapshot; see [vulnerability intelligence](vulnerability-intelligence.md) |
 
 ## Partial parse
 
@@ -109,7 +109,7 @@ Delivery is **at-least-once**. PatchPilot does **not** claim exactly-once proces
 
 ## Retry
 
-Exponential backoff **with jitter**. Classify retryable vs not (see table above). Circuit-breaking: after consecutive feed failures, system **Integration** → `degraded`; stop hammering; probe on a slow timer.
+Exponential backoff **with jitter**. Classify retryable vs not (see table above). Circuit-breaking: after consecutive feed failures, **IntelligenceSource** → `degraded`; stop hammering; probe on a slow timer.
 
 ## Timeouts and shutdown
 

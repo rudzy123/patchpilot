@@ -1,0 +1,131 @@
+# Database model
+
+This is the Session 5 persistence design for PatchPilot. It implements the v0.1 [domain model](domain-model.md) in PostgreSQL through Prisma in `packages/database`. Product APIs, parsers, and scoring are **not** implemented here.
+
+Opaque IDs are UUIDs (`gen_random_uuid()`). Timestamps are `TIMESTAMPTZ` stored in UTC. Prisma lives only in `packages/database`. Domain ports in `packages/domain` do not import Prisma types.
+
+## Global versus tenant-owned
+
+| Global / shared catalog | Tenant-owned |
+| --- | --- |
+| `vulnerability` | `organization`, `membership`, `team`, `team_membership` |
+| `vulnerability_alias` | `environment`, `asset`, `asset_owner`, `asset_tag` |
+| `vulnerability_source_record` | `repository_connection`, `sbom`, `sbom_ingestion` |
+| Built-in `risk_policy` (`scope = builtin`, `organization_id` null) | `component`, `component_occurrence`, `dependency_relationship` |
+| `integration_provider` | `finding`, `finding_observation`, org `risk_policy` (`scope = organization`) |
+| `intelligence_source` (OSV / CISA KEV sync state) | `risk_calculation`, `remediation_task`, `risk_acceptance` |
+| | `evidence`, tenant `audit_event` |
+| | `integration` (`organization_id` required), `external_credential` |
+| | tenant `outbox_event`, `background_job` (when org set), `idempotency_record` |
+
+`user` is instance-level. Access to tenant data is via `membership`. Listing users is still scoped by membership in a later API session.
+
+A global `vulnerability` may be referenced by findings in many organizations. Tenant queries always include `organization_id` from the authorized organization argument. Repository methods do not trust that argument as authentication; they enforce scope.
+
+## Repository method rules
+
+Tenant-owned ports require `organizationId` as a required argument (`findById(organizationId, id)`). There is no `findById(id)` for tenant aggregates. Global intelligence tables may be read without an organization id.
+
+Adapters always add `WHERE organization_id = $organizationId` (or `id = $organizationId` for the organization row itself). Pagination is keyset by `id`, bounded to 1–100 rows (default 20).
+
+## Compound foreign keys
+
+Related tenant rows must share an organization. Prisma unique `(organization_id, id)` keys on parents enable compound FKs, including:
+
+- Team membership → team and membership in the same org
+- Asset → environment and owning team in the same org
+- Asset owner → asset, optional membership, optional team in the same org
+- Repository connection → asset and optional tenant integration
+- SBOM / ingestion / occurrence / dependency / finding / observation / calculation / task / acceptance / evidence → parents in the same org
+- Ingestion → the same asset as its SBOM
+- Occurrence → the same SBOM as its ingestion and the same asset as that SBOM
+- Finding occurrence pointer → the same asset and component as the occurrence
+- Dependency endpoints → occurrences from the same ingestion
+- Asset `last_successful_sbom_ingestion_id` → an ingestion for that same asset
+- Tenant user actions (assignee, uploader, acceptance actors, evidence submitter, tenant audit actor) → `membership` in the same organization
+
+Built-in risk policies use `scope = builtin` and `organization_id` null. Organization policies use `scope = organization` and a non-null `organization_id`. A check constraint ties those two columns. A trigger rejects a `risk_calculation` whose policy belongs to a different organization. Published policies cannot be deleted; identity and definition cannot change after `published_at` is set. The only allowed published-status change is `published` → `retired`.
+
+OSV and CISA KEV synchronization is `intelligence_source`, not a tenant `integration`. `integration.organization_id` is required. Tenant credentials attach only to an organization-owned `integration`.
+
+## Identifiers, time, and concurrency
+
+- Primary keys are UUID.
+- `created_at` / `updated_at` use `timestamptz(6)`.
+- Append-only tables omit `updated_at`.
+- Mutable aggregate roots store `version` (integer ≥ 1) for later optimistic concurrency. Application compare-and-set is deferred.
+
+## JSON documents
+
+JSON is allowed only where the field is versioned and not the primary query key. Every documented JSON object must include `schemaVersion`.
+
+| Field | Purpose | Versioning |
+| --- | --- | --- |
+| `risk_policy.definition` | Published factor catalog and weights | `schemaVersion`; published rows immutable |
+| `risk_calculation.factors` / `result` | Reproducible factor snapshot and stored priority | `schemaVersion` |
+| `audit_event.payload` | Redacted metadata | `schemaVersion` plus `audit_event.schema_version` |
+| `outbox_event.payload` | Opaque ids and safe metadata | `event_schema_version` and payload `schemaVersion` |
+| `evidence.metadata` | Extensible non-secret metadata | `schemaVersion` |
+| `vulnerability_source_record.normalized` | Immutable normalized source revision | uniqueness includes `normalization_version`; `schemaVersion` in JSON |
+| `finding_observation.evidence` | Safe compare metadata | `schemaVersion` |
+| `integration.config` / `intelligence_source.config` | Non-secret endpoints/intervals | `schemaVersion` |
+| `idempotency_record.response` | Bounded response metadata | `schemaVersion` |
+
+Do not store raw SBOM bytes, provider payloads, tokens, or source code in JSON.
+
+## Deletion
+
+Foreign keys use `ON DELETE RESTRICT`. Evidentiary tables are not cascade-deleted. Organization archive is a status change. v0.1 has no product hard-delete of evidence. Append-only triggers reject `UPDATE`/`DELETE` on `audit_event`, `finding_observation`, `risk_calculation`, `vulnerability_source_record`, and `evidence`.
+
+## SchemaFoundation
+
+Session 3 created a technical `SchemaFoundation` table. Migration `20260827120000_tenant_model` drops it. Later forward-only corrections are `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, and `20260827160000_policy_creator_membership`. Committed `migration.sql` files are authoritative, including SQL extras Prisma cannot express. Duplicate `prisma/sql` extras files are not applied independently and are not kept. The Session 3, Session 5, and committed correction migration files are unchanged.
+
+## Row-Level Security
+
+RLS is **not** enabled. Application predicates and compound FKs are the v0.1 control ([ADR 0013](../adr/0013-organization-scoped-tenancy.md)). RLS remains a future defense-in-depth option.
+
+## Check constraints (SQL extras)
+
+Prisma cannot express every invariant. Those extras are defined only in committed `migration.sql` files. Migrations `20260827120000_tenant_model`, `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, and `20260827160000_policy_creator_membership` add named checks, including:
+
+| Constraint | Invariant |
+| --- | --- |
+| `organization_slug_shape_chk` / `team_slug_shape_chk` / `environment_slug_shape_chk` | Lowercase `^[a-z0-9]+(-[a-z0-9]+)*$` |
+| `sbom_sha256_chk` / evidence and intel SHA checks | 64 lowercase hex characters |
+| `sbom_byte_length_chk` | Positive byte size |
+| `dependency_relationship_not_self_chk` | Source ≠ target occurrence |
+| `risk_policy_scope_ownership_chk` | `builtin` requires null org; `organization` requires a non-null org |
+| `risk_policy_status_timestamps_chk` | Draft/published/retired timestamps stay consistent |
+| `risk_policy_creator_scope_chk` | Built-ins have no membership creator; org policies may |
+| `risk_acceptance_expiration_chk` | `expires_at > starts_at` |
+| `risk_acceptance_approval_chk` / `*_active_approval_chk` / `*_revocation_chk` | Approver/timestamp and revocation fields stay consistent |
+| `outbox_event_attempt_chk` / `*_lease_chk` / `*_processed_ts_chk` | Nonnegative attempts; lease and processed timestamps match status |
+| `evidence_one_target_chk` | Exactly one supported target; `export_snapshot` is the only asset-targeted kind |
+| `asset_owner_target_chk` | Exactly one of `user_id` or `team_id` |
+| `audit_event_actor_scope_chk` | Tenant `user` actors require membership; `system` / `instance_operator` must not |
+| `intelligence_source_provider_chk` | Global sync rows are `osv` or `cisa_kev` only |
+| `*_version_chk` | Optimistic concurrency version ≥ 1 |
+| Archive / completed / failure-code timestamp consistency | Status and timestamps agree |
+
+Partial unique indexes cover active asset names per organization, builtin vs org risk-policy versions, NULL-safe asset-owner identity, non-null SBOM ingestion idempotency keys, one active risk acceptance per finding, outbox/audit replay keys, and available outbox work. Ingestion uniqueness is **not** `(sbom_id, parser_version)`: retries keep history via `attempt_number`, and a newer parser may reprocess the same SBOM.
+
+## Indexes
+
+Every index maps to a documented access or uniqueness need: organization slug; membership by org+user and active memberships; team/environment lookup; assets by org/status/owner/environment/last observation; SBOMs by asset+received time and org+asset+hash; ingestion by state; component identity; occurrences by SBOM and component; dependency traversal; vulnerability OSV/CVE/aliases and source provenance; findings by org/status/asset/vulnerability/assignee/due; observations by finding+time; policies by org+status; calculations by finding+time; tasks by assignee/status/due; expiring acceptances; audit by org+time and target; outbox claim; job lease; idempotency lookup and expiry.
+
+## Append-only enforcement
+
+`BEFORE UPDATE OR DELETE` triggers reject mutation of `audit_event`, `finding_observation`, `risk_calculation`, `vulnerability_source_record`, and `evidence`. Published `risk_policy` rows cannot change identity or definition; they cannot be deleted; they may only move `published` → `retired`. Trigger functions set `search_path = pg_catalog, public` so they do not inherit the caller search path. These controls do not prevent a superuser from rewriting history.
+
+## Limitations
+
+Triggers and revoked DML are not WORM storage. Superusers can still rewrite history. Hash chaining is not implemented; this database does not claim non-repudiation.
+
+Organization `slug` uniqueness does not reserve product route names (`api`, `health`, `login`, and similar). Do not treat the current unique index as URL-routing protection. Reserved slugs stay deferred until URL routing is implemented.
+
+## Related documents
+
+- [Tenant isolation](tenant-isolation.md)
+- [Migrations](../development/migrations.md)
+- [Database development](../development/database.md)

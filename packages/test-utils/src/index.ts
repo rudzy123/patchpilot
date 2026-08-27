@@ -42,6 +42,7 @@ export function createFoundationTestEnv(): Readonly<Record<string, string>> {
     REQUEST_ID_HEADER: 'x-request-id',
     CORRELATION_ID_HEADER: 'x-correlation-id',
     NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'test',
+    PATCHPILOT_ALLOW_DESTRUCTIVE_DATABASE: 'true',
   });
 }
 
@@ -60,6 +61,34 @@ export function createFoundationProductionTestEnv(): Readonly<Record<string, str
     OBJECT_STORAGE_USE_SSL: 'true',
     NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'production',
   });
+}
+
+export function createSyntheticTenantPair(): {
+  organizationA: { slug: string; displayName: string };
+  organizationB: { slug: string; displayName: string };
+  userA: { email: string; displayName: string };
+  userB: { email: string; displayName: string };
+  vulnerabilityIdentity: string;
+} {
+  return {
+    organizationA: {
+      slug: 'synthetic-org-a',
+      displayName: 'Synthetic Organization A',
+    },
+    organizationB: {
+      slug: 'synthetic-org-b',
+      displayName: 'Synthetic Organization B',
+    },
+    userA: {
+      email: 'owner-a@synthetic.patchpilot.test',
+      displayName: 'Synthetic Owner A',
+    },
+    userB: {
+      email: 'owner-b@synthetic.patchpilot.test',
+      displayName: 'Synthetic Owner B',
+    },
+    vulnerabilityIdentity: 'PATCHPILOT-SYNTH-VULN-1',
+  };
 }
 
 export async function getFreePort(): Promise<number> {

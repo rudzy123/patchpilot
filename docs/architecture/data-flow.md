@@ -102,7 +102,7 @@ Asynchronous worker work:
 
 1. Same upload pipeline; new **SBOM** (new hash) for the same asset.
 2. After parse+correlate+enrich+score, the ingestion may become `completed`. For each existing finding on the asset, write a new **FindingObservation** keyed by this `sbomIngestionId`: `present`, `absent`, or `inconclusive` with method.
-3. Finding state updates per [finding lifecycle](finding-lifecycle.md) **only if this ingestion is current** (greatest SBOM `uploadedAt` among `completed`). `resolved` is a **calculated conclusion** requiring evidence from that current ingestion. An older SBOM that finishes later persists observations and must not change finding state.
+3. Finding state updates per [finding lifecycle](finding-lifecycle.md) **only if this ingestion is current** (greatest SBOM `receivedAt` among `completed`). `resolved` is a **calculated conclusion** requiring evidence from that current ingestion. An older SBOM that finishes later persists observations and must not change finding state.
 4. Recalculate priority with a **new** RiskCalculation (`calculationReason: rescan`, `sbomIngestionId` set). Previous calculations remain.
 
 ## 13. Export

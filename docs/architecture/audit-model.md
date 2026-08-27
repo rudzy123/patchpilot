@@ -25,7 +25,7 @@ Application roles cannot "correct" an audit row. Corrections are new events.
 | --- | --- |
 | `id` | UUID (event id) |
 | `organizationId` | Required for tenant operations; null only for system catalog events |
-| `actorUserId` | Null for system jobs; then `actorType = system` |
+| `actorMembershipId` | Required for tenant `user` actors; null for `system` / `instance_operator` |
 | `actorType` | `user`, `system`, `instance_operator` |
 | `action` | Stable dotted name |
 | `subjectType` / `subjectId` | Target type / target id |
@@ -41,7 +41,7 @@ Application roles cannot "correct" an audit row. Corrections are new events.
 
 ## Database-only immutability — limitations
 
-PostgreSQL INSERT-only plus revoked UPDATE/DELETE on the table is the v0.1 control. It is **not** physical WORM storage. Superusers, stolen credentials, backups, and disk snapshots can still alter or copy rows. Operators who need stronger immutability must export audit to an external append-only store (future ADR). See [audit-integrity-failure.md](../runbooks/audit-integrity-failure.md).
+Database-only immutability is implemented with `BEFORE UPDATE OR DELETE` triggers that raise `restrict_violation`. PostgreSQL INSERT-only plus those triggers is the v0.1 control. It is **not** physical WORM storage. Superusers, stolen credentials, backups, and disk snapshots can still alter or copy rows. Hash chaining is **not** implemented; the database does not claim non-repudiation. Operators who need stronger immutability must export audit to an external append-only store (future ADR). See [audit-integrity-failure.md](../runbooks/audit-integrity-failure.md).
 
 Tenant audit queries always include `organizationId` from authorized context. System events are visible to instance operators only, not to org members of unrelated tenants.
 

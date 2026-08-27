@@ -49,6 +49,10 @@ getSbomObjectMeta(organizationId, sbomId)
 
 Adapters translate this to a query that **always** contains `WHERE organization_id = $authorizedOrg` from **AuthorizedContext**, never from `query.organizationId` or the request body.
 
+Session 5 persists this at the database layer: every tenant-owned Prisma repository method takes `organizationId` as a required argument. Compound foreign keys reject cross-organization parent/child pairs. Authentication and membership authorization remain application-layer work; persistence still does not treat a caller-supplied id as proof of membership.
+
+Physical schema, constraints, and indexes: [database-model.md](database-model.md).
+
 Forbidden patterns:
 
 - `findById(id)` then check org in the caller "if you remember"
@@ -63,10 +67,10 @@ Idempotency keys and upload hashes are unique per **organization** (and asset wh
 | --- | --- |
 | **Vulnerability** | **Organization**, **Membership**, **Team** |
 | **VulnerabilitySourceRecord** | **User** is instance-level; access to org data is via membership |
-| Built-in **RiskPolicy** | Org **RiskPolicy** overrides |
+| Built-in **RiskPolicy** (`scope = builtin`) | Org **RiskPolicy** (`scope = organization`) |
 | CISA KEV snapshots (as source records) | **Asset**, **AssetOwner**, **Environment** |
-| System **Integration** for OSV/KEV | **SBOM**, **SBOMIngestion**, **Component**, **ComponentOccurrence**, **DependencyRelationship** |
-| | **Finding**, **FindingObservation**, **RiskCalculation** |
+| **IntegrationProvider** | **SBOM**, **SBOMIngestion**, **Component**, **ComponentOccurrence**, **DependencyRelationship** |
+| **IntelligenceSource** for OSV/KEV sync | **Finding**, **FindingObservation**, **RiskCalculation** |
 | | **RemediationTask**, **RiskAcceptance**, **Evidence** |
 | | Tenant **AuditEvent** |
 | | Tenant **Integration** / **ExternalCredential** (unused for GitHub in v0.1) |

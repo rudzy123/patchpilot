@@ -133,7 +133,7 @@ When `risk_accepted` and evidence supports `resolved`, the finding becomes `reso
 
 Each **completed** SBOM ingestion for the asset produces an observation per existing finding (keyed by `sbomIngestionId`) and creates findings for new present matches.
 
-**Current ingestion:** among ingestions in state `completed` for the asset, the one whose SBOM `uploadedAt` is greatest (tie-break ingestion `createdAt`, then ingestion `id`). Completing an **older** upload still persists that ingestion's graph and observations; it must **not** update `lastSuccessfulSbomIngestionId`, `lastObservedAt`, or finding state. "Latest completed" never means last worker to finish.
+**Current ingestion:** among ingestions in state `completed` for the asset, the one whose SBOM `receivedAt` is greatest (tie-break ingestion `createdAt`, then ingestion `id`). Completing an **older** upload still persists that ingestion's graph and observations; it must **not** update `lastSuccessfulSbomIngestionId`, `lastObservedAt`, or finding state. "Latest completed" never means last worker to finish.
 
 | `result` | Meaning |
 | --- | --- |

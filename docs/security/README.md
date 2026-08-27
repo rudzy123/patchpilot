@@ -13,7 +13,8 @@ PatchPilot can support an organization's vulnerability-management process. These
 | [Risk register](risk-register.md) | Prioritized architecture and security risks |
 | [CI security](ci-security.md) | GitHub Actions threat model and controls |
 | [Dependency security](dependency-security.md) | Lockfile, Dependabot, and Dependency Review |
-| [Secret scanning](secret-scanning.md) | GitHub secret scanning and local options |
+| [Data access](data-access.md) | Organization scoping at the persistence boundary |
+| [Database security](database-security.md) | PostgreSQL controls, secrets, and migration safety |
 
 Operational failure plans: [docs/runbooks/](../runbooks/README.md).
 

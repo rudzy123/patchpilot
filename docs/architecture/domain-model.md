@@ -34,6 +34,8 @@ erDiagram
   Finding ||--o{ RiskAcceptance : may_have
   Organization ||--o{ Evidence : owns
   Organization ||--o{ AuditEvent : records
+  IntegrationProvider ||--o{ Integration : catalogs
+  IntegrationProvider ||--o| IntelligenceSource : syncs_as
   Organization ||--o{ Integration : may_own
   Integration ||--o{ ExternalCredential : uses
   Organization ||--o{ OutboxEvent : enqueues
@@ -83,9 +85,11 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | RemediationTask | | yes | | | until terminal | | yes | Completion ≠ resolved |
 | RiskAcceptance | | yes | yes | yes | state only | amendments = new row | yes | Expiration required |
 | Evidence | | yes | yes | yes | no | yes | yes | |
-| AuditEvent | system or T | tenant when org set | yes | yes | **no** | yes | keep in v0.1 | |
-| Integration | system or T | tenant when org set | yes | | yes | | | |
-| ExternalCredential | | yes | yes | | state | versions | yes | Ciphertext Restricted |
+| AuditEvent | system or T | tenant when org set | yes | yes | **no** | yes | keep in v0.1 | Tenant `user` actors are memberships |
+| IntegrationProvider | yes | | | | | | | Global provider catalog |
+| IntelligenceSource | yes | | yes | | yes | | | OSV/KEV system sync state |
+| Integration | | yes | yes | | yes | | | Organization-owned installation; `organizationId` required |
+| ExternalCredential | | yes | yes | | state | versions | yes | Ciphertext Restricted; attaches only to Integration |
 | OutboxEvent | system or T | tenant when org set | | | publishedAt | | | Tenant work requires `organizationId`; system intel refresh may be null |
 | BackgroundJob | system or T | tenant when org set | | | state | | | Same split as outbox |
 
@@ -95,7 +99,7 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | --- | --- |
 | **Component** vs **ComponentOccurrence** | Versionless package identity vs this package **version** listed in **this ingestion** |
 | **Vulnerability** vs **Finding** | Shared intel vs tenant+asset observation of it |
-| **VulnerabilitySourceRecord** vs **Vulnerability** | One retrieved payload vs normalized identity |
+| **VulnerabilitySourceRecord** vs **Vulnerability** | Immutable normalized source revision vs identity projection. Repeated retrieval of unchanged bytes is not a new revision; a newer `normalizationVersion` may create one. |
 | Vulnerability **severity** vs **priority** | Source fact vs calculated ranking |
 | **Finding** vs **FindingObservation** | Stable identity vs per-ingestion presence/absence/inconclusive (a **calculated** compare result) |
 | **SBOM** vs **SBOMIngestion** | Immutable original document vs one processing attempt (parser version, graph, observations) |
@@ -113,7 +117,7 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | RemediationTask | `open`, `assigned`, `in_progress`, `blocked`, `completed`, `cancelled` | [remediation-lifecycle.md](remediation-lifecycle.md) |
 | RiskAcceptance | `active`, `expired`, `revoked`, `superseded` | [remediation-lifecycle.md](remediation-lifecycle.md) |
 | BackgroundJob | `pending`, `queued`, `running`, `succeeded`, `failed`, `dead_lettered`, `cancelled` | [reliability-model.md](reliability-model.md) |
-| Integration | `disabled`, `enabled`, `degraded` | this document |
+| Integration | `disabled`, `enabled`, `degraded` | this document (also **IntelligenceSource**) |
 | ExternalCredential | `pending`, `active`, `rotating`, `expired`, `revoked`, `failed_validation` | this document |
 
 SBOM (the evidence document) has no workflow state of its own; processing state lives on **SBOMIngestion**.
@@ -127,11 +131,15 @@ The **tenant** boundary. Prefer this word in APIs and schema (`organizationId`).
 | Field (logical) | Notes |
 | --- | --- |
 | `id` | UUID |
+| `slug` | Globally unique, lowercase `[a-z0-9]+(-[a-z0-9]+)*`, length 2–64. Uniqueness of the stored value does not fully solve Unicode homoglyphs. Reserved product-route slugs are **not** enforced yet; document and implement them before URL routing. |
 | `name` | Display name |
 | `createdAt` | UTC |
-| `status` | `active` or `archived` (organization archive is an operator/owner action; not a user-resource lifecycle in the required set) |
+| `updatedAt` | UTC |
+| `status` | `active` or `archived` (organization archive is an operator/owner action; not a user-resource lifecycle in the required set). There is no `suspended` state. |
+| `archivedAt` | Required when archived; null when active |
+| `version` | Optimistic concurrency counter |
 
-Owns: memberships, teams, assets, environments, SBOMs, components, findings, evidence, credentials, audit events, org-scoped integrations, outbox events.
+Owns: memberships, teams, assets, environments, SBOMs, components, findings, evidence, credentials, audit events, org-owned integrations, outbox events. Built-in risk policies and intelligence sources are not organization-owned.
 
 ## User
 
@@ -140,10 +148,13 @@ A person who can authenticate to the instance.
 | Field (logical) | Notes |
 | --- | --- |
 | `id` | UUID |
-| `email` | Unique at instance level for local accounts (interim [OD-1](open-decisions.md)) |
-| `passwordCredential` | Hash only; never log |
+| `email` | Unique at instance level for local accounts (interim [OD-1](open-decisions.md)). Stored lowercase. Uniqueness does not fully canonicalize plus-addressing or Unicode lookalikes. |
+| `displayName` | Untrusted text |
+| `status` | `active` or `disabled` |
 | `createdAt` | UTC |
-| `disabledAt` | Optional UTC |
+| `disabledAt` | Required when disabled |
+
+Password hashes are **not** persisted in Session 5. OD-1 remains open; this session does not add authentication secrets.
 
 A user without membership cannot access tenant-owned data. Instance operator bootstrap is separate ([OD-10](open-decisions.md)).
 
@@ -173,7 +184,7 @@ Optional grouping of users inside an organization ([OD-11](open-decisions.md)).
 | `name` | |
 | `createdAt` | UTC |
 
-Team membership can be modeled as a join table in persistence without a separately named domain aggregate. Teams do not bypass organization scope.
+Team membership is a persistence join table (`TeamMembership`) that is organization-consistent: a user must have a `Membership` in the same organization as the team (compound foreign key). Teams do not bypass organization scope.
 
 ## Asset
 
@@ -185,7 +196,7 @@ Lifecycle: `active` ↔ `archived`. Creation enters `active`. No hard delete in 
 | --- | --- |
 | `id` | UUID |
 | `organizationId` | Tenant scope |
-| `name` | Required |
+| `name` | Required. Unique per organization among `active` assets (`organization_id` + lower(name)). Archived names may be reused after archive. |
 | `description` | Optional untrusted text |
 | `assetType` | Controlled vocabulary |
 | `environmentId` | Optional FK |
@@ -197,8 +208,8 @@ Lifecycle: `active` ↔ `archived`. Creation enters `active`. No hard delete in 
 | `deploymentContext` | Optional untrusted text |
 | `externalIdentifiers` | Optional map of vendor keys |
 | `tags` | Optional short labels; length-capped |
-| `lastObservedAt` | UTC `uploadedAt` of the **current** completed ingestion (see below), not the wall-clock of whichever worker finished last |
-| `lastSuccessfulSbomIngestionId` | FK to the **current** completed ingestion: among `completed` ingestions for this asset, the one whose SBOM `uploadedAt` is greatest (tie-break `SBOMIngestion.createdAt`, then `SBOMIngestion.id`). A late-finishing **older** upload must not overwrite this pointer. |
+| `lastObservedAt` | UTC `receivedAt` of the **current** completed ingestion (see below), not the wall-clock of whichever worker finished last |
+| `lastSuccessfulSbomIngestionId` | FK to the **current** completed ingestion: among `completed` ingestions for this asset, the one whose SBOM `receivedAt` is greatest (tie-break `SBOMIngestion.createdAt`, then `SBOMIngestion.id`). A late-finishing **older** upload must not overwrite this pointer. |
 
 Context changes (environment, criticality, exposure, classification) emit audit events and enqueue **RiskCalculation** with `calculationReason: asset_change`. History is not erased.
 
@@ -258,8 +269,10 @@ The original document as **evidence**, plus identifiers needed to retrieve it.
 | `byteLength` | |
 | `cycloneDxSpecVersion` | Allowlisted value recorded after validation |
 | `objectKey` | Storage key including organization and digest |
-| `uploadedByUserId` | |
-| `uploadedAt` | UTC |
+| `uploadedByMembershipId` | Optional historical membership of the uploader |
+| `receivedAt` | Server UTC when PatchPilot accepted the object. Canonical current-ingestion clock. |
+| `capturedAt` | Optional producer-supplied generation time. Not used to choose current ingestion. |
+| `createdAt` | Database row creation time. |
 | `parserVersionLastSucceeded` | Optional; from last completed ingestion |
 
 Original bytes live in object storage, not as a substitute parsed graph. The parsed graph is derived data.
@@ -279,7 +292,7 @@ Lifecycle states and transitions: [sbom-ingestion.md](sbom-ingestion.md).
 | `state` | Canonical ingestion state |
 | `stage` | Fine-grained step: `validate`, `parse`, `persist_graph`, `correlate`, `enrich`, `score` |
 | `parserVersion` | Parser that ran or will run |
-| `idempotencyKey` | Organization-scoped |
+| `idempotencyKey` | Organization-scoped. Unique when non-null. Null keys allow historical retries. |
 | `errorCode` | Stable taxonomy; no raw payload |
 | `quarantineReason` | If `quarantined` |
 
@@ -347,7 +360,7 @@ This row is a projection for correlation. Authoritative provenance lives on **Vu
 
 ## VulnerabilitySourceRecord
 
-One retrieved payload from one source about one vulnerability identity. Updates are **versioned or additive**. Never silently overwrite.
+An **immutable normalized source revision**, not a retrieval log. Uniqueness is `(source, sourceIdentity, payloadSha256, normalizationVersion)`. The same source bytes may be normalized again by a newer normalizer. Repeated retrieval of unchanged content does not need another revision. A future retrieval-event model can record fetch attempts separately.
 
 | Field (logical) | Notes |
 | --- | --- |
@@ -355,10 +368,11 @@ One retrieved payload from one source about one vulnerability identity. Updates 
 | `vulnerabilityId` | |
 | `source` | `osv` or `cisa_kev` (KEV may attach as enrichment records keyed by CVE) |
 | `sourceIdentity` | Provider document id |
-| `retrievedAt` | UTC |
+| `retrievedAt` | UTC of the snapshot that was normalized |
 | `payloadSha256` | Hash of stored raw snapshot |
+| `normalizationVersion` | PatchPilot normalizer identifier; part of uniqueness |
 | `normalized` | Validated extracted fields |
-| `supersedesRecordId` | Optional previous record |
+| `supersedesRecordId` | Previous revision for the **same** vulnerability, source, and source identity |
 
 Conflicting sources: retain both. A versioned policy may choose display precedence; it does not delete the loser.
 
@@ -386,23 +400,26 @@ Per-**SBOMIngestion** compare result for whether the finding's **versionless** c
 | `method` | For example `exact_purl`, `ecosystem_name_version`, `version_out_of_affected_range`, `missing_identity`, `incomplete_sbom_coverage` |
 | `observedAt` | UTC |
 
-`resolved` on the finding is a conclusion over the **current** ingestion's observation (latest `uploadedAt` among `completed` ingestions), not a ticket field and not whichever ingestion finished last.
+`resolved` on the finding is a conclusion over the **current** ingestion's observation (latest SBOM `receivedAt` among `completed` ingestions), not a ticket field and not whichever ingestion finished last.
 
 ## RiskPolicy
 
-Versioned rules that turn **observed facts** into **priority**. Built-in policies are global. Organization overrides are tenant-owned copies with their own versions.
+Versioned rules that turn **observed facts** into **priority**. Shared table. `scope` is `builtin` or `organization`. Built-ins keep `organizationId` null. Organization policies require `organizationId`. Repository methods for built-ins and tenant policies are separate.
 
 | Field (logical) | Notes |
 | --- | --- |
 | `id` | UUID |
-| `organizationId` | Null for built-in |
+| `scope` | `builtin` or `organization` |
+| `organizationId` | Null iff `scope = builtin` |
 | `policyKey` | Stable name |
 | `version` | Monotonic per key |
+| `status` | `draft`, `published`, `retired` |
 | `definition` | Weights and factor catalog (JSON, validated) |
-| `publishedAt` | UTC |
-| `supersededAt` | Optional UTC |
+| `publishedAt` | Required when published or retired |
+| `retiredAt` | Required when retired; null otherwise |
+| `createdByMembershipId` | Optional. Organization policies only. Historical membership; revocation does not clear it. Null for built-ins. |
 
-Published definitions are immutable. Edits publish a new version. Historical **RiskCalculation** rows keep the old version. See [risk-policy.md](risk-policy.md).
+Published definitions are immutable: identity (`policyKey`, `version`, `scope`, `organizationId`), `publishedAt`, and `definition` cannot change. Deletion of a published policy is rejected. The only allowed published-status change is `published` → `retired`. Organization-policy `createdByMembershipId` is optional and must belong to that organization, including after revocation. Built-in policies have no membership creator. Edits that need a new definition publish a new version. Historical **RiskCalculation** rows keep the old version. See [risk-policy.md](risk-policy.md).
 
 ## RiskCalculation
 
@@ -453,7 +470,8 @@ Tenant-owned artifact or structured claim needed to explain a finding later.
 | `id` | UUID |
 | `organizationId` | |
 | `kind` | `sbom_object`, `kev_match`, `intel_record`, `policy_snapshot`, `compensating_control`, `export_snapshot` |
-| `subjectType` / `subjectId` | Finding, SBOM, asset, or export |
+| `findingId` / `sbomId` / `assetId` | Exactly one target. `assetId` is allowed only for `export_snapshot`. |
+| `submittedByMembershipId` | Optional historical membership of the submitter |
 | `objectKey` | If stored bytes |
 | `metadata` | Non-secret structured fields |
 | `createdAt` | UTC |
@@ -462,17 +480,26 @@ Tenant-owned artifact or structured claim needed to explain a finding later.
 
 Append-only security- or remediation-sensitive record. Never updated or deleted in place. See [audit-model.md](audit-model.md).
 
-System-level events (shared catalog import) may use a null `organizationId`. Tenant events always have `organizationId`.
+System-level events (shared catalog import) may use a null `organizationId` and `actorType` `system` or `instance_operator` with no membership. Tenant `user` events require `organizationId` and `actorMembershipId`.
+
+## IntegrationProvider
+
+Global catalog row for a named provider (`osv`, `cisa_kev`, `reserved`). Not tenant-owned.
+
+## IntelligenceSource
+
+System synchronization state for OSV and CISA KEV. Not a tenant installation. `providerKey` is `osv` or `cisa_kev`. Pagination cursors and last-sync timestamps live here, not on **Integration**.
 
 ## Integration
 
-Provider-neutral connection record ([ADR 0015](../adr/0015-provider-neutral-integrations.md)).
+Organization-owned installation of an **IntegrationProvider** ([ADR 0015](../adr/0015-provider-neutral-integrations.md)). `organizationId` is required.
 
 | Field (logical) | Notes |
 | --- | --- |
 | `id` | UUID |
-| `organizationId` | Null for **system** OSV/KEV; set for future tenant providers |
-| `providerKey` | `osv`, `cisa_kev`, reserved others |
+| `organizationId` | Required |
+| `providerId` | FK to **IntegrationProvider** |
+| `displayName` | Operator-visible label |
 | `state` | `disabled`, `enabled`, `degraded` |
 | `config` | Non-secret: endpoints from allowlist, refresh interval |
 
@@ -487,13 +514,13 @@ Provider-neutral connection record ([ADR 0015](../adr/0015-provider-neutral-inte
 | `degraded` | `enabled` | Health recovered |
 | `degraded` | `disabled` | Operator disables |
 
-v0.1 runtime integrations are **system** OSV and CISA KEV only. Tenant GitHub integrations are not enabled.
+v0.1 runtime feed synchronization uses **IntelligenceSource** for OSV and CISA KEV. Tenant GitHub integrations are not enabled. A tenant **Integration** may exist for the reserved provider catalog entry; it is not used for GitHub in v0.1.
 
 ## ExternalCredential
 
-Tenant-owned secret material for an integration. Encrypted at rest. Decrypt only inside the integration adapter.
+Tenant-owned secret material for an organization-owned **Integration**. Encrypted at rest. Decrypt only inside the integration adapter.
 
-v0.1 may have **no** tenant credentials if only public OSV and KEV are used. The entity still exists so later providers do not invent a second model. System feed fetches must not use tenant tokens.
+v0.1 may have **no** tenant credentials if only public OSV and KEV are used. The entity still exists so later providers do not invent a second model. System feed fetches must not use tenant tokens. Credentials cannot attach to **IntelligenceSource**.
 
 ### External credential transitions
 
@@ -529,7 +556,7 @@ Transactional outbox row for durable work ([ADR 0007](../adr/0007-transactional-
 | `createdAt` | UTC |
 | `publishedAt` | Optional UTC |
 
-Written in the same transaction as the state change. No network I/O in that transaction.
+Written in the same transaction as the state change. No network I/O in that transaction. Status values: `pending`, `claimed`, `processed`, `failed`, `dead_lettered`. `processedAt` is the ADR `publishedAt` equivalent. Delivery is at-least-once; the schema does not claim exactly-once.
 
 ## BackgroundJob
 

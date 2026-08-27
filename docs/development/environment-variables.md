@@ -19,6 +19,7 @@ Copy [`.env.example`](../../.env.example) to `.env`. Example values are **develo
 | `WEB_PORT` | Documented Next.js port. Local default `3000`. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated exact origin allowlist. `*` is rejected. |
 | `DATABASE_URL` | PostgreSQL URL. Never logged. |
+| `PATCHPILOT_ALLOW_DESTRUCTIVE_DATABASE` | Must be `true` for `pnpm db:reset` and ephemeral integration-test databases. Never set in production. `NODE_ENV` alone is not a safety grant. |
 | `REDIS_URL` | Redis URL. Never logged. |
 | `OBJECT_STORAGE_ENDPOINT` | S3-compatible endpoint (local MinIO). |
 | `OBJECT_STORAGE_ACCESS_KEY` | Object-storage access key. |
