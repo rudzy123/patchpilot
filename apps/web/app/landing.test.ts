@@ -30,9 +30,14 @@ describe('web landing page', () => {
     const layout = readAppFile('layout.tsx');
 
     expect(layout).toContain('lang="en"');
+    expect(layout).toContain('AppProviders');
+    expect(layout).toContain('loadPublicConfig');
+    expect(layout).toContain('apiBaseUrl');
     expect(landing).toContain('<main>');
     expect(landing).toContain('<h1>{publicConfig.appName}</h1>');
     expect(landing.match(/<h1/g)?.length).toBe(1);
+    expect(landing).toContain('href="/login"');
+    expect(landing).toContain('Sign in');
     expect(landing).toContain('href="/health"');
     expect(landing).toContain('Service health');
     expect(landing).not.toContain('click here');

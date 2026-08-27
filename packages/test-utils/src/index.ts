@@ -42,6 +42,7 @@ export function createFoundationTestEnv(): Readonly<Record<string, string>> {
     REQUEST_ID_HEADER: 'x-request-id',
     CORRELATION_ID_HEADER: 'x-correlation-id',
     NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'test',
+    NEXT_PUBLIC_API_BASE_URL: 'http://127.0.0.1:3001',
     PATCHPILOT_ALLOW_DESTRUCTIVE_DATABASE: 'true',
     ...foundationAuthEnv('test'),
   });
@@ -62,6 +63,7 @@ export function createFoundationProductionTestEnv(): Readonly<Record<string, str
     OBJECT_STORAGE_BUCKET: 'patchpilot',
     OBJECT_STORAGE_USE_SSL: 'true',
     NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'production',
+    NEXT_PUBLIC_API_BASE_URL: 'https://api.patchpilot.example',
     ...foundationAuthEnv('production'),
   });
 }

@@ -1,0 +1,187 @@
+import {
+  errorEnvelopeSchema,
+  organizationsResponseSchema,
+  sessionResponseSchema,
+  type OrganizationsResponse,
+  type SessionResponse,
+} from '@patchpilot/contracts';
+
+/** Synchronizer token header. Must match `AUTH_CSRF_HEADER_NAME` / ADR 0019. */
+export const CSRF_HEADER_NAME = 'x-csrf-token';
+
+export const GENERIC_LOGIN_FAILURE = 'Invalid email or password.';
+export const GENERIC_UNAVAILABLE = 'Sign in is temporarily unavailable.';
+export const GENERIC_SESSION_EXPIRED = 'Your session has expired. Sign in again.';
+export const GENERIC_ACCESS_DENIED = 'You do not have access to that resource.';
+
+export type AuthRequestError = {
+  status: number;
+  code: string;
+  message: string;
+};
+
+export function createAuthApi(apiBaseUrl: string) {
+  const baseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+
+  return {
+    login(input: { email: string; password: string }): Promise<SessionResponse> {
+      return sendJson<SessionResponse>({
+        baseUrl,
+        path: '/auth/login',
+        method: 'POST',
+        body: input,
+        parse: (value) => sessionResponseSchema.parse(value),
+        unauthorizedMessage: GENERIC_LOGIN_FAILURE,
+      });
+    },
+
+    readSession(): Promise<SessionResponse> {
+      return sendJson<SessionResponse>({
+        baseUrl,
+        path: '/auth/session',
+        method: 'GET',
+        parse: (value) => sessionResponseSchema.parse(value),
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+      });
+    },
+
+    listOrganizations(): Promise<OrganizationsResponse> {
+      return sendJson<OrganizationsResponse>({
+        baseUrl,
+        path: '/auth/organizations',
+        method: 'GET',
+        parse: (value) => organizationsResponseSchema.parse(value),
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+      });
+    },
+
+    selectOrganization(organizationId: string, csrfToken: string): Promise<SessionResponse> {
+      return sendJson<SessionResponse>({
+        baseUrl,
+        path: '/auth/select-organization',
+        method: 'POST',
+        body: { organizationId },
+        csrfToken,
+        parse: (value) => sessionResponseSchema.parse(value),
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+      });
+    },
+
+    logout(csrfToken: string | null): Promise<void> {
+      return sendJson<void>({
+        baseUrl,
+        path: '/auth/logout',
+        method: 'POST',
+        body: {},
+        ...(csrfToken === null ? {} : { csrfToken }),
+        parse: () => undefined,
+        acceptNoContent: true,
+      });
+    },
+  };
+}
+
+export type AuthApi = ReturnType<typeof createAuthApi>;
+
+async function sendJson<T>(input: {
+  baseUrl: string;
+  path: string;
+  method: 'GET' | 'POST';
+  body?: unknown;
+  csrfToken?: string;
+  parse: (value: unknown) => T;
+  acceptNoContent?: boolean;
+  unauthorizedMessage?: string;
+}): Promise<T> {
+  const headers = new Headers();
+  if (input.body !== undefined) {
+    headers.set('content-type', 'application/json');
+  }
+  if (input.csrfToken !== undefined && input.csrfToken.length > 0) {
+    headers.set(CSRF_HEADER_NAME, input.csrfToken);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${input.baseUrl}${input.path}`, {
+      method: input.method,
+      credentials: 'include',
+      cache: 'no-store',
+      headers,
+      ...(input.body === undefined ? {} : { body: JSON.stringify(input.body) }),
+    });
+  } catch {
+    throw createAuthRequestError(0, 'internal', GENERIC_UNAVAILABLE);
+  }
+
+  if (input.acceptNoContent === true && response.status === 204) {
+    return input.parse(undefined);
+  }
+
+  const payload: unknown = await readJson(response);
+  if (!response.ok) {
+    throw mapErrorEnvelope(payload, response.status, input.unauthorizedMessage);
+  }
+
+  return input.parse(payload);
+}
+
+async function readJson(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (text.length === 0) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function mapErrorEnvelope(
+  payload: unknown,
+  status: number,
+  unauthorizedMessage: string | undefined,
+): AuthRequestError {
+  const parsed = errorEnvelopeSchema.safeParse(payload);
+  if (!parsed.success) {
+    return createAuthRequestError(
+      status,
+      status === 401 ? 'unauthorized' : 'internal',
+      status === 401 ? (unauthorizedMessage ?? GENERIC_SESSION_EXPIRED) : GENERIC_UNAVAILABLE,
+    );
+  }
+
+  if (parsed.data.error.code === 'unauthorized') {
+    return createAuthRequestError(
+      status,
+      'unauthorized',
+      unauthorizedMessage ?? parsed.data.error.message,
+    );
+  }
+
+  if (parsed.data.error.code === 'forbidden') {
+    return createAuthRequestError(status, 'forbidden', GENERIC_ACCESS_DENIED);
+  }
+
+  if (parsed.data.error.code === 'rate_limited' || parsed.data.error.code === 'internal') {
+    return createAuthRequestError(status, parsed.data.error.code, parsed.data.error.message);
+  }
+
+  return createAuthRequestError(status, parsed.data.error.code, parsed.data.error.message);
+}
+
+function createAuthRequestError(status: number, code: string, message: string): AuthRequestError {
+  return { status, code, message };
+}
+
+export function isAuthRequestError(error: unknown): error is AuthRequestError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    'code' in error &&
+    'message' in error
+  );
+}

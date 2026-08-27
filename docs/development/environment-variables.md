@@ -36,7 +36,7 @@ Copy [`.env.example`](../../.env.example) to `.env`. Example values are **develo
 
 ## Authentication ([ADR 0019](../adr/0019-local-password-sessions.md))
 
-Required. There is **no** dummy password-hash environment variable. Login, hashing, and session runtime are not implemented in Batch 1; these variables are validated at process start so later batches cannot boot with unsafe defaults.
+Required. There is **no** dummy password-hash environment variable. These variables are validated at process start so the API cannot boot with unsafe auth defaults.
 
 | Variable | Purpose |
 | --- | --- |
@@ -62,6 +62,7 @@ Required. There is **no** dummy password-hash environment variable. Login, hashi
 | Variable | Purpose |
 | --- | --- |
 | `NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT` | Required public environment label (`development`, `test`, or `production`). `loadPublicConfigFrom` does not default it. Web `dev`/`build` scripts supply `development`/`production` only when the variable is unset, so a clean checkout can still build. |
+| `NEXT_PUBLIC_API_BASE_URL` | Browser-visible API origin used by the web app for `fetch` to `apps/api` (`credentials: include`). No username, password, query, or fragment. Production must be `https`. Trailing slashes are stripped. Do not put CSRF tokens or session identifiers in this value. |
 
 Do not add `DATABASE_URL`, Redis URLs, object-storage secrets, or API tokens to `NEXT_PUBLIC_*` files.
 

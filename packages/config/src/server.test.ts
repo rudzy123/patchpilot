@@ -242,6 +242,7 @@ describe('loadPublicConfigFrom', () => {
   it('does not expose server secrets', () => {
     const publicConfig = loadPublicConfigFrom({
       NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'development',
+      NEXT_PUBLIC_API_BASE_URL: 'http://127.0.0.1:3001',
       DATABASE_URL: 'postgresql://should-not-appear',
     });
 
@@ -254,13 +255,34 @@ describe('loadPublicConfigFrom', () => {
     expect(() => loadPublicConfigFrom({})).toThrow(/Public configuration is invalid/);
   });
 
+  it('rejects credentialed or production-http API base URLs', () => {
+    expect(() =>
+      loadPublicConfigFrom({
+        NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'development',
+        NEXT_PUBLIC_API_BASE_URL: 'http://user:secret@127.0.0.1:3001',
+      }),
+    ).toThrow(/must not include credentials/);
+    expect(() =>
+      loadPublicConfigFrom({
+        NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'production',
+        NEXT_PUBLIC_API_BASE_URL: 'http://127.0.0.1:3001',
+      }),
+    ).toThrow(/must use https/);
+  });
+
   it('does not pass the process environment object through as public config input', () => {
     const publicConfig = loadPublicConfigFrom({
       NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'test',
+      NEXT_PUBLIC_API_BASE_URL: 'http://127.0.0.1:3001',
       DATABASE_URL: 'postgresql://should-not-appear',
       OBJECT_STORAGE_SECRET_KEY: 'should-not-appear',
     });
 
-    expect(Object.keys(publicConfig).sort()).toEqual(['appName', 'deploymentEnvironment']);
+    expect(Object.keys(publicConfig).sort()).toEqual([
+      'apiBaseUrl',
+      'appName',
+      'deploymentEnvironment',
+    ]);
+    expect(publicConfig.apiBaseUrl).toBe('http://127.0.0.1:3001');
   });
 });

@@ -1,6 +1,6 @@
 # Testing
 
-Vitest is the unit and integration runner. Playwright is **not** wired in this foundation; the landing page and health contract are covered by unit tests. Browser journeys belong to a later milestone when product UI exists. GitHub-hosted E2E testing is deferred until actual Playwright tests exist; see [CI-DEFER-1](ci.md#deferred-ci-work). Do not treat the local `pnpm test:e2e` placeholder as end-to-end validation.
+Vitest is the unit and integration runner. Playwright is **not** wired in this foundation; the landing page, health contract, and Session 6 authentication UI are covered by unit and component tests. Browser journeys belong to a later milestone when product UI exists. GitHub-hosted E2E testing is deferred until actual Playwright tests exist; see [CI-DEFER-1](ci.md#deferred-ci-work). Do not treat the local `pnpm test:e2e` placeholder as end-to-end validation.
 
 ## Labels
 
@@ -30,7 +30,7 @@ pnpm infrastructure:down
 - API factory: live/ready, request ids, error envelope, CORS allowlist, body limit, header redaction, `trustProxy=false`.
 - Authentication routes (Fastify inject): login/logout/session/organizations/select-organization, cookie attributes, Origin, CSRF, rotation, tenancy, audit redaction, limiter failure.
 - Worker factory: fake Redis/database, idempotent shutdown, init failure.
-- Web landing copy, landmarks, and `/health` contract.
+- Web landing copy, landmarks, `/health` contract, and Session 6 authentication UI (login, session bootstrap, organization selector, logout, expired-session, access-denied). Web auth tests use jsdom and Testing Library; they do not start Next.js or the API.
 
 ## What integration tests cover
 

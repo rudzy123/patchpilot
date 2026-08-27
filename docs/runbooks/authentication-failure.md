@@ -9,6 +9,8 @@ Use this when login, logout, session inspection, or organization selection fails
 - Authenticated `GET /auth/session` or `GET /auth/organizations` returns `401`
 - `POST /auth/select-organization` returns `404` (`Organization not found.`)
 - Browser login from an unexpected origin returns `403`
+- Web `/session-expired` after an authenticated request returns `401`
+- Web `/access-denied` after organization selection is forbidden or not found
 
 ## Immediate checks
 

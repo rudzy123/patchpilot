@@ -1,6 +1,6 @@
 # Local development setup
 
-This is the local **development foundation** through Session 5 (PostgreSQL tenant schema). It is not a production deployment and it does not include product workflows (authentication, SBOM processing, scoring, or remediation).
+This is the local **development foundation** through Session 6 (schema, API auth routes, and minimal web login). It is not a production deployment and it does not include product workflows (SBOM processing, scoring, or remediation).
 
 ## Prerequisites
 
@@ -109,4 +109,4 @@ Environment variables are documented in [environment-variables.md](environment-v
 
 ## What this foundation does not include
 
-See [database.md](database.md) and [migrations.md](migrations.md). Do not expect authentication, SBOM upload, vulnerability feeds, risk scoring, or GitHub integration in this milestone.
+See [database.md](database.md) and [migrations.md](migrations.md). Do not expect registration, password reset, SBOM upload, vulnerability feeds, risk scoring, or GitHub integration in this milestone. Session 6 login uses `/login` against the API origin in `NEXT_PUBLIC_API_BASE_URL`.
