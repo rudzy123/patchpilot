@@ -127,9 +127,13 @@ The **tenant** boundary. Prefer this word in APIs and schema (`organizationId`).
 | Field (logical) | Notes |
 | --- | --- |
 | `id` | UUID |
+| `slug` | Globally unique, lowercase `[a-z0-9]+(-[a-z0-9]+)*`, length 2–64. Uniqueness of the stored value does not fully solve Unicode homoglyphs. |
 | `name` | Display name |
 | `createdAt` | UTC |
-| `status` | `active` or `archived` (organization archive is an operator/owner action; not a user-resource lifecycle in the required set) |
+| `updatedAt` | UTC |
+| `status` | `active` or `archived` (organization archive is an operator/owner action; not a user-resource lifecycle in the required set). There is no `suspended` state. |
+| `archivedAt` | Required when archived; null when active |
+| `version` | Optimistic concurrency counter |
 
 Owns: memberships, teams, assets, environments, SBOMs, components, findings, evidence, credentials, audit events, org-scoped integrations, outbox events.
 
@@ -140,10 +144,13 @@ A person who can authenticate to the instance.
 | Field (logical) | Notes |
 | --- | --- |
 | `id` | UUID |
-| `email` | Unique at instance level for local accounts (interim [OD-1](open-decisions.md)) |
-| `passwordCredential` | Hash only; never log |
+| `email` | Unique at instance level for local accounts (interim [OD-1](open-decisions.md)). Stored lowercase. Uniqueness does not fully canonicalize plus-addressing or Unicode lookalikes. |
+| `displayName` | Untrusted text |
+| `status` | `active` or `disabled` |
 | `createdAt` | UTC |
-| `disabledAt` | Optional UTC |
+| `disabledAt` | Required when disabled |
+
+Password hashes are **not** persisted in Session 5. OD-1 remains open; this session does not add authentication secrets.
 
 A user without membership cannot access tenant-owned data. Instance operator bootstrap is separate ([OD-10](open-decisions.md)).
 
@@ -173,7 +180,7 @@ Optional grouping of users inside an organization ([OD-11](open-decisions.md)).
 | `name` | |
 | `createdAt` | UTC |
 
-Team membership can be modeled as a join table in persistence without a separately named domain aggregate. Teams do not bypass organization scope.
+Team membership is a persistence join table (`TeamMembership`) that is organization-consistent: a user must have a `Membership` in the same organization as the team (compound foreign key). Teams do not bypass organization scope.
 
 ## Asset
 
@@ -185,7 +192,7 @@ Lifecycle: `active` ↔ `archived`. Creation enters `active`. No hard delete in 
 | --- | --- |
 | `id` | UUID |
 | `organizationId` | Tenant scope |
-| `name` | Required |
+| `name` | Required. Unique per organization among `active` assets (`organization_id` + lower(name)). Archived names may be reused after archive. |
 | `description` | Optional untrusted text |
 | `assetType` | Controlled vocabulary |
 | `environmentId` | Optional FK |
@@ -529,7 +536,7 @@ Transactional outbox row for durable work ([ADR 0007](../adr/0007-transactional-
 | `createdAt` | UTC |
 | `publishedAt` | Optional UTC |
 
-Written in the same transaction as the state change. No network I/O in that transaction.
+Written in the same transaction as the state change. No network I/O in that transaction. Status values: `pending`, `claimed`, `processed`, `failed`, `dead_lettered`. `processedAt` is the ADR `publishedAt` equivalent. Delivery is at-least-once; the schema does not claim exactly-once.
 
 ## BackgroundJob
 

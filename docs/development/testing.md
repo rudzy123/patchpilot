@@ -36,8 +36,9 @@ pnpm infrastructure:down
 - PostgreSQL `SELECT 1` readiness through `@patchpilot/database`.
 - Redis `PING` through the worker ioredis adapter.
 - MinIO `/minio/health/live` over HTTP (no MinIO SDK).
+- Session 5: clean and Session 3 upgrade migrations, tenant constraints, repository `organizationId` scoping, append-only audit, outbox checks, seed idempotency, and atomic tenant+audit+outbox transactions.
 
-They use the same development placeholder URLs as Compose defaults. They do not create product rows, upload SBOMs, or call vulnerability feeds.
+They use the same development placeholder URLs as Compose defaults. Constraint tests create ephemeral `patchpilot_it_*` / `patchpilot_migrate_*` databases and drop them. They do not upload SBOMs or call vulnerability feeds.
 
 ## Determinism
 
@@ -47,4 +48,4 @@ They use the same development placeholder URLs as Compose defaults. They do not 
 
 ## Security tests
 
-Tenant isolation, job replay, and SBOM parser tests are required when those features exist. They are out of scope for this foundation because the product entities are not implemented.
+Tenant isolation, job replay, and SBOM parser tests are required when those features exist. Session 5 persists tenant isolation at the repository and constraint layer. Parser and HTTP isolation tests remain later.

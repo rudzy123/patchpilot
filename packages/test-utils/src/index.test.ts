@@ -4,6 +4,7 @@ import {
   createFoundationProductionTestEnv,
   createFoundationTestEnv,
   createFrozenClock,
+  createSyntheticTenantPair,
   getFreePort,
 } from './index.js';
 
@@ -33,5 +34,12 @@ describe('test utilities', () => {
   it('allocates a free port without sleeping', async () => {
     const port = await getFreePort();
     expect(port).toBeGreaterThan(0);
+  });
+
+  it('returns two isolated synthetic tenant labels', () => {
+    const pair = createSyntheticTenantPair();
+    expect(pair.organizationA.slug).not.toBe(pair.organizationB.slug);
+    expect(pair.userA.email).toMatch(/synthetic\.patchpilot\.test$/);
+    expect(pair.vulnerabilityIdentity).toBe('PATCHPILOT-SYNTH-VULN-1');
   });
 });

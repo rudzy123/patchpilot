@@ -36,6 +36,8 @@ Instance operators may run these **only** on a forensic copy when possible:
 - Did cache keys omit organization?
 - Did object keys omit `org/{organizationId}/`?
 - Did a job skip reload-from-persistence?
+- Did a write bypass repository adapters (raw SQL or an unrestricted Prisma client)?
+- Did a compound foreign key fail to exist for the suspected parent/child pair? Schema: [database-model.md](../architecture/database-model.md).
 
 ## Recovery
 

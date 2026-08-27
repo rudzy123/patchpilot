@@ -49,6 +49,10 @@ getSbomObjectMeta(organizationId, sbomId)
 
 Adapters translate this to a query that **always** contains `WHERE organization_id = $authorizedOrg` from **AuthorizedContext**, never from `query.organizationId` or the request body.
 
+Session 5 persists this at the database layer: every tenant-owned Prisma repository method takes `organizationId` as a required argument. Compound foreign keys reject cross-organization parent/child pairs. Authentication and membership authorization remain application-layer work; persistence still does not treat a caller-supplied id as proof of membership.
+
+Physical schema, constraints, and indexes: [database-model.md](database-model.md).
+
 Forbidden patterns:
 
 - `findById(id)` then check org in the caller "if you remember"

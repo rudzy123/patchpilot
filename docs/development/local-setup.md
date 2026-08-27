@@ -1,6 +1,6 @@
 # Local development setup
 
-This is the Session 3 **development foundation**. It is not a production deployment and it does not include product workflows (authentication, SBOM processing, scoring, or remediation).
+This is the local **development foundation** through Session 5 (PostgreSQL tenant schema). It is not a production deployment and it does not include product workflows (authentication, SBOM processing, scoring, or remediation).
 
 ## Prerequisites
 
@@ -38,11 +38,17 @@ nvm use        # or install Node 24 another way
    pnpm infrastructure:up
    ```
 
-4. Apply the Prisma migration. It creates `SchemaFoundation` technical scaffolding only (no product tables). That model is unused by application code and is scheduled for removal at the database-domain milestone.
+4. Apply Prisma migrations. Session 3 created `SchemaFoundation`; Session 5 replaces it with the tenant schema (`20260827120000_tenant_model`).
 
    ```bash
    pnpm db:generate
-   pnpm db:migrate
+   pnpm db:migrate:deploy
+   ```
+
+   Optional synthetic data (not for production):
+
+   ```bash
+   pnpm db:seed
    ```
 
 5. Start the application shells from the repository root.
@@ -96,10 +102,11 @@ pnpm workflows:lint
 | `pnpm db:generate` | Generate Prisma Client |
 | `pnpm db:migrate` | Create/apply migrations locally (`prisma migrate dev`, interactive) |
 | `pnpm db:migrate:deploy` | Apply existing migrations non-interactively (`prisma migrate deploy`) |
-| `pnpm db:reset` | Reset the local database (destructive; refused when `NODE_ENV` or `PATCHPILOT_DEPLOYMENT_ENVIRONMENT` is `production`) |
+| `pnpm db:reset` | Reset the local database (destructive; requires loopback host, `patchpilot` database name, and `PATCHPILOT_ALLOW_DESTRUCTIVE_DATABASE=true`; refused in production) |
+| `pnpm db:seed` | Idempotent synthetic development seed (refused in production) |
 
 Environment variables are documented in [environment-variables.md](environment-variables.md). Test labels are in [testing.md](testing.md). Failures: [troubleshooting.md](troubleshooting.md) and [local infrastructure runbook](../runbooks/local-infrastructure-failure.md). GitHub Actions: [ci.md](ci.md).
 
 ## What this foundation does not include
 
-Do not expect authentication, tenant CRUD, SBOM upload, vulnerability feeds, risk scoring, remediation workflows, GitHub integration, AI features, Kubernetes manifests, or application containers in Compose. Those remain later milestones.
+See [database.md](database.md) and [migrations.md](migrations.md). Do not expect authentication, SBOM upload, vulnerability feeds, risk scoring, or GitHub integration in this milestone.

@@ -9,7 +9,7 @@ Local commands remain authoritative when GitHub-hosted checks have not run yet. 
 | Workflow file | Name | Purpose |
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | CI | Two jobs: workflow/governance lint, then quality gates |
-| `.github/workflows/integration.yml` | Integration | PostgreSQL, Redis, MinIO, SchemaFoundation migrate deploy, `pnpm test:integration` |
+| `.github/workflows/integration.yml` | Integration | PostgreSQL, Redis, MinIO, tenant-schema migrate deploy, `pnpm test:integration` |
 | `.github/workflows/codeql.yml` | CodeQL | JavaScript/TypeScript analysis (`build-mode: none`) |
 | `.github/workflows/dependency-review.yml` | Dependency review | Pull-request dependency and license change review |
 | `.github/workflows/scorecard.yml` | Scorecard | OpenSSF Scorecard on `main` and a weekly schedule |
@@ -100,7 +100,7 @@ On GitHub-hosted `ubuntu-latest`, the job process and `docker run` share the run
 
 Credentials are the documented development placeholders. They are job-scoped environment values, not production secrets and not GitHub repository secrets.
 
-Prisma Client is generated, then `pnpm db:migrate:deploy` applies the existing Session 3 `SchemaFoundation` migration to an empty CI database. That is appropriate: CI must apply committed migrations non-interactively. It is not a production product-schema migration. Tests still run through `pnpm test:integration`. There are no live OSV/KEV calls.
+Prisma Client is generated, then `pnpm db:migrate:deploy` applies committed migrations (Session 3 then Session 5 tenant model) to an empty CI database. That is appropriate: CI must apply committed migrations non-interactively. Tests still run through `pnpm test:integration`, including ephemeral-database migration and tenant-isolation cases. There are no live OSV/KEV calls.
 
 ## End-to-end testing
 

@@ -12,3 +12,13 @@ export {
   type DeploymentEnvironment,
   type ServerConfig,
 } from './server.js';
+export {
+  assertDestructiveDatabaseCommandAllowed,
+  assertDevelopmentSeedAllowed,
+  assertEphemeralTestDatabaseName,
+  inspectDatabaseUrl,
+  redactDatabaseUrl,
+  cloneProcessEnv,
+  DatabaseCommandSafetyError,
+  type DatabaseUrlSafety,
+} from './database-safety.js';

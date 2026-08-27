@@ -2,7 +2,7 @@
   "name": "@patchpilot/database",
   "version": "0.0.0",
   "private": true,
-  "description": "Prisma persistence foundation. Product models are deferred.",
+  "description": "Prisma persistence adapters, tenant schema, and database integration tests.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -28,13 +28,15 @@
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "reset": "prisma migrate reset --force",
+    "seed": "prisma generate && tsc -p tsconfig.build.json && node dist/seed/run.js",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
+    "@patchpilot/config": "workspace:*",
+    "@patchpilot/domain": "workspace:*",
     "@prisma/client": "^6.19.0"
   },
   "devDependencies": {
-    "@patchpilot/config": "workspace:*",
     "@patchpilot/eslint-config": "workspace:*",
     "@patchpilot/test-utils": "workspace:*",
     "@patchpilot/typescript-config": "workspace:*",

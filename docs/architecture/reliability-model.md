@@ -9,8 +9,8 @@ Passing tests do not make a deployment production-ready. Each job type still nee
 1. Validate at the HTTP or scheduler boundary.
 2. Perform object-storage I/O **outside** a transaction (SBOM put).
 3. Transaction: domain state + **OutboxEvent** + **AuditEvent**.
-4. Relay publishes to BullMQ; marks outbox `publishedAt`.
-5. Worker runs; retries; dead-letters poison.
+4. Relay publishes to BullMQ; marks outbox `processedAt` (status `processed`). Outbox row statuses are `pending`, `claimed`, `processed`, `failed`, `dead_lettered`. Delivery is at-least-once; the schema does not claim exactly-once.
+5. Worker runs; retries; dead-letters poison. **BackgroundJob** statuses remain `pending`, `queued`, `running`, `succeeded`, `failed`, `dead_lettered`, `cancelled`.
 
 If step 3 fails after step 2, an orphan object may exist. A reconcile job lists unreferenced keys in the org prefix and does not delete until retention policy says so.
 

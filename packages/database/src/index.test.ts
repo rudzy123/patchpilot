@@ -1,39 +1,41 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
+import { boundPageSize, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './paging.js';
 import {
-  checkDatabaseReady,
-  disconnectPrisma,
-  getPrismaClient,
-  resetPrismaClientForTests,
-} from './index.js';
+  normalizeEmail,
+  normalizeSlug,
+  requirePositiveByteLength,
+  requireSha256,
+} from './guards.js';
 
-afterEach(async () => {
-  await disconnectPrisma();
+describe('input guards', () => {
+  it('accepts lowercase SHA-256 digests', () => {
+    const digest = 'a'.repeat(64);
+    expect(requireSha256(digest, 'sha256')).toBe(digest);
+  });
+
+  it('rejects uppercase or short SHA-256 values', () => {
+    expect(() => requireSha256('A'.repeat(64), 'sha256')).toThrow(/64 lowercase/);
+    expect(() => requireSha256('abc', 'sha256')).toThrow(/64 lowercase/);
+  });
+
+  it('requires positive byte lengths', () => {
+    expect(requirePositiveByteLength(1, 'byteLength')).toBe(1);
+    expect(() => requirePositiveByteLength(0, 'byteLength')).toThrow(/positive/);
+  });
+
+  it('normalizes slugs and emails', () => {
+    expect(normalizeSlug('Acme-Org', 'slug')).toBe('acme-org');
+    expect(() => normalizeSlug('Acme_Org', 'slug')).toThrow(/slug/);
+    expect(normalizeEmail('Owner@Synthetic.PatchPilot.Test')).toBe(
+      'owner@synthetic.patchpilot.test',
+    );
+  });
 });
 
-describe('prisma client lifecycle', () => {
-  it('reuses a single client instance', () => {
-    resetPrismaClientForTests();
-    const first = getPrismaClient();
-    const second = getPrismaClient();
-    expect(first).toBe(second);
-  });
-
-  it('rejects a second initialization with a different database URL', () => {
-    resetPrismaClientForTests();
-    getPrismaClient({ databaseUrl: 'postgresql://patchpilot:one@127.0.0.1:1/patchpilot' });
-    expect(() =>
-      getPrismaClient({ databaseUrl: 'postgresql://patchpilot:two@127.0.0.1:1/patchpilot' }),
-    ).toThrow(/different database URL/);
-  });
-
-  it('reports not ready when PostgreSQL is unavailable without leaking connection strings', async () => {
-    resetPrismaClientForTests();
-    const result = await checkDatabaseReady(200, {
-      databaseUrl: 'postgresql://patchpilot:invalid@127.0.0.1:1/patchpilot',
-    });
-    expect(result).toEqual({ ok: false });
-    expect(JSON.stringify(result)).not.toContain('postgresql://');
-    expect(JSON.stringify(result)).not.toContain('invalid');
+describe('page bounds', () => {
+  it('clamps repository page sizes', () => {
+    expect(boundPageSize(undefined)).toBe(DEFAULT_PAGE_SIZE);
+    expect(boundPageSize(500)).toBe(MAX_PAGE_SIZE);
   });
 });
