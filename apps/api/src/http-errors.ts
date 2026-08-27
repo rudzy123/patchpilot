@@ -18,6 +18,12 @@ export const INVALID_REQUEST: AppError = Object.freeze({
   message: 'Invalid request.',
 });
 
+/** Public response when the in-memory HTTP auth limiter is exhausted. */
+export const AUTH_HTTP_RATE_LIMITED: AppError = Object.freeze({
+  code: 'rate_limited',
+  message: 'Too many requests. Try again later.',
+});
+
 export function httpStatusForError(error: AppError): number {
   switch (error.code) {
     case 'validation':

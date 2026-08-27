@@ -6,6 +6,7 @@ Use this when login, logout, session inspection, or organization selection fails
 
 - `POST /auth/login` returns `401` with `Invalid email or password.`
 - `POST /auth/login` returns `429` (`Too many login attempts. Try again later.`) or `503` (`Login is temporarily unavailable.`)
+- Other `/auth` routes return `429` (`Too many requests. Try again later.`) when the in-memory HTTP limiter is exhausted
 - Authenticated `GET /auth/session` or `GET /auth/organizations` returns `401`
 - `POST /auth/select-organization` returns `404` (`Organization not found.`)
 - Browser login from an unexpected origin returns `403`
@@ -15,7 +16,7 @@ Use this when login, logout, session inspection, or organization selection fails
 ## Immediate checks
 
 1. Confirm PostgreSQL is reachable (`GET /health/ready`). Sessions are stored in PostgreSQL, not Redis.
-2. Confirm Redis is reachable if login is `503`. Login is **fail-closed** when the limiter cannot decide. Logout and session reads must not require Redis.
+2. Confirm Redis is reachable if login is `503`. Login is **fail-closed** when the limiter cannot decide. Logout and session reads must not require Redis. A `429` on login can come from the in-memory HTTP limiter or from Redis; neither trusts `X-Forwarded-For`.
 3. Confirm `CORS_ALLOWED_ORIGINS` matches the browser Origin exactly. Login, logout (with a live cookie), and select-organization reject other origins.
 4. Confirm production cookies use `__Host-patchpilot.sid` with Secure, HttpOnly, SameSite=Lax, Path=/, and no Domain. Restart after fixing `AUTH_COOKIE_NAME` / `AUTH_COOKIE_SECURE`; do not change cookie flags in the running process.
 

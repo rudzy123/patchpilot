@@ -1,6 +1,6 @@
 import { loadServerConfigFrom } from '@patchpilot/config';
 import type { SessionResponse } from '@patchpilot/contracts';
-import { createFoundationProductionTestEnv } from '@patchpilot/test-utils';
+import { createFoundationProductionTestEnv, createFoundationTestEnv } from '@patchpilot/test-utils';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -338,6 +338,35 @@ describe('authentication routes', () => {
     await app.close();
   });
 
+  it('rate-limits auth HTTP by direct peer IP before the login use case', async () => {
+    const config = loadServerConfigFrom({
+      ...createFoundationTestEnv(),
+      AUTH_LOGIN_RATE_LIMIT_IP_MAX: '1',
+    });
+    const { app, harness } = await buildTestApi({ config, membershipCount: 1 });
+    const first = await login(app, harness.user.email, VALID_PASSWORD);
+    const second = await login(
+      app,
+      harness.user.email,
+      VALID_PASSWORD,
+      {},
+      {
+        'x-forwarded-for': '198.51.100.20',
+      },
+    );
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(429);
+    expect(second.json()).toMatchObject({
+      error: {
+        code: 'rate_limited',
+        message: 'Too many login attempts. Try again later.',
+      },
+    });
+    expect(typeof second.json().error.requestId).toBe('string');
+    expect(harness.limiter.consumeCalls).toHaveLength(1);
+    await app.close();
+  });
+
   it('fails closed when the login limiter is unavailable', async () => {
     const { app, harness } = await buildTestApi({ limiterUnavailable: true });
     const known = await login(app, harness.user.email, VALID_PASSWORD);
@@ -357,6 +386,7 @@ async function login(
   email: string,
   password: string,
   extraBody: Record<string, unknown> = {},
+  extraHeaders: Record<string, string> = {},
 ) {
   return app.inject({
     method: 'POST',
@@ -366,6 +396,7 @@ async function login(
       origin: TEST_ORIGIN,
       'content-type': 'application/json',
       'x-forwarded-for': FORWARDED_IP,
+      ...extraHeaders,
     },
     payload: { email, password, ...extraBody },
   });

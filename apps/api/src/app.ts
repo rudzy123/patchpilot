@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
+import { LOGIN_RATE_LIMITED, type TrustedActor } from '@patchpilot/auth';
 import { type ServerConfig } from '@patchpilot/config';
 import {
   healthLiveResponseSchema,
@@ -14,11 +15,11 @@ import {
 import { type Logger, createChildLogger } from '@patchpilot/logger';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { SessionRecord } from '@patchpilot/domain';
-import type { TrustedActor } from '@patchpilot/auth';
 
 import { registerAuthRoutes } from './auth-routes.js';
 import type { AuthRuntime } from './auth-runtime.js';
 import { readSingleHeader } from './headers.js';
+import { AUTH_HTTP_RATE_LIMITED } from './http-errors.js';
 import { resolveRequestIdentifiers } from './ids.js';
 
 export type DatabaseReadyCheck = (timeoutMs: number) => Promise<{ ok: boolean }>;
@@ -110,17 +111,22 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
   app.setErrorHandler((error, request, reply) => {
     const statusCode = fastifyStatusCode(error);
     const isPayloadTooLarge = statusCode === 413;
+    const isRateLimited = statusCode === 429;
     const code = isPayloadTooLarge
       ? 'validation'
-      : statusCode >= 400 && statusCode < 500
-        ? 'validation'
-        : 'internal';
+      : isRateLimited
+        ? 'rate_limited'
+        : statusCode >= 400 && statusCode < 500
+          ? 'validation'
+          : 'internal';
     const publicMessage =
       dependencies.config.deploymentEnvironment === 'production' && code === 'internal'
         ? 'An internal error occurred.'
         : isPayloadTooLarge
           ? 'Request body is too large.'
-          : errorMessage(error);
+          : isRateLimited
+            ? rateLimitedPublicMessage(error)
+            : errorMessage(error);
 
     dependencies.logger.error(
       {
@@ -217,4 +223,13 @@ function errorMessage(error: unknown): string {
 
 function errorName(error: unknown): string {
   return error instanceof Error ? error.name : 'Error';
+}
+
+function rateLimitedPublicMessage(error: unknown): string {
+  const message = errorMessage(error);
+  if (message === LOGIN_RATE_LIMITED.message || message === AUTH_HTTP_RATE_LIMITED.message) {
+    return message;
+  }
+
+  return AUTH_HTTP_RATE_LIMITED.message;
 }
