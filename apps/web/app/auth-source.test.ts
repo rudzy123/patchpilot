@@ -8,12 +8,17 @@ const webRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const authImplementationFiles = [
   'lib/auth-api.ts',
+  'lib/asset-form.ts',
+  'lib/asset-permissions.ts',
   'components/auth-provider.tsx',
   'components/login-form.tsx',
   'components/organization-selector.tsx',
   'components/require-auth.tsx',
   'components/signed-in-shell.tsx',
   'components/app-providers.tsx',
+  'components/asset-form.tsx',
+  'components/archive-asset-dialog.tsx',
+  'components/organization-required.tsx',
   'app/layout.tsx',
   'app/login/login-page-client.tsx',
   'app/login/page.tsx',
@@ -25,6 +30,12 @@ const authImplementationFiles = [
   'app/session-expired/page.tsx',
   'app/access-denied/access-denied-page-client.tsx',
   'app/access-denied/page.tsx',
+  'app/assets/assets-page-client.tsx',
+  'app/assets/page.tsx',
+  'app/assets/new/new-asset-page-client.tsx',
+  'app/assets/new/page.tsx',
+  'app/assets/[assetId]/asset-detail-page-client.tsx',
+  'app/assets/[assetId]/page.tsx',
 ];
 
 function readWebFile(relativePath: string): string {
@@ -38,6 +49,9 @@ describe('web authentication source constraints', () => {
       expect(source.includes('localStorage'), `${file} must not use localStorage`).toBe(false);
       expect(source.includes('sessionStorage'), `${file} must not use sessionStorage`).toBe(false);
       expect(source.includes('document.cookie'), `${file} must not read document.cookie`).toBe(
+        false,
+      );
+      expect(source.includes('dangerouslySetInnerHTML'), `${file} must not set inner HTML`).toBe(
         false,
       );
       expect(source).not.toMatch(/searchParams.*csrf/i);

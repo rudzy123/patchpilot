@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { ReactElement, ReactNode } from 'react';
 
 import { useAuth } from './auth-provider';
@@ -15,7 +16,7 @@ export function SignedInShell({ children }: { children: ReactNode }): ReactEleme
   }
 
   return (
-    <div>
+    <div className="asset-shell">
       <header>
         <p>
           Signed in as <span>{user?.displayName ?? 'Unknown user'}</span>
@@ -26,6 +27,10 @@ export function SignedInShell({ children }: { children: ReactNode }): ReactEleme
             </>
           ) : null}
         </p>
+        <nav aria-label="Primary">
+          <a href="/home">Home</a>
+          <Link href="/assets">Assets</Link>
+        </nav>
         <nav aria-label="Account">
           <a href="/organizations">Change organization</a>
           <button type="button" onClick={() => void handleLogout()} disabled={submitting}>

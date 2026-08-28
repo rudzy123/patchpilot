@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type ReactElement } from 'react';
+import Link from 'next/link';
 
 import { RequireAuth } from '../../components/require-auth';
 import { SignedInShell } from '../../components/signed-in-shell';
@@ -23,8 +24,10 @@ export function HomePageClient(): ReactElement {
           </h1>
           <p>
             {user?.displayName} is authenticated
-            {organization !== null ? ` for ${organization.name}` : ''}. Product workflows are not
-            available yet.
+            {organization !== null ? ` for ${organization.name}` : ''}.
+          </p>
+          <p>
+            <Link href="/assets">Asset inventory</Link>
           </p>
         </main>
       </SignedInShell>
