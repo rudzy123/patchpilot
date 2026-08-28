@@ -322,6 +322,7 @@ export class PrismaAssetRepository implements AssetRepository {
     organizationId: string,
     assetId: string,
     expectedVersion: number,
+    archivedAt?: Date,
   ) {
     if (!isUuid(organizationId) || !isUuid(assetId)) {
       return { kind: 'not_found' } satisfies AssetCompareAndSetOutcome;
@@ -337,7 +338,7 @@ export class PrismaAssetRepository implements AssetRepository {
         },
         data: {
           lifecycleStatus: 'archived',
-          archivedAt: new Date(),
+          archivedAt: archivedAt ?? new Date(),
           version: { increment: 1 },
         },
       });
