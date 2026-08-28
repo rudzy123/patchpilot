@@ -1,3 +1,16 @@
+import type {
+  AssetCompareAndSetOutcome,
+  AssetDetailRecord,
+  AssetEnvironmentOption,
+  AssetListPage,
+  AssetListQuery,
+  AssetMembershipOption,
+  AssetOwnerAssignment,
+  AssetTeamOption,
+  NormalizedCreateAssetCommand,
+  NormalizedExternalIdentifier,
+  NormalizedUpdateAssetCommand,
+} from './assets/types.js';
 import type { Page, PageRequest } from './pagination.js';
 import type {
   AssetOwnerRecord,
@@ -18,6 +31,7 @@ import type {
   TeamRecord,
   UserRecord,
 } from './records.js';
+import type { AppError, Result } from './result.js';
 import type {
   AssetDataClassification,
   AssetLifecycleStatus,
@@ -294,6 +308,10 @@ export type MembershipRepository = {
   findById(organizationId: string, id: string): Promise<MembershipRecord | undefined>;
   findByUser(organizationId: string, userId: string): Promise<MembershipRecord | undefined>;
   listForOrganization(organizationId: string, page?: PageRequest): Promise<Page<MembershipRecord>>;
+  listActiveOptions(
+    organizationId: string,
+    page?: PageRequest,
+  ): Promise<Page<AssetMembershipOption>>;
   /**
    * Authentication-boundary query. Lists active Memberships in active
    * Organizations for one User. Callers must pass the authenticated user id.
@@ -317,6 +335,7 @@ export type TeamRepository = {
   create(input: CreateTeamInput): Promise<TeamRecord>;
   findById(organizationId: string, id: string): Promise<TeamRecord | undefined>;
   listForOrganization(organizationId: string, page?: PageRequest): Promise<Page<TeamRecord>>;
+  listActiveOptions(organizationId: string, page?: PageRequest): Promise<Page<AssetTeamOption>>;
   addMember(organizationId: string, teamId: string, userId: string): Promise<TeamMembershipRecord>;
 };
 
@@ -324,12 +343,47 @@ export type EnvironmentRepository = {
   create(input: CreateEnvironmentInput): Promise<EnvironmentRecord>;
   findById(organizationId: string, id: string): Promise<EnvironmentRecord | undefined>;
   listForOrganization(organizationId: string, page?: PageRequest): Promise<Page<EnvironmentRecord>>;
+  listActiveOptions(
+    organizationId: string,
+    page?: PageRequest,
+  ): Promise<Page<AssetEnvironmentOption>>;
 };
 
 export type AssetRepository = {
   create(input: CreateAssetInput): Promise<AssetRecord>;
+  createAggregate(
+    organizationId: string,
+    command: NormalizedCreateAssetCommand,
+  ): Promise<Result<AssetDetailRecord>>;
   findById(organizationId: string, id: string): Promise<AssetRecord | undefined>;
-  listForOrganization(organizationId: string, page?: PageRequest): Promise<Page<AssetRecord>>;
+  findDetailById(organizationId: string, id: string): Promise<AssetDetailRecord | undefined>;
+  listForOrganization(organizationId: string, query?: AssetListQuery): Promise<AssetListPage>;
+  compareAndSetUpdate(
+    organizationId: string,
+    assetId: string,
+    command: NormalizedUpdateAssetCommand,
+  ): Promise<Result<AssetCompareAndSetOutcome>>;
+  compareAndSetArchive(
+    organizationId: string,
+    assetId: string,
+    expectedVersion: number,
+    archivedAt?: Date,
+  ): Promise<AssetCompareAndSetOutcome>;
+  replaceOwners(
+    organizationId: string,
+    assetId: string,
+    owners: readonly AssetOwnerAssignment[],
+  ): Promise<Result<void, AppError>>;
+  replaceTags(
+    organizationId: string,
+    assetId: string,
+    tags: readonly string[],
+  ): Promise<Result<void, AppError>>;
+  replaceExternalIdentifiers(
+    organizationId: string,
+    assetId: string,
+    identifiers: readonly NormalizedExternalIdentifier[],
+  ): Promise<Result<void, AppError>>;
   addOwner(
     organizationId: string,
     assetId: string,

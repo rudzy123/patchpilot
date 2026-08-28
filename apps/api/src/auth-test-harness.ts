@@ -33,11 +33,16 @@ import type {
   UserRecord,
   UserRepository,
 } from '@patchpilot/domain';
-import { JSON_SCHEMA_VERSION_V1 } from '@patchpilot/domain';
+import {
+  ASSET_NOT_FOUND,
+  JSON_SCHEMA_VERSION_V1,
+  ORGANIZATION_CONTEXT_REQUIRED,
+} from '@patchpilot/domain';
 import { createLogger, type Logger } from '@patchpilot/logger';
 import { createFoundationTestEnv } from '@patchpilot/test-utils';
 
 import { buildApi } from './app.js';
+import type { AssetRuntime } from './asset-runtime.js';
 import type { AuthRuntime } from './auth-runtime.js';
 import type { DatabaseReadyCheck } from './app.js';
 
@@ -69,11 +74,13 @@ export async function buildTestApi(options?: {
   config?: ServerConfig;
   logger?: Logger;
   membershipCount?: 0 | 1 | 2;
+  primaryRole?: 'viewer' | 'member' | 'admin' | 'owner';
   limiterUnavailable?: boolean;
   now?: () => string;
   generateId?: () => string;
   checkDatabaseReady?: DatabaseReadyCheck;
   harness?: AuthTestHarness;
+  assets?: AssetRuntime;
 }) {
   const harness = options?.harness ?? createAuthTestHarness(options);
   const app = await buildApi({
@@ -81,6 +88,7 @@ export async function buildTestApi(options?: {
     logger: options?.logger ?? harness.logger,
     checkDatabaseReady: options?.checkDatabaseReady ?? (async () => ({ ok: true })),
     auth: harness.auth,
+    assets: options?.assets ?? emptyAssetRuntime(),
     ...(options?.now === undefined ? {} : { now: options.now }),
     ...(options?.generateId === undefined ? {} : { generateId: options.generateId }),
   });
@@ -89,6 +97,7 @@ export async function buildTestApi(options?: {
 
 export function createAuthTestHarness(options?: {
   membershipCount?: 0 | 1 | 2;
+  primaryRole?: 'viewer' | 'member' | 'admin' | 'owner';
   limiterUnavailable?: boolean;
   config?: ServerConfig;
 }): AuthTestHarness {
@@ -104,7 +113,7 @@ export function createAuthTestHarness(options?: {
   const membershipRows = organizations.slice(0, membershipCount).map((organization, index) => ({
     organization,
     membership: createMembershipRecord(organization, user, {
-      role: index === 0 ? 'owner' : 'member',
+      role: index === 0 ? (options?.primaryRole ?? 'owner') : 'member',
     }),
   }));
   const users = createMemoryUserRepository([user]);
@@ -167,6 +176,44 @@ export function createAuthTestHarness(options?: {
     user,
     organizations,
     auth,
+  };
+}
+
+function emptyAssetRuntime(): AssetRuntime {
+  const denied = {
+    async execute() {
+      return { ok: false as const, error: ORGANIZATION_CONTEXT_REQUIRED };
+    },
+  };
+  return {
+    list: {
+      async execute() {
+        return { ok: true as const, value: { items: [], nextCursor: undefined } };
+      },
+    },
+    get: {
+      async execute() {
+        return { ok: false as const, error: ASSET_NOT_FOUND };
+      },
+    },
+    create: denied,
+    update: denied,
+    archive: denied,
+    listEnvironments: {
+      async execute() {
+        return { ok: true as const, value: { items: [], nextCursor: undefined } };
+      },
+    },
+    listTeams: {
+      async execute() {
+        return { ok: true as const, value: { items: [], nextCursor: undefined } };
+      },
+    },
+    listMemberships: {
+      async execute() {
+        return { ok: true as const, value: { items: [], nextCursor: undefined } };
+      },
+    },
   };
 }
 
@@ -435,6 +482,9 @@ function createMemoryMembershipRepository(
       return undefined;
     },
     async listForOrganization() {
+      return { items: [], nextCursor: undefined };
+    },
+    async listActiveOptions() {
       return { items: [], nextCursor: undefined };
     },
     async listActiveInActiveOrganizationsForUser(userId) {

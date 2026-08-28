@@ -834,7 +834,10 @@ describe('tenant model persistence', () => {
     });
     expect(await repos.assets.findById(orgB.id, assetA.id)).toBeUndefined();
     expect(repos.assets.findById.length).toBe(2);
-    const page = await repos.assets.listForOrganization(orgA.id, { limit: 1000 });
+    const page = await repos.assets.listForOrganization(orgA.id, {
+      limit: 1000,
+      lifecycleStatus: 'active',
+    });
     expect(page.items.length).toBeLessThanOrEqual(100);
   });
 

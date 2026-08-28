@@ -1,11 +1,8 @@
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import type {
-  AssetOwnerRecord,
-  AssetRepository,
   AuditAppendRepository,
   ClearActiveOrganizationInput,
-  CreateAssetInput,
   CreateEnvironmentInput,
   CreateFindingInput,
   CreateMembershipInput,
@@ -54,8 +51,6 @@ import {
   requireSha256,
 } from './guards.js';
 import {
-  mapAsset,
-  mapAssetOwner,
   mapAuditEvent,
   mapEnvironment,
   mapFinding,
@@ -72,7 +67,8 @@ import {
   mapTeamMembership,
   mapUser,
 } from './mappers.js';
-import { afterIdWhere, paginateById } from './paging.js';
+import { PrismaAssetRepository } from './asset-repository.js';
+import { afterIdWhere, boundPageSize, paginateById } from './paging.js';
 import { getPrismaClient } from './client.js';
 
 function tenantWhere(organizationId: string, id: string): { organizationId: string; id: string } {
@@ -379,6 +375,31 @@ class PrismaMembershipRepository implements MembershipRepository {
     }, page);
   }
 
+  public async listActiveOptions(organizationId: string, page?: PageRequest) {
+    const limit = boundPageSize(page?.limit);
+    const rows = await this.client.membership.findMany({
+      where: { organizationId, status: 'active', ...afterIdWhere(page?.afterId) },
+      include: { user: true },
+      orderBy: { id: 'asc' },
+      take: limit + 1,
+    });
+    const items = rows.map((row) => ({
+      membershipId: row.id,
+      displayName: row.user.displayName,
+      role: row.role,
+    }));
+    if (items.length > limit) {
+      const pageItems = items.slice(0, limit);
+      const last = rows[pageItems.length - 1];
+      return {
+        items: pageItems,
+        nextCursor: last === undefined ? undefined : { id: last.id },
+      };
+    }
+
+    return { items, nextCursor: undefined };
+  }
+
   public async listActiveInActiveOrganizationsForUser(userId: string) {
     const rows = await this.client.membership.findMany({
       where: {
@@ -450,6 +471,21 @@ class PrismaTeamRepository implements TeamRepository {
     }, page);
   }
 
+  public async listActiveOptions(organizationId: string, page?: PageRequest) {
+    return paginateById(async ({ take, cursorId }) => {
+      const rows = await this.client.team.findMany({
+        where: { organizationId, status: 'active', ...afterIdWhere(cursorId) },
+        orderBy: { id: 'asc' },
+        take,
+      });
+      return rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+      }));
+    }, page);
+  }
+
   public async addMember(organizationId: string, teamId: string, userId: string) {
     const row = await this.client.teamMembership.create({
       data: { organizationId, teamId, userId },
@@ -490,82 +526,21 @@ class PrismaEnvironmentRepository implements EnvironmentRepository {
       return rows.map(mapEnvironment);
     }, page);
   }
-}
 
-class PrismaAssetRepository implements AssetRepository {
-  public constructor(private readonly client: PrismaClientLike) {}
-
-  public async create(input: CreateAssetInput) {
-    const row = await this.client.asset.create({
-      data: {
-        organizationId: input.organizationId,
-        name: input.name.trim(),
-        assetType: input.assetType,
-        ...(input.description === undefined ? {} : { description: input.description }),
-        ...(input.lifecycleStatus === undefined ? {} : { lifecycleStatus: input.lifecycleStatus }),
-        ...(input.environmentId === undefined ? {} : { environmentId: input.environmentId }),
-        ...(input.owningTeamId === undefined ? {} : { owningTeamId: input.owningTeamId }),
-        ...(input.businessCriticality === undefined
-          ? {}
-          : { businessCriticality: input.businessCriticality }),
-        ...(input.internetExposure === undefined
-          ? {}
-          : { internetExposure: input.internetExposure }),
-        ...(input.dataClassification === undefined
-          ? {}
-          : { dataClassification: input.dataClassification }),
-        ...(input.repositoryUrl === undefined ? {} : { repositoryUrl: input.repositoryUrl }),
-        ...(input.deploymentContext === undefined
-          ? {}
-          : { deploymentContext: input.deploymentContext }),
-        ...(input.tags === undefined
-          ? {}
-          : {
-              tags: {
-                create: input.tags.map((tag) => ({
-                  organizationId: input.organizationId,
-                  tag: tag.trim().toLowerCase(),
-                })),
-              },
-            }),
-      },
-    });
-    return mapAsset(row);
-  }
-
-  public async findById(organizationId: string, id: string) {
-    const row = await this.client.asset.findFirst({
-      where: tenantWhere(organizationId, id),
-    });
-    return row === null ? undefined : mapAsset(row);
-  }
-
-  public async listForOrganization(organizationId: string, page?: PageRequest) {
+  public async listActiveOptions(organizationId: string, page?: PageRequest) {
     return paginateById(async ({ take, cursorId }) => {
-      const rows = await this.client.asset.findMany({
-        where: { organizationId, ...afterIdWhere(cursorId) },
+      const rows = await this.client.environment.findMany({
+        where: { organizationId, status: 'active', ...afterIdWhere(cursorId) },
         orderBy: { id: 'asc' },
         take,
       });
-      return rows.map(mapAsset);
+      return rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        sensitivityClass: row.sensitivityClass,
+      }));
     }, page);
-  }
-
-  public async addOwner(
-    organizationId: string,
-    assetId: string,
-    owner: { userId?: string; teamId?: string; role: AssetOwnerRecord['role'] },
-  ) {
-    const row = await this.client.assetOwner.create({
-      data: {
-        organizationId,
-        assetId,
-        role: owner.role,
-        ...(owner.userId === undefined ? {} : { userId: owner.userId }),
-        ...(owner.teamId === undefined ? {} : { teamId: owner.teamId }),
-      },
-    });
-    return mapAssetOwner(row);
   }
 }
 

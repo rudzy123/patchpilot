@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import * as databasePublic from './index.js';
 import { boundPageSize, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './paging.js';
 import {
+  isUuid,
   normalizeEmail,
   normalizeSlug,
   requireArgon2idPhc,
@@ -58,6 +59,12 @@ describe('input guards', () => {
     const attackStarted = Date.now();
     expect(() => normalizeEmail(adversarial)).toThrow(/email/);
     expect(Date.now() - attackStarted).toBeLessThan(1000);
+  });
+
+  it('accepts UUID v1-v8 values used as tenant identifiers', () => {
+    expect(isUuid('11111111-1111-4111-8111-111111111111')).toBe(true);
+    expect(isUuid('not-a-uuid')).toBe(false);
+    expect(isUuid('')).toBe(false);
   });
 });
 

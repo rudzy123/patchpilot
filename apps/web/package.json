@@ -2,7 +2,7 @@
   "name": "@patchpilot/web",
   "version": "0.0.0",
   "private": true,
-  "description": "Next.js App Router presentation. Landing page and Session 6 authentication UI.",
+  "description": "Next.js App Router presentation. Landing, Session 6 authentication, and Session 7 asset inventory UI.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {

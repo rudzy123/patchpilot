@@ -16,6 +16,8 @@ import { type Logger, createChildLogger } from '@patchpilot/logger';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { SessionRecord } from '@patchpilot/domain';
 
+import { registerAssetRoutes } from './asset-routes.js';
+import type { AssetRuntime } from './asset-runtime.js';
 import { registerAuthRoutes } from './auth-routes.js';
 import type { AuthRuntime } from './auth-runtime.js';
 import { readSingleHeader } from './headers.js';
@@ -29,6 +31,7 @@ export type ApiDependencies = {
   logger: Logger;
   checkDatabaseReady: DatabaseReadyCheck;
   auth: AuthRuntime;
+  assets: AssetRuntime;
   now?: () => string;
   generateId?: () => string;
 };
@@ -184,6 +187,12 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     config: dependencies.config,
     logger: dependencies.logger,
     auth: dependencies.auth,
+  });
+
+  await registerAssetRoutes(app, {
+    config: dependencies.config,
+    auth: dependencies.auth,
+    assets: dependencies.assets,
   });
 
   app.addHook('onSend', async (request, _reply, payload) => {

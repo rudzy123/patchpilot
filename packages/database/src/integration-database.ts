@@ -50,7 +50,14 @@ export const FROZEN_MIGRATIONS = [
     directory: '20260827180000_local_credentials_and_sessions',
     sha256: '3a5a9adb12dbf0fea656c225056cdef8f2fc048229ad10cf1ba81b14265eedd0',
   },
+  {
+    directory: '20260828120000_asset_inventory_constraints',
+    sha256: '3270a9ec871a5cf8ec522c245ede9a3312aef6182950abd23d08dce342ec6f18',
+  },
 ] as const;
+
+export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
+  '20260828120000_asset_inventory_constraints' as const;
 
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
@@ -60,6 +67,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260827160000_policy_creator_membership',
   '20260827170000_audit_actor_anonymous',
   '20260827180000_local_credentials_and_sessions',
+  SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
@@ -215,4 +223,14 @@ export const SESSION_6_THROUGH_ANONYMOUS_MIGRATIONS = [
 export async function applyThroughAuditActorAnonymous(databaseUrl: string): Promise<void> {
   await applyThroughPolicyCreatorMembership(databaseUrl);
   await applyMigrationSqlAndResolve(databaseUrl, '20260827170000_audit_actor_anonymous');
+}
+
+export const SESSION_6_COMPLETE_MIGRATIONS = [
+  ...SESSION_6_THROUGH_ANONYMOUS_MIGRATIONS,
+  '20260827180000_local_credentials_and_sessions',
+] as const;
+
+export async function applyThroughSession6(databaseUrl: string): Promise<void> {
+  await applyThroughAuditActorAnonymous(databaseUrl);
+  await applyMigrationSqlAndResolve(databaseUrl, '20260827180000_local_credentials_and_sessions');
 }

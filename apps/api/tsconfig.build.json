@@ -6,5 +6,5 @@
     "outDir": "dist"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts", "src/auth-test-harness.ts"]
+  "exclude": ["src/**/*.test.ts", "src/auth-test-harness.ts", "src/asset-test-harness.ts"]
 }

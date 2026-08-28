@@ -42,6 +42,8 @@ export type AuthContextValue = AuthViewState & {
   selectOrganization: (organizationId: string) => Promise<'home' | 'denied' | 'error'>;
   acknowledgeAccessDenied: () => void;
   clearError: () => void;
+  getCsrfToken: () => string | null;
+  api: AuthApi;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -240,6 +242,8 @@ export function AuthProvider({
     setErrorMessage(null);
   }, []);
 
+  const getCsrfToken = useCallback((): string | null => csrfTokenRef.current, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
@@ -253,6 +257,8 @@ export function AuthProvider({
       selectOrganization,
       acknowledgeAccessDenied,
       clearError,
+      getCsrfToken,
+      api,
     }),
     [
       status,
@@ -266,6 +272,8 @@ export function AuthProvider({
       selectOrganization,
       acknowledgeAccessDenied,
       clearError,
+      getCsrfToken,
+      api,
     ],
   );
 

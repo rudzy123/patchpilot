@@ -14,6 +14,7 @@ describe('web focus styles', () => {
     expect(css).toContain('button:focus-visible');
     expect(css).toContain('input:focus-visible');
     expect(css).toContain('select:focus-visible');
+    expect(css).toContain('textarea:focus-visible');
     expect(css).toContain('outline');
   });
 });

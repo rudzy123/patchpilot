@@ -16,8 +16,12 @@ import {
   passwordHashAlgorithms,
   riskPolicyScopes,
   sessionAuthenticationMethods,
+  type AssetRepository,
+  type EnvironmentRepository,
   type FindingRepository,
+  type MembershipRepository,
   type OrganizationRepository,
+  type TeamRepository,
 } from './index.js';
 
 describe('result boundary', () => {
@@ -76,5 +80,75 @@ describe('tenant repository ports', () => {
     void findingRepo.findById('org', 'id');
     expect(organizationRepo.findById.length).toBe(2);
     expect(findingRepo.findById.length).toBe(2);
+  });
+
+  it('requires organizationId on asset detail, list, and option queries', () => {
+    const assets: Pick<
+      AssetRepository,
+      'findDetailById' | 'listForOrganization' | 'createAggregate' | 'compareAndSetUpdate'
+    > = {
+      findDetailById: async (organizationId: string, id: string) => {
+        expect(organizationId.length).toBeGreaterThan(0);
+        expect(id.length).toBeGreaterThan(0);
+        return undefined;
+      },
+      listForOrganization: async (organizationId: string, _query?) => {
+        expect(organizationId.length).toBeGreaterThan(0);
+        return { items: [], nextCursor: undefined };
+      },
+      createAggregate: async (organizationId: string, command) => {
+        expect(organizationId.length).toBeGreaterThan(0);
+        expect(command.name.length).toBeGreaterThan(0);
+        return err({ code: 'forbidden', message: 'Organization context is required.' });
+      },
+      compareAndSetUpdate: async (organizationId: string, assetId: string, command) => {
+        expect(organizationId.length).toBeGreaterThan(0);
+        expect(assetId.length).toBeGreaterThan(0);
+        expect(command.expectedVersion).toBeGreaterThan(0);
+        return err({ code: 'forbidden', message: 'Organization context is required.' });
+      },
+    };
+    const environments: Pick<EnvironmentRepository, 'listActiveOptions'> = {
+      listActiveOptions: async (organizationId: string) => {
+        expect(organizationId.length).toBeGreaterThan(0);
+        return { items: [], nextCursor: undefined };
+      },
+    };
+    const teams: Pick<TeamRepository, 'listActiveOptions'> = {
+      listActiveOptions: async (organizationId: string) => {
+        expect(organizationId.length).toBeGreaterThan(0);
+        return { items: [], nextCursor: undefined };
+      },
+    };
+    const memberships: Pick<MembershipRepository, 'listActiveOptions'> = {
+      listActiveOptions: async (organizationId: string) => {
+        expect(organizationId.length).toBeGreaterThan(0);
+        return { items: [], nextCursor: undefined };
+      },
+    };
+
+    void assets.findDetailById('org', 'asset');
+    void assets.listForOrganization('org');
+    void assets.createAggregate('org', {
+      name: 'demo',
+      assetType: 'application',
+      businessCriticality: 'unspecified',
+      internetExposure: 'unknown',
+      dataClassification: 'unspecified',
+      owners: [],
+      tags: [],
+      externalIdentifiers: [],
+    });
+    void assets.compareAndSetUpdate('org', 'asset', { expectedVersion: 1, name: 'demo' });
+    void environments.listActiveOptions('org');
+    void teams.listActiveOptions('org');
+    void memberships.listActiveOptions('org');
+    expect(assets.findDetailById.length).toBe(2);
+    expect(assets.listForOrganization.length).toBe(2);
+    expect(assets.createAggregate.length).toBe(2);
+    expect(assets.compareAndSetUpdate.length).toBe(3);
+    expect(environments.listActiveOptions.length).toBe(1);
+    expect(teams.listActiveOptions.length).toBe(1);
+    expect(memberships.listActiveOptions.length).toBe(1);
   });
 });

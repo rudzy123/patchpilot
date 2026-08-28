@@ -10,6 +10,8 @@ export const ARGON2ID_PHC_MAX_LENGTH = 255;
 export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 /** Local @ dotted-domain. Labels exclude `.` so quantifiers do not overlap (CodeQL js/polynomial-redos). */
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+export const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function requireSha256(value: string, fieldName: string): string {
   if (!SHA256_HEX.test(value)) {
@@ -64,6 +66,10 @@ export function normalizeEmail(value: string): string {
   }
 
   return email;
+}
+
+export function isUuid(value: string): boolean {
+  return UUID_PATTERN.test(value);
 }
 
 export function asJsonObject(value: Prisma.JsonValue, fieldName: string): Prisma.InputJsonValue {

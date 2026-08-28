@@ -4,7 +4,7 @@ import {
   type TrustedActor,
 } from '@patchpilot/auth';
 import type { ServerConfig } from '@patchpilot/config';
-import type { Result, SessionRecord } from '@patchpilot/domain';
+import { ORGANIZATION_CONTEXT_REQUIRED, type Result, type SessionRecord } from '@patchpilot/domain';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { readSessionCookie } from './cookies.js';
@@ -79,6 +79,25 @@ export function requireAuthenticatedSession(
   }
 
   return undefined;
+}
+
+export function requireActiveOrganization(
+  request: ResolvedAuthRequest,
+  reply: FastifyReply,
+): FastifyReply | undefined {
+  if (
+    request.actor === null ||
+    request.actor.organizationId === null ||
+    request.actor.membershipId === null
+  ) {
+    return sendAppError(request, reply, ORGANIZATION_CONTEXT_REQUIRED);
+  }
+
+  return undefined;
+}
+
+export function applyPrivateNoStore(_request: FastifyRequest, reply: FastifyReply): void {
+  void reply.header('cache-control', 'private, no-store');
 }
 
 export function requireSynchronizerCsrf(

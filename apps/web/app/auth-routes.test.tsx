@@ -51,6 +51,10 @@ describe('authentication routes', () => {
 
     expect(await screen.findByRole('heading', { name: 'Signed in' })).toBeInTheDocument();
     expect(screen.getByText(/is authenticated/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Asset inventory' })).toHaveAttribute(
+      'href',
+      '/assets',
+    );
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.queryByText(/dashboard/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/SBOM/i)).not.toBeInTheDocument();

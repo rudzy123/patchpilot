@@ -6,6 +6,7 @@ import { navigationMocks } from './test/router-mock';
 
 beforeEach(() => {
   navigationMocks.replace.mockClear();
+  navigationMocks.push.mockClear();
   window.localStorage.clear();
   window.sessionStorage.clear();
 });
