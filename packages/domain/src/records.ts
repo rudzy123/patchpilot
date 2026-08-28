@@ -192,6 +192,15 @@ export type AssetTagRecord = {
   createdAt: Date;
 };
 
+export type AssetExternalIdentifierRecord = {
+  id: string;
+  organizationId: string;
+  assetId: string;
+  namespace: string;
+  identifier: string;
+  createdAt: Date;
+};
+
 export type RepositoryConnectionRecord = {
   id: string;
   organizationId: string;

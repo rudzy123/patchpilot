@@ -2,7 +2,7 @@
   "name": "@patchpilot/contracts",
   "version": "0.0.0",
   "private": true,
-  "description": "Shared HTTP contracts for health and authentication routes.",
+  "description": "Shared HTTP contracts for health, authentication, and asset inventory routes.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -24,6 +24,7 @@
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
+    "@patchpilot/domain": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

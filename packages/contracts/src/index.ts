@@ -21,6 +21,36 @@ export {
   type SelectOrganizationRequest,
   type SessionResponse,
 } from './auth.js';
+export {
+  archiveAssetRequestSchema,
+  assetDetailSchema,
+  assetExternalIdentifierSchema,
+  assetListQuerySchema,
+  assetListResponseSchema,
+  assetOwnerAssignmentSchema,
+  assetSummarySchema,
+  assetTagSchema,
+  createAssetRequestSchema,
+  encodeAssetListCursor,
+  environmentOptionSchema,
+  environmentOptionsResponseSchema,
+  membershipOptionSchema,
+  membershipOptionsResponseSchema,
+  teamOptionSchema,
+  teamOptionsResponseSchema,
+  updateAssetRequestSchema,
+  type ArchiveAssetRequest,
+  type AssetDetail,
+  type AssetListQueryRequest,
+  type AssetListResponse,
+  type AssetOwnerAssignmentRequest,
+  type AssetSummary,
+  type CreateAssetRequest,
+  type EnvironmentOption,
+  type MembershipOption,
+  type TeamOption,
+  type UpdateAssetRequest,
+} from './assets.js';
 
 export const healthServiceSchema = z.enum(['api', 'web', 'worker']);
 
