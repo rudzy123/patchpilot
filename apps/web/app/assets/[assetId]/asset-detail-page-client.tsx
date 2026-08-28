@@ -151,9 +151,9 @@ function AssetDetailPageBody({ assetId }: { assetId: string }): ReactElement {
 
   return (
     <main>
-        <p>
-          <Link href="/assets">Back to assets</Link>
-        </p>
+      <p>
+        <Link href="/assets">Back to assets</Link>
+      </p>
       {status === 'loading' ? (
         <>
           <h1 ref={headingRef} tabIndex={-1}>

@@ -2,7 +2,7 @@
   "name": "@patchpilot/api",
   "version": "0.0.0",
   "private": true,
-    "description": "Fastify HTTP API. Health, Session 6 authentication, and Session 7 asset inventory routes.",
+  "description": "Fastify HTTP API. Health, Session 6 authentication, and Session 7 asset inventory routes.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {

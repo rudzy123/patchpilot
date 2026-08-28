@@ -48,12 +48,7 @@ export function ArchiveAssetDialog({
         <button type="button" onClick={onCancel} disabled={submitting}>
           Cancel
         </button>
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={submitting}
-          aria-busy={submitting}
-        >
+        <button type="button" onClick={onConfirm} disabled={submitting} aria-busy={submitting}>
           {submitting ? 'Archiving' : 'Archive asset'}
         </button>
       </div>

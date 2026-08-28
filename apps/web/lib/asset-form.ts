@@ -158,7 +158,10 @@ export function toCreateBody(values: AssetFormValues): Record<string, unknown> {
   return body;
 }
 
-export function toUpdateBody(values: AssetFormValues, expectedVersion: number): Record<string, unknown> {
+export function toUpdateBody(
+  values: AssetFormValues,
+  expectedVersion: number,
+): Record<string, unknown> {
   return {
     expectedVersion,
     name: values.name.trim(),
@@ -183,4 +186,3 @@ export function catalogLabel(
 ): string {
   return options.find((option) => option.value === value)?.label ?? value;
 }
-

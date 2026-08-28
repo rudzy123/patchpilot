@@ -105,12 +105,8 @@ function AssetsPageBody(): ReactElement {
       )}
 
       {status === 'loading' ? <p role="status">Loading assets</p> : null}
-      {status === 'error' && errorMessage !== null ? (
-        <p role="alert">{errorMessage}</p>
-      ) : null}
-      {status === 'ready' && items.length === 0 ? (
-        <p>No assets yet.</p>
-      ) : null}
+      {status === 'error' && errorMessage !== null ? <p role="alert">{errorMessage}</p> : null}
+      {status === 'ready' && items.length === 0 ? <p>No assets yet.</p> : null}
       {status === 'ready' && items.length > 0 ? (
         <div className="asset-table-wrap">
           <table>

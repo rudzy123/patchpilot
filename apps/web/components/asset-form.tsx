@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactElement,
-} from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactElement } from 'react';
 
 import type {
   AssetDetail,
@@ -179,13 +172,14 @@ export function AssetForm({
     return fieldErrors.find((error) => error.id === id)?.message;
   }
 
-  const describedBy = [
-    fieldErrors.length > 0 || formError !== null || conflictMessage !== null
-      ? `${formId}-errors`
-      : undefined,
-  ]
-    .filter((value): value is string => value !== undefined)
-    .join(' ') || undefined;
+  const describedBy =
+    [
+      fieldErrors.length > 0 || formError !== null || conflictMessage !== null
+        ? `${formId}-errors`
+        : undefined,
+    ]
+      .filter((value): value is string => value !== undefined)
+      .join(' ') || undefined;
 
   return (
     <form onSubmit={(event) => void handleSubmit(event)} noValidate className="asset-form">
@@ -377,7 +371,9 @@ export function AssetForm({
         {values.owners.length === 0 ? <p>No owners assigned.</p> : null}
         <ul className="asset-chip-list">
           {values.owners.map((owner, index) => (
-            <li key={`${owner.kind}-${owner.kind === 'membership' ? owner.membershipId : owner.teamId}-${index}`}>
+            <li
+              key={`${owner.kind}-${owner.kind === 'membership' ? owner.membershipId : owner.teamId}-${index}`}
+            >
               <span>{ownerLabel(owner, memberships, teams)}</span>
               {readOnly ? null : (
                 <button
@@ -589,7 +585,13 @@ export function AssetForm({
 
       {readOnly ? null : (
         <button type="submit" disabled={submitting} aria-busy={submitting}>
-          {submitting ? (mode === 'create' ? 'Creating' : 'Saving') : mode === 'create' ? 'Create asset' : 'Save changes'}
+          {submitting
+            ? mode === 'create'
+              ? 'Creating'
+              : 'Saving'
+            : mode === 'create'
+              ? 'Create asset'
+              : 'Save changes'}
         </button>
       )}
     </form>

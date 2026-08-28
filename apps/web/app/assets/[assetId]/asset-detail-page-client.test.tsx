@@ -115,10 +115,7 @@ describe('AssetDetailPageClient', () => {
       version: 2,
     };
     const authApi = adminApi({
-      getAsset: vi
-        .fn()
-        .mockResolvedValueOnce(assetDetailFixture)
-        .mockResolvedValueOnce(refreshed),
+      getAsset: vi.fn().mockResolvedValueOnce(assetDetailFixture).mockResolvedValueOnce(refreshed),
       updateAsset: vi.fn(async () => {
         throw { status: 409, code: 'conflict', message: ASSET_VERSION_CONFLICT };
       }),
@@ -131,9 +128,7 @@ describe('AssetDetailPageClient', () => {
     await user.type(name, 'Stale name');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
-    expect(
-      await screen.findByText(/This asset was updated by someone else/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/This asset was updated by someone else/)).toBeInTheDocument();
     await waitFor(() => {
       expect(authApi.getAsset).toHaveBeenCalledTimes(2);
     });

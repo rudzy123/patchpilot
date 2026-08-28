@@ -194,7 +194,10 @@ describe('createAuthApi', () => {
           version: 2,
         });
       }
-      if (url.endsWith(`/assets/${ASSET_ID}`) && (_init?.method === 'PATCH' || _init?.method === 'GET')) {
+      if (
+        url.endsWith(`/assets/${ASSET_ID}`) &&
+        (_init?.method === 'PATCH' || _init?.method === 'GET')
+      ) {
         return jsonResponse(200, assetDetailFixture);
       }
       if (url.startsWith(`${API_BASE}/assets`)) {
