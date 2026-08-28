@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   archiveAssetRequestSchema,
+  assetIdParamSchema,
   assetListQuerySchema,
+  assetOptionsQuerySchema,
   assetOwnerAssignmentSchema,
   createAssetRequestSchema,
   updateAssetRequestSchema,
@@ -191,5 +193,27 @@ describe('asset list query contract', () => {
         orderBy: 'created_at DESC',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('asset path and options query contracts', () => {
+  it('requires a UUID asset id and rejects extra params', () => {
+    expect(assetIdParamSchema.parse({ assetId: ASSET_ID })).toEqual({ assetId: ASSET_ID });
+    expect(assetIdParamSchema.safeParse({ assetId: 'not-a-uuid' }).success).toBe(false);
+    expect(
+      assetIdParamSchema.safeParse({ assetId: ASSET_ID, organizationId: ENVIRONMENT_ID }).success,
+    ).toBe(false);
+  });
+
+  it('maps options pagination and rejects unknown fields', () => {
+    expect(assetOptionsQuerySchema.parse({})).toEqual({});
+    expect(assetOptionsQuerySchema.parse({ limit: '12', cursor: MEMBERSHIP_ID })).toEqual({
+      limit: 12,
+      afterId: MEMBERSHIP_ID,
+    });
+    expect(assetOptionsQuerySchema.safeParse({ limit: 0 }).success).toBe(false);
+    expect(assetOptionsQuerySchema.safeParse({ organizationId: ENVIRONMENT_ID }).success).toBe(
+      false,
+    );
   });
 });

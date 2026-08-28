@@ -16,6 +16,7 @@ import {
 import { loadServerConfigFrom } from '@patchpilot/config';
 import type { SessionResponse } from '@patchpilot/contracts';
 import {
+  createPrismaUnitOfWork,
   createRepositories,
   disconnectPrisma,
   getPrismaClient,
@@ -26,6 +27,7 @@ import { createFoundationTestEnv } from '@patchpilot/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApi } from './app.js';
+import { createAssetRuntime } from './asset-runtime.js';
 import { TEST_ORIGIN, VALID_PASSWORD } from './auth-test-harness.js';
 
 const SOCKET_IP = '192.0.2.10';
@@ -42,6 +44,14 @@ describe('authentication routes persistence', () => {
   const hasher = createArgon2PasswordHasher();
   const tokens = createNodeRandomTokenGenerator();
   const clock = createSystemClock();
+  const assets = createAssetRuntime({
+    assets: repos.assets,
+    environments: repos.environments,
+    teams: repos.teams,
+    memberships: repos.memberships,
+    unitOfWork: createPrismaUnitOfWork({ client: prisma }),
+    clock,
+  });
   const limiter = createFakeLoginRateLimiter({
     auth: config.auth,
     logger,
@@ -122,6 +132,7 @@ describe('authentication routes persistence', () => {
         listOrganizations: createListActiveOrganizationsUseCase(shared),
         audit: repos.auditEvents,
       },
+      assets,
     });
 
     const loggedIn = await app.inject({
@@ -273,6 +284,7 @@ describe('authentication routes persistence', () => {
         listOrganizations: createListActiveOrganizationsUseCase(shared),
         audit: repos.auditEvents,
       },
+      assets,
     });
     const known = await app.inject({
       method: 'POST',

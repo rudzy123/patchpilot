@@ -12,6 +12,7 @@ import {
 import { loadServerConfig } from '@patchpilot/config';
 import {
   checkDatabaseReady,
+  createPrismaUnitOfWork,
   createRepositories,
   disconnectPrisma,
   getPrismaClient,
@@ -20,6 +21,7 @@ import { createLogger } from '@patchpilot/logger';
 import { startTelemetry } from '@patchpilot/observability';
 
 import { buildApi } from './app.js';
+import { createAssetRuntime } from './asset-runtime.js';
 import { createRedisLoginRateLimiter } from './redis-login-rate-limiter.js';
 
 async function main(): Promise<void> {
@@ -37,10 +39,19 @@ async function main(): Promise<void> {
       : { tracesEndpoint: config.openTelemetry.tracesEndpoint }),
   });
 
-  const repos = createRepositories(getPrismaClient({ databaseUrl: config.databaseUrl }));
+  const prisma = getPrismaClient({ databaseUrl: config.databaseUrl });
+  const repos = createRepositories(prisma);
   const hasher = createArgon2PasswordHasher();
   const tokens = createNodeRandomTokenGenerator();
   const clock = createSystemClock();
+  const assets = createAssetRuntime({
+    assets: repos.assets,
+    environments: repos.environments,
+    teams: repos.teams,
+    memberships: repos.memberships,
+    unitOfWork: createPrismaUnitOfWork({ client: prisma }),
+    clock,
+  });
   const limiter = createRedisLoginRateLimiter({
     redisUrl: config.redisUrl,
     auth: config.auth,
@@ -84,6 +95,7 @@ async function main(): Promise<void> {
       listOrganizations: createListActiveOrganizationsUseCase(shared),
       audit: repos.auditEvents,
     },
+    assets,
   });
 
   let shuttingDown = false;

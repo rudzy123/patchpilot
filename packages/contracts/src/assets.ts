@@ -7,6 +7,8 @@ import {
   ASSET_RAW_TEXT_MAX_LENGTH,
   ASSET_TAG_MAX_COUNT,
   DEFAULT_ASSET_LIFECYCLE_LIST_FILTER,
+  MAX_PAGE_SIZE,
+  MIN_PAGE_SIZE,
   assetDataClassifications,
   assetOwnerRoles,
   assetTypes,
@@ -23,6 +25,7 @@ import {
   type AssetListQuery,
   type NormalizedCreateAssetCommand,
   type NormalizedUpdateAssetCommand,
+  type PageRequest,
 } from '@patchpilot/domain';
 import { z } from 'zod';
 
@@ -129,6 +132,26 @@ export const updateAssetRequestSchema = z
 export const archiveAssetRequestSchema = z.strictObject({
   expectedVersion: expectedVersionSchema,
 });
+
+export const assetIdParamSchema = z.strictObject({
+  assetId: z.uuid(),
+});
+
+export const assetOptionsQuerySchema = z
+  .strictObject({
+    limit: z.coerce.number().int().min(MIN_PAGE_SIZE).max(MAX_PAGE_SIZE).optional(),
+    cursor: z.uuid().optional(),
+  })
+  .transform((value): PageRequest => {
+    const page: PageRequest = {};
+    if (value.limit !== undefined) {
+      page.limit = value.limit;
+    }
+    if (value.cursor !== undefined) {
+      page.afterId = value.cursor;
+    }
+    return page;
+  });
 
 export const assetListQuerySchema = z
   .strictObject({
@@ -271,7 +294,9 @@ export { encodeAssetListCursor };
 export type CreateAssetRequest = z.infer<typeof createAssetRequestSchema>;
 export type UpdateAssetRequest = z.infer<typeof updateAssetRequestSchema>;
 export type ArchiveAssetRequest = z.infer<typeof archiveAssetRequestSchema>;
+export type AssetIdParam = z.infer<typeof assetIdParamSchema>;
 export type AssetListQueryRequest = z.infer<typeof assetListQuerySchema>;
+export type AssetOptionsQuery = z.infer<typeof assetOptionsQuerySchema>;
 export type AssetSummary = z.infer<typeof assetSummarySchema>;
 export type AssetDetail = z.infer<typeof assetDetailSchema>;
 export type AssetListResponse = z.infer<typeof assetListResponseSchema>;
