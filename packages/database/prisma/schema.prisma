@@ -592,7 +592,8 @@ model Asset {
   evidence                    Evidence[]
 
   @@unique([organizationId, id], map: "asset_org_id_key")
-  @@index([organizationId, lifecycleStatus], map: "asset_org_status_idx")
+  // Default list keyset (org, lifecycle_status, lower(name), id) is SQL-only:
+  // asset_org_status_name_id_idx. It supersedes asset_org_status_idx.
   @@index([organizationId, environmentId], map: "asset_org_environment_idx")
   @@index([organizationId, owningTeamId], map: "asset_org_owning_team_idx")
   @@index([organizationId, lastObservedAt], map: "asset_org_last_observed_idx")
@@ -648,6 +649,9 @@ model AssetExternalIdentifier {
   asset        Asset        @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
 
   @@unique([organizationId, assetId, namespace], map: "asset_external_id_org_asset_ns_key")
+  // Namespace shape and identifier control/length CHECKs are SQL-only:
+  // asset_external_identifier_namespace_shape_chk,
+  // asset_external_identifier_value_chk.
   @@map("asset_external_identifier")
 }
 

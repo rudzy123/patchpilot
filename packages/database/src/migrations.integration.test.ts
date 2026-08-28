@@ -10,18 +10,21 @@ import {
   EXPECTED_APPLIED_MIGRATIONS,
   FROZEN_MIGRATIONS,
   REVIEWED_SESSION_5_MIGRATIONS,
+  SESSION_6_COMPLETE_MIGRATIONS,
+  SESSION_6_PREAUTH_MIGRATIONS,
+  SESSION_6_THROUGH_ANONYMOUS_MIGRATIONS,
+  SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
   applyMigrationSqlAndResolve,
   applySession3Schema,
   applyThroughAuditActorAnonymous,
   applyThroughPolicyCreatorMembership,
   applyThroughReviewedSession5,
   applyThroughSession5,
+  applyThroughSession6,
   createEphemeralDatabase,
   deployMigrations,
   dropEphemeralDatabase,
   frozenMigrationFile,
-  SESSION_6_PREAUTH_MIGRATIONS,
-  SESSION_6_THROUGH_ANONYMOUS_MIGRATIONS,
   sha256File,
 } from './integration-database.js';
 
@@ -105,6 +108,8 @@ const SQL_ONLY_CHECKS = [
   'intelligence_source_provider_chk',
   'sbom_sha256_chk',
   'organization_slug_shape_chk',
+  'asset_external_identifier_namespace_shape_chk',
+  'asset_external_identifier_value_chk',
 ] as const;
 
 const SQL_ONLY_INDEXES = [
@@ -114,6 +119,7 @@ const SQL_ONLY_INDEXES = [
   'risk_policy_builtin_key_version_uidx',
   'risk_policy_org_key_version_uidx',
   'asset_active_name_org_idx',
+  'asset_org_status_name_id_idx',
   'membership_user_active_idx',
   'session_idle_cleanup_idx',
   'session_absolute_cleanup_idx',
@@ -267,6 +273,7 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
   for (const index of SQL_ONLY_INDEXES) {
     expect(indexes).toContain(index);
   }
+  expect(indexes).not.toContain('asset_org_status_idx');
 
   const triggers = await names(
     client,
@@ -301,7 +308,7 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
 }
 
 describe('frozen migrations', () => {
-  it('keeps Session 3, Session 5, correction, policy-creator, and auth SQL byte-stable', async () => {
+  it('keeps Session 3 through Session 7 asset-inventory SQL byte-stable', async () => {
     for (const frozen of FROZEN_MIGRATIONS) {
       const digest = await sha256File(frozenMigrationFile(frozen.directory));
       expect(digest).toBe(frozen.sha256);
@@ -539,6 +546,7 @@ describe('migrations', () => {
         '20260827160000_policy_creator_membership',
         '20260827170000_audit_actor_anonymous',
         '20260827180000_local_credentials_and_sessions',
+        SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
       ]);
       expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
 
@@ -609,6 +617,7 @@ describe('migrations', () => {
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         '20260827170000_audit_actor_anonymous',
         '20260827180000_local_credentials_and_sessions',
+        SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -736,6 +745,7 @@ describe('migrations', () => {
       );
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         '20260827180000_local_credentials_and_sessions',
+        SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -745,6 +755,50 @@ describe('migrations', () => {
         WHERE tgname = 'audit_event_append_only' AND NOT tgisinternal
       `;
       expect(appendOnly[0]?.tgenabled).toBe('O');
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades current main (Session 6 complete) by applying only the asset inventory constraints', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughSession6(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore).toEqual([...SESSION_6_COMPLETE_MIGRATIONS]);
+
+      const indexesBefore = await names(
+        client,
+        `SELECT indexname AS name FROM pg_indexes WHERE schemaname = 'public'`,
+      );
+      expect(indexesBefore).toContain('asset_org_status_idx');
+      expect(indexesBefore).not.toContain('asset_org_status_name_id_idx');
+      expect(indexesBefore).toContain('asset_active_name_org_idx');
+
+      const checksBefore = await names(
+        client,
+        `SELECT conname AS name FROM pg_constraint WHERE contype = 'c'`,
+      );
+      expect(checksBefore).not.toContain('asset_external_identifier_namespace_shape_chk');
+      expect(checksBefore).not.toContain('asset_external_identifier_value_chk');
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+      ]);
+      await assertFinalMigratedSchema(client);
     } finally {
       await client.$disconnect();
       await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
@@ -766,6 +820,10 @@ describe('migrations', () => {
       await applyMigrationSqlAndResolve(
         ephemeral.databaseUrl,
         '20260827180000_local_credentials_and_sessions',
+      );
+      await applyMigrationSqlAndResolve(
+        ephemeral.databaseUrl,
+        SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
       );
       await assertFinalMigratedSchema(client);
 
@@ -850,6 +908,7 @@ describe('migrations', () => {
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         '20260827170000_audit_actor_anonymous',
         '20260827180000_local_credentials_and_sessions',
+        SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
       ]);
       await assertFinalMigratedSchema(client);
 
