@@ -367,6 +367,7 @@ export type AssetRepository = {
     organizationId: string,
     assetId: string,
     expectedVersion: number,
+    archivedAt?: Date,
   ): Promise<AssetCompareAndSetOutcome>;
   replaceOwners(
     organizationId: string,

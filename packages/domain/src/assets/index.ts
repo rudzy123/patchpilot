@@ -33,9 +33,51 @@ export {
   ASSET_NOT_FOUND,
   ASSET_UPDATE_EMPTY,
   ASSET_VERSION_CONFLICT,
+  ENVIRONMENT_NOT_ASSIGNABLE,
+  MEMBERSHIP_NOT_ASSIGNABLE,
   ORGANIZATION_CONTEXT_REQUIRED,
+  PERMISSION_DENIED,
+  TEAM_NOT_ASSIGNABLE,
   assetValidationError,
 } from './errors.js';
+export {
+  ASSET_MANAGE_PERMISSION,
+  ASSET_READ_PERMISSION,
+  authorizeAssetManage,
+  authorizeAssetRead,
+  type AssetActor,
+  type AuthorizedAssetActor,
+} from './authorization.js';
+export { assetAuditActions, ASSET_AUDIT_SUBJECT_TYPE } from './audit.js';
+export { createArchiveAssetUseCase, type ArchiveAssetUseCaseInput } from './archive-asset.js';
+export { createCreateAssetUseCase, type CreateAssetUseCaseInput } from './create-asset.js';
+export {
+  createGetAssetUseCase,
+  type GetAssetInput,
+  type GetAssetDependencies,
+} from './get-asset.js';
+export {
+  createListAssetEnvironmentsUseCase,
+  type ListAssetEnvironmentsDependencies,
+  type ListAssetEnvironmentsInput,
+} from './list-asset-environments.js';
+export {
+  createListAssetMembershipsUseCase,
+  type ListAssetMembershipsDependencies,
+  type ListAssetMembershipsInput,
+} from './list-asset-memberships.js';
+export {
+  createListAssetTeamsUseCase,
+  type ListAssetTeamsDependencies,
+  type ListAssetTeamsInput,
+} from './list-asset-teams.js';
+export {
+  createListAssetsUseCase,
+  type ListAssetsDependencies,
+  type ListAssetsInput,
+} from './list-assets.js';
+export { createUpdateAssetUseCase, type UpdateAssetUseCaseInput } from './update-asset.js';
+export type { AssetMutationDependencies, AssetMutationRequest } from './mutation.js';
 export {
   hasAssetUpdateMutation,
   normalizeAssetDeploymentContext,
