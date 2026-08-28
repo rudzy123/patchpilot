@@ -6,6 +6,7 @@ import type {
   BusinessCriticality,
   EnvironmentSensitivityClass,
   InternetExposure,
+  MembershipRole,
 } from '../lifecycle.js';
 import type { AssetExternalIdentifierRecord, AssetRecord, AssetTagRecord } from '../records.js';
 
@@ -106,6 +107,25 @@ export type AssetListQuery = {
   owningTeamId?: string;
   tag?: string;
   namePrefix?: string;
+};
+
+export type AssetEnvironmentOption = {
+  id: string;
+  name: string;
+  slug: string;
+  sensitivityClass: EnvironmentSensitivityClass;
+};
+
+export type AssetTeamOption = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+export type AssetMembershipOption = {
+  membershipId: string;
+  displayName: string;
+  role: MembershipRole;
 };
 
 export type AssetListPage = {

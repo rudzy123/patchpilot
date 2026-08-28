@@ -26,7 +26,7 @@ A global `vulnerability` may be referenced by findings in many organizations. Te
 
 Tenant-owned ports require `organizationId` as a required argument (`findById(organizationId, id)`). There is no `findById(id)` for tenant aggregates. Global intelligence tables may be read without an organization id. Authentication ports (`UserRepository`, `LocalCredentialRepository`, `SessionRepository`, and the membership auth-boundary queries) are instance-level: they take the authenticated user id or a token digest, never a client-supplied organization as authority.
 
-Adapters always add `WHERE organization_id = $organizationId` (or `id = $organizationId` for the organization row itself). Pagination is keyset by `id`, bounded to 1–100 rows (default 20), except the Session 7 Asset list, which is keyset on `(lower(name), id)` with default `lifecycle_status = active`. That list index is SQL-only (`asset_org_status_name_id_idx`); Prisma cannot express `lower(name)`.
+Adapters always add `WHERE organization_id = $organizationId` (or `id = $organizationId` for the organization row itself). Pagination is keyset by `id`, bounded to 1–100 rows (default 20), except the Session 7 Asset list, which is keyset on `(lower(name), id)` with default `lifecycle_status = active`. That list index is SQL-only (`asset_org_status_name_id_idx`); Prisma cannot express `lower(name)`. Mutable Asset aggregates use application compare-and-set on `organization_id`, `id`, `version`, and active lifecycle.
 
 ## Compound foreign keys
 
@@ -53,7 +53,7 @@ OSV and CISA KEV synchronization is `intelligence_source`, not a tenant `integra
 - Primary keys are UUID.
 - `created_at` / `updated_at` use `timestamptz(6)`.
 - Append-only tables omit `updated_at`.
-- Mutable aggregate roots store `version` (integer ≥ 1) for later optimistic concurrency. Application compare-and-set is deferred.
+- Mutable aggregate roots store `version` (integer ≥ 1) for optimistic concurrency. Asset inventory compare-and-set is implemented in `packages/database`; other aggregates remain deferred.
 
 ## JSON documents
 

@@ -437,6 +437,9 @@ function createMemoryMembershipRepository(
     async listForOrganization() {
       return { items: [], nextCursor: undefined };
     },
+    async listActiveOptions() {
+      return { items: [], nextCursor: undefined };
+    },
     async listActiveInActiveOrganizationsForUser(userId) {
       return rows.filter(
         (row) =>
