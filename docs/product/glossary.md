@@ -12,10 +12,12 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **Port / adapter** | Port = interface; adapter = infrastructure implementation (Prisma, HTTP, queue, storage). |
 | **Development adapter** | An implementation unsafe for production (fake auth, unsigned webhooks, plaintext credential stubs, unrestricted HTTP). Must be config-gated off in production. |
 | **Asset** | A software system the organization tracks (application, service, or other inventoried target) that can receive SBOM uploads. |
-| **SBOM** | Software bill of materials. MVP accepts CycloneDX JSON. The original file is evidence and is stored, hashed, and not treated as trusted input. |
+| **SBOM** | Software bill of materials. MVP accepts CycloneDX JSON 1.4, 1.5, and 1.6. The original file is evidence and is stored, hashed, and not treated as trusted input. Object bodies never enter PostgreSQL. |
 | **CycloneDX** | The SBOM specification used for MVP JSON uploads. Validate before parse. |
+| **SBOM ingestion `completed`** | Successful evidence re-read, SHA-256 and length verification, JSON/structural and semantic limits, allowlisted schema validation, and normalized graph persistence ([ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md)). It does **not** mean exhaustive software inventory, correlation, findings, enrichment, scoring, or remediation. |
+| **Graph completeness** | `empty`, `no_dependencies`, `partial`, or `complete` on a completed ingestion. `empty` does not mean the Asset contains no software. `no_dependencies` does not prove the software has no dependencies. |
 | **Component** | A package or library listed in an SBOM. Domain **Component** is **versionless** identity (type/namespace/name or ecosystem/namespace/name). Version lives on **ComponentOccurrence**. |
-| **Dependency relationship** | An edge between components as recorded in the SBOM. Observed fact, not a risk score. |
+| **Dependency relationship** | An edge between components as recorded in the SBOM. Observed fact, not a risk score. Unknown dependency refs reject Session 8 ingestion. Self-edges are skipped as warnings. Cycles are preserved. |
 | **Vulnerability record** | Intelligence about a vulnerability (for example a CVE) from a named source, with provenance. |
 | **Finding** | Tenant-owned link between an **asset**'s **versionless** component identity and a **vulnerability record** (OSV id). Spans ingestions. Per-ingestion presence is a **Finding observation**, not a new finding when identity matches. |
 | **Correlation** | Matching components to vulnerability records using defined identifiers and recorded method. |
@@ -40,7 +42,7 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **Priority band** | Calculated grouping of **priority** (for example P1–P4). Not vulnerability severity. |
 | **Finding observation** | Append-only per-**SBOMIngestion** **calculated** record of whether a finding's versionless component identity was `present`, `absent`, or `inconclusive`. |
 | **Incomplete SBOM coverage** | Calculated concern that a newer SBOM is too thin to treat missing components as remediated. |
-| **Processing lease** | Time-bounded claim a worker holds on a **BackgroundJob** (mirrored on the ingestion row if useful). Ingestion and job processing share **one** lease, not two. |
+| **Processing lease** | Time-bounded claim. Session 8 uses separate leases: **OutboxEvent** (relay until BullMQ accepts) and **BackgroundJob** (processor execution). `SbomIngestion.leaseExpiresAt` is unused in Session 8. |
 | **False positive (finding)** | Authorized decision that the *match* is wrong. Does not mean the advisory is invalid globally. |
 | **Mitigated (finding)** | Compensating control recorded while the component is still observed. Not **resolved**. |
 | **Membership** | Binding of a **User** to an **Organization** with a role (`owner`, `admin`, `member`, `viewer`) and status (`active`, `revoked`). |

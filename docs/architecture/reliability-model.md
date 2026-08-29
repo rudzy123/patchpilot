@@ -9,8 +9,8 @@ Passing tests do not make a deployment production-ready. Each job type still nee
 1. Validate at the HTTP or scheduler boundary.
 2. Perform object-storage I/O **outside** a transaction (SBOM put).
 3. Transaction: domain state + **OutboxEvent** + **AuditEvent**.
-4. Relay publishes to BullMQ; marks outbox `processedAt` (status `processed`). Outbox row statuses are `pending`, `claimed`, `processed`, `failed`, `dead_lettered`. Delivery is at-least-once; the schema does not claim exactly-once.
-5. Worker runs; retries; dead-letters poison. **BackgroundJob** statuses remain `pending`, `queued`, `running`, `succeeded`, `failed`, `dead_lettered`, `cancelled`.
+4. Relay publishes to BullMQ; marks outbox `processedAt` (status `processed`). **OutboxEvent** `processed` means BullMQ **accepted** the job, not that the worker finished. Outbox row statuses are `pending`, `claimed`, `processed`, `failed`, `dead_lettered`. Delivery is at-least-once; the schema does not claim exactly-once.
+5. Worker runs; retries; dead-letters poison. **BackgroundJob** represents actual processor execution. Statuses remain `pending`, `queued`, `running`, `succeeded`, `failed`, `dead_lettered`, `cancelled`.
 
 If step 3 fails after step 2, an orphan object may exist. A reconcile job lists unreferenced keys in the org prefix and does not delete until retention policy says so.
 
@@ -97,7 +97,7 @@ Dead-lettered jobs retain payload **ids** only (no raw SBOM). Operators replay a
 
 ## Partial parse
 
-If persist_graph succeeds and correlate fails transiently, resume from stage `correlate` without deleting components. The ingestion stays `processing` (not `completed`). Do not leave a second organization's data mutated.
+Session 8 marks the ingestion `completed` after persist_graph succeeds. There is no Session 8 resume into `correlate`. Future correlation is a separate additive workflow and must not rewrite completed Session 8 rows. Do not leave a second organization's data mutated.
 
 ## Delivery semantics
 
@@ -105,7 +105,7 @@ Delivery is **at-least-once**. PatchPilot does **not** claim exactly-once proces
 
 ## Job leases
 
-`running` jobs hold a lease (`leaseExpiresAt`). Ingestion processing uses **that same lease**, not a second independent lock. Initial recommendation: 15 minutes, configurable, validate under load. Heartbeat while working. On expiry another worker may start (**lease theft** if clocks skew: still safe if idempotent). Workers must not accept a client-supplied lease owner.
+**OutboxEvent** and **BackgroundJob** have **separate** leases. Outbox `processed` is relay success (BullMQ accepted). BackgroundJob `running` holds the processor lease (`leaseExpiresAt`). `SbomIngestion.leaseExpiresAt` is unused in Session 8. Initial processing-lease recommendation: 15 minutes, configurable (`SBOM_PROCESSING_LEASE_MS`), validate under load. Heartbeat while working. On expiry another worker may start (**lease theft** if clocks skew: still safe if idempotent). Workers must not accept a client-supplied lease owner.
 
 ## Retry
 

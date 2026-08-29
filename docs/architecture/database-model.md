@@ -1,6 +1,6 @@
 # Database model
 
-This is the Session 5–7 persistence design for PatchPilot. It implements the v0.1 [domain model](domain-model.md) in PostgreSQL through Prisma in `packages/database`. Product APIs, parsers, scoring, and authentication HTTP routes are **not** implemented here. Session 7 Batch 2 adds SQL-only asset list keyset indexing and `AssetExternalIdentifier` CHECKs; inventory HTTP routes remain later.
+This is the Session 5–7 persistence design for PatchPilot. It implements the v0.1 [domain model](domain-model.md) in PostgreSQL through Prisma in `packages/database`. Session 8 Batch 1 does **not** add migrations. Forthcoming Session 8 columns include `graphCompleteness`, bom-ref uniqueness, and `version_known` on occurrences. `SbomIngestion.leaseExpiresAt` already exists and remains **unused** in Session 8. Product parsers, scoring, and upload HTTP routes are **not** implemented here.
 
 Opaque IDs are UUIDs (`gen_random_uuid()`). Timestamps are `TIMESTAMPTZ` stored in UTC. Prisma lives only in `packages/database`. Domain ports in `packages/domain` do not import Prisma types.
 

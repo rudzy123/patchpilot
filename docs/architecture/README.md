@@ -1,8 +1,8 @@
 # Architecture
 
-This directory is the v0.1 architecture design for PatchPilot. Sessions 3–4 scaffolded application shells, CI, and governance. Session 5 adds the PostgreSQL tenant schema and persistence adapters. Product APIs, SBOM parsing, live feeds, and scoring are **not** implemented yet.
+This directory is the v0.1 architecture design for PatchPilot. Sessions 3–4 scaffolded application shells, CI, and governance. Session 5 adds the PostgreSQL tenant schema and persistence adapters. Session 6 implements local-password authentication. Session 7 persists asset inventory. Session 8 Batch 1 records [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md) and typed SBOM limits; live upload, parse, object-storage adapters, and graph persistence are **not** implemented yet. Product APIs for correlation, live feeds, and scoring are **not** implemented.
 
-Decisions in this directory follow the Architecture Decision Records under [docs/adr/](../adr/README.md). ADRs 0001–0019 are **Accepted** for v0.1. Remaining gaps are listed in [open-decisions.md](open-decisions.md). OD-1, OD-2, and OD-3 are closed by [ADR 0019](../adr/0019-local-password-sessions.md).
+Decisions in this directory follow the Architecture Decision Records under [docs/adr/](../adr/README.md). ADRs 0001–0020 are **Accepted** for v0.1. Remaining gaps are listed in [open-decisions.md](open-decisions.md). OD-1, OD-2, and OD-3 are closed by [ADR 0019](../adr/0019-local-password-sessions.md). Session 8 ingestion completion is closed by [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md). OD-14 is unchanged.
 
 ## How to read this set
 
@@ -27,6 +27,7 @@ When two documents describe the same rule, treat this table as the source of tru
 | Entity definitions and lifecycle state names | [domain-model.md](domain-model.md) |
 | Asset ownership and environments | [asset-model.md](asset-model.md) |
 | Ingestion limits, hashing, quarantine | [sbom-ingestion.md](sbom-ingestion.md) |
+| Session 8 `completed` and graph completeness | [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md) |
 | Intelligence provenance and matching | [vulnerability-intelligence.md](vulnerability-intelligence.md) |
 | Finding states and rescan conclusions | [finding-lifecycle.md](finding-lifecycle.md) |
 | Scoring, factors, policy versions | [risk-policy.md](risk-policy.md) |
@@ -40,7 +41,7 @@ When two documents describe the same rule, treat this table as the source of tru
 
 ## What this design set does not claim
 
-- Product workflows (authentication runtime, SBOM processing, scoring, remediation) are specified here. [ADR 0019](../adr/0019-local-password-sessions.md) is accepted; login and session tables are **not** implemented in Batch 1. Session 5 persists the tenant schema; those workflows themselves are **not** implemented yet.
+- Product workflows (SBOM processing, scoring, remediation) are specified here. Authentication HTTP exists (Session 6). Session 8 Batch 1 adds typed ingestion limits and [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md); upload, parse, and graph persistence runtime are **not** implemented yet.
 - The foundation does not claim SOC 2, ISO 27001, FedRAMP, PCI, HIPAA, or any other compliance status.
 
 ## Open decisions

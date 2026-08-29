@@ -38,7 +38,7 @@ Application roles cannot "correct" an audit row. Corrections are new events.
 | `userAgent` | Optional; same policy |
 | `payload` | Redacted structured metadata: ids, hashes, policy version, states |
 
-**Must not** appear in payload or logs: raw SBOM documents, external API tokens, authorization headers, cookies, full third-party payloads, source code, sensitive object-storage URLs (including presigned/signed URLs).
+**Must not** appear in payload or logs: raw SBOM documents, object keys, filenames, parser excerpts, external API tokens, authorization headers, cookies, full third-party payloads, source code, sensitive object-storage URLs (including presigned/signed URLs). SHA-256 of original bytes **may** appear (Confidential). Session 8 creates no signed object URLs.
 
 ### Actor truth table
 
@@ -67,7 +67,7 @@ At minimum, emit events for:
 | `membership.created` / `membership.revoked` / `membership.role_changed` | Membership changes |
 | `organization.created` / `organization.archived` | Org lifecycle |
 | `asset.created` / `asset.archived` / `asset.restored` / `asset.updated` | Asset model |
-| `sbom.uploaded` / `sbom.duplicate` / `sbom.upload_rejected` | Upload recorded or rejected at the API |
+| `sbom.uploaded` / `sbom.duplicate` / `sbom.upload_rejected` | Upload recorded or rejected at the API. `sbom.duplicate` is emitted when a user request resolves to existing evidence; Session 8 does not insert a `duplicate`-state ingestion row. |
 | `sbom.ingestion.completed` / `rejected` / `quarantined` / `failed` / `released_from_quarantine` | Ingestion terminals and release |
 | `sbom.reprocessed` | New ingestion on existing object |
 | `intelligence.imported` | OSV/KEV snapshot stored |

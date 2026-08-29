@@ -60,5 +60,6 @@ Closer implementation notes may add detail. They must not silently weaken accept
 | [0017](0017-optional-ai-user-credentials.md) | Optional AI with user-supplied credentials only | Accepted |
 | [0018](0018-go-cli-deferred.md) | Go CLI deferred until after the web MVP | Accepted |
 | [0019](0019-local-password-sessions.md) | Local password authentication and opaque sessions | Accepted |
+| [0020](0020-sbom-ingestion-graph-completion.md) | Session 8 SBOM ingestion graph completion | Accepted |
 
-Still open before later implementation: MFA and account lockout beyond login rate limits, credential KEK/KMS, instance-operator identity, and a dedicated `packages/application` split. See [open-decisions.md](../architecture/open-decisions.md). OD-1 (authentication mechanism), OD-2 (session store), and OD-3 (interim permission catalog) are closed by [ADR 0019](0019-local-password-sessions.md).
+Still open before later implementation: MFA and account lockout beyond login rate limits, credential KEK/KMS, instance-operator identity, and a dedicated `packages/application` split. See [open-decisions.md](../architecture/open-decisions.md). OD-1 (authentication mechanism), OD-2 (session store), and OD-3 (interim permission catalog) are closed by [ADR 0019](0019-local-password-sessions.md). Session 8 `completed` and graph-completeness semantics are closed by [ADR 0020](0020-sbom-ingestion-graph-completion.md). OD-14 (CycloneDX versions beyond 1.6) is unchanged.
