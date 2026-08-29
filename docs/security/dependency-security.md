@@ -27,9 +27,9 @@ Installed as exact versions (no caret or tilde ranges). No `pnpm.overrides` entr
 | `ajv-formats` | 3.0.1 | MIT | `@patchpilot/sbom` | `date-time` and `uri` formats only; no URL fetch |
 | `packageurl-js` | 2.0.1 | MIT | `@patchpilot/sbom` | Parse Package URLs |
 | `secure-json-parse` | 4.1.0 | BSD-3-Clause | `@patchpilot/sbom` | Reject `__proto__` / `constructor.prototype` keys |
-| `@aws-sdk/client-s3` | 3.1121.0 | Apache-2.0 | `@patchpilot/integrations` | Installed only; no S3 client construction, no default credential-provider chain, no public ACL |
+| `@aws-sdk/client-s3` | 3.1120.0 | Apache-2.0 | `@patchpilot/integrations` | Installed only; no S3 client construction, no default credential-provider chain, no public ACL |
 
-pnpm recorded `minimumReleaseAgeExclude: ['@aws-sdk/client-s3@3.1121.0']` because that exact version was newer than the workspace release-age gate. That exclude is not an override and does not hide an advisory.
+`3.1120.0` is the newest exact version that satisfied Node 24, had no known advisory at install time, and met pnpm 11's default 1440-minute `minimumReleaseAge`. `3.1121.0` was newer than that gate; no `minimumReleaseAgeExclude` entry was kept.
 
 Not installed: `@aws-sdk/lib-storage`, `minio`, `@cyclonedx/cyclonedx-library`, `ajv-formats-draft2019`, `@fastify/multipart`, XML libraries, `libxmljs2`, SPDX parser libraries, archive libraries, malware scanners, live schema clients, or another PURL parser.
 

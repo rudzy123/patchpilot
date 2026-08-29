@@ -19,3 +19,4 @@ CHANGELOG.md
 *.md
 .tsc-check
 deploy/compose/data
+packages/sbom/vendor

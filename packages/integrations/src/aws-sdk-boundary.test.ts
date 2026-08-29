@@ -53,7 +53,7 @@ describe('@aws-sdk/client-s3 boundary', () => {
       dependencies?: Record<string, string>;
     };
     const dependencies = manifest.dependencies ?? {};
-    expect(dependencies['@aws-sdk/client-s3']).toBe('3.1121.0');
+    expect(dependencies['@aws-sdk/client-s3']).toBe('3.1120.0');
     expect(dependencies).not.toHaveProperty('@aws-sdk/lib-storage');
     expect(dependencies).not.toHaveProperty('minio');
   });
@@ -64,5 +64,6 @@ describe('@aws-sdk/client-s3 boundary', () => {
     expect(lockfile).not.toMatch(/^overrides:/m);
     expect(workspace).not.toMatch(/^overrides:/m);
     expect(workspace).not.toContain('pnpm.overrides');
+    expect(workspace).not.toContain('minimumReleaseAgeExclude');
   });
 });
