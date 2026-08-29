@@ -29,10 +29,12 @@ export function createEmptyJobRegistry(): JobRegistry {
  * Tenant object-key conventions (org/{organizationId}/assets/{assetId}/sboms/sha256/{sha256})
  * are accepted in ADR 0008 and deferred until SBOM storage exists.
  *
- * A MinIO adapter is deferred until object operations or storage readiness are required.
- * Local Compose healthchecks cover MinIO for this foundation.
+ * @aws-sdk/client-s3 is installed for a later adapter batch. This package does not
+ * construct an S3 client, use the default credential-provider chain, or set public ACLs.
+ * A MinIO adapter is still deferred; Compose healthchecks are not an SDK compatibility claim.
  */
 export const deferredIntegrationNotes = {
   objectKeyConvention: 'deferred-until-sbom-storage',
   minioAdapter: 'deferred-compose-healthcheck-is-sufficient',
+  s3Client: 'installed-not-wired',
 } as const;

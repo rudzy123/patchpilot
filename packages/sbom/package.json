@@ -2,7 +2,7 @@
   "name": "@patchpilot/sbom",
   "version": "0.0.0",
   "private": true,
-  "description": "Framework-independent SBOM package boundary. No parser in this iteration.",
+  "description": "Offline CycloneDX JSON schema compilation. Complete parser and upload handling are deferred.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -14,7 +14,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "vendor"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -30,5 +31,11 @@
     "eslint": "^9.39.1",
     "typescript": "~5.9.3",
     "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "packageurl-js": "2.0.1",
+    "secure-json-parse": "4.1.0"
   }
 }

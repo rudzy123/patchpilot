@@ -1,4 +1,18 @@
 /**
- * CycloneDX parsing and upload handling are deferred.
+ * Offline CycloneDX JSON schema compilation. Complete parsing, worker-thread
+ * isolation, semantic limits, and graph persistence are deferred.
  */
-export const packageBoundary = '@patchpilot/sbom' as const;
+export { packageBoundary } from './boundary.js';
+export { createOfflineAjv } from './offline-ajv.js';
+export { parsePackageUrl } from './purl.js';
+export {
+  ALLOWLISTED_CYCLONEDX_SPEC_VERSIONS,
+  compileAllowlistedCycloneDxSchemas,
+  readVendoredSchemaFile,
+  selectAllowlistedSpecVersion,
+  validateCycloneDxDocument,
+  type AllowlistedCycloneDxSpecVersion,
+  type CycloneDxSchemaValidation,
+} from './schema-registry.js';
+export { parseUntrustedJson } from './untrusted-json.js';
+export { VENDOR_CYCLONEDX_JSON_SCHEMA_DIRECTORY } from './vendor-directory.js';

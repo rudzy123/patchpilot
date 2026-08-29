@@ -17,15 +17,45 @@ A green Dependency Review or Dependabot alert state does not mean the repository
 
 PatchPilot traces use an explicit OpenTelemetry trace provider and optional OTLP HTTP JSON exporter. Do not add `@opentelemetry/sdk-node`, Prometheus, Jaeger, Zipkin, gRPC, or proto exporters to restore convenience. Those packages pulled unused attack surface (including `protobufjs@8.0.0` via `@opentelemetry/otlp-transformer@0.211.0`). Prefer removing unused exporters over `pnpm.overrides` for `protobufjs`.
 
+## Session 8 Batch 2 approved dependencies
+
+Installed as exact versions (no caret or tilde ranges). No `pnpm.overrides` entry was added. `allowBuilds` was not changed.
+
+| Package | Version | License | Where | Purpose in this batch |
+| --- | --- | --- | --- | --- |
+| `ajv` | 8.20.0 | MIT | `@patchpilot/sbom` | Compile vendored CycloneDX JSON schemas offline |
+| `ajv-formats` | 3.0.1 | MIT | `@patchpilot/sbom` | `date-time` and `uri` formats only; no URL fetch |
+| `packageurl-js` | 2.0.1 | MIT | `@patchpilot/sbom` | Parse Package URLs |
+| `secure-json-parse` | 4.1.0 | BSD-3-Clause | `@patchpilot/sbom` | Reject `__proto__` / `constructor.prototype` keys |
+| `@aws-sdk/client-s3` | 3.1121.0 | Apache-2.0 | `@patchpilot/integrations` | Installed only; no S3 client construction, no default credential-provider chain, no public ACL |
+
+pnpm recorded `minimumReleaseAgeExclude: ['@aws-sdk/client-s3@3.1121.0']` because that exact version was newer than the workspace release-age gate. That exclude is not an override and does not hide an advisory.
+
+Not installed: `@aws-sdk/lib-storage`, `minio`, `@cyclonedx/cyclonedx-library`, `ajv-formats-draft2019`, `@fastify/multipart`, XML libraries, `libxmljs2`, SPDX parser libraries, archive libraries, malware scanners, live schema clients, or another PURL parser.
+
+## Vendored CycloneDX JSON schemas
+
+Official JSON schemas for CycloneDX **1.4**, **1.5**, and **1.6** are stored under `packages/sbom/vendor/cyclonedx-json-schema/`.
+
+- Source repository: `https://github.com/CycloneDX/specification`
+- Source tag: `1.6.1` (lightweight tag; peeled commit equals the tag object)
+- Source commit: `8a27bfd1be5be0dcb2c208a34d2f4fa0b6d75bd7`
+- License: Apache-2.0 (`LICENSE` plus `NOTICE` in that directory)
+- Provenance: `PROVENANCE.json` and `SHA256SUMS`
+
+`$ref` discovery from the three BOM schemas required only `schema/jsf-0.82.schema.json` and `schema/spdx.schema.json` in addition to the BOM files. CycloneDX 1.7, older BOM schemas, XML, protobuf, and strict snapshots are not vendored.
+
+Normal **install, test, build, runtime, and CI do not download schemas**. Re-vendoring is a maintainer-only script (`scripts/vendor-cyclonedx-json-schema.mjs --execute`) that is not a lifecycle or CI script.
+
 ## Remaining `pnpm audit` findings
 
-Re-run on 2026-08-27 against `feat/authentication-authorization` after Session 6 local verification (`pnpm audit` exit 1; metadata: 1 high, 0 critical, 0 moderate, 0 low; 686 total dependencies). No `pnpm.overrides` entry hides an advisory. This is the same Prisma-transitive finding recorded after the observability cut; Session 6 did not add a second advisory.
+Re-run on 2026-08-29 against `feat/sbom-ingestion` after Session 8 Batch 2 local verification, both before and after the new dependencies (`pnpm audit` exit 1; `pnpm audit --prod` exit 1). No `pnpm.overrides` entry hides an advisory. Session 8 Batch 2 did not add a second advisory. The remaining finding is the same Prisma-transitive `deepmerge-ts` advisory recorded after the observability cut and Session 6.
 
 | Advisory | Package | Severity | How it is reached | Residual status |
 | --- | --- | --- | --- | --- |
-| [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx) | `deepmerge-ts@7.1.5` (vulnerable `<8.0.0`, patched `>=8.0.0`) | high | Two paths, both through Prisma 6.19.x in `packages/database`: `@prisma/client` → `prisma` → `@prisma/config` → `deepmerge-ts`, and `prisma` → `@prisma/config` → `deepmerge-ts` | Unrelated to OpenTelemetry and unrelated to PatchPilot password hashing or session tokens. The advisory is stack exhaustion when merging recursive object graphs (CWE-674). PatchPilot does not depend on `deepmerge-ts` directly. Do not add a `pnpm.overrides` entry to silence it. Prefer a Prisma release that depends on `deepmerge-ts>=8.0.0` when one exists. |
+| [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx) | `deepmerge-ts@7.1.5` (vulnerable `<8.0.0`, patched `>=8.0.0`) | high | Two paths, both through Prisma 6.19.x in `packages/database`: `@prisma/client` → `prisma` → `@prisma/config` → `deepmerge-ts`, and `prisma` → `@prisma/config` → `deepmerge-ts` | Unrelated to OpenTelemetry, SBOM schema compilation, `packageurl-js`, `secure-json-parse`, and `@aws-sdk/client-s3`. The advisory is stack exhaustion when merging recursive object graphs (CWE-674). PatchPilot does not depend on `deepmerge-ts` directly. Do not add a `pnpm.overrides` entry to silence it. Prefer a Prisma release that depends on `deepmerge-ts>=8.0.0` when one exists. |
 
-Re-run `pnpm audit` after dependency changes. This table is a snapshot, not a claim that the tree is free of other unreported advisories.
+Re-run `pnpm audit` after dependency changes. This table is a snapshot, not a claim that the tree is free of other unreported advisories. The post-install audit results in this batch must be compared with the pre-install run; do not treat this prose as a substitute for the recorded command output.
 
 ## Review process for dependency pull requests
 
