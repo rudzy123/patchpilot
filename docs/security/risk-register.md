@@ -40,7 +40,7 @@ Decision deadline: before the first implementing PR for that area, unless noted.
 | R28 | Future CLI skips API authz | L | H | P3 | Clients | CLI deferred; must call API | If bypassed | CLI ADR | watch |
 | R29 | DoS of public feeds (external) | L | L | P3 | Intel | Out of product scope | n/a | n/a | accepted |
 | R30 | Compliance theater in UI copy | M | M | P2 | Product | Review checklist; non-goals | Copy drift | Every UI PR | mitigated-in-design |
-| R31 | Numeric ingestion limits unvalidated | H | M | P1 | Ingestion | Labelled proposals with floors/ceilings in `@patchpilot/config`; perf tests still required | Too tight/loose; `SBOM_ORPHAN_GRACE_SECONDS` floor equals `SBOM_IDEMPOTENCY_TTL_SECONDS` floor so the grace floor is not independently loadable | Before production-minded release | open |
+| R31 | Numeric ingestion limits unvalidated | H | M | P1 | Ingestion | Labelled proposals with floors/ceilings in `@patchpilot/config`; perf tests still required | Too tight/loose | Before production-minded release | open |
 | R32 | Database-only audit not WORM | M | M | P1 | Audit | Document limitations; DB grants | Superuser | First audit table | mitigated-in-design |
 | R33 | Coverage heuristic false inconclusive/resolved | M | M | P2 | Findings | 50% drop proposal; tune | Heuristic | First rescan PR | watch |
 | R34 | Exclusive finding states clobber acceptance/mitigation/FP | M | H | P1 | Findings | Occupancy rules in [finding-lifecycle.md](../architecture/finding-lifecycle.md) | UI still must show both records | First finding state PR | mitigated-in-design |

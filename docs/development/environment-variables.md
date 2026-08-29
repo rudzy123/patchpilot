@@ -59,7 +59,7 @@ Required. These are reviewed **initial defaults**, not production performance gu
 | `SBOM_IDEMPOTENCY_TTL_SECONDS` | IdempotencyRecord TTL. Default `86400`. Floor `3600`, ceiling `259200`. |
 | `SBOM_UPLOAD_RATE_LIMIT_MAX` | Max uploads per window per limiter key. Default `10`. Floor `1`, ceiling `60`. |
 | `SBOM_UPLOAD_RATE_LIMIT_WINDOW_SECONDS` | Upload limiter window. Default `900`. Floor `60`, ceiling `3600`. |
-| `SBOM_ORPHAN_GRACE_SECONDS` | Delay before unreferenced object cleanup. Default `604800`. Floor `3600`, ceiling `2592000`. Must be greater than `SBOM_IDEMPOTENCY_TTL_SECONDS`. |
+| `SBOM_ORPHAN_GRACE_SECONDS` | Delay before unreferenced object cleanup. Default `604800`. Floor `7200`, ceiling `2592000`. Must be greater than `SBOM_IDEMPOTENCY_TTL_SECONDS`. |
 | `SBOM_PARSER_VERSION` | Safe VARCHAR(64) parser label. Default `0.1.0`. |
 | `SBOM_NORMALIZATION_VERSION` | Safe VARCHAR(64) normalization label. Default `1`. |
 

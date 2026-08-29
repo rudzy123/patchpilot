@@ -355,10 +355,6 @@ describe('SBOM ingestion configuration', () => {
         limit.envKey,
       ).toEqual([]);
 
-      if (limit.envKey === 'SBOM_ORPHAN_GRACE_SECONDS') {
-        continue;
-      }
-
       const env = relationshipSafeEnv();
       env[limit.envKey] = String(limit.min);
       expect(loadServerConfigFrom(env).sbom[limit.configKey], limit.envKey).toBe(limit.min);
@@ -418,6 +414,15 @@ describe('SBOM ingestion configuration', () => {
       objectStorageOperationTimeoutMs: 2_000,
     });
     expect(issues.some((issue) => issue.path[0] === 'idempotencyTtlSeconds')).toBe(true);
+  });
+
+  it('loads the idempotency TTL and orphan-grace floors together', () => {
+    const env = validDevelopmentEnv();
+    env['SBOM_IDEMPOTENCY_TTL_SECONDS'] = String(SBOM_IDEMPOTENCY_TTL_SECONDS_MIN);
+    env['SBOM_ORPHAN_GRACE_SECONDS'] = String(SBOM_ORPHAN_GRACE_SECONDS_MIN);
+    const config = loadServerConfigFrom(env);
+    expect(config.sbom.idempotencyTtlSeconds).toBe(SBOM_IDEMPOTENCY_TTL_SECONDS_MIN);
+    expect(config.sbom.orphanGraceSeconds).toBe(SBOM_ORPHAN_GRACE_SECONDS_MIN);
   });
 
   it('rejects an orphan grace period that is not greater than the idempotency TTL', () => {
