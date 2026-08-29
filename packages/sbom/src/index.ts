@@ -1,9 +1,24 @@
 /**
- * Offline CycloneDX JSON schema compilation. Complete parsing, worker-thread
- * isolation, semantic limits, and graph persistence are deferred.
+ * Offline CycloneDX JSON schema compilation and parser-thread DTOs.
+ * Complete parsing, worker-thread isolation, semantic limits, and graph
+ * persistence are deferred.
  */
 export { packageBoundary } from './boundary.js';
 export { createOfflineAjv } from './offline-ajv.js';
+export {
+  hashParserWorkerBytes,
+  parserLimitsSchema,
+  parserWorkerFailureSchema,
+  parserWorkerRequestSchema,
+  parserWorkerSuccessSchema,
+  validateParserWorkerFailure,
+  validateParserWorkerRequest,
+  validateParserWorkerSuccess,
+  type ParserThreadMessage,
+  type ParserWorkerFailure,
+  type ParserWorkerRequest,
+  type ParserWorkerSuccess,
+} from './parser-thread.js';
 export { parsePackageUrl } from './purl.js';
 export {
   ALLOWLISTED_CYCLONEDX_SPEC_VERSIONS,

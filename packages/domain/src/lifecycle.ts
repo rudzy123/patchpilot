@@ -86,6 +86,40 @@ export const sbomIngestionStages = [
 ] as const;
 export type SbomIngestionStage = (typeof sbomIngestionStages)[number];
 
+/** Session 8 runtime stages. Frozen correlate/enrich/score values remain unused. */
+export const session8IngestionStages = ['validate', 'parse', 'persist_graph'] as const;
+export type Session8IngestionStage = (typeof session8IngestionStages)[number];
+
+export const session8UnusedIngestionStages = ['correlate', 'enrich', 'score'] as const;
+export type Session8UnusedIngestionStage = (typeof session8UnusedIngestionStages)[number];
+
+export const graphCompletenessValues = ['empty', 'no_dependencies', 'partial', 'complete'] as const;
+export type GraphCompleteness = (typeof graphCompletenessValues)[number];
+
+/** Ingestion states Session 8 may persist. Frozen `duplicate` is unused. */
+export const session8IngestionStates = [
+  'accepted',
+  'queued',
+  'processing',
+  'completed',
+  'rejected',
+  'quarantined',
+  'failed',
+] as const;
+export type Session8IngestionState = (typeof session8IngestionStates)[number];
+
+/**
+ * Session 8 transition helpers treat these as closed. Operator release of
+ * quarantined/failed rows is not a Session 8 transition.
+ */
+export const session8IngestionTerminalStates = [
+  'completed',
+  'rejected',
+  'quarantined',
+  'failed',
+] as const;
+export type Session8IngestionTerminalState = (typeof session8IngestionTerminalStates)[number];
+
 export const componentIdentityStates = ['resolved', 'ambiguous', 'unsupported'] as const;
 export type ComponentIdentityState = (typeof componentIdentityStates)[number];
 
@@ -208,6 +242,7 @@ export type IdempotencyRecordStatus = (typeof idempotencyRecordStatuses)[number]
 
 export const findingTerminalStates = ['resolved'] as const;
 export const remediationTaskTerminalStatuses = ['completed', 'cancelled'] as const;
+/** Frozen catalog including unused `duplicate`. Session 8 helpers use `session8IngestionTerminalStates`. */
 export const sbomIngestionTerminalStates = ['completed', 'rejected', 'duplicate'] as const;
 export const riskAcceptanceTerminalStatuses = ['expired', 'revoked', 'superseded'] as const;
 export const backgroundJobTerminalStatuses = ['succeeded', 'cancelled'] as const;

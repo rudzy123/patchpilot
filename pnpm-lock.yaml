@@ -520,6 +520,12 @@ importers:
 
   packages/sbom:
     dependencies:
+      '@patchpilot/config':
+        specifier: workspace:*
+        version: link:../config
+      '@patchpilot/domain':
+        specifier: workspace:*
+        version: link:../domain
       ajv:
         specifier: 8.20.0
         version: 8.20.0
@@ -532,6 +538,9 @@ importers:
       secure-json-parse:
         specifier: 4.1.0
         version: 4.1.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@patchpilot/eslint-config':
         specifier: workspace:*

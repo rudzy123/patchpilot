@@ -2,7 +2,7 @@
   "name": "@patchpilot/sbom",
   "version": "0.0.0",
   "private": true,
-  "description": "Offline CycloneDX JSON schema compilation. Complete parser and upload handling are deferred.",
+  "description": "Offline CycloneDX JSON schema compilation and parser-thread DTOs. Complete parser runtime is deferred.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -33,9 +33,12 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
+    "@patchpilot/config": "workspace:*",
+    "@patchpilot/domain": "workspace:*",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "packageurl-js": "2.0.1",
-    "secure-json-parse": "4.1.0"
+    "secure-json-parse": "4.1.0",
+    "zod": "^4.4.3"
   }
 }
