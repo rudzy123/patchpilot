@@ -6,6 +6,16 @@ In scope: the ten security-sensitive areas in [AGENTS.md](../../AGENTS.md). Out 
 
 Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). Do not publish exploit payloads here.
 
+## Session 8 Batch 1 notes
+
+[ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md) records graph-complete ingestion. Typed limits live in `@patchpilot/config`. Runtime upload, parse, object storage, and worker processors are **not** implemented in this batch.
+
+- `completed` means verified evidence and persisted graph. It does **not** mean exhaustive inventory or remediation. `empty` / `no_dependencies` are not “no software” / “no dependencies.”
+- Parser wall-clock budget is **worker-thread termination**. `Promise.race` around synchronous `JSON.parse` or Ajv is **not** a control.
+- Private object storage uses tenant-and-Asset-scoped keys. No public or signed object URLs exist.
+- Session 8 has no web upload UI and no retry or quarantine-release API.
+- CSRF residual on session cookies is no longer “runtime not in Batch 1”: Session 6 auth routes exist. Session 8 upload routes do not exist yet.
+
 ## Assets to protect
 
 | Asset | Class | Why it matters |
@@ -61,7 +71,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** XSS in UI, SSRF if fetched, parser crash, prototype pollution.
 
-**Mitigation:** CycloneDX JSON only; no URL fetch; schema and depth limits; quarantine poison; treat names as untrusted text; no `eval`.
+**Mitigation:** CycloneDX JSON 1.4–1.6 only; no URL fetch; schema, depth, node, and semantic limits from typed configuration; quarantine poison; treat names as untrusted text; no `eval`. Parser timeout uses worker-thread termination, not `Promise.race`.
 
 ### Oversized JSON
 
@@ -69,7 +79,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Memory exhaustion (DoS).
 
-**Mitigation:** 20 MiB default cap counted while streaming; reject before parse.
+**Mitigation:** `SBOM_UPLOAD_MAX_BYTES` default 20 MiB counted while streaming; reject before parse. Ordinary `REQUEST_BODY_LIMIT_BYTES` is independent.
 
 ### Deeply nested JSON
 
@@ -77,7 +87,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Worker crash, restart loops.
 
-**Mitigation:** Max depth 32; time-boxed parse; poison → quarantine not infinite retry.
+**Mitigation:** Max depth 32 (configurable); wall-clock parse via worker-thread termination; poison → quarantine not infinite retry. `Promise.race` is not a parser kill switch.
 
 ### Dependency explosion
 
@@ -173,7 +183,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Upload, accept risk, export as the user.
 
-**Mitigation:** `SameSite=Lax`, exact Origin allowlist, and a synchronizer CSRF token on authenticated mutations ([ADR 0019](../adr/0019-local-password-sessions.md)).
+**Mitigation:** `SameSite=Lax`, exact Origin allowlist, and a synchronizer CSRF token on authenticated mutations ([ADR 0019](../adr/0019-local-password-sessions.md)). Session 6 login/logout/select-organization routes implement this. Session 8 has no upload HTTP yet.
 
 ### Credential leakage
 
@@ -365,7 +375,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** False `resolved`.
 
-**Mitigation:** Coverage heuristic → `inconclusive`; see [finding-lifecycle.md](../architecture/finding-lifecycle.md).
+**Mitigation:** Coverage heuristic → `inconclusive`; see [finding-lifecycle.md](../architecture/finding-lifecycle.md). Session 8 `completed` does not imply exhaustive coverage and does not by itself support `resolved`.
 
 ## Control table (material threats)
 
@@ -390,7 +400,7 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 | SSRF | Cloud metadata | URL fetch | Cred theft | No SBOM URLs; allowlist | Egress logs | Block | Adapter tests | Mis-allowlist | Integrations |
 | SQLi | DB | Concat SQL | Takeover | Prisma | — | Restore | — | Raw SQL mistakes | Database |
 | XSS | Sessions | Component names | Session theft | Escape, CSP later | — | Rotate | UI tests | New sinks | Web |
-| CSRF | Mutations | Cross-site POST | Unwanted upload | SameSite + Origin + token | — | Revoke | API tests | Runtime not in Batch 1 | API |
+| CSRF | Mutations | Cross-site POST | Unwanted upload | SameSite + Origin + token | — | Revoke | API tests | Session 6 auth exists; Session 8 upload routes not yet | API |
 | Cred/secret logging | Logs | Header in Pino | Restricted leak | Redaction | Log review | Rotate | Redaction tests | Sink bypass | Logger |
 | Audit alteration | Accountability | UPDATE audit | Lost history | Insert-only | Integrity runbook | Restore | Update-fail test | Superuser | Audit |
 | Public bucket | SBOMs | ACL | Theft | Private + org keys | Cloud alerts | Make private | Adapter tests | Operator ACL | Storage |

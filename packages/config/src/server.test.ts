@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ConfigValidationError, loadServerConfigFrom } from './server.js';
 import { loadPublicConfigFrom } from './public.js';
 import { DEVELOPMENT_SESSION_COOKIE_NAME, PRODUCTION_SESSION_COOKIE_NAME } from './auth.js';
+import { sbomDefaultEnvironmentVariables } from './sbom.js';
 
 function developmentAuthEnv(): Record<string, string> {
   return {
@@ -65,6 +66,7 @@ function validDevelopmentEnv(): Record<string, string> {
     REQUEST_BODY_LIMIT_BYTES: '1048576',
     REQUEST_ID_HEADER: 'x-request-id',
     CORRELATION_ID_HEADER: 'x-correlation-id',
+    ...sbomDefaultEnvironmentVariables(),
     ...developmentAuthEnv(),
   };
 }
@@ -92,6 +94,7 @@ function validProductionEnv(): Record<string, string> {
     REQUEST_BODY_LIMIT_BYTES: '1048576',
     REQUEST_ID_HEADER: 'x-request-id',
     CORRELATION_ID_HEADER: 'x-correlation-id',
+    ...sbomDefaultEnvironmentVariables(),
     ...productionAuthEnv(),
   };
 }

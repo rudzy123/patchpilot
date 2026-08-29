@@ -17,6 +17,33 @@ export function createFrozenClock(isoUtc: string): FrozenClock {
   };
 }
 
+function foundationSbomEnv(): Record<string, string> {
+  return {
+    SBOM_UPLOAD_MAX_BYTES: '20971520',
+    SBOM_JSON_MAX_DEPTH: '32',
+    SBOM_JSON_MAX_NODES: '200000',
+    SBOM_JSON_MAX_STRING_BYTES: '65536',
+    SBOM_MAX_COMPONENTS: '10000',
+    SBOM_MAX_DEPENDENCY_EDGES: '50000',
+    SBOM_MAX_BOM_REF_BYTES: '2048',
+    SBOM_MAX_PURL_BYTES: '2048',
+    SBOM_MAX_COMPONENT_NAME_CHARS: '512',
+    SBOM_MAX_VERSION_CHARS: '256',
+    SBOM_MAX_METADATA_TOOLS: '64',
+    SBOM_MAX_EXTERNAL_REFS_PER_COMPONENT: '32',
+    SBOM_MAX_PROPERTIES_PER_COMPONENT: '64',
+    SBOM_PARSER_TIMEOUT_MS: '60000',
+    SBOM_PROCESSING_LEASE_MS: '900000',
+    SBOM_IDEMPOTENCY_TTL_SECONDS: '86400',
+    SBOM_UPLOAD_RATE_LIMIT_MAX: '10',
+    SBOM_UPLOAD_RATE_LIMIT_WINDOW_SECONDS: '900',
+    OBJECT_STORAGE_OPERATION_TIMEOUT_MS: '30000',
+    SBOM_ORPHAN_GRACE_SECONDS: '604800',
+    SBOM_PARSER_VERSION: '0.1.0',
+    SBOM_NORMALIZATION_VERSION: '1',
+  };
+}
+
 export function createFoundationTestEnv(): Readonly<Record<string, string>> {
   return Object.freeze({
     PATCHPILOT_DEPLOYMENT_ENVIRONMENT: 'test',
@@ -44,6 +71,7 @@ export function createFoundationTestEnv(): Readonly<Record<string, string>> {
     NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: 'test',
     NEXT_PUBLIC_API_BASE_URL: 'http://127.0.0.1:3001',
     PATCHPILOT_ALLOW_DESTRUCTIVE_DATABASE: 'true',
+    ...foundationSbomEnv(),
     ...foundationAuthEnv('test'),
   });
 }
