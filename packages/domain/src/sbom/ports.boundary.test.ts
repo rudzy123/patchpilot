@@ -68,6 +68,7 @@ describe('session 8 port and domain boundary', () => {
           organizationId: input.organizationId,
           scope: input.scope,
           keyHash: input.keyHash,
+          reservationFingerprint: input.reservationFingerprint,
           status: 'started',
           expiresAt: input.expiresAt,
           completedAt: null,
@@ -146,14 +147,15 @@ describe('session 8 port and domain boundary', () => {
         return undefined;
       },
     };
-    const graph: Pick<ComponentGraphPersistencePort, 'replaceForIngestion'> = {
-      replaceForIngestion: async (_input) => err({ code: 'internal', message: 'adapter deferred' }),
+    const graph: Pick<ComponentGraphPersistencePort, 'persistOnceForIngestion'> = {
+      persistOnceForIngestion: async (_input) =>
+        err({ code: 'internal', message: 'adapter deferred' }),
     };
     void metadata.findById('org', 'sbom');
     void ingestions.findById('org', 'ingestion');
     expect(metadata.findById.length).toBe(2);
     expect(ingestions.findById.length).toBe(2);
-    expect(graph.replaceForIngestion.length).toBe(1);
+    expect(graph.persistOnceForIngestion.length).toBe(1);
     const source = readFileSync(join(packageRoot, 'sbom/ports.ts'), 'utf8');
     expect(source).not.toMatch(/rawBody|uploadBody|originalBytes|filename|originalFilename/);
   });

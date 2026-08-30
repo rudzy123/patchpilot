@@ -282,6 +282,7 @@ describe('tenant model persistence', () => {
         sbomId: sbomA.id,
         assetId: assetA.id,
         parserVersion: '0.0.0-test',
+        normalizationVersion: '1',
       },
     });
     const componentA = await prisma.component.create({
@@ -482,6 +483,7 @@ describe('tenant model persistence', () => {
         sbomId: sbom.id,
         assetId: asset.id,
         parserVersion: '0.0.0-test',
+        normalizationVersion: '1',
       },
     });
     const vulnerability = await prisma.vulnerability.create({

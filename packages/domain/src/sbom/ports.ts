@@ -107,6 +107,7 @@ export type HashFreeIdempotencyReservationInput = {
   organizationId: string;
   scope: string;
   keyHash: string;
+  reservationFingerprint: string;
   expiresAt: Date;
 };
 
@@ -121,7 +122,8 @@ export type IdempotencyReservationRecord = {
   organizationId: string;
   scope: string;
   keyHash: string;
-  status: 'started' | 'completed';
+  reservationFingerprint: string;
+  status: 'started' | 'completed' | 'conflict';
   expiresAt: Date;
   completedAt: Date | null;
   response: SbomUploadIdempotencyResponseIds | null;
@@ -138,6 +140,7 @@ export type FinalizeIdempotencyInput = {
   organizationId: string;
   scope: string;
   keyHash: string;
+  reservationFingerprint: string;
   finalFingerprint: string;
   response: SbomUploadIdempotencyResponseIds;
   responseStatus: number;
@@ -189,6 +192,11 @@ export type PersistSbomMetadataInput = {
 export type SbomMetadataPersistencePort = {
   insert(input: PersistSbomMetadataInput): Promise<SbomRecord>;
   findById(organizationId: string, sbomId: string): Promise<SbomRecord | undefined>;
+  findByAssetAndId(
+    organizationId: string,
+    assetId: string,
+    sbomId: string,
+  ): Promise<SbomRecord | undefined>;
   findByAssetAndHash(
     organizationId: string,
     assetId: string,
@@ -212,11 +220,17 @@ export type CreateAcceptedIngestionInput = {
   sbomId: string;
   assetId: string;
   parserVersion: string;
+  normalizationVersion: string;
 };
 
 export type SbomIngestionPersistencePort = {
   createAccepted(input: CreateAcceptedIngestionInput): Promise<Result<SbomIngestionRecord>>;
   findById(organizationId: string, ingestionId: string): Promise<SbomIngestionRecord | undefined>;
+  findByAssetAndId(
+    organizationId: string,
+    assetId: string,
+    ingestionId: string,
+  ): Promise<SbomIngestionRecord | undefined>;
   findCurrentForSbom(
     organizationId: string,
     sbomId: string,
@@ -229,16 +243,30 @@ export type SbomIngestionPersistencePort = {
   ): Promise<Result<{ record: SbomIngestionRecord; snapshot: Session8IngestionSnapshot }>>;
 };
 
+export type PersistOwnedBackgroundJob = {
+  jobId: string;
+  workerIdentifier: string;
+  completedAt: Date;
+};
+
 export type PersistComponentGraphInput = {
   organizationId: string;
   assetId: string;
   sbomId: string;
   sbomIngestionId: string;
   graph: NormalizedComponentGraph;
+  correlationId: string;
+  ownedJob?: PersistOwnedBackgroundJob;
 };
 
+/**
+ * Insert-once graph persistence. Graph rows are inserted once; a completed
+ * ingestion replay is a no-op; graph rows are never deleted and rebuilt; an
+ * incompatible terminal ingestion is rejected; partial failure rolls back the
+ * transaction. Callers pass a validated NormalizedComponentGraph, never raw bytes.
+ */
 export type ComponentGraphPersistencePort = {
-  replaceForIngestion(input: PersistComponentGraphInput): Promise<Result<void>>;
+  persistOnceForIngestion(input: PersistComponentGraphInput): Promise<Result<void>>;
   listOccurrencesForIngestion(
     organizationId: string,
     sbomIngestionId: string,
@@ -269,19 +297,23 @@ export type OutboxRelayClaim = {
   attemptCount: number;
 };
 
-export type ClaimOutboxInput = {
-  eventId: string;
+export type ClaimOutboxBatchInput = {
+  limit: number;
   now: Date;
   leaseExpiresAt: Date;
 };
 
+export type ClaimedOutboxEvent = ClaimableOutboxEvent & OutboxRelayClaim;
+
 export type MarkOutboxProcessedInput = {
+  organizationId: string | null;
   eventId: string;
   acceptedAt: Date;
   queueJobId: string;
 };
 
 export type OutboxDeliveryFailureInput = {
+  organizationId: string | null;
   eventId: string;
   failureCategory: SafeFailureCategory;
   failureCode: SafeFailureCode;
@@ -289,19 +321,28 @@ export type OutboxDeliveryFailureInput = {
 };
 
 export type OutboxDeadLetterInput = {
+  organizationId: string | null;
   eventId: string;
   failureCategory: SafeFailureCategory;
   failureCode: SafeFailureCode;
 };
 
+export type ExpireOutboxLeaseInput = {
+  organizationId: string | null;
+  eventId: string;
+  now: Date;
+};
+
 /**
  * Outbox relay persistence. queueJobId is a deterministic string for a future
- * queue adapter. This port does not expose BullMQ job objects.
+ * queue adapter. This port does not expose BullMQ job objects. Claim is atomic:
+ * due pending rows and expired claimed rows are selected in two bounded branches
+ * then locked with FOR UPDATE SKIP LOCKED. Pending work is preferred so expired
+ * claimed work cannot starve it.
  */
 export type OutboxRelayPersistencePort = {
-  listClaimable(input: { limit: number; now: Date }): Promise<readonly ClaimableOutboxEvent[]>;
-  claim(input: ClaimOutboxInput): Promise<Result<OutboxRelayClaim>>;
-  expireLease(input: { eventId: string; now: Date }): Promise<Result<void>>;
+  claimDueBatch(input: ClaimOutboxBatchInput): Promise<readonly ClaimedOutboxEvent[]>;
+  expireLease(input: ExpireOutboxLeaseInput): Promise<Result<void>>;
   markProcessedAfterQueueAcceptance(
     input: MarkOutboxProcessedInput,
   ): Promise<Result<OutboxEventRecord>>;
@@ -333,6 +374,7 @@ export type QueuedBackgroundJob = {
 };
 
 export type ClaimBackgroundJobInput = {
+  organizationId: string | null;
   jobId: string;
   workerIdentifier: string;
   now: Date;
@@ -353,6 +395,7 @@ export type BackgroundJobLease = {
 };
 
 export type RenewBackgroundJobLeaseInput = {
+  organizationId: string | null;
   jobId: string;
   workerIdentifier: string;
   now: Date;
@@ -360,6 +403,7 @@ export type RenewBackgroundJobLeaseInput = {
 };
 
 export type RetryBackgroundJobInput = {
+  organizationId: string | null;
   jobId: string;
   failureCategory: SafeFailureCategory;
   failureCode: SafeFailureCode;
@@ -367,13 +411,17 @@ export type RetryBackgroundJobInput = {
 };
 
 export type SucceedBackgroundJobInput = {
+  organizationId: string | null;
   jobId: string;
+  workerIdentifier: string;
   completedAt: Date;
   graphCompleteness?: GraphCompleteness;
 };
 
 export type TerminalBackgroundJobFailureInput = {
+  organizationId: string | null;
   jobId: string;
+  workerIdentifier: string;
   failureCategory: SafeFailureCategory;
   failureCode: SafeFailureCode;
   completedAt: Date;

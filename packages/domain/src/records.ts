@@ -246,7 +246,7 @@ export type SbomIngestionRecord = {
   stage: SbomIngestionStage | null;
   attemptNumber: number;
   parserVersion: string;
-  normalizationVersion: string | null;
+  normalizationVersion: string;
   idempotencyKey: string | null;
   startedAt: Date | null;
   completedAt: Date | null;
@@ -268,7 +268,7 @@ export type ComponentRecord = {
   organizationId: string;
   identityKey: string;
   purl: string | null;
-  ecosystem: string;
+  ecosystem: string | null;
   namespace: string | null;
   name: string;
   identityState: ComponentIdentityState;

@@ -382,6 +382,7 @@ describe('session 5 review corrections', () => {
         sbomId: sbomA.id,
         assetId: assetA.id,
         parserVersion: '0.0.0-test',
+        normalizationVersion: '1',
       },
     });
     const ingestionB = await prisma.sbomIngestion.create({
@@ -390,6 +391,7 @@ describe('session 5 review corrections', () => {
         sbomId: sbomB.id,
         assetId: assetB.id,
         parserVersion: '0.0.0-test',
+        normalizationVersion: '1',
       },
     });
     await expect(
@@ -399,6 +401,7 @@ describe('session 5 review corrections', () => {
           sbomId: sbomA.id,
           assetId: assetB.id,
           parserVersion: '0.0.0-test',
+          normalizationVersion: '1',
         },
       }),
     ).rejects.toThrow();
@@ -468,6 +471,7 @@ describe('session 5 review corrections', () => {
         sbomId: sbomA2.id,
         assetId: assetA.id,
         parserVersion: '0.0.0-test',
+        normalizationVersion: '1',
       },
     });
     await expect(
@@ -864,6 +868,7 @@ describe('session 5 review corrections', () => {
         sbomId: sbom.id,
         assetId: asset.id,
         parserVersion: '0.0.0-test',
+        normalizationVersion: '1',
         idempotencyKey: 'upload-1',
       },
     });
@@ -874,6 +879,7 @@ describe('session 5 review corrections', () => {
           sbomId: sbom.id,
           assetId: asset.id,
           parserVersion: '0.0.1-test',
+          normalizationVersion: '1',
           idempotencyKey: 'upload-1',
         },
       }),
@@ -884,6 +890,7 @@ describe('session 5 review corrections', () => {
         sbomId: sbom.id,
         assetId: asset.id,
         parserVersion: '0.0.1-test',
+        normalizationVersion: '1',
         attemptNumber: 2,
       },
     });
@@ -893,6 +900,7 @@ describe('session 5 review corrections', () => {
         sbomId: sbom.id,
         assetId: asset.id,
         parserVersion: '0.0.2-test',
+        normalizationVersion: '1',
         attemptNumber: 3,
       },
     });

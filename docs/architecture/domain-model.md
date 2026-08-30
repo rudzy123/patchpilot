@@ -331,9 +331,9 @@ Lifecycle states and transitions: [sbom-ingestion.md](sbom-ingestion.md). Sessio
 | `assetId` | Denormalized for scoping |
 | `state` | Canonical ingestion state. Session 8 does not insert `duplicate` rows; duplicate evidence reuses the existing resource. |
 | `stage` | Session 8: `validate`, `parse`, `persist_graph`. Frozen unused: `correlate`, `enrich`, `score`. |
-| `graphCompleteness` | `empty`, `no_dependencies`, `partial`, or `complete` after graph persist. `empty` does not mean the Asset contains no software. `no_dependencies` does not prove the software has no dependencies. Persistence is a forthcoming Session 8 migration. |
+| `graphCompleteness` | `empty`, `no_dependencies`, `partial`, or `complete` after graph persist. `empty` does not mean the Asset contains no software. `no_dependencies` does not prove the software has no dependencies. Persisted by Session 8 Batch 4. |
 | `parserVersion` | Parser that ran or will run |
-| `normalizationVersion` | Graph normalization identifier |
+| `normalizationVersion` | Required bounded graph normalization identifier. Database column is NOT NULL. Newly created accepted ingestions always persist the provided label. Mappers fail if a row lacks a value; they do not substitute a default. |
 | `idempotencyKey` | Existing column is unused in Session 8. HTTP idempotency uses **IdempotencyRecord**. |
 | `leaseExpiresAt` | Unused in Session 8. OutboxEvent and BackgroundJob have separate leases. |
 | `errorCode` | Stable taxonomy; no raw payload |
@@ -367,7 +367,7 @@ A component as listed in a specific **SBOMIngestion**, including version and bom
 | `sbomId` | Denormalized; original document |
 | `sbomIngestionId` | Required. Derived graph is per processing attempt |
 | `componentId` | Versionless identity |
-| `version` | Untrusted text; **not** part of **Component** or **Finding** identity. Session 8 will persist unknown versions via a forthcoming `version_known` column; do not store `*` or `latest`. |
+| `version` | Untrusted text; **not** part of **Component** or **Finding** identity. Unknown versions persist as `version_known = false` with an empty placeholder. `*`, `latest`, and `unknown` cannot be represented as known ComponentVersion values in Session 8. They may appear only as literal observed evidence if a future explicit policy permits them. |
 | `versionedPurl` | Optional full PURL including version as listed in the document |
 | `bomRef` | Optional, untrusted |
 | `isDirect` | Observed from the document when present; otherwise unknown |

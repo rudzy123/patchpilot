@@ -29,4 +29,10 @@ export const SBOM_TEMPORARY_OBJECT_KEY_PATTERN =
 export const SBOM_FINAL_OBJECT_KEY_PATTERN =
   /^org\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/assets\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/sboms\/sha256\/[a-f0-9]{64}$/;
 
+/**
+ * These strings cannot be represented as known ComponentVersion values.
+ * Session 8 rejects them in domain validation. They may appear only as literal
+ * observed evidence if a future explicit policy permits them. Persistence does
+ * not add a PostgreSQL sentinel ban.
+ */
 export const FORBIDDEN_KNOWN_VERSION_STRINGS = ['*', 'latest', 'unknown'] as const;

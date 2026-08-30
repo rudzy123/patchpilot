@@ -40,7 +40,7 @@ Future correlation is a **separate additive workflow**. It must not rewrite comp
 | `partial` | Some dependency information was represented; the graph is not a full closed set of listed refs. |
 | `complete` | The document’s dependency graph was fully represented after validation. This is not exhaustive product inventory. |
 
-Unknown `dependsOn` targets reject the ingestion (`unresolved_dependency_ref`). Self-edges are skipped and counted as warnings. Cycles are preserved.
+Unknown `dependsOn` targets reject the ingestion (`unresolved_dependency_ref`). Self-edges are omitted by the parser and counted as warnings (`self_dependency_skipped`). Persistence does not skip or warn on self-edges; a normalized graph that still contains one violates DTO invariants and is rejected. Batch 9 parser tests must prove: the parser receives a self-edge, omits it from normalized edges, increments the self-edge skipped warning count, and persistence then receives a graph with no self-edge. Cycles are preserved.
 
 ## Default limits
 

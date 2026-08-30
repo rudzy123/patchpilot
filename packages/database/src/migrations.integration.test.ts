@@ -14,6 +14,7 @@ import {
   SESSION_6_PREAUTH_MIGRATIONS,
   SESSION_6_THROUGH_ANONYMOUS_MIGRATIONS,
   SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+  SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
   applyMigrationSqlAndResolve,
   applySession3Schema,
   applyThroughAuditActorAnonymous,
@@ -21,6 +22,7 @@ import {
   applyThroughReviewedSession5,
   applyThroughSession5,
   applyThroughSession6,
+  applyThroughSession7,
   createEphemeralDatabase,
   deployMigrations,
   dropEphemeralDatabase,
@@ -110,6 +112,19 @@ const SQL_ONLY_CHECKS = [
   'organization_slug_shape_chk',
   'asset_external_identifier_namespace_shape_chk',
   'asset_external_identifier_value_chk',
+  'sbom_ingestion_processing_started_chk',
+  'sbom_ingestion_completed_requirements_chk',
+  'sbom_ingestion_graph_counts_nonnegative_chk',
+  'sbom_ingestion_graph_completeness_counts_chk',
+  'sbom_ingestion_non_completed_graph_null_chk',
+  'sbom_ingestion_failure_pair_chk',
+  'sbom_ingestion_completed_after_started_chk',
+  'sbom_ingestion_parser_version_label_chk',
+  'sbom_ingestion_normalization_version_label_chk',
+  'sbom_parser_version_last_succeeded_label_chk',
+  'component_ecosystem_null_or_nonempty_chk',
+  'component_occurrence_version_known_chk',
+  'idempotency_record_status_response_chk',
 ] as const;
 
 const SQL_ONLY_INDEXES = [
@@ -124,6 +139,10 @@ const SQL_ONLY_INDEXES = [
   'session_idle_cleanup_idx',
   'session_absolute_cleanup_idx',
   'session_active_org_idx',
+  'component_occurrence_org_ingestion_bom_ref_uidx',
+  'outbox_event_claimed_lease_idx',
+  'background_job_outbox_event_uidx',
+  'sbom_ingestion_org_sbom_created_idx',
 ] as const;
 
 const SQL_ONLY_TRIGGERS = [
@@ -189,6 +208,43 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
   expect(sbomColumns).toContain('captured_at');
   expect(sbomColumns).toContain('created_at');
   expect(sbomColumns).not.toContain('uploaded_at');
+
+  const ingestionColumns = await names(
+    client,
+    `SELECT column_name AS name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'sbom_ingestion'`,
+  );
+  expect(ingestionColumns).toContain('graph_completeness');
+  expect(ingestionColumns).toContain('normalization_version');
+  expect(ingestionColumns).toContain('component_count');
+  expect(ingestionColumns).toContain('dependency_edge_count');
+  expect(ingestionColumns).toContain('warning_count');
+
+  const occurrenceColumns = await names(
+    client,
+    `SELECT column_name AS name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'component_occurrence'`,
+  );
+  expect(occurrenceColumns).toContain('version_known');
+
+  const ecosystemNullable = await client.$queryRaw<Array<{ is_nullable: string }>>`
+    SELECT is_nullable
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'component' AND column_name = 'ecosystem'
+  `;
+  expect(ecosystemNullable[0]?.is_nullable).toBe('YES');
+
+  const graphCompleteness = await names(
+    client,
+    `SELECT e.enumlabel AS name
+     FROM pg_enum e
+     JOIN pg_type t ON t.oid = e.enumtypid
+     JOIN pg_namespace n ON n.oid = t.typnamespace
+     WHERE n.nspname = 'public' AND t.typname = 'sbom_graph_completeness'`,
+  );
+  expect(graphCompleteness).toEqual(
+    expect.arrayContaining(['empty', 'no_dependencies', 'partial', 'complete']),
+  );
 
   const evidenceKinds = await names(
     client,
@@ -308,7 +364,7 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
 }
 
 describe('frozen migrations', () => {
-  it('keeps Session 3 through Session 7 asset-inventory SQL byte-stable', async () => {
+  it('keeps Session 3 through Session 8 graph-persistence SQL byte-stable', async () => {
     for (const frozen of FROZEN_MIGRATIONS) {
       const digest = await sha256File(frozenMigrationFile(frozen.directory));
       expect(digest).toBe(frozen.sha256);
@@ -547,6 +603,7 @@ describe('migrations', () => {
         '20260827170000_audit_actor_anonymous',
         '20260827180000_local_credentials_and_sessions',
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+        SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
       ]);
       expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
 
@@ -618,6 +675,7 @@ describe('migrations', () => {
         '20260827170000_audit_actor_anonymous',
         '20260827180000_local_credentials_and_sessions',
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+        SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -746,6 +804,7 @@ describe('migrations', () => {
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         '20260827180000_local_credentials_and_sessions',
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+        SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -797,6 +856,48 @@ describe('migrations', () => {
       );
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+        SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+      ]);
+      await assertFinalMigratedSchema(client);
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades a Session 7 database by applying only graph persistence', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughSession7(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore).toEqual([
+        ...SESSION_6_COMPLETE_MIGRATIONS,
+        SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+      ]);
+      expect(appliedBefore).not.toContain(SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE);
+
+      const ingestionColumnsBefore = await names(
+        client,
+        `SELECT column_name AS name FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'sbom_ingestion'`,
+      );
+      expect(ingestionColumnsBefore).not.toContain('graph_completeness');
+      expect(ingestionColumnsBefore).not.toContain('normalization_version');
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -824,6 +925,10 @@ describe('migrations', () => {
       await applyMigrationSqlAndResolve(
         ephemeral.databaseUrl,
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+      );
+      await applyMigrationSqlAndResolve(
+        ephemeral.databaseUrl,
+        SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
       );
       await assertFinalMigratedSchema(client);
 
@@ -909,6 +1014,7 @@ describe('migrations', () => {
         '20260827170000_audit_actor_anonymous',
         '20260827180000_local_credentials_and_sessions',
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+        SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
 

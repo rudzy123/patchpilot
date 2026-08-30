@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { FORBIDDEN_KNOWN_VERSION_STRINGS } from './constants.js';
 import {
   fromOccurrenceVersionColumns,
   knownComponentVersion,
@@ -42,11 +43,19 @@ describe('component version', () => {
     expect(fromOccurrenceVersionColumns({ versionKnown: true, version: '' }).ok).toBe(false);
   });
 
-  it('rejects *, latest, unknown, and guessed placeholder strings', () => {
-    expect(knownComponentVersion('*').ok).toBe(false);
-    expect(knownComponentVersion('latest').ok).toBe(false);
-    expect(knownComponentVersion('unknown').ok).toBe(false);
+  it('rejects *, latest, and unknown as known ComponentVersion values', () => {
+    // Session 8 rejects these as known values. They may appear only as literal
+    // observed evidence if a future explicit policy permits them.
+    for (const sentinel of FORBIDDEN_KNOWN_VERSION_STRINGS) {
+      expect(knownComponentVersion(sentinel).ok).toBe(false);
+      expect(parseComponentVersion({ kind: 'known', value: sentinel }).ok).toBe(false);
+      expect(toOccurrenceVersionColumns({ kind: 'known', value: sentinel }).ok).toBe(false);
+      expect(fromOccurrenceVersionColumns({ versionKnown: true, version: sentinel }).ok).toBe(
+        false,
+      );
+    }
     expect(knownComponentVersion('LATEST').ok).toBe(false);
+    expect(knownComponentVersion('Unknown').ok).toBe(false);
   });
 
   it('rejects unknown versions that carry a placeholder observed value', () => {

@@ -1,6 +1,6 @@
 # Database model
 
-This is the Session 5–7 persistence design for PatchPilot. It implements the v0.1 [domain model](domain-model.md) in PostgreSQL through Prisma in `packages/database`. Session 8 Batch 1 does **not** add migrations. Forthcoming Session 8 columns include `graphCompleteness`, bom-ref uniqueness, and `version_known` on occurrences. `SbomIngestion.leaseExpiresAt` already exists and remains **unused** in Session 8. Product parsers, scoring, and upload HTTP routes are **not** implemented here.
+This is the Session 5–8 persistence design for PatchPilot. It implements the v0.1 [domain model](domain-model.md) in PostgreSQL through Prisma in `packages/database`. Session 8 Batch 4 adds graph-completeness columns, nullable Component `ecosystem`, occurrence `version_known`, insert-once graph persistence, outbox claim/execution adapters, and SQL-only CHECKs. `SbomIngestion.leaseExpiresAt` remains **unused** in Session 8. Product parsers, scoring, object-storage adapters, and upload HTTP routes are **not** implemented here.
 
 Opaque IDs are UUIDs (`gen_random_uuid()`). Timestamps are `TIMESTAMPTZ` stored in UTC. Prisma lives only in `packages/database`. Domain ports in `packages/domain` do not import Prisma types.
 
@@ -26,7 +26,7 @@ A global `vulnerability` may be referenced by findings in many organizations. Te
 
 Tenant-owned ports require `organizationId` as a required argument (`findById(organizationId, id)`). There is no `findById(id)` for tenant aggregates. Global intelligence tables may be read without an organization id. Authentication ports (`UserRepository`, `LocalCredentialRepository`, `SessionRepository`, and the membership auth-boundary queries) are instance-level: they take the authenticated user id or a token digest, never a client-supplied organization as authority.
 
-Adapters always add `WHERE organization_id = $organizationId` (or `id = $organizationId` for the organization row itself). Pagination is keyset by `id`, bounded to 1–100 rows (default 20), except the Session 7 Asset list, which is keyset on `(lower(name), id)` with default `lifecycle_status = active`. That list index is SQL-only (`asset_org_status_name_id_idx`); Prisma cannot express `lower(name)`. Mutable Asset aggregates use application compare-and-set on `organization_id`, `id`, `version`, and active lifecycle.
+Adapters always add `WHERE organization_id = $organizationId` (or `id = $organizationId` for the organization row itself). Pagination is keyset by `id`, bounded to 1–100 rows (default 20), except the Session 7 Asset list, which is keyset on `(lower(name), id)` with default `lifecycle_status = active`, and the Session 8 SBOM list, which is keyset on `(received_at DESC, id DESC)`. The Asset list index is SQL-only (`asset_org_status_name_id_idx`); Prisma cannot express `lower(name)`. Mutable Asset aggregates use application compare-and-set on `organization_id`, `id`, `version`, and active lifecycle. Asynchronous `lastSuccessfulSbomIngestionId` pointer updates **do not** increment `Asset.version`: that column remains user compare-and-set concurrency for scalar and collection edits. Pointer fields are system-maintained observation metadata and are not part of `NormalizedUpdateAssetCommand`.
 
 ## Compound foreign keys
 
@@ -79,7 +79,7 @@ Foreign keys use `ON DELETE RESTRICT`. Evidentiary tables are not cascade-delete
 
 ## SchemaFoundation
 
-Session 3 created a technical `SchemaFoundation` table. Migration `20260827120000_tenant_model` drops it. Later forward-only corrections are `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, and `20260827160000_policy_creator_membership`. Session 6 authentication persistence is `20260827170000_audit_actor_anonymous` plus `20260827180000_local_credentials_and_sessions`. Session 7 asset inventory extras are `20260828120000_asset_inventory_constraints`. Committed `migration.sql` files are authoritative, including SQL extras Prisma cannot express. Duplicate `prisma/sql` extras files are not applied independently and are not kept. Frozen Session 3 through Session 6 migration files are unchanged.
+Session 3 created a technical `SchemaFoundation` table. Migration `20260827120000_tenant_model` drops it. Later forward-only corrections are `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, and `20260827160000_policy_creator_membership`. Session 6 authentication persistence is `20260827170000_audit_actor_anonymous` plus `20260827180000_local_credentials_and_sessions`. Session 7 asset inventory extras are `20260828120000_asset_inventory_constraints`. Session 8 graph persistence extras are `20260830120000_sbom_ingestion_graph_persistence`. Committed `migration.sql` files are authoritative, including SQL extras Prisma cannot express. Duplicate `prisma/sql` extras files are not applied independently and are not kept. Frozen Session 3 through Session 8 migration files are unchanged. Any SQL correction after freeze requires another forward-only migration.
 
 ## Row-Level Security
 
@@ -87,7 +87,7 @@ RLS is **not** enabled. Application predicates and compound FKs are the v0.1 con
 
 ## Check constraints (SQL extras)
 
-Prisma cannot express every invariant. Those extras are defined only in committed `migration.sql` files. Migrations `20260827120000_tenant_model`, `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, `20260827160000_policy_creator_membership`, `20260827180000_local_credentials_and_sessions`, and `20260828120000_asset_inventory_constraints` add named checks, including:
+Prisma cannot express every invariant. Those extras are defined only in committed `migration.sql` files. Migrations `20260827120000_tenant_model`, `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, `20260827160000_policy_creator_membership`, `20260827180000_local_credentials_and_sessions`, `20260828120000_asset_inventory_constraints`, and `20260830120000_sbom_ingestion_graph_persistence` add named checks, including:
 
 | Constraint | Invariant |
 | --- | --- |
@@ -111,12 +111,14 @@ Prisma cannot express every invariant. Those extras are defined only in committe
 | `intelligence_source_provider_chk` | Global sync rows are `osv` or `cisa_kev` only |
 | `*_version_chk` | Optimistic concurrency version ≥ 1 |
 | Archive / completed / failure-code timestamp consistency | Status and timestamps agree |
+| `sbom_ingestion_*_chk` / `component_occurrence_version_known_chk` / `component_ecosystem_null_or_nonempty_chk` | Session 8 graph completeness, counts, labels, known/unknown versions, nullable ecosystem |
+| `idempotency_record_status_response_chk` | Generic started/completed/conflict response matrix; not SBOM-specific |
 
 Partial unique indexes cover active asset names per organization, builtin vs org risk-policy versions, NULL-safe asset-owner identity, non-null SBOM ingestion idempotency keys, one active risk acceptance per finding, outbox/audit replay keys, and available outbox work. Ingestion uniqueness is **not** `(sbom_id, parser_version)`: retries keep history via `attempt_number`, and a newer parser may reprocess the same SBOM.
 
 ## Indexes
 
-Every index maps to a documented access or uniqueness need: organization slug; membership by org+user and active memberships; team/environment lookup; assets by org+lifecycle+`lower(name)`+id (SQL-only `asset_org_status_name_id_idx`; supersedes `asset_org_status_idx`), owning team, environment, and last observation; active-name uniqueness (`asset_active_name_org_idx`); SBOMs by asset+received time and org+asset+hash; ingestion by state; component identity; occurrences by SBOM and component; dependency traversal; vulnerability OSV/CVE/aliases and source provenance; findings by org/status/asset/vulnerability/assignee/due; observations by finding+time; policies by org+status; calculations by finding+time; tasks by assignee/status/due; expiring acceptances; audit by org+time and target; outbox claim; job lease; idempotency lookup and expiry; session token/CSRF digests, user, idle/absolute cleanup (worker deferred), and optional active organization. Do not add Prisma `@@index` rows for expression indexes; they stay in `migration.sql`.
+Every index maps to a documented access or uniqueness need: organization slug; membership by org+user and active memberships; team/environment lookup; assets by org+lifecycle+`lower(name)`+id (SQL-only `asset_org_status_name_id_idx`; supersedes `asset_org_status_idx`), owning team, environment, and last observation; active-name uniqueness (`asset_active_name_org_idx`); SBOMs by asset+received time and org+asset+hash; ingestion by state and current-ingestion keyset (`sbom_ingestion_org_sbom_created_idx`); component identity; occurrences by SBOM, component, and non-null bom-ref (`component_occurrence_org_ingestion_bom_ref_uidx`); dependency traversal; vulnerability OSV/CVE/aliases and source provenance; findings by org/status/asset/vulnerability/assignee/due; observations by finding+time; policies by org+status; calculations by finding+time; tasks by assignee/status/due; expiring acceptances; audit by org+time and target; outbox pending work and claimed-lease reclaim (`outbox_event_claimed_lease_idx`); job lease and outbox-event uniqueness (`background_job_outbox_event_uidx`); idempotency lookup and expiry; session token/CSRF digests, user, idle/absolute cleanup (worker deferred), and optional active organization. Do not add Prisma `@@index` rows for expression indexes; they stay in `migration.sql`. The broader `background_job_outbox_idx` is retained because the new unique index was not proven to cover every existing lookup, including null `outbox_event_id` rows.
 
 ## Append-only enforcement
 
@@ -128,7 +130,7 @@ Triggers and revoked DML are not WORM storage. Superusers can still rewrite hist
 
 Organization `slug` uniqueness does not reserve product route names (`api`, `health`, `login`, and similar). Do not treat the current unique index as URL-routing protection. Reserved slugs stay deferred until URL routing is implemented.
 
-[ADR 0019](../adr/0019-local-password-sessions.md) `LocalCredential` and `Session` tables, restored `actor_user_id`, and `anonymous` audit actors are in `20260827170000_audit_actor_anonymous` plus `20260827180000_local_credentials_and_sessions`. Session 5 migrations stay frozen. Authentication HTTP routes, cookies, CSRF, and seed passwords are not in this batch.
+[ADR 0019](../adr/0019-local-password-sessions.md) `LocalCredential` and `Session` tables, restored `actor_user_id`, and `anonymous` audit actors are in `20260827170000_audit_actor_anonymous` plus `20260827180000_local_credentials_and_sessions`. Session 5 migrations stay frozen. Session 8 graph persistence extras are `20260830120000_sbom_ingestion_graph_persistence` and are **not** frozen in this batch. Authentication HTTP routes, cookies, CSRF, and seed passwords are not in this batch.
 
 ## Related documents
 
