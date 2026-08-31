@@ -78,7 +78,7 @@ Archives (zip, tar, gzip-wrapped JSON) are **not** accepted. SPDX is **not** acc
 2. Require `Idempotency-Key` (header) for uploads. Uniqueness is organization-scoped on **IdempotencyRecord**. Replay returns the original result. Session 8 does not write `SbomIngestion.idempotencyKey`.
 3. Check `Content-Type` against the allowlist (ignore extra parameters except charset).
 4. Enforce `Content-Length` if present; still count bytes while reading.
-5. Stream to SHA-256 and a bounded buffer. Abort at size limit. Raw body; no multipart; no Fastify JSON parse for this route.
+5. Stream to SHA-256 with a bounded sniff prefix. Abort at size limit. Raw body; no multipart; no Fastify JSON parse for this route.
 6. Put original bytes to private object storage (temporary key, then content-addressed key).
 7. Database transaction: SBOM metadata + ingestion + audit + idempotency finalization + outbox. No parser, feed, or further storage I/O in this transaction.
 

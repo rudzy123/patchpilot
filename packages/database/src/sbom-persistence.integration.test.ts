@@ -79,6 +79,11 @@ describe('session 8 sbom persistence adapters', () => {
       if (file === 'outbox-relay-persistence.ts') {
         expect(source).toContain('FOR UPDATE SKIP LOCKED');
       }
+      if (file === 'component-graph-persistence.ts') {
+        expect(source).toContain('pg_advisory_xact_lock');
+        expect(source).toContain('SELECT "last_successful_sbom_ingestion_id" AS "current_id"');
+        expect(source).toContain('ReadCommitted');
+      }
     }
   });
 
@@ -689,11 +694,13 @@ describe('session 8 sbom persistence adapters', () => {
       organizationId: org.id,
       sbomId: olderSbom.id,
       assetId: asset.id,
+      createdAt: new Date('2026-08-30T11:00:00.000Z'),
     });
     const newer = await createProcessingIngestion(prisma, {
       organizationId: org.id,
       sbomId: newerSbom.id,
       assetId: asset.id,
+      createdAt: new Date('2026-08-30T17:00:00.000Z'),
     });
     const graph = graphOf(
       [resolvedComponent({ name: 'only', bomRef: 'pkg:npm/only', version: '1.0.0' })],

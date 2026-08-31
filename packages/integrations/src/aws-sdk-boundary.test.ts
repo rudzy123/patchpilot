@@ -54,8 +54,33 @@ describe('@aws-sdk/client-s3 boundary', () => {
     };
     const dependencies = manifest.dependencies ?? {};
     expect(dependencies['@aws-sdk/client-s3']).toBe('3.1120.0');
+    expect(dependencies['@smithy/node-http-handler']).toBe('4.11.3');
     expect(dependencies).not.toHaveProperty('@aws-sdk/lib-storage');
+    expect(dependencies).not.toHaveProperty('@aws-sdk/s3-request-presigner');
     expect(dependencies).not.toHaveProperty('minio');
+  });
+
+  it('does not import signed URLs, multipart helpers, or full-document buffers', () => {
+    const productionFiles = productionTypeScriptFiles(srcRoot);
+    expect(productionFiles.length).toBeGreaterThan(0);
+    const banned =
+      /getSignedUrl|getSignedUrlWithClient|@aws-sdk\/lib-storage|@aws-sdk\/s3-request-presigner|CompleteMultipartUpload|CreateMultipartUpload|UploadPartCommand|transformToByteArray|transformToString/;
+    const drainWait = /once\(\s*['"]drain['"]/;
+    const bufferConcat = /Buffer\.concat/;
+
+    for (const filePath of productionFiles) {
+      const source = readFileSync(filePath, 'utf8');
+      expect(source, filePath).not.toMatch(banned);
+      expect(source, filePath).not.toMatch(drainWait);
+      expect(source, filePath).not.toMatch(bufferConcat);
+    }
+  });
+
+  it('sets WHEN_REQUIRED checksums after streaming PutObject failed with an undefined decoded-content-length header', () => {
+    const source = readFileSync(join(srcRoot, 's3-client.ts'), 'utf8');
+    expect(source).toContain("requestChecksumCalculation: 'WHEN_REQUIRED'");
+    expect(source).toContain("responseChecksumValidation: 'WHEN_REQUIRED'");
+    expect(source).toContain('x-amz-decoded-content-length');
   });
 
   it('does not add a pnpm override for this client', () => {

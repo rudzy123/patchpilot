@@ -82,6 +82,10 @@ export {
   buildTemporarySbomObjectKey,
   isFinalSbomObjectKey,
   isTemporarySbomObjectKey,
+  sbomObjectKeyScope,
+  sbomObjectKeysShareScope,
+  sha256FromFinalSbomObjectKey,
+  type SbomObjectKeyScope,
 } from './object-keys.js';
 export {
   applySession8IngestionTransition,
@@ -110,6 +114,8 @@ export type {
 } from './types.js';
 export {
   deterministicOutboxQueueJobId,
+  isStorageFailureCategory,
+  storageFailureCategories,
   type BackgroundJobExecutionClaim,
   type BackgroundJobExecutionPort,
   type BackgroundJobLease,
@@ -123,6 +129,7 @@ export {
   type CreateAcceptedIngestionInput,
   type DeleteTemporaryObjectInput,
   type FinalizeIdempotencyInput,
+  type GetObjectCompletion,
   type GetObjectInput,
   type GetObjectResult,
   type HashFreeIdempotencyReservationInput,
@@ -143,6 +150,7 @@ export {
   type PersistSbomMetadataInput,
   type PromoteObjectInput,
   type PutTemporaryObjectInput,
+  type PutTemporaryObjectResult,
   type QueueBackgroundJobInput,
   type QueuedBackgroundJob,
   type RenewBackgroundJobLeaseInput,
@@ -155,6 +163,7 @@ export {
   type SbomObjectStoragePort,
   type SbomUploadIdempotencyPort,
   type SbomUploadIdempotencyResponseIds,
+  type StorageFailureCategory,
   type SucceedBackgroundJobInput,
   type TerminalBackgroundJobFailureInput,
 } from './ports.js';

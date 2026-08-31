@@ -27,14 +27,31 @@ export function createEmptyJobRegistry(): JobRegistry {
 
 /**
  * Tenant object-key conventions (org/{organizationId}/assets/{assetId}/sboms/sha256/{sha256})
- * are accepted in ADR 0008 and deferred until SBOM storage exists.
+ * are implemented by S3SbomObjectStorage. The older buffered ObjectStoragePort remains unused.
  *
- * @aws-sdk/client-s3 is installed for a later adapter batch. This package does not
- * construct an S3 client, use the default credential-provider chain, or set public ACLs.
- * A MinIO adapter is still deferred; Compose healthchecks are not an SDK compatibility claim.
+ * The Session 8 adapter uses @aws-sdk/client-s3@3.1120.0 with static credentials,
+ * forcePathStyle, and no public ACLs. Compose MinIO healthchecks are not an SDK
+ * compatibility claim; adapter integration tests are.
  */
 export const deferredIntegrationNotes = {
-  objectKeyConvention: 'deferred-until-sbom-storage',
-  minioAdapter: 'deferred-compose-healthcheck-is-sufficient',
-  s3Client: 'installed-not-wired',
+  objectKeyConvention: 'org-asset-sha256',
+  minioAdapter: 's3-compatible-streaming-adapter',
+  s3Client: 'wired-static-credentials',
 } as const;
+
+export {
+  createS3SbomObjectStorage,
+  S3SbomObjectStorage,
+  type ObjectStorageLogger,
+  type S3SbomObjectStorageConfig,
+  type S3SbomObjectStorageOptions,
+} from './s3-sbom-object-storage.js';
+export { createS3Client, S3ClientConstructionError } from './s3-client.js';
+export { encodeS3CopySource } from './s3-copy-source.js';
+export { classifyS3Failure, classifiedStorageFailure } from './s3-errors.js';
+export {
+  createPutInspectTransform,
+  readableFromByteStream,
+  sniffSbomPrefix,
+  SNIFF_PREFIX_MAX_BYTES,
+} from './s3-stream.js';

@@ -41,7 +41,7 @@ Healthcheck is `redis-cli ping`. Local Redis has no password. Production Redis m
 
 ### MinIO
 
-Healthcheck is `GET /minio/health/live`. There is no MinIO SDK and no guaranteed bucket in this foundation. Object operations are deferred. If curl is missing inside the image, the healthcheck will fail even when the API listens; replace the image pin or healthcheck after confirming with `curl http://127.0.0.1:19000/minio/health/live` from the host.
+Healthcheck is `GET /minio/health/live`. There is no MinIO JavaScript SDK. Session 8 Batch 5 talks to this instance through `@aws-sdk/client-s3` with `forcePathStyle`. Object operations require the configured bucket; development/test may create that bucket through `initializeDevelopmentBucket`. If curl is missing inside the image, the healthcheck will fail even when the API listens; replace the image pin or healthcheck after confirming with `curl http://127.0.0.1:19000/minio/health/live` from the host.
 
 ## Data loss warning
 

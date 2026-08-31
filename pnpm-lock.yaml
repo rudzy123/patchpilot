@@ -403,10 +403,16 @@ importers:
       '@aws-sdk/client-s3':
         specifier: 3.1120.0
         version: 3.1120.0
-    devDependencies:
       '@patchpilot/config':
         specifier: workspace:*
         version: link:../config
+      '@patchpilot/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@smithy/node-http-handler':
+        specifier: 4.11.3
+        version: 4.11.3
+    devDependencies:
       '@patchpilot/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config

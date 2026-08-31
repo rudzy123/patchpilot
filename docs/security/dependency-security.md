@@ -27,7 +27,8 @@ Installed as exact versions (no caret or tilde ranges). No `pnpm.overrides` entr
 | `ajv-formats` | 3.0.1 | MIT | `@patchpilot/sbom` | `date-time` and `uri` formats only; no URL fetch |
 | `packageurl-js` | 2.0.1 | MIT | `@patchpilot/sbom` | Parse Package URLs |
 | `secure-json-parse` | 4.1.0 | BSD-3-Clause | `@patchpilot/sbom` | Reject `__proto__` / `constructor.prototype` keys |
-| `@aws-sdk/client-s3` | 3.1120.0 | Apache-2.0 | `@patchpilot/integrations` | Installed only; no S3 client construction, no default credential-provider chain, no public ACL |
+| `@aws-sdk/client-s3` | 3.1120.0 | Apache-2.0 | `@patchpilot/integrations` | Streaming S3-compatible SBOM object storage. Static credentials only; no default credential-provider chain; no public ACL |
+| `@smithy/node-http-handler` | 4.11.3 | Apache-2.0 | `@patchpilot/integrations` | Direct pin of the version already resolved by the S3 client, for bounded connection and request timeouts |
 
 `3.1120.0` is the newest exact version that satisfied Node 24, had no known advisory at install time, and met pnpm 11's default 1440-minute `minimumReleaseAge`. `3.1121.0` was newer than that gate; no `minimumReleaseAgeExclude` entry was kept.
 

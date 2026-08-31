@@ -89,12 +89,19 @@ describe('session 8 port and domain boundary', () => {
           body: (async function* () {
             yield new Uint8Array();
           })(),
-          byteLength: input.maxBytes,
+          completion: Promise.resolve({ observedByteLength: input.maxBytes }),
+          cancel: async () => undefined,
         }),
     };
     expect(storage.verifyBucketAvailability.length).toBeLessThanOrEqual(1);
     const source = readFileSync(join(packageRoot, 'sbom/ports.ts'), 'utf8');
     expect(source).not.toMatch(/S3Client|PutObjectCommand|GetObjectCommand|@aws-sdk|\$metadata/);
+    expect(source).toContain('declaredByteLength');
+    expect(source).toContain('observedByteLength');
+    expect(source).toContain('storageFailureCategories');
+    expect(source).toMatch(
+      /export type ClassifiedStorageFailure = \{\s*category: StorageFailureCategory;\s*\}/,
+    );
     expect(
       isTemporarySbomObjectKey(
         buildTemporarySbomObjectKey({

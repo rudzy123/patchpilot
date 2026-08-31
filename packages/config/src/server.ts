@@ -24,6 +24,10 @@ import { parseBoolean, parseInteger, readOptional, readRequired } from './read-e
 import {
   bucketNameLooksLikeDevelopmentPlaceholder,
   isValidObjectStorageBucketName,
+  OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MAX,
+  OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MIN,
+  OBJECT_STORAGE_REGION_MAX_LENGTH,
+  OBJECT_STORAGE_REGION_PATTERN,
   refineSbomNumericBounds,
   sbomConfigSchema,
   sbomRelationshipIssues,
@@ -55,10 +59,19 @@ export const serverConfigSchema = z
     redisUrl: z.string().min(1),
     objectStorage: z.object({
       endpoint: z.string().min(1),
+      region: z
+        .string()
+        .min(2)
+        .max(OBJECT_STORAGE_REGION_MAX_LENGTH)
+        .regex(
+          OBJECT_STORAGE_REGION_PATTERN,
+          'Object-storage region must be an explicit bound label.',
+        ),
       accessKey: z.string().min(1),
       secretKey: z.string().min(1),
       bucket: z.string().min(1),
       useSsl: z.boolean(),
+      connectionTimeoutMs: z.number().int().positive(),
     }),
     sbom: sbomConfigSchema,
     openTelemetry: z.object({
@@ -119,6 +132,28 @@ export const serverConfigSchema = z
           'Production object-storage bucket names must not use development placeholders such as patchpilot-dev.',
       });
     }
+
+    if (
+      value.objectStorage.connectionTimeoutMs < OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MIN ||
+      value.objectStorage.connectionTimeoutMs > OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MAX
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['objectStorage', 'connectionTimeoutMs'],
+        message: `Object-storage connection timeout must be between ${OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MIN} and ${OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MAX}.`,
+      });
+    }
+
+    if (value.objectStorage.connectionTimeoutMs > value.sbom.objectStorageOperationTimeoutMs) {
+      context.addIssue({
+        code: 'custom',
+        path: ['objectStorage', 'connectionTimeoutMs'],
+        message:
+          'Object-storage connection timeout must be less than or equal to the operation timeout.',
+      });
+    }
+
+    refineObjectStorageEndpoint(value, context);
 
     refineSbomNumericBounds(value.sbom, (issue) => {
       context.addIssue({
@@ -190,10 +225,15 @@ export function loadServerConfigFrom(
       redisUrl: readRequired(env, 'REDIS_URL'),
       objectStorage: {
         endpoint: readRequired(env, 'OBJECT_STORAGE_ENDPOINT'),
+        region: readRequired(env, 'OBJECT_STORAGE_REGION'),
         accessKey: readRequired(env, 'OBJECT_STORAGE_ACCESS_KEY'),
         secretKey: readRequired(env, 'OBJECT_STORAGE_SECRET_KEY'),
         bucket: readRequired(env, 'OBJECT_STORAGE_BUCKET'),
         useSsl: parseBoolean(readRequired(env, 'OBJECT_STORAGE_USE_SSL'), 'OBJECT_STORAGE_USE_SSL'),
+        connectionTimeoutMs: parseInteger(
+          readRequired(env, 'OBJECT_STORAGE_CONNECTION_TIMEOUT_MS'),
+          'OBJECT_STORAGE_CONNECTION_TIMEOUT_MS',
+        ),
       },
       openTelemetry: {
         enabled: parseBoolean(readRequired(env, 'OTEL_ENABLED'), 'OTEL_ENABLED'),
@@ -579,6 +619,44 @@ function redisUrlHasPassword(redisUrl: string): boolean {
     return parsed.password.length > 0;
   } catch {
     return false;
+  }
+}
+
+function refineObjectStorageEndpoint(value: ServerConfig, context: z.RefinementCtx): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(value.objectStorage.endpoint);
+  } catch {
+    context.addIssue({
+      code: 'custom',
+      path: ['objectStorage', 'endpoint'],
+      message: 'Object-storage endpoint must be a valid URL.',
+    });
+    return;
+  }
+
+  if (parsed.username !== '' || parsed.password !== '') {
+    context.addIssue({
+      code: 'custom',
+      path: ['objectStorage', 'endpoint'],
+      message: 'Object-storage endpoint must not include credentials or userinfo.',
+    });
+  }
+
+  if (value.objectStorage.useSsl && parsed.protocol !== 'https:') {
+    context.addIssue({
+      code: 'custom',
+      path: ['objectStorage', 'endpoint'],
+      message: 'Object-storage endpoint must use https when OBJECT_STORAGE_USE_SSL is true.',
+    });
+  }
+
+  if (!value.objectStorage.useSsl && parsed.protocol !== 'http:') {
+    context.addIssue({
+      code: 'custom',
+      path: ['objectStorage', 'endpoint'],
+      message: 'Object-storage endpoint must use http when OBJECT_STORAGE_USE_SSL is false.',
+    });
   }
 }
 

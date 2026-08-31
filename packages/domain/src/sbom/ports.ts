@@ -17,13 +17,32 @@ import type { SbomListQuery, SbomListPage } from './types.js';
 
 export type ObjectByteStream = AsyncIterable<Uint8Array>;
 
+/**
+ * Provider-neutral object-storage failures. These are not Session 8 public
+ * SafeFailureCode values; later batches map them at the HTTP boundary.
+ */
+export const storageFailureCategories = [
+  'bucket_missing',
+  'object_missing',
+  'access_denied',
+  'timeout',
+  'aborted',
+  'size_limit',
+  'invalid_content',
+  'copy_failed',
+  'storage_unavailable',
+  'internal',
+] as const;
+
+export type StorageFailureCategory = (typeof storageFailureCategories)[number];
+
 export type ClassifiedStorageFailure = {
-  category: Extract<SafeFailureCategory, 'storage' | 'timeout' | 'internal'>;
-  code: Extract<
-    SafeFailureCode,
-    'storage_timeout' | 'object_missing' | 'hash_mismatch' | 'processing_failed'
-  >;
+  category: StorageFailureCategory;
 };
+
+export function isStorageFailureCategory(value: string): value is StorageFailureCategory {
+  return (storageFailureCategories as readonly string[]).includes(value);
+}
 
 export type ObjectStoragePrivacyAssumptions = {
   bucketPrivate: true;
@@ -38,7 +57,13 @@ export type PutTemporaryObjectInput = {
   body: ObjectByteStream;
   contentType: string;
   maxBytes: number;
+  declaredByteLength?: number;
   signal?: AbortSignal;
+};
+
+export type PutTemporaryObjectResult = {
+  sha256: string;
+  observedByteLength: number;
 };
 
 export type PromoteObjectInput = {
@@ -46,6 +71,7 @@ export type PromoteObjectInput = {
   finalObjectKey: string;
   expectedSha256: string;
   expectedByteLength: number;
+  contentType: string;
   signal?: AbortSignal;
 };
 
@@ -62,12 +88,27 @@ export type DeleteTemporaryObjectInput = {
 export type GetObjectInput = {
   finalObjectKey: string;
   maxBytes: number;
+  expectedByteLength?: number;
+  expectedSha256?: string;
   signal?: AbortSignal;
 };
 
+export type GetObjectCompletion = {
+  observedByteLength: number;
+  sha256?: string;
+};
+
+/**
+ * Streaming GetObject handle. `declaredByteLength` is Head/Get metadata and may
+ * be absent. `completion` resolves only after successful end-of-stream and
+ * rejects on abort, timeout, size mismatch, or hash mismatch. Abandoning the
+ * body requires `cancel()` so the socket is destroyed.
+ */
 export type GetObjectResult = {
   body: ObjectByteStream;
-  byteLength: number;
+  declaredByteLength?: number;
+  completion: Promise<GetObjectCompletion>;
+  cancel: () => Promise<void>;
 };
 
 export type InitializeDevelopmentBucketInput = {
@@ -90,7 +131,7 @@ export type SbomObjectStoragePort = {
   ): Promise<Result<void, ClassifiedStorageFailure>>;
   putTemporaryObject(
     input: PutTemporaryObjectInput,
-  ): Promise<Result<void, ClassifiedStorageFailure>>;
+  ): Promise<Result<PutTemporaryObjectResult, ClassifiedStorageFailure>>;
   promoteTemporaryObject(
     input: PromoteObjectInput,
   ): Promise<Result<void, ClassifiedStorageFailure>>;

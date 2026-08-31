@@ -24,8 +24,10 @@ Copy [`.env.example`](../../.env.example) to `.env`. Example values are **develo
 | `OBJECT_STORAGE_ENDPOINT` | S3-compatible endpoint (local MinIO). |
 | `OBJECT_STORAGE_ACCESS_KEY` | Object-storage access key. |
 | `OBJECT_STORAGE_SECRET_KEY` | Object-storage secret. |
-| `OBJECT_STORAGE_BUCKET` | S3-compatible bucket name (3–63 characters, lowercase, digits, dots, hyphens; not an IPv4 address; no adjacent periods). Production rejects development placeholders such as `patchpilot-dev`. Bucket creation is deferred until object operations exist. |
-| `OBJECT_STORAGE_USE_SSL` | `true` or `false`. |
+| `OBJECT_STORAGE_BUCKET` | S3-compatible bucket name (3–63 characters, lowercase, digits, dots, hyphens; not an IPv4 address; no adjacent periods). Production rejects development placeholders such as `patchpilot-dev`. Development and test may create the configured bucket through the Session 8 adapter; production never creates a missing bucket. |
+| `OBJECT_STORAGE_USE_SSL` | `true` or `false`. Must agree with the endpoint scheme (`https` when true, `http` when false). |
+| `OBJECT_STORAGE_REGION` | Explicit S3-compatible region label. Default `us-east-1`. Lowercase alphanumeric and hyphens, 2–32 characters. Required even for MinIO. |
+| `OBJECT_STORAGE_CONNECTION_TIMEOUT_MS` | Socket connect timeout. Default `3000`. Floor `250`, ceiling `10000`. Must be less than or equal to `OBJECT_STORAGE_OPERATION_TIMEOUT_MS`. |
 | `OBJECT_STORAGE_OPERATION_TIMEOUT_MS` | Timeout for a single object-storage operation used by SBOM upload/re-read. Default `30000`. Floor `1000`, ceiling `120000`. Must be less than `SBOM_PROCESSING_LEASE_MS`. |
 | `OTEL_ENABLED` | Enables OpenTelemetry **trace** SDK initialization. Default `false`. Does not enable metrics, log export, or automatic instrumentation. |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Optional OTLP **HTTP JSON** traces endpoint. Required only when exporting. When unset, enabled telemetry uses a no-op span processor and does not contact a collector. Other `OTEL_*` variables are not read by PatchPilot. |

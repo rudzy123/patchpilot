@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { DEVELOPMENT_SESSION_COOKIE_NAME, PRODUCTION_SESSION_COOKIE_NAME } from './auth.js';
 import { ConfigValidationError, loadServerConfigFrom } from './server.js';
 import {
+  OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_DEFAULT,
+  OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MIN,
   OBJECT_STORAGE_OPERATION_TIMEOUT_MS_DEFAULT,
   OBJECT_STORAGE_OPERATION_TIMEOUT_MS_MAX,
   OBJECT_STORAGE_OPERATION_TIMEOUT_MS_MIN,
+  OBJECT_STORAGE_REGION_DEFAULT,
   SBOM_IDEMPOTENCY_TTL_SECONDS_DEFAULT,
   SBOM_IDEMPOTENCY_TTL_SECONDS_MAX,
   SBOM_IDEMPOTENCY_TTL_SECONDS_MIN,
@@ -160,6 +163,7 @@ function relationshipSafeEnv(): Record<string, string> {
   const env = validDevelopmentEnv();
   env['SBOM_PARSER_TIMEOUT_MS'] = String(SBOM_PARSER_TIMEOUT_MS_MIN);
   env['OBJECT_STORAGE_OPERATION_TIMEOUT_MS'] = String(OBJECT_STORAGE_OPERATION_TIMEOUT_MS_MIN);
+  env['OBJECT_STORAGE_CONNECTION_TIMEOUT_MS'] = String(OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MIN);
   env['SBOM_PROCESSING_LEASE_MS'] = String(SBOM_PROCESSING_LEASE_MS_MAX);
   env['SBOM_IDEMPOTENCY_TTL_SECONDS'] = String(SBOM_IDEMPOTENCY_TTL_SECONDS_MIN);
   env['SBOM_ORPHAN_GRACE_SECONDS'] = String(SBOM_ORPHAN_GRACE_SECONDS_MAX);
@@ -329,6 +333,10 @@ describe('SBOM ingestion configuration', () => {
       normalizationVersion: SBOM_NORMALIZATION_VERSION_DEFAULT,
     });
     expect(config.requestBodyLimitBytes).toBe(1_048_576);
+    expect(config.objectStorage.region).toBe(OBJECT_STORAGE_REGION_DEFAULT);
+    expect(config.objectStorage.connectionTimeoutMs).toBe(
+      OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_DEFAULT,
+    );
   });
 
   it('loads valid test configuration', () => {

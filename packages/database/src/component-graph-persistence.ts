@@ -83,14 +83,6 @@ export class PrismaComponentGraphPersistence implements ComponentGraphPersistenc
         return err(SBOM_PROCESSING_REQUIRES_STARTED_AT);
       }
 
-      await tx.$queryRaw`
-        SELECT "id"
-        FROM "asset"
-        WHERE "organization_id" = ${input.organizationId}::uuid
-          AND "id" = ${input.assetId}::uuid
-        FOR UPDATE
-      `;
-
       const sbom = await tx.sbom.findFirst({
         where: {
           organizationId: input.organizationId,
@@ -218,34 +210,12 @@ export class PrismaComponentGraphPersistence implements ComponentGraphPersistenc
         },
       });
 
-      await tx.$executeRaw`
-        UPDATE "asset" AS a
-        SET
-          "last_successful_sbom_ingestion_id" = ${input.sbomIngestionId}::uuid,
-          "last_successful_sbom_ingestion_at" = ${completedAt},
-          "updated_at" = CURRENT_TIMESTAMP
-        WHERE a."organization_id" = ${input.organizationId}::uuid
-          AND a."id" = ${input.assetId}::uuid
-          AND NOT EXISTS (
-            SELECT 1
-            FROM "sbom_ingestion" AS cur
-            INNER JOIN "sbom" AS cur_sbom
-              ON cur_sbom."organization_id" = cur."organization_id"
-             AND cur_sbom."id" = cur."sbom_id"
-            WHERE cur."organization_id" = a."organization_id"
-              AND cur."id" = a."last_successful_sbom_ingestion_id"
-              AND cur."state" = 'completed'
-              AND (
-                cur_sbom."received_at",
-                cur."created_at",
-                cur."id"
-              ) >= (
-                ${sbom.receivedAt}::timestamptz,
-                ${ingestion.createdAt}::timestamptz,
-                ${input.sbomIngestionId}::uuid
-              )
-          )
-      `;
+      await replaceAssetPointerIfCandidateIsCurrent(tx, {
+        organizationId: input.organizationId,
+        assetId: input.assetId,
+        candidateIngestionId: input.sbomIngestionId,
+        completedAt,
+      });
 
       await tx.auditEvent.create({
         data: {
@@ -338,10 +308,103 @@ export class PrismaComponentGraphPersistence implements ComponentGraphPersistenc
 
   private async runInTransaction<T>(work: (client: PrismaClientLike) => Promise<T>): Promise<T> {
     if (isRootPrismaClient(this.client)) {
-      return this.client.$transaction(async (tx) => work(tx));
+      return this.client.$transaction(async (tx) => work(tx), {
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      });
     }
     return work(this.client);
   }
+}
+
+/**
+ * Serialize pointer updates for one asset until commit. `$queryRaw` must
+ * return a row: Prisma cannot deserialize `void` from `pg_advisory_xact_lock`.
+ * Ranking uses the locked pointer id and both ingestions' stored columns so
+ * a concurrent older writer cannot compare against a stale asset snapshot.
+ */
+async function lockAssetForPointerUpdate(
+  tx: PrismaClientLike,
+  organizationId: string,
+  assetId: string,
+): Promise<string | null> {
+  await tx.$queryRaw`
+    SELECT 1::int AS locked
+    FROM (
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${`${organizationId}:${assetId}`}, 0)
+      )
+    ) AS taken
+  `;
+  const locked = await tx.$queryRaw<Array<{ current_id: string | null }>>`
+    SELECT "last_successful_sbom_ingestion_id" AS "current_id"
+    FROM "asset"
+    WHERE "organization_id" = ${organizationId}::uuid
+      AND "id" = ${assetId}::uuid
+    FOR UPDATE
+  `;
+  return locked[0]?.current_id ?? null;
+}
+
+async function replaceAssetPointerIfCandidateIsCurrent(
+  tx: PrismaClientLike,
+  input: {
+    organizationId: string;
+    assetId: string;
+    candidateIngestionId: string;
+    completedAt: Date;
+  },
+): Promise<void> {
+  const currentIngestionId = await lockAssetForPointerUpdate(
+    tx,
+    input.organizationId,
+    input.assetId,
+  );
+
+  if (currentIngestionId !== null) {
+    const ranking = await tx.$queryRaw<Array<{ current_wins: number }>>`
+      SELECT CASE
+        WHEN (
+          cur_sbom."received_at",
+          cur."created_at",
+          cur."id"
+        ) >= (
+          cand_sbom."received_at",
+          cand."created_at",
+          cand."id"
+        )
+        THEN 1
+        ELSE 0
+      END::int AS "current_wins"
+      FROM "sbom_ingestion" AS cand
+      INNER JOIN "sbom" AS cand_sbom
+        ON cand_sbom."organization_id" = cand."organization_id"
+       AND cand_sbom."id" = cand."sbom_id"
+      INNER JOIN "sbom_ingestion" AS cur
+        ON cur."organization_id" = cand."organization_id"
+       AND cur."id" = ${currentIngestionId}::uuid
+       AND cur."state" = 'completed'
+      INNER JOIN "sbom" AS cur_sbom
+        ON cur_sbom."organization_id" = cur."organization_id"
+       AND cur_sbom."id" = cur."sbom_id"
+      WHERE cand."organization_id" = ${input.organizationId}::uuid
+        AND cand."id" = ${input.candidateIngestionId}::uuid
+        AND cand."asset_id" = ${input.assetId}::uuid
+        AND cand."state" = 'completed'
+    `;
+    if (Number(ranking[0]?.current_wins) === 1) {
+      return;
+    }
+  }
+
+  await tx.$executeRaw`
+    UPDATE "asset"
+    SET
+      "last_successful_sbom_ingestion_id" = ${input.candidateIngestionId}::uuid,
+      "last_successful_sbom_ingestion_at" = ${input.completedAt},
+      "updated_at" = CURRENT_TIMESTAMP
+    WHERE "organization_id" = ${input.organizationId}::uuid
+      AND "id" = ${input.assetId}::uuid
+  `;
 }
 
 async function upsertComponent(
