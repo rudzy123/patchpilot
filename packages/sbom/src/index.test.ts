@@ -8,7 +8,7 @@ import secureJsonParse from 'secure-json-parse';
 import { packageBoundary } from './index.js';
 
 describe('@patchpilot/sbom', () => {
-  it('exports a package boundary without claiming a complete parser', () => {
+  it('exports a package boundary for the worker-thread parser', () => {
     expect(packageBoundary).toBe('@patchpilot/sbom');
   });
 

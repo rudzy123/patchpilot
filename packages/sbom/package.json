@@ -2,7 +2,7 @@
   "name": "@patchpilot/sbom",
   "version": "0.0.0",
   "private": true,
-  "description": "Offline CycloneDX JSON schema compilation and parser-thread DTOs. Complete parser runtime is deferred.",
+  "description": "Offline CycloneDX JSON schema compilation and worker-thread parser.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -21,7 +21,7 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test:unit": "vitest run --config vitest.config.ts",
+    "test:unit": "tsc -p tsconfig.build.json && vitest run --config vitest.config.ts",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "devDependencies": {

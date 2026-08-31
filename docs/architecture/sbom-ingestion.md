@@ -6,7 +6,7 @@ SBOMs are untrusted. Do not execute content. Do not fetch `externalReferences`, 
 
 Session 8 implements **validate**, **parse**, and **persist_graph** only. Frozen stage values `correlate`, `enrich`, and `score` remain unused. There is **no** web upload UI and **no** retry or quarantine-release HTTP API in Session 8.
 
-Session 8 Batch 6 implements the authorized, idempotent upload **use case** (`createUploadSbomUseCase` in `@patchpilot/domain`). Session 8 Batch 7 implements Fastify SBOM upload and read routes. Session 8 Batch 8 implements the worker outbox relay (PostgreSQL claim, BullMQ publish, processed + BackgroundJob). Parser runtime and web UI are **not** implemented.
+Session 8 Batch 6 implements the authorized, idempotent upload **use case** (`createUploadSbomUseCase` in `@patchpilot/domain`). Session 8 Batch 7 implements Fastify SBOM upload and read routes. Session 8 Batch 8 implements the worker outbox relay (PostgreSQL claim, BullMQ publish, processed + BackgroundJob). Session 8 Batch 9 implements the worker-thread CycloneDX parser. Graph-persist processors and web UI are **not** implemented.
 
 ## Goals
 
@@ -42,7 +42,7 @@ Future correlation is a **separate additive workflow**. It must not rewrite comp
 | `partial` | Some dependency information was represented; the graph is not a full closed set of listed refs. |
 | `complete` | The document’s dependency graph was fully represented after validation. This is not exhaustive product inventory. |
 
-Unknown `dependsOn` targets reject the ingestion (`unresolved_dependency_ref`). Self-edges are omitted by the parser and counted as warnings (`self_dependency_skipped`). Persistence does not skip or warn on self-edges; a normalized graph that still contains one violates DTO invariants and is rejected. Batch 9 parser tests must prove: the parser receives a self-edge, omits it from normalized edges, increments the self-edge skipped warning count, and persistence then receives a graph with no self-edge. Cycles are preserved.
+Unknown `dependsOn` targets reject the ingestion (`unresolved_dependency_ref`). Self-edges are omitted by the parser and counted as warnings (`self_dependency_skipped`). Persistence does not skip or warn on self-edges; a normalized graph that still contains one violates DTO invariants and is rejected. Batch 9 parser tests prove: the parser receives a self-edge, omits it from normalized edges, increments the self-edge skipped warning count, and persistence then receives a graph with no self-edge. Cycles are preserved.
 
 ## Default limits
 

@@ -18,6 +18,9 @@ function productionTypeScriptFiles(directory: string): string[] {
     if (entry.name.endsWith('.test.ts') || entry.name.endsWith('.integration.test.ts')) {
       continue;
     }
+    if (entry.name === 'hang-worker-thread.ts') {
+      continue;
+    }
     if (entry.name.endsWith('.ts')) {
       files.push(fullPath);
     }
