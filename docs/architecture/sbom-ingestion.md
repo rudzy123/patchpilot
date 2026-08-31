@@ -6,7 +6,7 @@ SBOMs are untrusted. Do not execute content. Do not fetch `externalReferences`, 
 
 Session 8 implements **validate**, **parse**, and **persist_graph** only. Frozen stage values `correlate`, `enrich`, and `score` remain unused. There is **no** web upload UI and **no** retry or quarantine-release HTTP API in Session 8.
 
-Session 8 Batch 6 implements the authorized, idempotent upload **use case** (`createUploadSbomUseCase` in `@patchpilot/domain`). Fastify upload routes, Redis/BullMQ publication, parser runtime, and web UI are **not** implemented.
+Session 8 Batch 6 implements the authorized, idempotent upload **use case** (`createUploadSbomUseCase` in `@patchpilot/domain`). Session 8 Batch 7 implements Fastify SBOM upload and read routes. Redis/BullMQ publication, parser runtime, and web UI are **not** implemented.
 
 ## Goals
 
