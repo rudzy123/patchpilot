@@ -2,7 +2,7 @@
 
 Use this when unpublished or unprocessed `outbox_event` rows accumulate. Architecture: [reliability model](../architecture/reliability-model.md), [ADR 0007](../adr/0007-transactional-outbox.md).
 
-Session 5 persists outbox rows. The worker relay is **not** implemented yet. A backlog with no relay is expected until that milestone.
+Session 5 persists outbox rows. Session 8 Batch 8 implements the worker relay: claim with `FOR UPDATE SKIP LOCKED`, publish to BullMQ, mark `processed`, and create or reuse `BackgroundJob`. A backlog still means Redis is down, the relay is crashed, or poison events were dead-lettered.
 
 ## Symptoms
 
@@ -20,7 +20,7 @@ Session 5 persists outbox rows. The worker relay is **not** implemented yet. A b
 
 | Class | Notes |
 | --- | --- |
-| Relay not deployed | Expected before the worker outbox relay exists |
+| Relay not deployed | Unexpected after Session 8 Batch 8; check worker process |
 | Relay crash | Rows remain `pending`; PostgreSQL is source of truth |
 | Poison payload | Bound `last_failure_code`; do not retry infinitely |
 | Duplicate delivery | At-least-once; handlers must be idempotent |
