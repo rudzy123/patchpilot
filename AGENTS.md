@@ -29,6 +29,7 @@ These are deliberate, documented gaps. Do not silently close one inside an unrel
 - No BullMQ `attempts`/`backoff` on `sbom.ingest` and no BackgroundJob requeue poller. A retryable failure leaves resumable state and stops until an operator replays the job.
 - `sbom.upload_rejected`, `sbom.ingestion.released_from_quarantine`, and `sbom.reprocessed` are specified in the audit model and not yet emitted.
 - Ingestion limit values in `packages/config` are unmeasured proposals (risk R31).
+- Idempotency reservation renewal during a slow client upload is not implemented (risk R43).
 
 ## Target repository layout
 

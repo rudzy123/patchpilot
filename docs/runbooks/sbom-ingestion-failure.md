@@ -28,7 +28,7 @@ Every ingestion failure carries one code from the closed catalog in [sbom-ingest
 | Rejected | `payload_too_large`, `content_type`, `utf8`, `json_syntax`, `json_depth`, `json_nodes`, `json_string_length`, `not_cyclonedx`, `unsupported_spec_version`, `schema_invalid`, `component_limit`, `edge_limit`, `identifier_length`, `tool_limit`, `reference_limit`, `property_limit`, `duplicate_bom_ref`, `unresolved_dependency_ref`, `invalid_purl`, `normalized_output_too_large` | The user must fix and re-upload. Do not requeue. Raising a limit is a **validated** configuration change, not an incident workaround. |
 | Quarantined | `prototype_pollution`, `parser_timeout`, `parser_crash`, `hash_mismatch` | Human review. Never auto-release. |
 | Retryable | `object_missing`, `storage_timeout`, `queue_unavailable` | Fix the infrastructure, then replay. |
-| Terminal internal | `processing_failed` | A bug, a misconfiguration, or missing state. Investigate before replaying. |
+| Terminal internal | `processing_failed` | A bug, a misconfiguration, missing state, or **objectKey** scope mismatch after reload. Investigate before replaying. |
 
 `hash_mismatch` is the one to escalate. It means stored bytes no longer verify against the recorded digest, which is corruption or tampering, not a transient fault.
 

@@ -198,6 +198,8 @@ No request sets an ACL. Production code cannot reference `getSignedUrl` or `@aws
 
 `cancel()` rejects with `aborted`. Every operation combines the caller's `AbortSignal` with a timeout derived from `OBJECT_STORAGE_OPERATION_TIMEOUT_MS`, and the SDK is configured with `maxAttempts: 1` so a retry storm cannot multiply that budget.
 
+The storage port validates final-key **shape** only, not tenant scope. Promote enforces matching org/asset prefixes between temporary and final keys. The ingestion processor adds a second check: `sbomObjectKeyScope(objectKey)` must agree with the reloaded **SBOM** row before any GET.
+
 ### Failure categories
 
 The adapter returns a `StorageFailureCategory`, never a raw SDK error. The ingestion processor maps each category to a safe failure code:
@@ -251,6 +253,8 @@ The outbox `dedupeKey` for `sbom.ingest` is `{organizationId}:sbom.ingest:{sbomI
 
 Reservation is taken **before** any storage write. A second request presenting the same key while the first is still in flight receives 409 `in_progress` rather than starting a competing upload. A request presenting the same key with a different asset or content type receives 409 `idempotency_conflict`. A replay of a finished upload returns the original 202 body byte-for-byte and does not write a second outbox event.
 
+`SBOM_IDEMPOTENCY_TTL_SECONDS` must exceed **twice** `OBJECT_STORAGE_OPERATION_TIMEOUT_MS` so a reservation can cover sequential temporary put and promote. That rule is enforced at process start. It does **not** bound a slow client stream: the reservation fingerprint covers only `assetId` and `contentType`, not body hash, and `expiresAt` is fixed at reservation time. An upload still streaming when the TTL expires can lose the key to a reclaiming request and leave a possible orphan. Operators should keep the TTL comfortably above expected upload duration; reservation renewal during streaming is not implemented.
+
 Job handlers are idempotent at each step: claiming an already-succeeded **BackgroundJob** returns `already_complete`, and graph persistence is insert-once for a given `sbomIngestionId`.
 
 ## Asynchronous processing
@@ -262,10 +266,11 @@ After `accepted`, the relay publishes `sbom.ingest`. The processor's step order 
 3. Claim the BackgroundJob lease. A lost claim is a retry, not a second execution.
 4. Reload the **SbomIngestion** with an organization predicate and transition it to `processing`.
 5. Reload the **SBOM** row with an organization predicate and use the stored `objectKey`, never a key rebuilt from a payload digest.
-6. Get a copy from object storage **outside** any database transaction.
-7. Verify byte length and SHA-256 against stored metadata while streaming.
-8. Parse in a worker thread: secure JSON parse, prototype-key rejection, structural limits, allowlisted CycloneDX schema validation, semantic limits, PURL normalization.
-9. Persist the derived graph **keyed by this `sbomIngestionId`** in a **database transaction that performs no HTTP, queue, or object-storage I/O**. The same transaction marks the ingestion `completed`, appends the `sbom.ingestion.completed` audit event, updates the Asset pointer, and marks the BackgroundJob succeeded.
+6. Verify the key's embedded `org/{organizationId}/assets/{assetId}` segments match the reloaded SBOM row. A mismatch is `processing_failed` with no storage GET.
+7. Get a copy from object storage **outside** any database transaction.
+8. Verify byte length and SHA-256 against stored metadata while streaming.
+9. Parse in a worker thread: secure JSON parse, prototype-key rejection, structural limits, allowlisted CycloneDX schema validation, semantic limits, PURL normalization. A worker that exits without posting a result is `parser_crash`, not a hung host promise.
+10. Persist the derived graph **keyed by this `sbomIngestionId`** in a **database transaction that performs no HTTP, queue, or object-storage I/O**. The same transaction marks the ingestion `completed`, appends the `sbom.ingestion.completed` audit event, updates the Asset pointer, and marks the BackgroundJob succeeded.
 
 Graph persist is `completed`. Correlation is not part of this session.
 
@@ -429,7 +434,7 @@ Each code has a **category** (what kind of thing went wrong) and an **outcome** 
 | `normalized_output_too_large` | limit | rejected | Normalized result exceeds the bounded output budget |
 | `prototype_pollution` | poison | quarantined | `__proto__`, `constructor`, or `prototype` used as a JSON object key |
 | `parser_timeout` | timeout | quarantined | Worker thread terminated at `SBOM_PARSER_TIMEOUT_MS` |
-| `parser_crash` | poison | quarantined | Worker thread died or returned an unusable result |
+| `parser_crash` | poison | quarantined | Worker thread died, returned an unusable result, or exited without posting a message |
 | `hash_mismatch` | storage | quarantined | Stored bytes do not match the recorded SHA-256 or byte length |
 | `object_missing` | storage | retryable | Stored object not found at read time |
 | `storage_timeout` | storage | retryable | Object-storage timeout, abort, or unavailability |
@@ -449,6 +454,8 @@ The original object remains for forensic review by **authorized** org admins and
 The parse budget is enforced by `worker.terminate()` on a Node worker thread, not by `Promise.race`. A promise cannot preempt CPU-bound work on the same isolate, so a `Promise.race` around synchronous `JSON.parse` or Ajv is not a control and must not be introduced as one. The processing lease is an execution lock, not a parser kill switch.
 
 Termination yields `parser_timeout`, which quarantines. That is intentional: a document that exhausted a 60-second budget once will exhaust it again, and retrying converts one hostile upload into sustained CPU denial.
+
+A worker thread that exits without posting a message is treated as `parser_crash` and quarantined. The host must never leave a BullMQ handler waiting on an unsettled parser promise.
 
 Quarantine behavior:
 

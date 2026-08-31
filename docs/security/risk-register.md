@@ -52,6 +52,7 @@ Decision deadline: before the first implementing PR for that area, unless noted.
 | R40 | Retryable ingestion failure stalls with no redelivery | H | M | P1 | Jobs | State returns to `queued` consistently and idempotently; operator replay is safe | No BullMQ `attempts` on `sbom.ingest` and no BackgroundJob poller; detection is manual | Before an operator-hosted release | open |
 | R41 | No BackgroundJob lease heartbeat | M | M | P2 | Jobs | Config forbids parser and storage timeouts at or above the lease; handlers idempotent so double execution is safe | A run exceeding the 15-minute lease can be claimed twice | Before raising the parser budget | open |
 | R42 | Stored evidence altered after upload | L | H | P1 | Storage | Re-read verifies byte length and SHA-256 while streaming; mismatch quarantines rather than retries | Attacker with both bucket and database write | Implemented Session 8 | mitigated-in-design |
+| R43 | Idempotency reservation expires during slow client upload | M | M | P2 | Ingestion | TTL must exceed 2× object-storage operation timeout; concurrent same-key requests get 409 while unexpired | Fingerprint excludes body; no reservation renewal; reclaim can orphan promoted bytes | Before operator-hosted release | open |
 
 ## P0 meaning
 

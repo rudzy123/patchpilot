@@ -15,7 +15,9 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 - Private object storage uses tenant-and-Asset-scoped keys. No public ACLs and no signed or presigned object URLs exist; a boundary test fails the build if presigner APIs appear in production code.
 - Upload routes now exist and enforce session authentication, exact Origin match, a synchronizer CSRF token, `sbom:upload` on the active organization, a required `Idempotency-Key`, per-route size limits, and peer-IP plus per-organization rate limits with `trustProxy=false`.
 - Every ingestion failure resolves to a closed-set safe failure code. Codes are what reach logs, audit payloads, and API responses; document content, Ajv output, and exception text do not.
-- Still absent, and therefore still residual: web upload UI, retry and quarantine-release APIs, object-storage orphan reconciliation, and a BackgroundJob lease heartbeat.
+- The ingestion processor verifies `objectKey` tenant scope against the reloaded **SBOM** row before storage GET. A worker thread that exits without posting a result is `parser_crash`, not a hung promise.
+- `SBOM_IDEMPOTENCY_TTL_SECONDS` must exceed twice `OBJECT_STORAGE_OPERATION_TIMEOUT_MS` at process start. Slow client streams can still outlive a reservation; renewal during upload is not implemented.
+- Still absent, and therefore still residual: web upload UI, retry and quarantine-release APIs, object-storage orphan reconciliation, BackgroundJob lease heartbeat, and idempotency reservation renewal during streaming upload.
 
 ## Assets to protect
 
@@ -64,7 +66,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Systematic data leak.
 
-**Mitigation:** Org-prefixed object keys; org-scoped uniqueness; reload aggregates in workers; no cross-org operator API without ADR.
+**Mitigation:** Org-prefixed object keys; org-scoped uniqueness; reload aggregates in workers; ingestion verifies `objectKey` scope against the reloaded **SBOM** row before GET; promote rejects cross-scope keys; no cross-org operator API without ADR.
 
 ### Malicious SBOMs
 
@@ -88,7 +90,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Worker crash, restart loops.
 
-**Mitigation:** Max depth 32 (configurable); wall-clock parse via worker-thread termination; poison → quarantine not infinite retry. `Promise.race` is not a parser kill switch.
+**Mitigation:** Max depth 32 (configurable); wall-clock parse via worker-thread termination; worker exit without a message → `parser_crash`; poison → quarantine not infinite retry. `Promise.race` is not a parser kill switch.
 
 ### Dependency explosion
 
@@ -409,7 +411,7 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 | Threat | Asset | Attack path | Impact | Preventive | Detective | Recovery | Test | Residual | Owner |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | IDOR | Findings, SBOMs | UUID in URL without membership | Cross-tenant read | Org predicate, deny default | Authz deny metrics | Isolation incident runbook | Cross-tenant tests | Until code exists | `packages/domain`, API |
-| Broken tenancy | All tenant data | Missing WHERE; digest-only keys | Systematic leak | Prefixed keys; job reload | Anomalous org access | Isolate, rotate | Isolation + job tamper | Operator disk | Tenancy |
+| Broken tenancy | All tenant data | Missing WHERE; digest-only keys | Systematic leak | Prefixed keys; promote scope; ingest key check; job reload | Anomalous org access | Isolate, rotate | Isolation + job tamper | Operator disk | Tenancy |
 | Privilege escalation | Acceptance, creds | Role not checked | Bad accept / leak | Role matrix | Audit | Revoke session | API authz tests | Insider owner | Authz |
 | Malicious SBOM | Parser, UI | Hostile JSON | XSS, crash, SSRF | No fetch, limits, escape | Quarantine metrics | Quarantine runbook | Parser tests | GIGO | `packages/sbom` |
 | Oversized JSON | API memory | Huge body | DoS | 20 MiB proposal cap | 413 metrics | Rate limit | Size tests | Volumetric DoS | API |
