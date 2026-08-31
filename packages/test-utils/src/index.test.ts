@@ -19,6 +19,10 @@ describe('test utilities', () => {
     const before = process.env['DATABASE_URL'];
     const env = createFoundationTestEnv();
     expect(env['PATCHPILOT_DEPLOYMENT_ENVIRONMENT']).toBe('test');
+    expect(env['INTELLIGENCE_KEV_ENABLED']).toBe('true');
+    expect(env['INTELLIGENCE_OSV_ENABLED']).toBe('false');
+    expect(env['INTELLIGENCE_KEV_URL']).toBeUndefined();
+    expect(env['INTELLIGENCE_OSV_URL']).toBeUndefined();
     expect(process.env['DATABASE_URL']).toBe(before);
   });
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ConfigValidationError, loadServerConfigFrom } from './server.js';
 import { loadPublicConfigFrom } from './public.js';
 import { DEVELOPMENT_SESSION_COOKIE_NAME, PRODUCTION_SESSION_COOKIE_NAME } from './auth.js';
+import { intelligenceDefaultEnvironmentVariables } from './intelligence.js';
 import { sbomDefaultEnvironmentVariables } from './sbom.js';
 
 function developmentAuthEnv(): Record<string, string> {
@@ -67,6 +68,7 @@ function validDevelopmentEnv(): Record<string, string> {
     REQUEST_ID_HEADER: 'x-request-id',
     CORRELATION_ID_HEADER: 'x-correlation-id',
     ...sbomDefaultEnvironmentVariables(),
+    ...intelligenceDefaultEnvironmentVariables(),
     ...developmentAuthEnv(),
   };
 }
@@ -95,6 +97,7 @@ function validProductionEnv(): Record<string, string> {
     REQUEST_ID_HEADER: 'x-request-id',
     CORRELATION_ID_HEADER: 'x-correlation-id',
     ...sbomDefaultEnvironmentVariables(),
+    ...intelligenceDefaultEnvironmentVariables(),
     ...productionAuthEnv(),
   };
 }
@@ -114,6 +117,9 @@ describe('loadServerConfigFrom', () => {
     expect(config.deploymentEnvironment).toBe('development');
     expect(config.allowDevelopmentAdapters).toBe(true);
     expect(config.corsAllowedOrigins).toEqual(['http://127.0.0.1:3000']);
+    expect(config.intelligence.kevEnabled).toBe(true);
+    expect(config.intelligence.osvEnabled).toBe(false);
+    expect(config.intelligence.osvRuntime).toBe('deferred');
   });
 
   it('does not require mutating process.env', () => {

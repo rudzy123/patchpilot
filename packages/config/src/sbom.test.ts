@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEVELOPMENT_SESSION_COOKIE_NAME, PRODUCTION_SESSION_COOKIE_NAME } from './auth.js';
+import { intelligenceDefaultEnvironmentVariables } from './intelligence.js';
 import { ConfigValidationError, loadServerConfigFrom } from './server.js';
 import {
   OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_DEFAULT,
@@ -124,6 +125,7 @@ function validDevelopmentEnv(): Record<string, string> {
     REQUEST_ID_HEADER: 'x-request-id',
     CORRELATION_ID_HEADER: 'x-correlation-id',
     ...sbomDefaultEnvironmentVariables(),
+    ...intelligenceDefaultEnvironmentVariables(),
     ...developmentAuthEnv(),
   };
 }

@@ -31,7 +31,16 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 | Import vs correlation | [ADR 0010](../adr/0010-osv-correlation.md) remains future correlation, not the Session 9 import mechanism | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) |
 | Snapshot/provenance strategy | Private raw snapshots, append-only revisions, guarded current-projection activation, content SHA-256 idempotency | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Object-key layout still open. |
 
-OD-8 (exact outbound numeric limits), OD-10 (instance operator identity), and OD-15 (matching algorithm) remain open.
+## Closed in Session 9 Batch 2C (configuration)
+
+| ID | Topic | Status after Batch 2C |
+| --- | --- | --- |
+| OD-8 KEV numeric limits | KEV response, count, parser, HTTP, lease, and staging-chunk bounds | Provisionally resolved for **initial KEV implementation** in `@patchpilot/config`. Values are PatchPilot safety margins from one 2026-08-31 snapshot, not CISA guarantees. |
+| OD-8 OSV archive runtime limits | Compressed/expanded `all.zip` operator download authorization | **Remains open.** Observed ~1.43 GiB / ~8.74 GiB / 890,787 entries are documented, not encoded as runtime configuration. OSV runtime remains disabled. |
+| OD-19 | Provider-neutral Vulnerability identity | **Remains open.** |
+| OD-20 | Staging database schema | **Remains open.** Active-generation staging is still required for KEV; schema is not designed in this batch. |
+
+OD-10 (instance operator identity) and OD-15 (matching algorithm) remain open.
 
 ## Still open
 
@@ -41,7 +50,7 @@ OD-8 (exact outbound numeric limits), OD-10 (instance operator identity), and OD
 | OD-5 | Production object-storage vendor | The port is S3-compatible; AWS, MinIO, or GCS interop is an operations choice. | Provider-neutral port ([ADR 0008](../adr/0008-private-object-storage.md)). Local Compose uses MinIO. Production uses any S3-compatible private bucket the operator provides. |
 | OD-6 | Application-layer package split | Use cases could live in `packages/domain` or a dedicated package. | Use cases live in `packages/domain` as application services. Revisit only if the package becomes unwieldy. |
 | OD-7 | Priority vs risk score split | Glossary treats them as the same until an ADR splits them. | Keep **priority** as the stored calculated ranking. **Risk score** is a synonym. Do not introduce a second authoritative number. |
-| OD-8 | Exact outbound rate-limit and import size numbers | OSV archive size, KEV body size, and provider limits are unmeasured. Conditional GET is unverified. | No production numeric limits in ADR 0021. Do not treat earlier prose (30 req/min, 5 MiB) as provider SLAs. Measure archives before implementation. |
+| OD-8 | Exact outbound rate-limit and import size numbers | KEV limits are provisionally in `@patchpilot/config`. OSV archive runtime limits are still not an operator download authorization. Conditional GET is not the KEV protocol. | Use the typed KEV bounds. Keep `INTELLIGENCE_OSV_ENABLED=false`. Do not treat earlier prose (30 req/min, 5 MiB) as provider SLAs. Do not encode the deferred ~1.8 GiB / ~11 GiB OSV discussion values as Session 9 configuration. |
 | OD-9 | Notification channels | Email, chat, or in-app-only is unspecified. | In-app state and exports only for MVP. No outbound notification provider. |
 | OD-10 | Instance operator identity | How a self-hosted admin authenticates separately from organization membership. | A config-gated bootstrap user that can manage **IntelligenceSource** rows and shared catalogs only. No cross-organization read of tenant evidence. A bypass ADR is required before any cross-org operator console. |
 | OD-11 | Team semantics | Teams are in the domain model; MVP journey does not require them. | Persist Team and optional AssetOwner.teamId. Do not block the MVP journey on teams. |
