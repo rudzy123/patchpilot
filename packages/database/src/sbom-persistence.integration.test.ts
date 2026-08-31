@@ -78,6 +78,8 @@ describe('session 8 sbom persistence adapters', () => {
       expect(source, file).not.toContain('Idempotency-Key');
       if (file === 'outbox-relay-persistence.ts') {
         expect(source).toContain('FOR UPDATE SKIP LOCKED');
+        expect(source).not.toMatch(/Queue\.add|bullmq|ioredis/);
+        expect(source).toContain('listProcessedAwaitingBackgroundJob');
       }
       if (file === 'component-graph-persistence.ts') {
         expect(source).toContain('pg_advisory_xact_lock');
@@ -241,7 +243,7 @@ describe('session 8 sbom persistence adapters', () => {
     expect(stored?.keyHash).toBe(keyHash);
   });
 
-  it('claims disjoint outbox batches with a proven two-branch plan', async () => {
+  it('claims disjoint outbox batches with SKIP LOCKED and includes expired relay leases', async () => {
     const org = await createOrg(prisma, `out-${randomUUID().slice(0, 8)}`);
     const now = new Date('2026-08-30T15:00:00.000Z');
     const payload = outboxPayload();
@@ -341,6 +343,62 @@ describe('session 8 sbom persistence adapters', () => {
     );
     expect(usesIndex(pendingPlan, 'outbox_event_available_work_idx')).toBe(true);
     expect(usesIndex(claimedPlan, 'outbox_event_claimed_lease_idx')).toBe(true);
+  });
+
+  it('reconciles processed outbox rows that are missing a BackgroundJob', async () => {
+    const org = await createOrg(prisma, `recon-${randomUUID().slice(0, 8)}`);
+    const adapters = createSbomPersistence(prisma);
+    const processed = await prisma.outboxEvent.create({
+      data: {
+        organizationId: org.id,
+        aggregateType: 'sbom_ingestion',
+        aggregateId: randomUUID(),
+        eventType: 'sbom.ingestion.requested.v1',
+        eventSchemaVersion: JSON_SCHEMA_VERSION_V1,
+        payload: outboxPayload(),
+        dedupeKey: `recon:${randomUUID()}`,
+        status: 'processed',
+        processedAt: new Date('2026-08-30T15:00:00.000Z'),
+      },
+    });
+    const alreadyQueued = await prisma.outboxEvent.create({
+      data: {
+        organizationId: org.id,
+        aggregateType: 'sbom_ingestion',
+        aggregateId: randomUUID(),
+        eventType: 'sbom.ingestion.requested.v1',
+        eventSchemaVersion: JSON_SCHEMA_VERSION_V1,
+        payload: outboxPayload(),
+        dedupeKey: `recon-job:${randomUUID()}`,
+        status: 'processed',
+        processedAt: new Date('2026-08-30T15:01:00.000Z'),
+      },
+    });
+    await adapters.backgroundJobs.enqueueQueued({
+      organizationId: org.id,
+      outboxEventId: alreadyQueued.id,
+      jobType: 'sbom.ingest',
+      dedupeKey: alreadyQueued.dedupeKey,
+    });
+
+    const awaiting = await adapters.outboxRelay.listProcessedAwaitingBackgroundJob({ limit: 10 });
+    expect(awaiting.map((event) => event.id)).toContain(processed.id);
+    expect(awaiting.map((event) => event.id)).not.toContain(alreadyQueued.id);
+    const created = await adapters.backgroundJobs.enqueueQueued({
+      organizationId: org.id,
+      outboxEventId: processed.id,
+      jobType: 'sbom.ingest',
+      dedupeKey: processed.dedupeKey,
+    });
+    const reused = await adapters.backgroundJobs.enqueueQueued({
+      organizationId: org.id,
+      outboxEventId: processed.id,
+      jobType: 'sbom.ingest',
+      dedupeKey: processed.dedupeKey,
+    });
+    expect(reused.id).toBe(created.id);
+    const remaining = await adapters.outboxRelay.listProcessedAwaitingBackgroundJob({ limit: 50 });
+    expect(remaining.map((event) => event.id)).not.toContain(processed.id);
   });
 
   it('enqueues one background job and claims with a single winner', async () => {

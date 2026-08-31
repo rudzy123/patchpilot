@@ -3,6 +3,7 @@ import {
   err,
   ok,
   type ClaimOutboxBatchInput,
+  type ClaimableOutboxEvent,
   type ClaimedOutboxEvent,
   type ExpireOutboxLeaseInput,
   type MarkOutboxProcessedInput,
@@ -183,6 +184,46 @@ export class PrismaOutboxRelayPersistence implements OutboxRelayPersistencePort 
     return this.loadEvent(input.organizationId, input.eventId);
   }
 
+  public async listProcessedAwaitingBackgroundJob(input: {
+    limit: number;
+  }): Promise<readonly ClaimableOutboxEvent[]> {
+    const limit = boundClaimLimit(input.limit);
+    if (limit < 1) {
+      return [];
+    }
+
+    const rows = await this.client.$queryRaw<AwaitingRow[]>`
+      SELECT
+        o."id",
+        o."organization_id" AS "organizationId",
+        o."aggregate_type" AS "aggregateType",
+        o."aggregate_id" AS "aggregateId",
+        o."event_type" AS "eventType",
+        o."dedupe_key" AS "dedupeKey",
+        o."available_at" AS "availableAt",
+        o."attempt_count" AS "attemptCount"
+      FROM "outbox_event" o
+      WHERE o."status" = 'processed'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "background_job" b
+          WHERE b."outbox_event_id" = o."id"
+        )
+      ORDER BY o."processed_at" ASC, o."id" ASC
+      LIMIT ${limit}
+    `;
+    return rows.map((row) => ({
+      id: row.id,
+      organizationId: row.organizationId,
+      aggregateType: row.aggregateType,
+      aggregateId: row.aggregateId,
+      eventType: row.eventType,
+      dedupeKey: row.dedupeKey,
+      availableAt: row.availableAt,
+      attemptCount: row.attemptCount,
+    }));
+  }
+
   private async loadEvent(
     organizationId: string | null,
     eventId: string,
@@ -215,6 +256,17 @@ type ClaimedRow = {
   attemptCount: number;
   claimedAt: Date | null;
   leaseExpiresAt: Date | null;
+};
+
+type AwaitingRow = {
+  id: string;
+  organizationId: string | null;
+  aggregateType: string;
+  aggregateId: string;
+  eventType: string;
+  dedupeKey: string;
+  availableAt: Date;
+  attemptCount: number;
 };
 
 export function organizationWhere(

@@ -26,7 +26,7 @@ describe('safe failure taxonomy', () => {
       'retryable_infrastructure',
       'terminal_internal',
     ]);
-    expect(safeFailureCodes).toHaveLength(27);
+    expect(safeFailureCodes).toHaveLength(28);
     expect(Object.keys(safeFailureCatalog).sort()).toEqual([...safeFailureCodes].sort());
   });
 
@@ -59,6 +59,10 @@ describe('safe failure taxonomy', () => {
     expect(classifySafeFailure('processing_failed')).toEqual({
       category: 'internal',
       outcome: 'terminal_internal',
+    });
+    expect(classifySafeFailure('queue_unavailable')).toEqual({
+      category: 'timeout',
+      outcome: 'retryable_infrastructure',
     });
   });
 

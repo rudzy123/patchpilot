@@ -1,10 +1,19 @@
 import { loadServerConfig } from '@patchpilot/config';
-import { checkDatabaseReady, disconnectPrisma } from '@patchpilot/database';
+import {
+  checkDatabaseReady,
+  createSbomPersistence,
+  disconnectPrisma,
+  getPrismaClient,
+} from '@patchpilot/database';
+import { createRelayOutboxBatchUseCase, createSystemClock } from '@patchpilot/domain';
 import { createEmptyJobRegistry } from '@patchpilot/integrations';
 import { createLogger } from '@patchpilot/logger';
 import { startTelemetry } from '@patchpilot/observability';
 
 import { createWorkerApp } from './app.js';
+import { createBullmqOutboxPublisher } from './bullmq-outbox-publisher.js';
+import { createOutboxRelayRuntime } from './outbox-relay-runtime.js';
+import { createBullmqConnectionOptions } from './queue-connection.js';
 import { createRedisConnection } from './redis.js';
 
 async function main(): Promise<void> {
@@ -22,12 +31,34 @@ async function main(): Promise<void> {
       : { tracesEndpoint: config.openTelemetry.tracesEndpoint }),
   });
   const redis = createRedisConnection(config.redisUrl);
+  const prisma = getPrismaClient({ databaseUrl: config.databaseUrl });
+  const persistence = createSbomPersistence(prisma);
+  const publisher = createBullmqOutboxPublisher({
+    connection: createBullmqConnectionOptions(config.redisUrl),
+  });
+  const relay = createRelayOutboxBatchUseCase({
+    clock: createSystemClock(),
+    outbox: persistence.outboxRelay,
+    queue: publisher,
+    backgroundJobs: persistence.backgroundJobs,
+    logger: {
+      warn(bindings: Record<string, unknown>, message: string) {
+        logger.warn(bindings, message);
+      },
+    },
+  });
+  const outboxRelay = createOutboxRelayRuntime({
+    execute: () => relay.execute(),
+    logger,
+    closeQueue: () => publisher.close(),
+  });
   const worker = createWorkerApp({
     logger,
     telemetry,
     redis,
     checkDatabaseReady: (timeoutMs) => checkDatabaseReady(timeoutMs),
     jobRegistry: createEmptyJobRegistry(),
+    outboxRelay,
     shutdownTimeoutMs: config.shutdownTimeoutMs,
     readinessTimeoutMs: config.readinessTimeoutMs,
   });

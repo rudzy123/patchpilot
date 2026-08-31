@@ -187,6 +187,9 @@ importers:
       '@patchpilot/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@patchpilot/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@patchpilot/integrations':
         specifier: workspace:*
         version: link:../../packages/integrations

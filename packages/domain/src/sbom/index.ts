@@ -1,5 +1,12 @@
 export {
   FORBIDDEN_KNOWN_VERSION_STRINGS,
+  OUTBOX_QUEUE_NAME,
+  OUTBOX_RELAY_BATCH_LIMIT,
+  OUTBOX_RELAY_LEASE_MS,
+  OUTBOX_RELAY_MAX_ATTEMPTS,
+  OUTBOX_RELAY_POLL_INTERVAL_MS,
+  OUTBOX_RELAY_RETRY_BASE_MS,
+  OUTBOX_RELAY_RETRY_CAP_MS,
   SBOM_FINAL_OBJECT_KEY_PATTERN,
   SBOM_IDENTITY_KEY_MAX_LENGTH,
   SBOM_INGEST_JOB_TYPE,
@@ -98,6 +105,16 @@ export {
   type SbomQueryDependencies,
   type SbomQueryListPage,
 } from './queries.js';
+export {
+  createRelayOutboxBatchUseCase,
+  jobTypeForOutboxEvent,
+  outboxRetryDelayMs,
+  OUTBOX_RELAY_DEFAULTS,
+  type OutboxRelayBatchResult,
+  type OutboxRelayDependencies,
+  type OutboxRelayLogger,
+  type OutboxRelayOptions,
+} from './relay.js';
 export { fingerprintUploadBody, type UploadBodyFingerprint } from './body-fingerprint.js';
 export {
   fromOccurrenceVersionColumns,
@@ -212,6 +229,9 @@ export {
   type ObjectStoragePrivacyAssumptions,
   type OutboxDeadLetterInput,
   type OutboxDeliveryFailureInput,
+  type OutboxQueueJob,
+  type OutboxQueuePublishResult,
+  type OutboxQueuePublisherPort,
   type OutboxRelayClaim,
   type OutboxRelayPersistencePort,
   type PersistComponentGraphInput,

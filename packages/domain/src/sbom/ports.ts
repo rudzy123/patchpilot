@@ -414,12 +414,38 @@ export type OutboxRelayPersistencePort = {
     input: OutboxDeliveryFailureInput,
   ): Promise<Result<OutboxEventRecord>>;
   markDeadLetter(input: OutboxDeadLetterInput): Promise<Result<OutboxEventRecord>>;
+  listProcessedAwaitingBackgroundJob(input: {
+    limit: number;
+  }): Promise<readonly ClaimableOutboxEvent[]>;
+};
+
+export type OutboxQueueJob = {
+  jobId: string;
+  jobType: string;
+  organizationId: string | null;
+  outboxEventId: string;
+  aggregateType: string;
+  aggregateId: string;
+  eventType: string;
+  dedupeKey: string;
+};
+
+export type OutboxQueuePublishResult =
+  | { ok: true; duplicate: boolean }
+  | { ok: false; retryable: true };
+
+/**
+ * Queue adapter used by the outbox relay. Implementations live outside
+ * packages/domain and must not be invoked from inside a PostgreSQL transaction.
+ */
+export type OutboxQueuePublisherPort = {
+  publish(job: OutboxQueueJob): Promise<OutboxQueuePublishResult>;
 };
 
 export function deterministicOutboxQueueJobId(
   event: Pick<ClaimableOutboxEvent, 'id' | 'eventType'>,
 ): string {
-  return `${event.eventType}:${event.id}`;
+  return `${event.eventType}__${event.id}`;
 }
 
 export type QueueBackgroundJobInput = {

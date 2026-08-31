@@ -36,6 +36,7 @@ export const safeFailureCodes = [
   'parser_crash',
   'normalized_output_too_large',
   'processing_failed',
+  'queue_unavailable',
 ] as const;
 export type SafeFailureCode = (typeof safeFailureCodes)[number];
 
@@ -81,6 +82,7 @@ export const safeFailureCatalog: { readonly [Code in SafeFailureCode]: SafeFailu
     parser_crash: { category: 'poison', outcome: 'quarantined' },
     normalized_output_too_large: { category: 'limit', outcome: 'rejected' },
     processing_failed: { category: 'internal', outcome: 'terminal_internal' },
+    queue_unavailable: { category: 'timeout', outcome: 'retryable_infrastructure' },
   };
 
 export function classifySafeFailure(code: SafeFailureCode): SafeFailureClassification {

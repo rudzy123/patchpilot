@@ -6,12 +6,15 @@ import {
 import { type Logger } from '@patchpilot/logger';
 import { type TelemetryHandle } from '@patchpilot/observability';
 
+import type { OutboxRelayRuntime } from './outbox-relay-runtime.js';
+
 export type WorkerDependencies = {
   logger: Logger;
   telemetry: TelemetryHandle;
   redis: RedisConnectionPort;
   checkDatabaseReady: (timeoutMs: number) => Promise<{ ok: boolean }>;
   jobRegistry?: JobRegistry;
+  outboxRelay?: OutboxRelayRuntime;
   shutdownTimeoutMs: number;
   readinessTimeoutMs: number;
 };
@@ -45,6 +48,7 @@ export function createWorkerApp(dependencies: WorkerDependencies): WorkerApp {
       );
       acceptingWork = true;
       stopped = false;
+      dependencies.outboxRelay?.start();
     },
     async stop(): Promise<void> {
       if (stopped) {
@@ -52,6 +56,9 @@ export function createWorkerApp(dependencies: WorkerDependencies): WorkerApp {
       }
 
       acceptingWork = false;
+      if (dependencies.outboxRelay !== undefined) {
+        await dependencies.outboxRelay.stop();
+      }
       await dependencies.redis.quit();
       await dependencies.telemetry.shutdown();
       stopped = true;

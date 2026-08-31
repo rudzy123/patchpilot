@@ -15,6 +15,7 @@ import {
   deterministicOutboxQueueJobId,
   type BackgroundJobExecutionPort,
   type ComponentGraphPersistencePort,
+  type OutboxQueuePublisherPort,
   type OutboxRelayPersistencePort,
   type SbomIngestionPersistencePort,
   type SbomMetadataPersistencePort,
@@ -130,10 +131,14 @@ describe('session 8 port and domain boundary', () => {
     const jobs: Pick<BackgroundJobExecutionPort, 'findIdempotentTerminal'> = {
       findIdempotentTerminal: async (_input) => undefined,
     };
+    const queue: Pick<OutboxQueuePublisherPort, 'publish'> = {
+      publish: async (_job) => ({ ok: true, duplicate: false }),
+    };
     expect(relay.markProcessedAfterQueueAcceptance.length).toBe(1);
     expect(jobs.findIdempotentTerminal.length).toBe(1);
+    expect(queue.publish.length).toBe(1);
     expect(deterministicOutboxQueueJobId({ id: 'evt', eventType: 'sbom.ingest' })).toBe(
-      'sbom.ingest:evt',
+      'sbom.ingest__evt',
     );
     const source = readFileSync(join(packageRoot, 'sbom/ports.ts'), 'utf8');
     expect(source).not.toMatch(/bullmq|JobsOptions|Job<|QueueEvents|WorkerOptions|FlowProducer/);
