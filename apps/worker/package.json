@@ -2,7 +2,7 @@
   "name": "@patchpilot/worker",
   "version": "0.0.0",
   "private": true,
-  "description": "Background worker. Relays transactional outbox events to BullMQ. Product processors are not registered yet.",
+  "description": "Background worker. Relays transactional outbox events to BullMQ and processes CycloneDX SBOM ingestion jobs.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -22,6 +22,7 @@
     "@patchpilot/integrations": "workspace:*",
     "@patchpilot/logger": "workspace:*",
     "@patchpilot/observability": "workspace:*",
+    "@patchpilot/sbom": "workspace:*",
     "bullmq": "^5.66.4",
     "ioredis": "^5.8.2"
   },

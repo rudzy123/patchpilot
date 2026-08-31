@@ -70,6 +70,8 @@ describe('session 8 sbom persistence adapters', () => {
       'outbox-relay-persistence.ts',
       'background-job-execution.ts',
       'component-graph-persistence.ts',
+      'sbom-ingestion-processor-unit-of-work.ts',
+      'sbom-upload-unit-of-work.ts',
     ];
     const banned = /ioredis|bullmq|@aws-sdk|S3Client|MinIO|process\.env/;
     for (const file of files) {
@@ -504,6 +506,17 @@ describe('session 8 sbom persistence adapters', () => {
       dedupeKey: outbox.dedupeKey,
     });
     expect(terminal?.status).toBe('succeeded');
+
+    const byOutbox = await adapters.backgroundJobs.findByOutboxEventId({
+      organizationId: org.id,
+      outboxEventId: outbox.id,
+    });
+    expect(byOutbox?.id).toBe(first.id);
+    const foreignLookup = await adapters.backgroundJobs.findByOutboxEventId({
+      organizationId: randomUUID(),
+      outboxEventId: outbox.id,
+    });
+    expect(foreignLookup).toBeUndefined();
   });
 
   it('persists a graph once, no-ops completed replay, and rolls back partial failure', async () => {

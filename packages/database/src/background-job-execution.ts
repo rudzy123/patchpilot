@@ -7,6 +7,7 @@ import {
   type BackgroundJobLease,
   type BackgroundJobRecord,
   type ClaimBackgroundJobInput,
+  type LookupBackgroundJobByOutboxInput,
   type LookupTerminalBackgroundJobInput,
   type QueueBackgroundJobInput,
   type QueuedBackgroundJob,
@@ -49,6 +50,18 @@ export class PrismaBackgroundJobExecution implements BackgroundJobExecutionPort 
       throw new Error('Background job unique conflict could not be loaded.');
     }
     return toQueued(existing);
+  }
+
+  public async findByOutboxEventId(
+    input: LookupBackgroundJobByOutboxInput,
+  ): Promise<BackgroundJobRecord | undefined> {
+    const row = await this.client.backgroundJob.findFirst({
+      where: {
+        outboxEventId: input.outboxEventId,
+        ...organizationWhere(input.organizationId),
+      },
+    });
+    return row === null ? undefined : mapBackgroundJob(row);
   }
 
   public async claimExecution(

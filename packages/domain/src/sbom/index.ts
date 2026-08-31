@@ -82,10 +82,26 @@ export {
 } from './authorization.js';
 export {
   SBOM_AUDIT_SUBJECT_TYPE,
+  SBOM_INGESTION_AUDIT_SUBJECT_TYPE,
   sbomAuditActions,
   sbomDuplicateAudit,
+  sbomIngestionFailedAudit,
+  sbomIngestionQuarantinedAudit,
+  sbomIngestionRejectedAudit,
   sbomUploadedAudit,
 } from './audit.js';
+export {
+  createProcessSbomIngestionUseCase,
+  mapStorageFailureToSafeCode,
+  type ProcessSbomIngestionDependencies,
+  type ProcessSbomIngestionLogger,
+  type ProcessSbomIngestionOptions,
+  type ProcessSbomIngestionOutcome,
+} from './ingest.js';
+export {
+  parseSbomIngestJobPayload,
+  type SbomIngestJobPayload,
+} from './ingest-job.js';
 export {
   createUploadSbomUseCase,
   type SbomUploadAccepted,
@@ -222,6 +238,7 @@ export {
   type HeadObjectInput,
   type IdempotencyReservationRecord,
   type InitializeDevelopmentBucketInput,
+  type LookupBackgroundJobByOutboxInput,
   type LookupTerminalBackgroundJobInput,
   type MarkOutboxProcessedInput,
   type ObjectByteStream,
@@ -247,7 +264,12 @@ export {
   type ResolveCompletedReplayInput,
   type ResolveCompletedReplayResult,
   type RetryBackgroundJobInput,
+  type SbomDocumentParseInput,
+  type SbomDocumentParseResult,
+  type SbomDocumentParserPort,
   type SbomIngestionPersistencePort,
+  type SbomIngestionProcessorRepositories,
+  type SbomIngestionProcessorUnitOfWork,
   type SbomMetadataPersistencePort,
   type SbomObjectStoragePort,
   type SbomUploadIdempotencyPort,

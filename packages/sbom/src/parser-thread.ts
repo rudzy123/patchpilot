@@ -241,14 +241,18 @@ export function validateParserWorkerSuccess(
     });
   }
 
-  const components: NormalizedComponent[] = [];
+  const graph = parserSuccessToNormalizedGraph(success);
+  if (!graph.ok) {
+    return graph;
+  }
+
+  if (success.components.some((component) => component.name.length > limits.maxComponentNameChars)) {
+    return err({
+      code: 'unprocessable_evidence',
+      message: 'Parser worker component name exceeds the typed limit.',
+    });
+  }
   for (const component of success.components) {
-    if (component.name.length > limits.maxComponentNameChars) {
-      return err({
-        code: 'unprocessable_evidence',
-        message: 'Parser worker component name exceeds the typed limit.',
-      });
-    }
     if (
       component.bomRef !== null &&
       Buffer.byteLength(component.bomRef, 'utf8') > limits.maxBomRefBytes
@@ -276,20 +280,38 @@ export function validateParserWorkerSuccess(
         message: 'Parser worker versioned PURL exceeds the typed limit.',
       });
     }
-    const version = parseComponentVersion(component.version);
-    if (!version.ok) {
-      return version;
-    }
-    if (version.value.kind === 'known' && version.value.value.length > limits.maxVersionChars) {
+    if (
+      component.version.kind === 'known' &&
+      component.version.value.length > limits.maxVersionChars
+    ) {
       return err({
         code: 'unprocessable_evidence',
         message: 'Parser worker version exceeds the typed limit.',
       });
     }
+  }
+
+  const validated = validateNormalizedComponentGraph(graph.value);
+  if (!validated.ok) {
+    return validated;
+  }
+
+  return ok(success);
+}
+
+export function parserSuccessToNormalizedGraph(
+  success: ParserWorkerSuccess,
+): Result<NormalizedComponentGraph> {
+  const components: NormalizedComponent[] = [];
+  for (const component of success.components) {
+    const version = parseComponentVersion(component.version);
+    if (!version.ok) {
+      return version;
+    }
     components.push({ ...component, version: version.value });
   }
 
-  const graph: NormalizedComponentGraph = {
+  return ok({
     specificationVersion: success.specificationVersion,
     graphCompleteness: success.graphCompleteness,
     components,
@@ -301,14 +323,7 @@ export function validateParserWorkerSuccess(
     capturedAt: success.capturedAt === null ? null : new Date(success.capturedAt),
     parserVersion: success.parserVersion,
     normalizationVersion: success.normalizationVersion,
-  };
-
-  const validated = validateNormalizedComponentGraph(graph);
-  if (!validated.ok) {
-    return validated;
-  }
-
-  return ok(success);
+  });
 }
 
 export function validateParserWorkerFailure(value: unknown): Result<ParserWorkerFailure> {

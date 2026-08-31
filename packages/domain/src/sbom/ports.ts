@@ -14,7 +14,7 @@ import { SBOM_UPLOAD_IDEMPOTENCY_RESPONSE_SCHEMA_VERSION } from './constants.js'
 import type { SafeFailureCategory, SafeFailureCode } from './failures.js';
 import type { NormalizedComponentGraph } from './graph.js';
 import type { Session8IngestionCommand, Session8IngestionSnapshot } from './transitions.js';
-import type { SbomListQuery, SbomListPage } from './types.js';
+import type { SbomListQuery, SbomListPage, SbomParserLimits } from './types.js';
 
 export type ObjectByteStream = AsyncIterable<Uint8Array>;
 
@@ -523,12 +523,20 @@ export type LookupTerminalBackgroundJobInput = {
   dedupeKey: string;
 };
 
+export type LookupBackgroundJobByOutboxInput = {
+  organizationId: string;
+  outboxEventId: string;
+};
+
 /**
  * BackgroundJob execution. Worker leases live here, not on SbomIngestion.
  * This port does not expose BullMQ types.
  */
 export type BackgroundJobExecutionPort = {
   enqueueQueued(input: QueueBackgroundJobInput): Promise<QueuedBackgroundJob>;
+  findByOutboxEventId(
+    input: LookupBackgroundJobByOutboxInput,
+  ): Promise<BackgroundJobRecord | undefined>;
   claimExecution(input: ClaimBackgroundJobInput): Promise<Result<BackgroundJobExecutionClaim>>;
   renewLease(input: RenewBackgroundJobLeaseInput): Promise<Result<BackgroundJobLease>>;
   markRetry(input: RetryBackgroundJobInput): Promise<Result<QueuedBackgroundJob>>;
@@ -539,4 +547,41 @@ export type BackgroundJobExecutionPort = {
   findIdempotentTerminal(
     input: LookupTerminalBackgroundJobInput,
   ): Promise<BackgroundJobRecord | undefined>;
+};
+
+export type SbomDocumentParseInput = {
+  bytes: ArrayBuffer;
+  expectedSha256: string;
+  byteLength: number;
+  limits: SbomParserLimits;
+  parserVersion: string;
+  normalizationVersion: string;
+};
+
+export type SbomDocumentParseResult =
+  | { ok: true; graph: NormalizedComponentGraph }
+  | { ok: false; code: SafeFailureCode };
+
+/**
+ * Isolate parser adapter. Domain does not import worker_threads, Ajv, or
+ * @patchpilot/sbom.
+ */
+export type SbomDocumentParserPort = {
+  parse(input: SbomDocumentParseInput): Promise<SbomDocumentParseResult>;
+};
+
+export type SbomIngestionProcessorRepositories = {
+  ingestions: SbomIngestionPersistencePort;
+  backgroundJobs: BackgroundJobExecutionPort;
+  auditEvents: AuditAppendRepository;
+};
+
+/**
+ * PostgreSQL-only unit of work for processor terminal and retry outcomes.
+ * Callers must not invoke object storage, Redis, or queues inside the callback.
+ */
+export type SbomIngestionProcessorUnitOfWork = {
+  runInTransaction<T>(
+    work: (repos: SbomIngestionProcessorRepositories) => Promise<T>,
+  ): Promise<T>;
 };

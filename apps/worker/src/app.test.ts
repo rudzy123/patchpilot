@@ -67,7 +67,7 @@ describe('worker application', () => {
     expect(quitCount).toBe(1);
   });
 
-  it('shuts down the outbox relay before releasing redis', async () => {
+  it('shuts down the ingest processor before the outbox relay and redis', async () => {
     const order: string[] = [];
     const worker = createWorkerApp({
       logger: silentLogger(),
@@ -78,6 +78,14 @@ describe('worker application', () => {
         },
       }),
       checkDatabaseReady: async () => ({ ok: true }),
+      ingestionProcessor: {
+        async start() {
+          return;
+        },
+        async stop() {
+          order.push('processor');
+        },
+      },
       outboxRelay: {
         start() {
           return;
@@ -91,7 +99,7 @@ describe('worker application', () => {
     });
     await worker.start();
     await worker.stop();
-    expect(order).toEqual(['relay', 'redis']);
+    expect(order).toEqual(['processor', 'relay', 'redis']);
   });
 
   it('surfaces initialization failure and still allows shutdown to release redis', async () => {

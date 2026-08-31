@@ -1,12 +1,13 @@
 /**
- * Offline CycloneDX JSON schema compilation and worker-thread parser.
- * Graph persistence and ingest job processors remain deferred.
+ * Offline CycloneDX JSON schema compilation, worker-thread parser, and
+ * domain parser-port adapter. Graph persistence lives in @patchpilot/database.
  */
 export { packageBoundary } from './boundary.js';
 export { createOfflineAjv } from './offline-ajv.js';
 export {
   hashParserWorkerBytes,
   parserLimitsSchema,
+  parserSuccessToNormalizedGraph,
   parserWorkerFailureSchema,
   parserWorkerRequestSchema,
   parserWorkerSuccessSchema,
@@ -18,6 +19,11 @@ export {
   type ParserWorkerRequest,
   type ParserWorkerSuccess,
 } from './parser-thread.js';
+export {
+  createWorkerThreadSbomParser,
+  parserThreadMessageToParseResult,
+  type WorkerThreadSbomParserOptions,
+} from './document-parser-adapter.js';
 export { defaultSbomParserLimits } from './parser-limits.js';
 export { handleParserWorkerMessage, parseSbomParserRequest } from './parse-document.js';
 export {
