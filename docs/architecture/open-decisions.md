@@ -22,6 +22,17 @@ None of these defaults weaken [tenant isolation](tenant-isolation.md) or [securi
 
 OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 
+## Closed in Session 9 Batch 1B (ADR 0021)
+
+| ID | Topic | Closed by |
+| --- | --- | --- |
+| Session 9 import role | Global, instance-owned, import-only catalog; OSV GCS bulk export + CISA KEV JSON snapshot | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Runtime is **not** implemented. |
+| Zero-Finding invariant | Import must not match components, write Findings/FindingObservations, enrich findings, score, remediate, or enqueue `finding.recalculate` | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) |
+| Import vs correlation | [ADR 0010](../adr/0010-osv-correlation.md) remains future correlation, not the Session 9 import mechanism | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) |
+| Snapshot/provenance strategy | Private raw snapshots, append-only revisions, guarded current-projection activation, content SHA-256 idempotency | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Object-key layout still open. |
+
+OD-8 (exact outbound numeric limits), OD-10 (instance operator identity), and OD-15 (matching algorithm) remain open.
+
 ## Still open
 
 | ID | Topic | Why it is open | Interim default for design and first implementation |
@@ -30,16 +41,19 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 | OD-5 | Production object-storage vendor | The port is S3-compatible; AWS, MinIO, or GCS interop is an operations choice. | Provider-neutral port ([ADR 0008](../adr/0008-private-object-storage.md)). Local Compose uses MinIO. Production uses any S3-compatible private bucket the operator provides. |
 | OD-6 | Application-layer package split | Use cases could live in `packages/domain` or a dedicated package. | Use cases live in `packages/domain` as application services. Revisit only if the package becomes unwieldy. |
 | OD-7 | Priority vs risk score split | Glossary treats them as the same until an ADR splits them. | Keep **priority** as the stored calculated ranking. **Risk score** is a synonym. Do not introduce a second authoritative number. |
-| OD-8 | Exact outbound rate-limit numbers | OSV and KEV provider limits change. | Configured limits with conservative defaults in [vulnerability-intelligence.md](vulnerability-intelligence.md); operators may tighten. |
+| OD-8 | Exact outbound rate-limit and import size numbers | OSV archive size, KEV body size, and provider limits are unmeasured. Conditional GET is unverified. | No production numeric limits in ADR 0021. Do not treat earlier prose (30 req/min, 5 MiB) as provider SLAs. Measure archives before implementation. |
 | OD-9 | Notification channels | Email, chat, or in-app-only is unspecified. | In-app state and exports only for MVP. No outbound notification provider. |
 | OD-10 | Instance operator identity | How a self-hosted admin authenticates separately from organization membership. | A config-gated bootstrap user that can manage **IntelligenceSource** rows and shared catalogs only. No cross-organization read of tenant evidence. A bypass ADR is required before any cross-org operator console. |
 | OD-11 | Team semantics | Teams are in the domain model; MVP journey does not require them. | Persist Team and optional AssetOwner.teamId. Do not block the MVP journey on teams. |
 | OD-12 | RepositoryConnection provider | GitHub is not MVP. | Persist the entity with status `not_configured`. No webhooks, no tokens, no repo API calls. |
 | OD-13 | Backup encryption and off-site copies | Operator responsibility for a self-hosted system. | Document duties in [deployment-model.md](deployment-model.md) and [retention-and-deletion.md](retention-and-deletion.md). Do not ship a hosted backup service. |
 | OD-14 | CycloneDX minor versions beyond 1.6 | Spec will evolve. | Allowlist 1.4, 1.5, and 1.6. New versions need an ADR and parser tests. |
-| OD-15 | Matching algorithm details beyond OSV ranges | PURL aliases, CPE, and fuzzy name match are high-risk. | Exact ecosystem + package + version using OSV ranges and PURL when present. No fuzzy name match in MVP. |
+| OD-15 | Matching algorithm details beyond OSV ranges | PURL aliases, CPE, and fuzzy name match are high-risk. | Exact ecosystem + package + version using OSV ranges and PURL when present. No fuzzy name match in MVP. Session 9 must not run matching ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). |
 | OD-16 | Reserved organization slugs | Product URL routing is not implemented. A unique slug is not enough to keep `api`, `health`, `login`, and similar names off tenant routes. | Document the gap; do not invent a reserved-slug list in the database until routing exists. |
 | OD-17 | MFA and account lockout | [ADR 0019](../adr/0019-local-password-sessions.md) specifies Argon2id and fail-closed login rate limits, not MFA or durable lockout. | Dual-key Redis login limits. No MFA. No lockout table. Revisit before treating the product as resistant to credential stuffing beyond those controls. |
 | OD-18 | Reverse-proxy trust hops | `trustProxy` remains false in Session 6. Production TLS topology is operator-specific. | Direct socket peer IP for login rate limits. Do not trust `X-Forwarded-For`. Document hops in a later ADR before enabling `trustProxy`. |
+| OD-19 | Provider-neutral Vulnerability identity | Existing required unique `osvId` cannot store a KEV-only CVE without a synthetic id or schema change. | Keep `osvId` until a later database-design ADR. Do not invent a Session 9 identity migration in Batch 1B. |
+| OD-20 | Intelligence object-key layout and staging generation | Final snapshot keys and the exact atomic activation model are not chosen. | Private instance-owned keys; no public or signed URLs. Staging/generation required in principle; schema deferred. |
+| OD-21 | Session 9 scheduler, heartbeat, and retry policy | Bounded automatic retry is required; cadence and heartbeat are not. | Follow Session 8 outbox + BackgroundJob leases. Terminal runs stay historical; replay creates a new run. No lease heartbeat yet. |
 
 Related: [ADR index](../adr/README.md), [architecture risk register](../security/risk-register.md).

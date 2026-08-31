@@ -70,7 +70,7 @@ At minimum, emit events for:
 | `sbom.uploaded` / `sbom.duplicate` / `sbom.upload_rejected` | Upload recorded or rejected at the API. `sbom.duplicate` is emitted when a user request resolves to existing evidence; Session 8 does not insert a `duplicate`-state ingestion row. |
 | `sbom.ingestion.completed` / `sbom.ingestion.rejected` / `sbom.ingestion.quarantined` / `sbom.ingestion.failed` / `sbom.ingestion.released_from_quarantine` | Ingestion terminals and release |
 | `sbom.reprocessed` | New ingestion on existing object |
-| `intelligence.imported` | OSV/KEV snapshot stored |
+| `intelligence.imported` | Earlier catalog name for OSV/KEV snapshot stored. Session 9 uses the specific `intelligence.sync_*` / `intelligence.kev_updated` actions below instead of treating this single name as sufficient. |
 | `priority.calculated` | **RiskCalculation** inserted |
 | `risk_policy.published` | Org override or builtin publish |
 | `finding.state_changed` | Finding lifecycle transition |
@@ -106,6 +106,34 @@ Worker-originated events use `actorType: 'system'` with `organizationId` set and
 `failureCode` is always a value from the closed safe-failure catalog in [sbom-ingestion.md](sbom-ingestion.md#failure-taxonomy). It is never an exception message, Ajv output, or a fragment of the document. Object keys, filenames, worker identifiers, and lease timestamps never appear in these payloads.
 
 `sbom.upload_rejected`, `sbom.ingestion.released_from_quarantine`, and `sbom.reprocessed` are specified above but **not yet emitted**: rejected uploads currently fail before a database write is worthwhile, and there is no quarantine-release or reprocess entry point.
+
+### Vulnerability-intelligence events (design only)
+
+Session 9 ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) specifies these actions. They are **not emitted**. This batch adds no database constraints and no runtime code.
+
+| Action | When |
+| --- | --- |
+| `intelligence.sync_requested` | Import request / outbox recorded |
+| `intelligence.sync_started` | Processor claimed the run |
+| `intelligence.snapshot_stored` | Raw body persisted privately; metadata recorded |
+| `intelligence.normalization_completed` | Complete source unit normalized; not yet necessarily activated |
+| `intelligence.sync_completed` | Current projection activated after complete success |
+| `intelligence.sync_not_modified` | Content SHA-256 matched; no current-catalog change |
+| `intelligence.sync_failed` | Failure without quarantine |
+| `intelligence.sync_quarantined` | Poison / integrity / parser isolation failure |
+| `intelligence.kev_updated` | Current KEV membership changed after an accepted complete snapshot |
+
+| Field | Session 9 rule |
+| --- | --- |
+| `actorType` | `system` |
+| `organizationId` | `null` |
+| Membership | none |
+| Subject | Global (provider, sync run, or snapshot id) |
+| Payload | Safe counts and identifiers only: provider, syncRunId, snapshotId, byte length, SHA-256 if policy permits, advisory/alias/affected-package/KEV counts, parser version, normalization version, safe failure code, duration |
+
+Must not appear: raw body, object key, full provider URL, provider error text, reference URLs, full affected-version arrays, Findings, credentials, stack traces, HTML.
+
+Replay uniqueness for these system events: non-null `correlationId` and unique `(action, subjectId, correlationId)` among rows where `organizationId` IS NULL.
 
 ## Integrity properties
 

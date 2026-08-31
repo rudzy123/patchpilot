@@ -17,20 +17,20 @@ Decision deadline: before the first implementing PR for that area, unless noted.
 | R5 | Development adapters enabled in production | M | H | P0 | Config | Config gating; tests | Human error | First config package | mitigated-in-design |
 | R6 | Prototype pollution / parser crash loops | M | H | P1 | Ingestion | Secure JSON parse, prototype-key rejection, depth/node/string limits, worker-thread termination (not `Promise.race`), quarantine instead of retry | Novel payloads | Implemented Session 8 | mitigated-in-design |
 | R7 | Package/ecosystem confusion in correlation | M | H | P1 | Matching | No fuzzy match; adapters | GIGO SBOMs | First correlate PR | mitigated-in-design |
-| R8 | Poisoned or stale intel silently trusted | M | M | P1 | Intel | Provenance, freshness UI, additive records | Public catalogs | First intel PR | mitigated-in-design |
+| R8 | Poisoned or stale intel silently trusted | M | M | P1 | Intel | Provenance, additive revisions, guarded current-projection activation, freshness UI later ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) | Public catalogs; runtime import not implemented | First intel PR | mitigated-in-design |
 | R9 | XSS via component names | M | H | P1 | Web | Escape; no raw JSON | New sinks | First UI PR | mitigated-in-design |
 | R10 | CSRF on session cookie | M | H | P1 | Authn | [ADR 0019](../adr/0019-local-password-sessions.md) SameSite + Origin + synchronizer token | Enforced on auth and SBOM upload routes | Implemented Session 6 and 8 | mitigated-in-design |
 | R11 | Secret or SBOM logging | M | H | P1 | Telemetry | Canonical redaction tests | Sink bypass | First logger PR | mitigated-in-design |
 | R12 | Audit UPDATE/DELETE or cascade evidence loss | L | H | P1 | Audit | Insert-only; FK policy; DB role | Superuser | First audit table | mitigated-in-design |
 | R13 | Incorrect priority / false "fixed" / incomplete SBOM | M | H | P1 | Policy/findings | Factors, policy version, coverage heuristic, rescan ≠ task | Weights arbitrary; heuristic | First score + rescan PR | mitigated-in-design |
-| R14 | SSRF via future URL fetch or mis-allowlist | L | H | P1 | Egress | No SBOM fetch; allowlists | Misconfig | First HTTP adapter | mitigated-in-design |
+| R14 | SSRF via future URL fetch or mis-allowlist | L | H | P1 | Egress | No SBOM fetch; no advisory/note URL fetch; compiled allowlist; reject non-public destinations ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) | Misconfig; DNS pinning not claimed | First HTTP adapter | mitigated-in-design |
 | R15 | Authn lockout and MFA unspecified | H | M | P1 | Authn | Rate limits in [ADR 0019](../adr/0019-local-password-sessions.md); [OD-17](../architecture/open-decisions.md) | No MFA | Before treating stuffing resistance as complete | open |
 | R16 | Credential KEK management weak or lost | M | H | P1 | Secrets | [OD-4](../architecture/open-decisions.md) | Lost KEK = lost creds | Before tenant credentials | open |
 | R17 | Redis exposed → queue injection | M | H | P1 | Jobs | Network isolation | Operator duty | First compose | mitigated-in-design |
 | R18 | Backup exposure | M | H | P1 | Deploy | Operator encrypt; Restricted class | Accepted | Ongoing | accepted |
 | R19 | Instance operator reads all DBs | H | H | P2 | Tenancy | Honest self-host; no app bypass | Disk access | n/a | accepted |
 | R20 | Supply-chain / CI compromise | M | H | P2 | Process | Lockfile later; SECURITY.md | Residual | First dependencies | watch |
-| R21 | OSV rate limit blocks correlation | M | M | P2 | Intel | Backoff, cache, degraded | Delay | First intel PR | mitigated-in-design |
+| R21 | OSV query or dump fetch blocks or discloses inventory | M | M | P2 | Intel | Session 9 uses bulk/snapshot import, not package-query APIs; bounded retry later; last accepted catalog remains | Delay; archive size unknown | First intel PR | mitigated-in-design |
 | R22 | Org policy override mistakes ranking | M | M | P2 | Policy | Immutable versions; history | Operator error | First override PR | mitigated-in-design |
 | R23 | Duplicate SHA-256 across assets | L | M | P2 | Ingestion | Duplicate only same org+asset | Extra storage | First upload | mitigated-in-design |
 | R24 | Finding identity includes version via full PURL or delayed CVE | M | H | P1 | Findings | Versionless identity + OSV id; CVE is alias ([finding-lifecycle.md](../architecture/finding-lifecycle.md)) | Product still may want version-scoped findings later | First correlate PR | mitigated-in-design |
@@ -53,6 +53,11 @@ Decision deadline: before the first implementing PR for that area, unless noted.
 | R41 | No BackgroundJob lease heartbeat | M | M | P2 | Jobs | Config forbids parser and storage timeouts at or above the lease; handlers idempotent so double execution is safe | A run exceeding the 15-minute lease can be claimed twice | Before raising the parser budget | open |
 | R42 | Stored evidence altered after upload | L | H | P1 | Storage | Re-read verifies byte length and SHA-256 while streaming; mismatch quarantines rather than retries | Attacker with both bucket and database write | Implemented Session 8 | mitigated-in-design |
 | R43 | Idempotency reservation expires during slow client upload | M | M | P2 | Ingestion | TTL must exceed 2× object-storage operation timeout; concurrent same-key requests get 409 while unexpired | Fingerprint excludes body; no reservation renewal; reclaim can orphan promoted bytes | Before operator-hosted release | open |
+| R44 | Partial OSV/KEV import becomes current catalog | M | H | P1 | Intel | Guarded activation after complete source unit; no freshness advance on partial failure ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) | Staging schema deferred | First intel persist PR | mitigated-in-design |
+| R45 | Unmeasured OSV archive or KEV body exhausts worker | H | H | P1 | Intel | Measured archive assessment required before implementation; extraction and body limits | Sizes unknown; no archive dependency selected | Before first import runtime PR | open |
+| R46 | Session 9 import creates Findings or discloses tenant packages | M | H | P0 | Intel / Findings | Zero-Finding invariant; no inventory-driven queries ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) | Later correlation must not silently reuse import jobs | First intel PR | mitigated-in-design |
+| R47 | Unique `osvId` blocks KEV-only or provider-neutral identity | M | M | P1 | Intel | Defer identity migration ([OD-19](../architecture/open-decisions.md)); do not invent synthetic OSV ids in Batch 1B | KEV-only CVEs cannot be Vulnerability rows yet | Database-design batch | open |
+| R48 | Intelligence snapshot orphan after DB commit failure | H | M | P1 | Storage | Same class as SBOM orphans; keys internal; no signed URLs | No intel reconcile job; layout deferred | Before operator-hosted intel | open |
 
 ## P0 meaning
 
@@ -60,7 +65,7 @@ P0 items must have tests and review on the first implementing PR for that area. 
 
 ## Open architecture decisions that drive risk
 
-See [open-decisions.md](../architecture/open-decisions.md). Highest coupling: **OD-17** (R15), **OD-4** (R16), **OD-10** (R19), **OD-15** (R7), **OD-18** (proxy trust). OD-1, OD-2, and OD-3 are closed by [ADR 0019](../adr/0019-local-password-sessions.md). Session 8 completion semantics are closed by [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md).
+See [open-decisions.md](../architecture/open-decisions.md). Highest coupling: **OD-17** (R15), **OD-4** (R16), **OD-10** (R19), **OD-15** (R7), **OD-18** (proxy trust), **OD-19** (R47), **OD-8** (R45). OD-1, OD-2, and OD-3 are closed by [ADR 0019](../adr/0019-local-password-sessions.md). Session 8 completion semantics are closed by [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md). Session 9 import-only catalog access is closed by [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md).
 
 ## Related documents
 

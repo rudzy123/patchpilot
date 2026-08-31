@@ -52,7 +52,7 @@ If the diagram is not rendered, the sections below define each entity and its re
 | Rule | Detail |
 | --- | --- |
 | Tenant-owned | Row includes `organizationId`. Queries always apply that predicate from trusted context. |
-| Global / shared catalog | Vulnerability intelligence, KEV snapshots, and built-in **RiskPolicy** definitions. Not tenant-owned. |
+| Global / shared catalog | Instance-owned vulnerability intelligence, KEV snapshots, and built-in **RiskPolicy** definitions. Not tenant-owned and not publicly accessible. Session 9 import ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) writes this catalog only. Generic **Finding** rows exist but are unused by Session 9. |
 | Reference rule | Tenant **Finding** rows may store the UUID of a global **Vulnerability** or **VulnerabilitySourceRecord**. They must not copy another organization's findings. |
 | Soft identity of a finding | `organizationId` + `assetId` + **versionless** component identity + vulnerability identity (**OSV id**). CVE and other aliases are denormalized; they are **not** part of the identity key. New ingestions add **FindingObservation** rows rather than duplicating the finding when identity matches. Versionless identity means CycloneDX/PURL **type + namespace + name** (or ecosystem + namespace + name). Strip `@version` / `?` / subpath from PURLs before using them as finding or **Component** identity. |
 | No cascade-delete of evidence | Foreign keys must not erase SBOMs, findings, audit events, or remediation records as a convenience. |
@@ -80,7 +80,7 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | Component | | yes | | | | | yes | Tenant package identity |
 | ComponentOccurrence | | yes | | yes | no | yes | yes | Per **SBOMIngestion** |
 | DependencyRelationship | | yes | | yes | no | yes | yes | Observed edge per ingestion |
-| Vulnerability | yes | | | | withdrawn flag additive | additive | | Shared identity |
+| Vulnerability | yes | | | | current projection; withdrawn flag additive | additive | | Shared identity; unique `osvId` is a known later-migration constraint |
 | VulnerabilitySourceRecord | yes | | | yes | no | yes | yes | Never silent overwrite |
 | Finding | | yes | | | state | | yes | Current calc pointer may move |
 | FindingObservation | | yes | | yes | no | yes | yes | Per **SBOMIngestion** compare |
@@ -92,7 +92,7 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | Evidence | | yes | yes | yes | no | yes | yes | |
 | AuditEvent | system or T | tenant when org set | yes | yes | **no** | yes | keep in v0.1 | Tenant `user` actors require membership; instance auth uses `actorUserId` |
 | IntegrationProvider | yes | | | | | | | Global provider catalog |
-| IntelligenceSource | yes | | yes | | yes | | | OSV/KEV system sync state |
+| IntelligenceSource | yes | | yes | | yes | | | OSV/KEV system sync state; Session 9 runtime not implemented |
 | Integration | | yes | yes | | yes | | | Organization-owned installation; `organizationId` required |
 | ExternalCredential | | yes | yes | | state | versions | yes | Ciphertext Restricted; attaches only to Integration |
 | OutboxEvent | system or T | tenant when org set | | | publishedAt | | | Tenant work requires `organizationId`; system intel refresh may be null |
@@ -103,8 +103,8 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | Pair | Distinction |
 | --- | --- |
 | **Component** vs **ComponentOccurrence** | Versionless package identity vs this package **version** listed in **this ingestion** |
-| **Vulnerability** vs **Finding** | Shared intel vs tenant+asset observation of it |
-| **VulnerabilitySourceRecord** vs **Vulnerability** | Immutable normalized source revision vs identity projection. Repeated retrieval of unchanged bytes is not a new revision; a newer `normalizationVersion` may create one. |
+| **Vulnerability** vs **Finding** | Shared intel vs tenant+asset observation of it. Session 9 import must not create Findings. |
+| **VulnerabilitySourceRecord** vs **Vulnerability** | Immutable normalized source revision vs mutable current projection activated only after a complete source unit succeeds. Repeated retrieval of unchanged bytes is not a new revision; a newer `normalizationVersion` may create one. Withdrawal and missing-from-authoritative-snapshot are separate facts. |
 | Vulnerability **severity** vs **priority** | Source fact vs calculated ranking |
 | **Finding** vs **FindingObservation** | Stable identity vs per-ingestion presence/absence/inconclusive (a **calculated** compare result) |
 | **SBOM** vs **SBOMIngestion** | Immutable original document vs one processing attempt (parser version, graph, observations) |
@@ -389,27 +389,27 @@ An **observed** edge between occurrences in the same SBOM. Not a risk score.
 
 ## Vulnerability
 
-Normalized, **shared catalog** record for a vulnerability identity (typically an OSV id, with CVE when published).
+Normalized, **shared catalog** current projection for a vulnerability identity (typically an OSV id, with CVE when published). Session 9 ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) may later update this projection only after a complete source unit succeeds. Session 9 does **not** create Findings.
 
 | Field (logical) | Notes |
 | --- | --- |
 | `id` | UUID (internal) |
-| `osvId` | Stable source identity when from OSV |
+| `osvId` | Required unique varchar today. Known migration constraint; [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) does **not** finalize a provider-neutral replacement. A KEV-only CVE cannot be stored here without that later review. |
 | `cveId` | Optional |
-| `aliases` | Additional identifiers |
-| `withdrawnAt` | Optional UTC; withdrawn is additive, not a silent delete |
+| `aliases` | Additional identifiers. Alias collision is not a merge key and is not proof that affected ranges are equivalent. |
+| `withdrawnAt` | Optional UTC; withdrawn is additive provider fact, not a silent delete, and not the same as missing-from-authoritative-snapshot |
 
-This row is a projection for correlation. Authoritative provenance lives on **VulnerabilitySourceRecord**. **Finding** identity uses `osvId` (internal `id` as FK). `cveId` and `aliases` may appear later; adding a CVE must **not** change finding identity or create a second finding.
+This row is a current projection. Authoritative provenance lives on **VulnerabilitySourceRecord**. Future **Finding** identity uses `osvId` (internal `id` as FK). `cveId` and `aliases` may appear later; adding a CVE must **not** change finding identity or create a second finding.
 
 ## VulnerabilitySourceRecord
 
-An **immutable normalized source revision**, not a retrieval log. Uniqueness is `(source, sourceIdentity, payloadSha256, normalizationVersion)`. The same source bytes may be normalized again by a newer normalizer. Repeated retrieval of unchanged content does not need another revision. A future retrieval-event model can record fetch attempts separately.
+An **immutable normalized source revision**, not a retrieval log and not a raw provider body. Raw bodies belong in private object storage; PostgreSQL stores hashes, metadata, and the normalized revision. Uniqueness is `(source, sourceIdentity, payloadSha256, normalizationVersion)`. The same source bytes may be normalized again by a newer normalizer. Repeated retrieval of unchanged content does not need another revision. Content SHA-256 is import idempotency until conditional GET is separately verified.
 
 | Field (logical) | Notes |
 | --- | --- |
 | `id` | UUID |
 | `vulnerabilityId` | |
-| `source` | `osv` or `cisa_kev` (KEV may attach as enrichment records keyed by CVE) |
+| `source` | `osv` or `cisa_kev` (KEV may attach as catalog source records keyed by CVE; that is not Finding enrichment) |
 | `sourceIdentity` | Provider document id |
 | `retrievedAt` | UTC of the snapshot that was normalized |
 | `payloadSha256` | Hash of stored raw snapshot |
@@ -421,7 +421,7 @@ Conflicting sources: retain both. A versioned policy may choose display preceden
 
 ## Finding
 
-Tenant-owned link between an asset's observed component identity and a **Vulnerability**, plus later enrichment pointers and the current workflow state.
+Tenant-owned link between an asset's observed component identity and a **Vulnerability**, plus later enrichment pointers and the current workflow state. Generic persistence already exists. Session 9 must not create, update, close, or reopen Findings or FindingObservations, and must not enqueue `finding.recalculate`.
 
 Lifecycle: [finding-lifecycle.md](finding-lifecycle.md).
 
@@ -531,7 +531,7 @@ Global catalog row for a named provider (`osv`, `cisa_kev`, `reserved`). Not ten
 
 ## IntelligenceSource
 
-System synchronization state for OSV and CISA KEV. Not a tenant installation. `providerKey` is `osv` or `cisa_kev`. Pagination cursors and last-sync timestamps live here, not on **Integration**.
+System synchronization state for OSV and CISA KEV. Not a tenant installation. `providerKey` is `osv` or `cisa_kev`. Last-sync timestamps and later verified conditional-request metadata live here, not on **Integration**. Session 9 runtime sync is **not implemented**. Do not treat stored cursors or ETags as a provider guarantee. Provider freshness must not advance after a partial source unit.
 
 ## Integration
 
@@ -557,7 +557,7 @@ Organization-owned installation of an **IntegrationProvider** ([ADR 0015](../adr
 | `degraded` | `enabled` | Health recovered |
 | `degraded` | `disabled` | Operator disables |
 
-v0.1 runtime feed synchronization uses **IntelligenceSource** for OSV and CISA KEV. Tenant GitHub integrations are not enabled. A tenant **Integration** may exist for the reserved provider catalog entry; it is not used for GitHub in v0.1.
+v0.1 **IntelligenceSource** rows exist for OSV and CISA KEV. Session 9 runtime feed synchronization is **not implemented** ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). Tenant GitHub integrations are not enabled. A tenant **Integration** may exist for the reserved provider catalog entry; it is not used for GitHub in v0.1.
 
 ## ExternalCredential
 

@@ -61,6 +61,8 @@ Idempotency keys and upload hashes are unique per **organization** (and asset wh
 
 ## Global intelligence versus tenant-owned data
 
+Normalized vulnerability intelligence is **instance-owned** and shared ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). It is not duplicated into every Organization. Global ownership does **not** make the catalog publicly accessible. Raw snapshot bytes stay in private object storage. Tenant **Findings** remain tenant-owned. Session 9 import must not query tenant package inventories and must not write Findings.
+
 | Global / shared catalog | Tenant-owned |
 | --- | --- |
 | **Vulnerability** | **Organization**, **Membership**, **Team** |
@@ -84,7 +86,7 @@ Rules:
 
 - Do not embed another organization's finding id.
 - Do not copy tenant component names into the global vulnerability table.
-- Shared catalog reads are allowed for any authenticated member; they are not secret tenant data. Still do not log full feed payloads.
+- Shared catalog reads are allowed for any authenticated member; they are not secret tenant data and they are not anonymous public access. Still do not log full feed payloads.
 
 ## How tests prevent cross-tenant access
 
@@ -107,7 +109,7 @@ Do not include exploit payloads. Minimal fixtures only.
 4. On mismatch, the job **fails terminal** to the dead-letter path without mutating, and an operational metric fires. It does not "repair" by writing to the payload org.
 5. Process one organization's data per job.
 
-System jobs (OSV **modified-since** refresh) have null organization and must not write tenant findings except via a subsequent tenant-scoped outbox event per affected org/finding. Targeted package queries, if used, are **per-organization** jobs and must not persist tenant package names on global catalog rows.
+System jobs (Session 9 OSV/KEV catalog import, [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) have null organization and must **not** write tenant findings, enqueue `finding.recalculate`, or query tenant package inventories. A later correlation workflow may emit tenant-scoped outbox events per affected org/finding. Targeted package queries, if ever used, are **per-organization** jobs outside Session 9 import and must not persist tenant package names on global catalog rows.
 
 ## How cache keys include organization context
 
@@ -136,7 +138,7 @@ v0.1 has no self-service hard delete of an organization. Archive hides writes. P
 | Plane | Examples | Data scope |
 | --- | --- | --- |
 | Tenant admin | Invite members, archive asset, publish org policy override, rotate **ExternalCredential** | Single authorized organization |
-| Instance operator | Enable system OSV/KEV integration, set refresh schedule, inspect queue lag, restore backups | Shared catalogs, infrastructure. **No** API that lists all orgs' SBOMs |
+| Instance operator | Enable system OSV/KEV integration, set refresh schedule, inspect queue lag, restore backups | Shared catalogs, infrastructure. **No** API that lists all orgs' SBOMs. Session 9 has no instance-operator or provider-status API yet. |
 | Break-glass | None in v0.1 | A cross-organization operator bypass requires an accepted ADR |
 
 Backup restoration is an infrastructure action. Application login after restore still uses membership. Operators should treat database and object-storage backups as **Restricted** ([data classification](data-classification.md)).
