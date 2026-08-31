@@ -54,10 +54,17 @@ export const FROZEN_MIGRATIONS = [
     directory: '20260828120000_asset_inventory_constraints',
     sha256: '3270a9ec871a5cf8ec522c245ede9a3312aef6182950abd23d08dce342ec6f18',
   },
+  {
+    directory: '20260830120000_sbom_ingestion_graph_persistence',
+    sha256: '920e7e685aeaa69c8515053d373353385e90c1a741404f93b0b1222a0abc2446',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
   '20260828120000_asset_inventory_constraints' as const;
+
+export const SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE =
+  '20260830120000_sbom_ingestion_graph_persistence' as const;
 
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
@@ -68,6 +75,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260827170000_audit_actor_anonymous',
   '20260827180000_local_credentials_and_sessions',
   SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+  SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
@@ -233,4 +241,9 @@ export const SESSION_6_COMPLETE_MIGRATIONS = [
 export async function applyThroughSession6(databaseUrl: string): Promise<void> {
   await applyThroughAuditActorAnonymous(databaseUrl);
   await applyMigrationSqlAndResolve(databaseUrl, '20260827180000_local_credentials_and_sessions');
+}
+
+export async function applyThroughSession7(databaseUrl: string): Promise<void> {
+  await applyThroughSession6(databaseUrl);
+  await applyMigrationSqlAndResolve(databaseUrl, SESSION_7_ASSET_INVENTORY_CONSTRAINTS);
 }

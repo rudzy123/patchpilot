@@ -28,6 +28,15 @@ const redactPaths = [
   'secret_access_key',
   'secretKey',
   'secret_key',
+  'accessKey',
+  'accessKeyId',
+  'objectKey',
+  'temporaryObjectKey',
+  'finalObjectKey',
+  'CopySource',
+  'copySource',
+  'x-amz-signature',
+  '*.x-amz-signature',
   'signedUrl',
   'signed_url',
   'password',
@@ -47,6 +56,17 @@ const redactPaths = [
   'csrf_token_hash',
   'sessionToken',
   'session_token',
+  'idempotencyKey',
+  'rawKey',
+  'Idempotency-Key',
+  'filename',
+  'originalFilename',
+  'headers["idempotency-key"]',
+  'headers["Idempotency-Key"]',
+  'req.headers["idempotency-key"]',
+  'req.headers["Idempotency-Key"]',
+  '*.idempotencyKey',
+  '*.rawKey',
   'credential.passwordHash',
   'credentials',
   'databaseUrl',
@@ -79,6 +99,13 @@ const redactPaths = [
   '*.secret_access_key',
   '*.secretKey',
   '*.secret_key',
+  '*.accessKey',
+  '*.accessKeyId',
+  '*.objectKey',
+  '*.temporaryObjectKey',
+  '*.finalObjectKey',
+  '*.CopySource',
+  '*.copySource',
   '*.signedUrl',
   '*.signed_url',
   '*.password',
@@ -98,6 +125,12 @@ const redactPaths = [
   '*.csrf_token_hash',
   '*.sessionToken',
   '*.session_token',
+  '*.idempotencyKey',
+  '*.rawKey',
+  '*.filename',
+  '*.originalFilename',
+  'headers["idempotency-key"]',
+  'req.headers["idempotency-key"]',
   'peerIp',
   'remoteAddress',
   'accountDigest',
@@ -196,7 +229,9 @@ function sanitizeHeaders(headers: unknown): Record<string, unknown> {
       lower.includes('api-key') ||
       lower.includes('apikey') ||
       lower.includes('secret') ||
-      lower.includes('signature')
+      lower.includes('signature') ||
+      lower === 'idempotency-key' ||
+      lower === 'content-disposition'
     ) {
       sanitized[key] = '[Redacted]';
       continue;

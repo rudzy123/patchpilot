@@ -41,7 +41,17 @@ Healthcheck is `redis-cli ping`. Local Redis has no password. Production Redis m
 
 ### MinIO
 
-Healthcheck is `GET /minio/health/live`. There is no MinIO SDK and no guaranteed bucket in this foundation. Object operations are deferred. If curl is missing inside the image, the healthcheck will fail even when the API listens; replace the image pin or healthcheck after confirming with `curl http://127.0.0.1:19000/minio/health/live` from the host.
+Healthcheck is `GET /minio/health/live`. There is no MinIO JavaScript SDK. PatchPilot talks to this instance through `@aws-sdk/client-s3` with `forcePathStyle`. Object operations require the configured bucket; development and test may create it through `initializeDevelopmentBucket`, which refuses to run unless the deployment environment is not `production`, `PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS` is `true`, and the requested bucket equals `OBJECT_STORAGE_BUCKET`. If curl is missing inside the image, the healthcheck will fail even when the API listens; replace the image pin or healthcheck after confirming with `curl http://127.0.0.1:19000/minio/health/live` from the host.
+
+Storage symptoms map to failure categories the adapter reports:
+
+| Symptom | Category | Usual local cause |
+| --- | --- | --- |
+| Upload returns 500 "Object storage is unavailable" | `storage_unavailable` or `timeout` | MinIO not started, or `OBJECT_STORAGE_ENDPOINT` port does not match `PATCHPILOT_MINIO_API_PORT` |
+| Ingestion terminal with `processing_failed` | `bucket_missing` or `access_denied` | Bucket never created, or `.env` keys drifted from the Compose literals |
+| Client fails a TLS or scheme check at startup | Configuration | `OBJECT_STORAGE_USE_SSL` disagrees with the endpoint scheme |
+
+`OBJECT_STORAGE_OPERATION_TIMEOUT_MS` must stay below `SBOM_PROCESSING_LEASE_MS`; the config layer rejects a combination that would let a storage call outlive the job lease.
 
 ## Data loss warning
 
@@ -51,4 +61,5 @@ Named volumes persist across `compose down`. `compose down -v` deletes them. Tha
 
 - [Local setup](../development/local-setup.md)
 - [Environment variables](../development/environment-variables.md)
-- [Background job failure](background-job-failure.md) (product jobs are not registered yet)
+- [Background job failure](background-job-failure.md)
+- [SBOM ingestion failure](sbom-ingestion-failure.md)

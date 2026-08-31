@@ -67,6 +67,41 @@ describe('worker application', () => {
     expect(quitCount).toBe(1);
   });
 
+  it('shuts down the ingest processor before the outbox relay and redis', async () => {
+    const order: string[] = [];
+    const worker = createWorkerApp({
+      logger: silentLogger(),
+      telemetry: { shutdown: async () => undefined },
+      redis: fakeRedis({
+        onQuit: () => {
+          order.push('redis');
+        },
+      }),
+      checkDatabaseReady: async () => ({ ok: true }),
+      ingestionProcessor: {
+        async start() {
+          return;
+        },
+        async stop() {
+          order.push('processor');
+        },
+      },
+      outboxRelay: {
+        start() {
+          return;
+        },
+        async stop() {
+          order.push('relay');
+        },
+      },
+      shutdownTimeoutMs: 100,
+      readinessTimeoutMs: 50,
+    });
+    await worker.start();
+    await worker.stop();
+    expect(order).toEqual(['processor', 'relay', 'redis']);
+  });
+
   it('surfaces initialization failure and still allows shutdown to release redis', async () => {
     let quitCount = 0;
     const worker = createWorkerApp({

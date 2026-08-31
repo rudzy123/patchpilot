@@ -117,7 +117,7 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | Entity | States | Detail |
 | --- | --- | --- |
 | Asset | `active`, `archived` | [asset-model.md](asset-model.md) |
-| SBOMIngestion | `accepted`, `queued`, `processing`, `completed`, `rejected`, `quarantined`, `failed`, `duplicate` | [sbom-ingestion.md](sbom-ingestion.md) |
+| SBOMIngestion | `accepted`, `queued`, `processing`, `completed`, `rejected`, `quarantined`, `failed` (`duplicate` unused in Session 8) | [sbom-ingestion.md](sbom-ingestion.md) |
 | Finding | `open`, `verification_pending`, `risk_accepted`, `mitigated`, `false_positive`, `resolved`, `inconclusive` | [finding-lifecycle.md](finding-lifecycle.md) |
 | RemediationTask | `open`, `assigned`, `in_progress`, `blocked`, `completed`, `cancelled` | [remediation-lifecycle.md](remediation-lifecycle.md) |
 | RiskAcceptance | `active`, `expired`, `revoked`, `superseded` | [remediation-lifecycle.md](remediation-lifecycle.md) |
@@ -321,7 +321,7 @@ Original bytes live in object storage, not as a substitute parsed graph. The par
 
 One processing attempt against an SBOM (initial upload or later reprocess with a newer parser).
 
-Lifecycle states and transitions: [sbom-ingestion.md](sbom-ingestion.md).
+Lifecycle states and transitions: [sbom-ingestion.md](sbom-ingestion.md). Session 8 ([ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md)) uses stages `validate`, `parse`, and `persist_graph` only. `completed` means stored evidence was re-read, byte length and SHA-256 were verified, JSON/structural limits, allowlisted CycloneDX schema, semantic limits, and normalized graph persistence all succeeded. It does **not** imply exhaustive software inventory, correlation, findings, enrichment, scoring, or remediation.
 
 | Field (logical) | Notes |
 | --- | --- |
@@ -329,14 +329,17 @@ Lifecycle states and transitions: [sbom-ingestion.md](sbom-ingestion.md).
 | `organizationId` | |
 | `sbomId` | |
 | `assetId` | Denormalized for scoping |
-| `state` | Canonical ingestion state |
-| `stage` | Fine-grained step: `validate`, `parse`, `persist_graph`, `correlate`, `enrich`, `score` |
+| `state` | Canonical ingestion state. Session 8 does not insert `duplicate` rows; duplicate evidence reuses the existing resource. |
+| `stage` | Session 8: `validate`, `parse`, `persist_graph`. Frozen unused: `correlate`, `enrich`, `score`. |
+| `graphCompleteness` | `empty`, `no_dependencies`, `partial`, or `complete` after graph persist. `empty` does not mean the Asset contains no software. `no_dependencies` does not prove the software has no dependencies. Persisted by Session 8 Batch 4. |
 | `parserVersion` | Parser that ran or will run |
-| `idempotencyKey` | Organization-scoped. Unique when non-null. Null keys allow historical retries. |
+| `normalizationVersion` | Required bounded graph normalization identifier. Database column is NOT NULL. Newly created accepted ingestions always persist the provided label. Mappers fail if a row lacks a value; they do not substitute a default. |
+| `idempotencyKey` | Existing column is unused in Session 8. HTTP idempotency uses **IdempotencyRecord**. |
+| `leaseExpiresAt` | Unused in Session 8. OutboxEvent and BackgroundJob have separate leases. |
 | `errorCode` | Stable taxonomy; no raw payload |
 | `quarantineReason` | If `quarantined` |
 
-Reprocessing **creates a new SBOMIngestion** for the same SBOM. It does not mutate a `completed` ingestion back to `queued`.
+Reprocessing **creates a new SBOMIngestion** for the same SBOM. It does not mutate a `completed` ingestion back to `queued`. Future correlation must not rewrite completed Session 8 history.
 
 ## Component
 
@@ -364,7 +367,7 @@ A component as listed in a specific **SBOMIngestion**, including version and bom
 | `sbomId` | Denormalized; original document |
 | `sbomIngestionId` | Required. Derived graph is per processing attempt |
 | `componentId` | Versionless identity |
-| `version` | Untrusted text; **not** part of **Component** or **Finding** identity |
+| `version` | Untrusted text; **not** part of **Component** or **Finding** identity. Unknown versions persist as `version_known = false` with an empty placeholder. `*`, `latest`, and `unknown` cannot be represented as known ComponentVersion values in Session 8. They may appear only as literal observed evidence if a future explicit policy permits them. |
 | `versionedPurl` | Optional full PURL including version as listed in the document |
 | `bomRef` | Optional, untrusted |
 | `isDirect` | Observed from the document when present; otherwise unknown |

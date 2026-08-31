@@ -8,9 +8,19 @@ None of these defaults weaken [tenant isolation](tenant-isolation.md) or [securi
 
 | ID | Topic | Closed by |
 | --- | --- | --- |
-| OD-1 | Authentication mechanism | [ADR 0019](../adr/0019-local-password-sessions.md): local email/password for existing users, Argon2id, opaque PostgreSQL sessions, CSRF, generic login failures. No public registration, JWT, or OIDC in v0.1. Runtime login is not implemented in Batch 1. |
+| OD-1 | Authentication mechanism | [ADR 0019](../adr/0019-local-password-sessions.md): local email/password for existing users, Argon2id, opaque PostgreSQL sessions, CSRF, generic login failures. No public registration, JWT, or OIDC in v0.1. |
 | OD-2 | Session store | [ADR 0019](../adr/0019-local-password-sessions.md) and [ADR 0006](../adr/0006-redis-bullmq.md): PostgreSQL is session authority. Redis is queue transport and login rate limiting only. |
 | OD-3 | RBAC permission catalog | [ADR 0019](../adr/0019-local-password-sessions.md) interim four-role permission matrix. A later ADR may supersede the catalog without changing authentication. |
+
+## Closed in Session 8 (ADR 0020)
+
+| ID | Topic | Closed by |
+| --- | --- | --- |
+| Session 8 `completed` | SBOM ingestion success after evidence verification and graph persist | [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md). Stages `validate`, `parse`, and `persist_graph` only. `correlate`, `enrich`, and `score` remain unused. Future correlation is additive and must not rewrite Session 8 completed rows. |
+| Graph completeness | `empty`, `no_dependencies`, `partial`, `complete` | [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md). `empty` does not mean the Asset contains no software. `no_dependencies` does not prove the software has no dependencies. |
+| Parser time budget | Wall-clock parse limit | [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md): worker-thread termination, not `Promise.race` around synchronous parse. |
+
+OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 
 ## Still open
 

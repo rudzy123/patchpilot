@@ -21,6 +21,18 @@ import {
 } from './auth.js';
 import { hydrateProcessEnvFromDevelopmentFiles } from './load-env-files.js';
 import { parseBoolean, parseInteger, readOptional, readRequired } from './read-env.js';
+import {
+  bucketNameLooksLikeDevelopmentPlaceholder,
+  isValidObjectStorageBucketName,
+  OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MAX,
+  OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MIN,
+  OBJECT_STORAGE_REGION_MAX_LENGTH,
+  OBJECT_STORAGE_REGION_PATTERN,
+  refineSbomNumericBounds,
+  sbomConfigSchema,
+  sbomRelationshipIssues,
+  type SbomConfig,
+} from './sbom.js';
 
 const deploymentEnvironmentSchema = z.enum(['development', 'test', 'production']);
 const logLevelSchema = z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']);
@@ -47,11 +59,21 @@ export const serverConfigSchema = z
     redisUrl: z.string().min(1),
     objectStorage: z.object({
       endpoint: z.string().min(1),
+      region: z
+        .string()
+        .min(2)
+        .max(OBJECT_STORAGE_REGION_MAX_LENGTH)
+        .regex(
+          OBJECT_STORAGE_REGION_PATTERN,
+          'Object-storage region must be an explicit bound label.',
+        ),
       accessKey: z.string().min(1),
       secretKey: z.string().min(1),
       bucket: z.string().min(1),
       useSsl: z.boolean(),
+      connectionTimeoutMs: z.number().int().positive(),
     }),
+    sbom: sbomConfigSchema,
     openTelemetry: z.object({
       enabled: z.boolean(),
       tracesEndpoint: z.string().min(1).optional(),
@@ -87,6 +109,65 @@ export const serverConfigSchema = z
         path: ['objectStorage'],
         message:
           'Production configuration rejected development-only placeholder credentials. Supply operator secrets at runtime.',
+      });
+    }
+
+    if (!isValidObjectStorageBucketName(value.objectStorage.bucket)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['objectStorage', 'bucket'],
+        message:
+          'Object-storage bucket must be a valid S3-compatible bucket name (3–63 characters, lowercase, no adjacent periods, not an IPv4 address).',
+      });
+    }
+
+    if (
+      value.deploymentEnvironment === 'production' &&
+      bucketNameLooksLikeDevelopmentPlaceholder(value.objectStorage.bucket)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['objectStorage', 'bucket'],
+        message:
+          'Production object-storage bucket names must not use development placeholders such as patchpilot-dev.',
+      });
+    }
+
+    if (
+      value.objectStorage.connectionTimeoutMs < OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MIN ||
+      value.objectStorage.connectionTimeoutMs > OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MAX
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['objectStorage', 'connectionTimeoutMs'],
+        message: `Object-storage connection timeout must be between ${OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MIN} and ${OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_MAX}.`,
+      });
+    }
+
+    if (value.objectStorage.connectionTimeoutMs > value.sbom.objectStorageOperationTimeoutMs) {
+      context.addIssue({
+        code: 'custom',
+        path: ['objectStorage', 'connectionTimeoutMs'],
+        message:
+          'Object-storage connection timeout must be less than or equal to the operation timeout.',
+      });
+    }
+
+    refineObjectStorageEndpoint(value, context);
+
+    refineSbomNumericBounds(value.sbom, (issue) => {
+      context.addIssue({
+        code: 'custom',
+        path: ['sbom', ...issue.path],
+        message: issue.message,
+      });
+    });
+
+    for (const issue of sbomRelationshipIssues(value.sbom)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['sbom', ...issue.path],
+        message: issue.message,
       });
     }
 
@@ -144,10 +225,15 @@ export function loadServerConfigFrom(
       redisUrl: readRequired(env, 'REDIS_URL'),
       objectStorage: {
         endpoint: readRequired(env, 'OBJECT_STORAGE_ENDPOINT'),
+        region: readRequired(env, 'OBJECT_STORAGE_REGION'),
         accessKey: readRequired(env, 'OBJECT_STORAGE_ACCESS_KEY'),
         secretKey: readRequired(env, 'OBJECT_STORAGE_SECRET_KEY'),
         bucket: readRequired(env, 'OBJECT_STORAGE_BUCKET'),
         useSsl: parseBoolean(readRequired(env, 'OBJECT_STORAGE_USE_SSL'), 'OBJECT_STORAGE_USE_SSL'),
+        connectionTimeoutMs: parseInteger(
+          readRequired(env, 'OBJECT_STORAGE_CONNECTION_TIMEOUT_MS'),
+          'OBJECT_STORAGE_CONNECTION_TIMEOUT_MS',
+        ),
       },
       openTelemetry: {
         enabled: parseBoolean(readRequired(env, 'OTEL_ENABLED'), 'OTEL_ENABLED'),
@@ -167,6 +253,7 @@ export function loadServerConfigFrom(
       ),
       requestIdHeader: readRequired(env, 'REQUEST_ID_HEADER'),
       correlationIdHeader: readRequired(env, 'CORRELATION_ID_HEADER'),
+      sbom: loadSbomConfigFrom(env),
       auth: {
         sessionAbsoluteTtlSeconds: parseInteger(
           readRequired(env, 'AUTH_SESSION_ABSOLUTE_TTL_SECONDS'),
@@ -254,6 +341,81 @@ export function loadServerConfigFrom(
 export function loadServerConfig(): ServerConfig {
   hydrateProcessEnvFromDevelopmentFiles(process.env, { moduleUrl: import.meta.url });
   return loadServerConfigFrom(process.env);
+}
+
+function loadSbomConfigFrom(env: Readonly<Record<string, string | undefined>>): SbomConfig {
+  return {
+    uploadMaxBytes: parseInteger(
+      readRequired(env, 'SBOM_UPLOAD_MAX_BYTES'),
+      'SBOM_UPLOAD_MAX_BYTES',
+    ),
+    jsonMaxDepth: parseInteger(readRequired(env, 'SBOM_JSON_MAX_DEPTH'), 'SBOM_JSON_MAX_DEPTH'),
+    jsonMaxNodes: parseInteger(readRequired(env, 'SBOM_JSON_MAX_NODES'), 'SBOM_JSON_MAX_NODES'),
+    jsonMaxStringBytes: parseInteger(
+      readRequired(env, 'SBOM_JSON_MAX_STRING_BYTES'),
+      'SBOM_JSON_MAX_STRING_BYTES',
+    ),
+    maxComponents: parseInteger(readRequired(env, 'SBOM_MAX_COMPONENTS'), 'SBOM_MAX_COMPONENTS'),
+    maxDependencyEdges: parseInteger(
+      readRequired(env, 'SBOM_MAX_DEPENDENCY_EDGES'),
+      'SBOM_MAX_DEPENDENCY_EDGES',
+    ),
+    maxBomRefBytes: parseInteger(
+      readRequired(env, 'SBOM_MAX_BOM_REF_BYTES'),
+      'SBOM_MAX_BOM_REF_BYTES',
+    ),
+    maxPurlBytes: parseInteger(readRequired(env, 'SBOM_MAX_PURL_BYTES'), 'SBOM_MAX_PURL_BYTES'),
+    maxComponentNameChars: parseInteger(
+      readRequired(env, 'SBOM_MAX_COMPONENT_NAME_CHARS'),
+      'SBOM_MAX_COMPONENT_NAME_CHARS',
+    ),
+    maxVersionChars: parseInteger(
+      readRequired(env, 'SBOM_MAX_VERSION_CHARS'),
+      'SBOM_MAX_VERSION_CHARS',
+    ),
+    maxMetadataTools: parseInteger(
+      readRequired(env, 'SBOM_MAX_METADATA_TOOLS'),
+      'SBOM_MAX_METADATA_TOOLS',
+    ),
+    maxExternalRefsPerComponent: parseInteger(
+      readRequired(env, 'SBOM_MAX_EXTERNAL_REFS_PER_COMPONENT'),
+      'SBOM_MAX_EXTERNAL_REFS_PER_COMPONENT',
+    ),
+    maxPropertiesPerComponent: parseInteger(
+      readRequired(env, 'SBOM_MAX_PROPERTIES_PER_COMPONENT'),
+      'SBOM_MAX_PROPERTIES_PER_COMPONENT',
+    ),
+    parserTimeoutMs: parseInteger(
+      readRequired(env, 'SBOM_PARSER_TIMEOUT_MS'),
+      'SBOM_PARSER_TIMEOUT_MS',
+    ),
+    processingLeaseMs: parseInteger(
+      readRequired(env, 'SBOM_PROCESSING_LEASE_MS'),
+      'SBOM_PROCESSING_LEASE_MS',
+    ),
+    idempotencyTtlSeconds: parseInteger(
+      readRequired(env, 'SBOM_IDEMPOTENCY_TTL_SECONDS'),
+      'SBOM_IDEMPOTENCY_TTL_SECONDS',
+    ),
+    uploadRateLimitMax: parseInteger(
+      readRequired(env, 'SBOM_UPLOAD_RATE_LIMIT_MAX'),
+      'SBOM_UPLOAD_RATE_LIMIT_MAX',
+    ),
+    uploadRateLimitWindowSeconds: parseInteger(
+      readRequired(env, 'SBOM_UPLOAD_RATE_LIMIT_WINDOW_SECONDS'),
+      'SBOM_UPLOAD_RATE_LIMIT_WINDOW_SECONDS',
+    ),
+    objectStorageOperationTimeoutMs: parseInteger(
+      readRequired(env, 'OBJECT_STORAGE_OPERATION_TIMEOUT_MS'),
+      'OBJECT_STORAGE_OPERATION_TIMEOUT_MS',
+    ),
+    orphanGraceSeconds: parseInteger(
+      readRequired(env, 'SBOM_ORPHAN_GRACE_SECONDS'),
+      'SBOM_ORPHAN_GRACE_SECONDS',
+    ),
+    parserVersion: readRequired(env, 'SBOM_PARSER_VERSION'),
+    normalizationVersion: readRequired(env, 'SBOM_NORMALIZATION_VERSION'),
+  };
 }
 
 function refineAuthConfig(value: ServerConfig, context: z.RefinementCtx): void {
@@ -457,6 +619,44 @@ function redisUrlHasPassword(redisUrl: string): boolean {
     return parsed.password.length > 0;
   } catch {
     return false;
+  }
+}
+
+function refineObjectStorageEndpoint(value: ServerConfig, context: z.RefinementCtx): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(value.objectStorage.endpoint);
+  } catch {
+    context.addIssue({
+      code: 'custom',
+      path: ['objectStorage', 'endpoint'],
+      message: 'Object-storage endpoint must be a valid URL.',
+    });
+    return;
+  }
+
+  if (parsed.username !== '' || parsed.password !== '') {
+    context.addIssue({
+      code: 'custom',
+      path: ['objectStorage', 'endpoint'],
+      message: 'Object-storage endpoint must not include credentials or userinfo.',
+    });
+  }
+
+  if (value.objectStorage.useSsl && parsed.protocol !== 'https:') {
+    context.addIssue({
+      code: 'custom',
+      path: ['objectStorage', 'endpoint'],
+      message: 'Object-storage endpoint must use https when OBJECT_STORAGE_USE_SSL is true.',
+    });
+  }
+
+  if (!value.objectStorage.useSsl && parsed.protocol !== 'http:') {
+    context.addIssue({
+      code: 'custom',
+      path: ['objectStorage', 'endpoint'],
+      message: 'Object-storage endpoint must use http when OBJECT_STORAGE_USE_SSL is false.',
+    });
   }
 }
 

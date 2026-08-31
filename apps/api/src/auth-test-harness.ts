@@ -37,6 +37,8 @@ import {
   ASSET_NOT_FOUND,
   JSON_SCHEMA_VERSION_V1,
   ORGANIZATION_CONTEXT_REQUIRED,
+  SBOM_NOT_FOUND,
+  SBOM_UPLOAD_INTERNAL,
 } from '@patchpilot/domain';
 import { createLogger, type Logger } from '@patchpilot/logger';
 import { createFoundationTestEnv } from '@patchpilot/test-utils';
@@ -45,6 +47,7 @@ import { buildApi } from './app.js';
 import type { AssetRuntime } from './asset-runtime.js';
 import type { AuthRuntime } from './auth-runtime.js';
 import type { DatabaseReadyCheck } from './app.js';
+import type { SbomRuntime } from './sbom-runtime.js';
 
 export const VALID_PASSWORD = 'correct-horse-battery';
 export const TEST_ORIGIN = 'http://127.0.0.1:3000';
@@ -81,6 +84,7 @@ export async function buildTestApi(options?: {
   checkDatabaseReady?: DatabaseReadyCheck;
   harness?: AuthTestHarness;
   assets?: AssetRuntime;
+  sboms?: SbomRuntime;
 }) {
   const harness = options?.harness ?? createAuthTestHarness(options);
   const app = await buildApi({
@@ -89,6 +93,7 @@ export async function buildTestApi(options?: {
     checkDatabaseReady: options?.checkDatabaseReady ?? (async () => ({ ok: true })),
     auth: harness.auth,
     assets: options?.assets ?? emptyAssetRuntime(),
+    sboms: options?.sboms ?? emptySbomRuntime(),
     ...(options?.now === undefined ? {} : { now: options.now }),
     ...(options?.generateId === undefined ? {} : { generateId: options.generateId }),
   });
@@ -212,6 +217,31 @@ function emptyAssetRuntime(): AssetRuntime {
     listMemberships: {
       async execute() {
         return { ok: true as const, value: { items: [], nextCursor: undefined } };
+      },
+    },
+  };
+}
+
+export function emptySbomRuntime(): SbomRuntime {
+  return {
+    upload: {
+      async execute() {
+        return { ok: false as const, error: SBOM_UPLOAD_INTERNAL };
+      },
+    },
+    list: {
+      async execute() {
+        return { ok: false as const, error: ORGANIZATION_CONTEXT_REQUIRED };
+      },
+    },
+    get: {
+      async execute() {
+        return { ok: false as const, error: SBOM_NOT_FOUND };
+      },
+    },
+    getIngestion: {
+      async execute() {
+        return { ok: false as const, error: SBOM_NOT_FOUND };
       },
     },
   };

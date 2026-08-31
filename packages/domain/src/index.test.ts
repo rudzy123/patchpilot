@@ -8,6 +8,7 @@ import {
   errorCodes,
   evidenceKinds,
   findingStates,
+  graphCompletenessValues,
   MAX_PAGE_SIZE,
   membershipRoles,
   MIN_PAGE_SIZE,
@@ -15,6 +16,10 @@ import {
   organizationStatuses,
   passwordHashAlgorithms,
   riskPolicyScopes,
+  sbomSpecificationVersions,
+  session8IngestionStages,
+  session8IngestionTerminalStates,
+  session8UnusedIngestionStages,
   sessionAuthenticationMethods,
   type AssetRepository,
   type EnvironmentRepository,
@@ -47,6 +52,19 @@ describe('lifecycle catalogs', () => {
     expect(auditActorTypes).toEqual(['user', 'system', 'instance_operator', 'anonymous']);
     expect(passwordHashAlgorithms).toEqual(['argon2id']);
     expect(sessionAuthenticationMethods).toEqual(['password']);
+  });
+
+  it('closes Session 8 graph completeness and ingestion stages', () => {
+    expect(graphCompletenessValues).toEqual(['empty', 'no_dependencies', 'partial', 'complete']);
+    expect(session8IngestionStages).toEqual(['validate', 'parse', 'persist_graph']);
+    expect(session8UnusedIngestionStages).toEqual(['correlate', 'enrich', 'score']);
+    expect(session8IngestionTerminalStates).toEqual([
+      'completed',
+      'rejected',
+      'quarantined',
+      'failed',
+    ]);
+    expect(sbomSpecificationVersions).not.toContain('1.7');
   });
 });
 

@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import * as databasePublic from './index.js';
@@ -10,6 +14,7 @@ import {
   requirePasswordRevision,
   requirePositiveByteLength,
   requireSha256,
+  requireVersionLabel,
 } from './guards.js';
 
 describe('input guards', () => {
@@ -37,6 +42,11 @@ describe('input guards', () => {
   it('requires positive byte lengths', () => {
     expect(requirePositiveByteLength(1, 'byteLength')).toBe(1);
     expect(() => requirePositiveByteLength(0, 'byteLength')).toThrow(/positive/);
+  });
+
+  it('requires bounded version labels', () => {
+    expect(requireVersionLabel('1.0.0', 'parserVersion')).toBe('1.0.0');
+    expect(() => requireVersionLabel('../escape', 'parserVersion')).toThrow(/version label/);
   });
 
   it('normalizes slugs and emails', () => {
@@ -78,5 +88,16 @@ describe('page bounds', () => {
 describe('public package surface', () => {
   it('does not export the persistence fixture as application API', () => {
     expect('persistTenantChangeWithAuditAndOutbox' in databasePublic).toBe(false);
+  });
+});
+
+describe('outbox claim SQL', () => {
+  it('keeps FOR UPDATE SKIP LOCKED on both production claim statements', () => {
+    const source = readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), 'outbox-relay-persistence.ts'),
+      'utf8',
+    );
+    expect(source).toMatch(/WHERE "status" = 'pending'[\s\S]*?FOR UPDATE SKIP LOCKED/);
+    expect(source).toMatch(/WHERE "status" = 'claimed'[\s\S]*?FOR UPDATE SKIP LOCKED/);
   });
 });

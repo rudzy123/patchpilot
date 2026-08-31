@@ -45,6 +45,7 @@ describe('logger redaction', () => {
             'proxy-authorization': 'Basic proxy-secret',
             'x-storage-secret': 'header-secret-value',
             'x-amz-signature': 'signed-query-secret',
+            'content-disposition': 'attachment; filename="bom.json"',
             'x-request-id': 'req-1',
           },
           body: { shouldNotAppearIfSerialized: true },
@@ -55,6 +56,13 @@ describe('logger redaction', () => {
         githubToken: 'ghs_exampletoken',
         secretAccessKey: 'minio-secret-key',
         secretKey: 'object-storage-secret',
+        accessKey: 'object-storage-access',
+        accessKeyId: 'AKIA-not-a-real-key',
+        objectKey: 'org/secret-object-key',
+        temporaryObjectKey: 'org/secret-temporary-key',
+        finalObjectKey: 'org/secret-final-key',
+        CopySource: 'bucket/org/secret-copy-source',
+        copySource: 'bucket/org/secret-copy-source-alt',
         signedUrl: 'https://minio.example/object?X-Amz-Signature=abc',
         password: 'plaintext-db-password',
         passwordHash: '$argon2id$v=19$m=19456,t=2,p=1$compattesthash',
@@ -63,6 +71,10 @@ describe('logger redaction', () => {
         csrfTokenHash: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
         tokenHash: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
         sessionToken: 'raw-session-token-value',
+        idempotencyKey: 'raw-idempotency-header-value',
+        rawKey: 'raw-idempotency-secret',
+        filename: 'bom.json',
+        originalFilename: 'customer-bom.json',
         peerIp: '192.0.2.10',
         accountDigest: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
         credential: { passwordHash: '$argon2id$v=19$m=19456,p=1,t=2$nestedcredhashvalue' },
@@ -86,11 +98,21 @@ describe('logger redaction', () => {
     expect(output).not.toContain('ghs_exampletoken');
     expect(output).not.toContain('minio-secret-key');
     expect(output).not.toContain('object-storage-secret');
+    expect(output).not.toContain('object-storage-access');
+    expect(output).not.toContain('AKIA-not-a-real-key');
+    expect(output).not.toContain('secret-object-key');
+    expect(output).not.toContain('secret-temporary-key');
+    expect(output).not.toContain('secret-final-key');
+    expect(output).not.toContain('secret-copy-source');
     expect(output).not.toContain('X-Amz-Signature=abc');
     expect(output).not.toContain('plaintext-db-password');
     expect(output).not.toContain('$argon2id$v=19$m=19456,t=2,p=1$compattesthash');
     expect(output).not.toContain('raw-csrf-token-value');
     expect(output).not.toContain('raw-session-token-value');
+    expect(output).not.toContain('raw-idempotency-header-value');
+    expect(output).not.toContain('raw-idempotency-secret');
+    expect(output).not.toContain('bom.json');
+    expect(output).not.toContain('customer-bom.json');
     expect(output).not.toContain('192.0.2.10');
     expect(output).not.toContain(
       'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',

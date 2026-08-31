@@ -24,15 +24,48 @@ Copy [`.env.example`](../../.env.example) to `.env`. Example values are **develo
 | `OBJECT_STORAGE_ENDPOINT` | S3-compatible endpoint (local MinIO). |
 | `OBJECT_STORAGE_ACCESS_KEY` | Object-storage access key. |
 | `OBJECT_STORAGE_SECRET_KEY` | Object-storage secret. |
-| `OBJECT_STORAGE_BUCKET` | Bucket name. Bucket creation is deferred until object operations exist. |
-| `OBJECT_STORAGE_USE_SSL` | `true` or `false`. |
+| `OBJECT_STORAGE_BUCKET` | S3-compatible bucket name (3–63 characters, lowercase, digits, dots, hyphens; not an IPv4 address; no adjacent periods). Production rejects development placeholders such as `patchpilot-dev`. Development and test may create the configured bucket through the Session 8 adapter; production never creates a missing bucket. |
+| `OBJECT_STORAGE_USE_SSL` | `true` or `false`. Must agree with the endpoint scheme (`https` when true, `http` when false). |
+| `OBJECT_STORAGE_REGION` | Explicit S3-compatible region label. Default `us-east-1`. Lowercase alphanumeric and hyphens, 2–32 characters. Required even for MinIO. |
+| `OBJECT_STORAGE_CONNECTION_TIMEOUT_MS` | Socket connect timeout. Default `3000`. Floor `250`, ceiling `10000`. Must be less than or equal to `OBJECT_STORAGE_OPERATION_TIMEOUT_MS`. |
+| `OBJECT_STORAGE_OPERATION_TIMEOUT_MS` | Timeout for a single object-storage operation used by SBOM upload/re-read. Default `30000`. Floor `1000`, ceiling `120000`. Must be less than `SBOM_PROCESSING_LEASE_MS`. |
 | `OTEL_ENABLED` | Enables OpenTelemetry **trace** SDK initialization. Default `false`. Does not enable metrics, log export, or automatic instrumentation. |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Optional OTLP **HTTP JSON** traces endpoint. Required only when exporting. When unset, enabled telemetry uses a no-op span processor and does not contact a collector. Other `OTEL_*` variables are not read by PatchPilot. |
 | `READINESS_TIMEOUT_MS` | Budget for readiness probes. |
 | `SHUTDOWN_TIMEOUT_MS` | Graceful shutdown budget. |
-| `REQUEST_BODY_LIMIT_BYTES` | Fastify body limit. |
+| `REQUEST_BODY_LIMIT_BYTES` | Ordinary Fastify JSON body limit. Independent of `SBOM_UPLOAD_MAX_BYTES`. Example `1048576`. |
 | `REQUEST_ID_HEADER` | Incoming/outgoing request id header. Default `x-request-id`. |
 | `CORRELATION_ID_HEADER` | Incoming/outgoing correlation id header. Default `x-correlation-id`. |
+
+## SBOM ingestion ([ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md))
+
+Required. These are reviewed **initial defaults**, not production performance guarantees; they have not been measured against representative SBOMs. Upload, parse, and graph persistence all read these values at runtime. Values must be canonical integers (no `NaN`, `Infinity`, scientific notation, or leading zeros). Parser timeout and object-storage timeout must be less than the processing lease, because no lease heartbeat exists. Idempotency TTL must exceed twice the object-storage operation timeout so a reservation can cover temporary put and promote. Orphan grace must be greater than the idempotency TTL. Object-storage credentials stay on the existing `OBJECT_STORAGE_*` secret fields and are not part of the public SBOM config object.
+
+| Variable | Purpose |
+| --- | --- |
+| `SBOM_UPLOAD_MAX_BYTES` | Raw SBOM upload cap. Default `20971520`. Floor `65536`, ceiling `33554432`. |
+| `SBOM_JSON_MAX_DEPTH` | Max JSON nesting. Default `32`. Floor `8`, ceiling `64`. |
+| `SBOM_JSON_MAX_NODES` | Max JSON values (objects, arrays, primitives). Default `200000`. Floor `1000`, ceiling `500000`. |
+| `SBOM_JSON_MAX_STRING_BYTES` | Max UTF-8 bytes per JSON string. Default `65536`. Floor `1024`, ceiling `262144`. |
+| `SBOM_MAX_COMPONENTS` | Max CycloneDX components. Default `10000`. Floor `1`, ceiling `25000`. |
+| `SBOM_MAX_DEPENDENCY_EDGES` | Max dependency edges. Default `50000`. Floor `0`, ceiling `100000`. |
+| `SBOM_MAX_BOM_REF_BYTES` | Max `bom-ref` bytes. Default `2048`. Floor `64`, ceiling `2048`. |
+| `SBOM_MAX_PURL_BYTES` | Max PURL bytes. Default `2048`. Floor `64`, ceiling `2048`. |
+| `SBOM_MAX_COMPONENT_NAME_CHARS` | Max component name characters. Default `512`. Floor `64`, ceiling `512`. |
+| `SBOM_MAX_VERSION_CHARS` | Max version characters. Default `256`. Floor `1`, ceiling `256`. |
+| `SBOM_MAX_METADATA_TOOLS` | Max metadata tools. Default `64`. Floor `0`, ceiling `256`. |
+| `SBOM_MAX_EXTERNAL_REFS_PER_COMPONENT` | Max external references per component. Default `32`. Floor `0`, ceiling `128`. |
+| `SBOM_MAX_PROPERTIES_PER_COMPONENT` | Max properties per component. Default `64`. Floor `0`, ceiling `256`. |
+| `SBOM_PARSER_TIMEOUT_MS` | Parser wall-clock budget (worker-thread termination). Default `60000`. Floor `10000`, ceiling `120000`. Must be less than `SBOM_PROCESSING_LEASE_MS`. |
+| `SBOM_PROCESSING_LEASE_MS` | BackgroundJob processing lease. Default `900000`. Floor `120000`, ceiling `1800000`. No heartbeat renews it, so it must cover the worst-case run. `SbomIngestion.leaseExpiresAt` is unused and never written. |
+| `SBOM_IDEMPOTENCY_TTL_SECONDS` | IdempotencyRecord TTL. Default `86400`. Floor `3600`, ceiling `259200`. |
+| `SBOM_UPLOAD_RATE_LIMIT_MAX` | Max uploads per window, applied twice: once per direct peer IP and once per authorized organization. Default `10`. Floor `1`, ceiling `60`. |
+| `SBOM_UPLOAD_RATE_LIMIT_WINDOW_SECONDS` | Upload limiter window for both limiters. Default `900`. Floor `60`, ceiling `3600`. |
+| `SBOM_ORPHAN_GRACE_SECONDS` | Policy floor for a future unreferenced-object cleanup job. Default `604800`. Floor `7200`, ceiling `2592000`. Must be greater than `SBOM_IDEMPOTENCY_TTL_SECONDS`. **No code reads this yet**; orphan cleanup is not implemented. |
+| `SBOM_PARSER_VERSION` | Safe VARCHAR(64) parser label. Default `0.1.0`. |
+| `SBOM_NORMALIZATION_VERSION` | Safe VARCHAR(64) normalization label. Default `1`. |
+
+Test configuration may inject smaller limits only through typed test configuration, and only within these floors. Do not add object-storage access keys or endpoints to this SBOM object.
 
 ## Authentication ([ADR 0019](../adr/0019-local-password-sessions.md))
 
@@ -79,4 +112,4 @@ If you change these, also change `DATABASE_URL`, `REDIS_URL`, and `OBJECT_STORAG
 
 ## Production notes
 
-Production configuration must set `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`, `PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS=false`, `LOG_PRETTY=false`, operator-supplied credentials (not `patchpilot-dev`, `not-for-production`, `minioadmin`, `changeme`, or `password` fragments), a Redis URL that includes a password, `AUTH_COOKIE_NAME=__Host-patchpilot.sid`, `AUTH_COOKIE_SECURE=true`, Argon2 parameters at or above OWASP minimums, and an exact **https** CORS allowlist. Bind addresses and TLS are operator responsibilities. Fastify `trustProxy` remains false; do not expect `X-Forwarded-For` to select the login rate-limit key.
+Production configuration must set `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`, `PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS=false`, `LOG_PRETTY=false`, operator-supplied credentials (not `patchpilot-dev`, `not-for-production`, `minioadmin`, `changeme`, or `password` fragments), a Redis URL that includes a password, `AUTH_COOKIE_NAME=__Host-patchpilot.sid`, `AUTH_COOKIE_SECURE=true`, Argon2 parameters at or above OWASP minimums, an exact **https** CORS allowlist, and an object-storage bucket that is not a development placeholder. Bind addresses and TLS are operator responsibilities. Fastify `trustProxy` remains false; do not expect `X-Forwarded-For` to select the login rate-limit key.

@@ -15,6 +15,7 @@ import type {
   ExternalCredentialStatus,
   FindingObservationResult,
   FindingState,
+  GraphCompleteness,
   IdempotencyRecordStatus,
   IntegrationProviderKey,
   IntegrationState,
@@ -55,6 +56,8 @@ import type {
   RiskPolicyDefinitionJson,
   VulnerabilityNormalizedJson,
 } from './json-documents.js';
+import type { SafeFailureCategory, SafeFailureCode } from './sbom/failures.js';
+import type { ComponentVersion } from './sbom/version.js';
 
 export type OrganizationRecord = {
   id: string;
@@ -243,11 +246,16 @@ export type SbomIngestionRecord = {
   stage: SbomIngestionStage | null;
   attemptNumber: number;
   parserVersion: string;
+  normalizationVersion: string;
   idempotencyKey: string | null;
   startedAt: Date | null;
   completedAt: Date | null;
-  failureCategory: string | null;
-  failureCode: string | null;
+  graphCompleteness: GraphCompleteness | null;
+  componentCount: number | null;
+  dependencyEdgeCount: number | null;
+  warningCount: number | null;
+  failureCategory: SafeFailureCategory | null;
+  failureCode: SafeFailureCode | null;
   quarantineReason: string | null;
   leaseExpiresAt: Date | null;
   version: number;
@@ -260,7 +268,7 @@ export type ComponentRecord = {
   organizationId: string;
   identityKey: string;
   purl: string | null;
-  ecosystem: string;
+  ecosystem: string | null;
   namespace: string | null;
   name: string;
   identityState: ComponentIdentityState;
@@ -275,7 +283,7 @@ export type ComponentOccurrenceRecord = {
   sbomIngestionId: string;
   componentId: string;
   bomRef: string | null;
-  version: string;
+  version: ComponentVersion;
   versionedPurl: string | null;
   isDirect: boolean | null;
   createdAt: Date;

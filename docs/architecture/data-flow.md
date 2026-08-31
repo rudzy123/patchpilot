@@ -2,7 +2,7 @@
 
 This document traces the v0.1 [MVP journey](../product/mvp-scope.md) through the modular monolith. It is a control-flow and evidence-flow description, not a network packet capture.
 
-Authorization context is established as in [tenant isolation](tenant-isolation.md). Limits and poison handling are in [SBOM ingestion](sbom-ingestion.md).
+Authorization context is established as in [tenant isolation](tenant-isolation.md). Limits and poison handling are in [SBOM ingestion](sbom-ingestion.md). Session 8 upload, parse, and graph persist follow [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md): stages `validate`, `parse`, and `persist_graph` only. Correlation, enrichment, scoring, findings, and remediation remain later additive workflows. Session 8 has no web upload UI.
 
 ## End-to-end journey
 
@@ -21,16 +21,17 @@ sequenceDiagram
   User->>Web: Create organization, register asset
   Web->>API: Authenticated commands
   API->>PG: Membership, asset, audit
-  User->>API: Upload CycloneDX JSON
+  User->>API: Upload CycloneDX JSON (no Session 8 web UI)
   API->>API: Size, content-type, hash
-  API->>OS: Put original bytes
+  API->>OS: Put original bytes (tenant-and-Asset key)
   API->>PG: SBOM, ingestion accepted, outbox, audit
-  Relay->>Q: Publish parse job
+  Relay->>Q: Publish parse job (outbox processed = BullMQ accepted)
   W->>OS: Get copy of object
-  W->>PG: Parse graph, correlate
-  W->>OSV: Allowlisted query if cache miss
-  W->>KEV: Not per upload; use snapshot
-  W->>PG: Findings, observations, calculations, audit
+  W->>PG: Validate, parse, persist graph (Session 8 completed)
+  Note over W,OSV: Future additive: correlate, enrich, score
+  W->>OSV: Allowlisted query if cache miss (not Session 8)
+  W->>KEV: Not per upload; use snapshot (not Session 8)
+  W->>PG: Findings, observations, calculations, audit (not Session 8)
   User->>API: Assign work, accept risk, export
   User->>API: Upload newer SBOM
   W->>PG: New observations, finding state, calculations
@@ -50,28 +51,27 @@ If the diagram is not rendered, the numbered flows below are complete.
 2. Transaction: **Asset** (`active`) + optional **AssetOwner** + **AuditEvent** (`asset.created`).
 3. **RepositoryConnection** is not created as a live integration; if a row exists it stays `not_configured`.
 
-## 3–5. Upload, store, parse
+## 3–5. Upload, store, parse (Session 8)
 
 Synchronous API work:
 
 1. Authenticate. Authorize `sbom.upload` for the asset's organization.
-2. Enforce content-type and upload size **before** unbounded parse.
+2. Enforce content-type and upload size **before** unbounded parse. Raw body; required `Idempotency-Key`.
 3. Stream body through a SHA-256 hasher and a byte counter. Abort over limit.
-4. Cheap JSON and CycloneDX spec-version allowlist checks on a copy in memory only after size is known.
-5. Put original bytes to private object storage using a content-addressed, organization-prefixed key. **Not** inside a DB transaction.
-6. Transaction: **SBOM**, **SBOMIngestion** (`accepted` or `duplicate`), **OutboxEvent** (`sbom.ingest`), **AuditEvent** (`sbom.uploaded`). No parser, feed, or further storage I/O in this transaction.
-7. Duplicate SHA-256 for the same organization + asset returns the existing SBOM without a second parse job (idempotent).
+4. Put original bytes to private object storage using a tenant-and-Asset-scoped key. **Not** inside a DB transaction. No public or signed object URLs.
+5. Transaction: **SBOM**, **SBOMIngestion** (`accepted`), **OutboxEvent** (`sbom.ingest`), **AuditEvent** (`sbom.uploaded`), idempotency finalization. No parser, feed, or further storage I/O in this transaction.
+6. Duplicate SHA-256 for the same organization + asset **reuses** the existing SBOM and ingestion resource. No `duplicate`-state ingestion row. No second outbox event.
 
 Asynchronous worker work:
 
-1. Relay publishes the outbox row to BullMQ (**BackgroundJob** `queued`).
+1. Relay publishes the outbox row to BullMQ. **OutboxEvent** `processed` means BullMQ accepted the job. **BackgroundJob** represents processor execution.
 2. Worker reloads SBOM by id **and** `organizationId`.
-3. Get a **copy** of object bytes. Do not fetch `externalReferences`, license URLs, or bom-links.
-4. Schema, depth, component, and edge limits. Failures become `rejected` or `quarantined` as defined in ingestion design.
+3. Get a **copy** of object bytes and re-verify length and SHA-256. Do not fetch `externalReferences`, license URLs, or bom-links.
+4. Schema, depth, node, component, and edge limits. Failures become `rejected` or `quarantined` as defined in ingestion design.
 5. Persist **Component**, **ComponentOccurrence**, **DependencyRelationship** keyed by **this** `sbomIngestionId`.
-6. Ingestion stage advances through parse; state stays `processing` until a terminal ingestion state. `completed` is allowed only after correlate, enrich, and score for this ingestion have finished (or failed terminal — then not `completed`).
+6. Ingestion stages are `validate`, `parse`, and `persist_graph` only. State becomes `completed` after those Session 8 steps succeed. `completed` does not imply exhaustive coverage. `correlate`, `enrich`, and `score` remain unused.
 
-## 6. Correlate
+## 6. Correlate (future additive workflow)
 
 1. For each occurrence, build ecosystem + name + version or PURL.
 2. Match against **Vulnerability** / **VulnerabilitySourceRecord** using recorded **method**.
@@ -101,7 +101,7 @@ Asynchronous worker work:
 ## 11–12. Newer SBOM and compare
 
 1. Same upload pipeline; new **SBOM** (new hash) for the same asset.
-2. After parse+correlate+enrich+score, the ingestion may become `completed`. For each existing finding on the asset, write a new **FindingObservation** keyed by this `sbomIngestionId`: `present`, `absent`, or `inconclusive` with method.
+2. Session 8 may already have marked the ingestion `completed` after graph persist. A later correlation workflow writes **FindingObservation** rows keyed by this `sbomIngestionId`: `present`, `absent`, or `inconclusive` with method. That workflow must not rewrite Session 8 completed history.
 3. Finding state updates per [finding lifecycle](finding-lifecycle.md) **only if this ingestion is current** (greatest SBOM `receivedAt` among `completed`). `resolved` is a **calculated conclusion** requiring evidence from that current ingestion. An older SBOM that finishes later persists observations and must not change finding state.
 4. Recalculate priority with a **new** RiskCalculation (`calculationReason: rescan`, `sbomIngestionId` set). Previous calculations remain.
 

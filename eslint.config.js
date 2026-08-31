@@ -13,6 +13,7 @@ export default [
       '**/test-results/**',
       'docs/**',
       'deploy/compose/data/**',
+      'packages/sbom/vendor/**',
     ],
   },
   ...baseConfig,

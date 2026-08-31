@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ConfigValidationError, loadServerConfigFrom } from './server.js';
 import { loadPublicConfigFrom } from './public.js';
 import { DEVELOPMENT_SESSION_COOKIE_NAME, PRODUCTION_SESSION_COOKIE_NAME } from './auth.js';
+import { sbomDefaultEnvironmentVariables } from './sbom.js';
 
 function developmentAuthEnv(): Record<string, string> {
   return {
@@ -65,6 +66,7 @@ function validDevelopmentEnv(): Record<string, string> {
     REQUEST_BODY_LIMIT_BYTES: '1048576',
     REQUEST_ID_HEADER: 'x-request-id',
     CORRELATION_ID_HEADER: 'x-correlation-id',
+    ...sbomDefaultEnvironmentVariables(),
     ...developmentAuthEnv(),
   };
 }
@@ -92,6 +94,7 @@ function validProductionEnv(): Record<string, string> {
     REQUEST_BODY_LIMIT_BYTES: '1048576',
     REQUEST_ID_HEADER: 'x-request-id',
     CORRELATION_ID_HEADER: 'x-correlation-id',
+    ...sbomDefaultEnvironmentVariables(),
     ...productionAuthEnv(),
   };
 }
@@ -235,6 +238,58 @@ describe('loadServerConfigFrom', () => {
     const env = validDevelopmentEnv();
     env['AUTH_LOGIN_RATE_LIMIT_IP_MAX'] = '0';
     expect(() => loadServerConfigFrom(env)).toThrow(/Login IP rate-limit max attempts/);
+  });
+
+  it('loads an explicit object-storage region and connection timeout', () => {
+    const config = loadServerConfigFrom(validDevelopmentEnv());
+    expect(config.objectStorage.region).toBe('us-east-1');
+    expect(config.objectStorage.connectionTimeoutMs).toBe(3000);
+    expect(config.objectStorage.useSsl).toBe(false);
+    expect(config.sbom.objectStorageOperationTimeoutMs).toBe(30_000);
+  });
+
+  it('rejects an object-storage endpoint that includes userinfo', () => {
+    const env = validDevelopmentEnv();
+    env['OBJECT_STORAGE_ENDPOINT'] = 'http://access:secret@127.0.0.1:19000';
+    expect(() => loadServerConfigFrom(env)).toThrow(/must not include credentials or userinfo/);
+  });
+
+  it('rejects TLS and endpoint-scheme mismatch', () => {
+    const httpsWithSslDisabled = validDevelopmentEnv();
+    httpsWithSslDisabled['OBJECT_STORAGE_ENDPOINT'] = 'https://127.0.0.1:19000';
+    httpsWithSslDisabled['OBJECT_STORAGE_USE_SSL'] = 'false';
+    expect(() => loadServerConfigFrom(httpsWithSslDisabled)).toThrow(/must use http/);
+
+    const httpWithSslEnabled = validProductionEnv();
+    httpWithSslEnabled['OBJECT_STORAGE_ENDPOINT'] = 'http://objects.internal:9000';
+    httpWithSslEnabled['OBJECT_STORAGE_USE_SSL'] = 'true';
+    expect(() => loadServerConfigFrom(httpWithSslEnabled)).toThrow(/must use https/);
+  });
+
+  it('rejects an unbounded or missing object-storage region', () => {
+    const env = validDevelopmentEnv();
+    env['OBJECT_STORAGE_REGION'] = 'US-EAST-1';
+    expect(() => loadServerConfigFrom(env)).toThrow(/region/);
+    delete env['OBJECT_STORAGE_REGION'];
+    expect(() => loadServerConfigFrom(env)).toThrow(/OBJECT_STORAGE_REGION/);
+  });
+
+  it('rejects a connection timeout greater than the operation timeout', () => {
+    const env = validDevelopmentEnv();
+    env['OBJECT_STORAGE_CONNECTION_TIMEOUT_MS'] = '4000';
+    env['OBJECT_STORAGE_OPERATION_TIMEOUT_MS'] = '1000';
+    expect(() => loadServerConfigFrom(env)).toThrow(
+      /connection timeout must be less than or equal to the operation timeout/,
+    );
+  });
+
+  it('accepts a connection timeout equal to the operation timeout', () => {
+    const env = validDevelopmentEnv();
+    env['OBJECT_STORAGE_CONNECTION_TIMEOUT_MS'] = '1000';
+    env['OBJECT_STORAGE_OPERATION_TIMEOUT_MS'] = '1000';
+    const config = loadServerConfigFrom(env);
+    expect(config.objectStorage.connectionTimeoutMs).toBe(1000);
+    expect(config.sbom.objectStorageOperationTimeoutMs).toBe(1000);
   });
 });
 

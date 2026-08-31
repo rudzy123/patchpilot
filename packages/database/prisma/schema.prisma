@@ -161,6 +161,15 @@ enum SbomIngestionStage {
   @@map("sbom_ingestion_stage")
 }
 
+enum SbomGraphCompleteness {
+  empty
+  no_dependencies
+  partial
+  complete
+
+  @@map("sbom_graph_completeness")
+}
+
 enum ComponentIdentityState {
   resolved
   ambiguous
@@ -721,15 +730,20 @@ model SbomIngestion {
   attemptNumber    Int                 @default(1) @map("attempt_number")
   parserVersion    String              @map("parser_version") @db.VarChar(64)
   idempotencyKey   String?             @map("idempotency_key") @db.VarChar(128)
-  startedAt        DateTime?           @map("started_at") @db.Timestamptz(6)
-  completedAt      DateTime?           @map("completed_at") @db.Timestamptz(6)
-  failureCategory  String?             @map("failure_category") @db.VarChar(64)
-  failureCode      String?             @map("failure_code") @db.VarChar(64)
-  quarantineReason String?             @map("quarantine_reason") @db.VarChar(64)
-  leaseExpiresAt   DateTime?           @map("lease_expires_at") @db.Timestamptz(6)
-  version          Int                 @default(1)
-  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  startedAt             DateTime?              @map("started_at") @db.Timestamptz(6)
+  completedAt           DateTime?              @map("completed_at") @db.Timestamptz(6)
+  graphCompleteness     SbomGraphCompleteness? @map("graph_completeness")
+  normalizationVersion  String                 @default("1") @map("normalization_version") @db.VarChar(64)
+  componentCount        Int?                   @map("component_count")
+  dependencyEdgeCount   Int?                   @map("dependency_edge_count")
+  warningCount          Int?                   @map("warning_count")
+  failureCategory       String?                @map("failure_category") @db.VarChar(64)
+  failureCode           String?                @map("failure_code") @db.VarChar(64)
+  quarantineReason      String?                @map("quarantine_reason") @db.VarChar(64)
+  leaseExpiresAt        DateTime?              @map("lease_expires_at") @db.Timestamptz(6)
+  version               Int                    @default(1)
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   sbom                 Sbom                     @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict)
@@ -745,6 +759,7 @@ model SbomIngestion {
   @@unique([organizationId, id, assetId], map: "sbom_ingestion_org_id_asset_key")
   @@index([organizationId, state, createdAt], map: "sbom_ingestion_org_state_idx")
   @@index([organizationId, sbomId, parserVersion], map: "sbom_ingestion_org_sbom_parser_idx")
+  @@index([organizationId, sbomId, createdAt, id], map: "sbom_ingestion_org_sbom_created_idx")
   @@map("sbom_ingestion")
 }
 
@@ -753,7 +768,7 @@ model Component {
   organizationId String                 @map("organization_id") @db.Uuid
   identityKey    String                 @map("identity_key") @db.VarChar(2048)
   purl           String?                @db.VarChar(2048)
-  ecosystem      String                 @db.VarChar(64)
+  ecosystem      String?                @db.VarChar(64)
   namespace      String?                @db.VarChar(512)
   name           String                 @db.VarChar(512)
   identityState  ComponentIdentityState @default(resolved) @map("identity_state")
@@ -778,6 +793,7 @@ model ComponentOccurrence {
   componentId     String   @map("component_id") @db.Uuid
   bomRef          String?  @map("bom_ref") @db.VarChar(2048)
   version         String   @db.VarChar(256)
+  versionKnown    Boolean  @default(true) @map("version_known")
   versionedPurl   String?  @map("versioned_purl") @db.VarChar(2048)
   isDirect        Boolean? @map("is_direct")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -798,6 +814,8 @@ model ComponentOccurrence {
   @@unique([organizationId, sbomIngestionId, componentId, version], map: "component_occurrence_identity_key")
   @@index([organizationId, sbomId], map: "component_occurrence_org_sbom_idx")
   @@index([organizationId, componentId], map: "component_occurrence_org_component_idx")
+  // Non-null bom-ref uniqueness is SQL-only:
+  // component_occurrence_org_ingestion_bom_ref_uidx.
   @@map("component_occurrence")
 }
 
@@ -1251,6 +1269,7 @@ model BackgroundJob {
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   outboxEvent  OutboxEvent?  @relation(fields: [outboxEventId], references: [id], onDelete: Restrict)
 
+  @@unique([outboxEventId], map: "background_job_outbox_event_uidx")
   @@index([organizationId, status], map: "background_job_org_status_idx")
   @@index([status, leaseExpiresAt], map: "background_job_lease_idx")
   @@index([outboxEventId], map: "background_job_outbox_idx")

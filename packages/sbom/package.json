@@ -2,7 +2,7 @@
   "name": "@patchpilot/sbom",
   "version": "0.0.0",
   "private": true,
-  "description": "Framework-independent SBOM package boundary. No parser in this iteration.",
+  "description": "Offline CycloneDX JSON schema compilation, worker-thread parser, and domain parser adapter.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -14,13 +14,14 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "vendor"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test:unit": "vitest run --config vitest.config.ts",
+    "test:unit": "tsc -p tsconfig.build.json && vitest run --config vitest.config.ts",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "devDependencies": {
@@ -30,5 +31,14 @@
     "eslint": "^9.39.1",
     "typescript": "~5.9.3",
     "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "@patchpilot/config": "workspace:*",
+    "@patchpilot/domain": "workspace:*",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "packageurl-js": "2.0.1",
+    "secure-json-parse": "4.1.0",
+    "zod": "^4.4.3"
   }
 }

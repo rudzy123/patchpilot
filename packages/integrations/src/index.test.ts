@@ -7,7 +7,9 @@ describe('integration ports', () => {
     expect(createEmptyJobRegistry()).toEqual([]);
   });
 
-  it('documents deferred MinIO adapter and tenant keys', () => {
-    expect(deferredIntegrationNotes.minioAdapter).toContain('deferred');
+  it('documents the streaming S3-compatible adapter', () => {
+    expect(deferredIntegrationNotes.minioAdapter).toBe('s3-compatible-streaming-adapter');
+    expect(deferredIntegrationNotes.s3Client).toBe('wired-static-credentials');
+    expect(deferredIntegrationNotes.objectKeyConvention).toBe('org-asset-sha256');
   });
 });

@@ -6,12 +6,17 @@ import {
 import { type Logger } from '@patchpilot/logger';
 import { type TelemetryHandle } from '@patchpilot/observability';
 
+import type { OutboxRelayRuntime } from './outbox-relay-runtime.js';
+import type { SbomIngestProcessor } from './sbom-ingest-processor.js';
+
 export type WorkerDependencies = {
   logger: Logger;
   telemetry: TelemetryHandle;
   redis: RedisConnectionPort;
   checkDatabaseReady: (timeoutMs: number) => Promise<{ ok: boolean }>;
   jobRegistry?: JobRegistry;
+  ingestionProcessor?: SbomIngestProcessor;
+  outboxRelay?: OutboxRelayRuntime;
   shutdownTimeoutMs: number;
   readinessTimeoutMs: number;
 };
@@ -39,12 +44,16 @@ export function createWorkerApp(dependencies: WorkerDependencies): WorkerApp {
       }
 
       const registry = dependencies.jobRegistry ?? createEmptyJobRegistry();
+      if (dependencies.ingestionProcessor !== undefined) {
+        await dependencies.ingestionProcessor.start();
+      }
       dependencies.logger.info(
-        { jobCount: registry.length },
-        'worker started with empty product job registry',
+        { jobCount: registry.length, ingestJob: 'sbom.ingest' },
+        'worker started',
       );
       acceptingWork = true;
       stopped = false;
+      dependencies.outboxRelay?.start();
     },
     async stop(): Promise<void> {
       if (stopped) {
@@ -52,6 +61,12 @@ export function createWorkerApp(dependencies: WorkerDependencies): WorkerApp {
       }
 
       acceptingWork = false;
+      if (dependencies.ingestionProcessor !== undefined) {
+        await dependencies.ingestionProcessor.stop();
+      }
+      if (dependencies.outboxRelay !== undefined) {
+        await dependencies.outboxRelay.stop();
+      }
       await dependencies.redis.quit();
       await dependencies.telemetry.shutdown();
       stopped = true;

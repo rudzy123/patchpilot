@@ -3,6 +3,10 @@ import type { PrismaClient } from '@prisma/client';
 
 export type PrismaClientLike = PrismaClient | Prisma.TransactionClient;
 
+export function isRootPrismaClient(client: PrismaClientLike): client is PrismaClient {
+  return typeof (client as PrismaClient).$transaction === 'function';
+}
+
 export const SHA256_HEX = /^[a-f0-9]{64}$/;
 export const ARGON2ID_PHC_PREFIX = '$argon2id$';
 export const ARGON2ID_PHC_MIN_LENGTH = 48;
@@ -44,6 +48,16 @@ export function requirePasswordRevision(value: number, fieldName: string): numbe
 export function requirePositiveByteLength(value: number, fieldName: string): number {
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error(`${fieldName} must be a positive integer.`);
+  }
+
+  return value;
+}
+
+const VERSION_LABEL = /^[a-zA-Z0-9][a-zA-Z0-9._+-]{0,63}$/;
+
+export function requireVersionLabel(value: string, fieldName: string): string {
+  if (!VERSION_LABEL.test(value) || value.length > 64) {
+    throw new Error(`${fieldName} must be a bounded version label.`);
   }
 
   return value;

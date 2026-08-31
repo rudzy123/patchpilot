@@ -29,7 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApi } from './app.js';
 import { createAssetRuntime, type AssetRuntime } from './asset-runtime.js';
-import { TEST_ORIGIN, VALID_PASSWORD } from './auth-test-harness.js';
+import { TEST_ORIGIN, VALID_PASSWORD, emptySbomRuntime } from './auth-test-harness.js';
 
 const SOCKET_IP = '192.0.2.10';
 
@@ -315,6 +315,7 @@ describe('asset inventory routes persistence', () => {
         audit: repos.auditEvents,
       },
       assets: runtime,
+      sboms: emptySbomRuntime(),
     });
   }
 

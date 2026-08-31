@@ -45,7 +45,11 @@ Expired **RiskAcceptance** is a **state** change, not deletion of the row.
 
 ## Orphan object storage
 
-If a put succeeded and the DB transaction failed, objects may lack a **SBOM** row. A reconcile job **lists** orphans for operators. Automatic delete of orphans is allowed only after a grace period (default 7 days) **and** only when no DB row references the key. Log object key template + hash, not bytes.
+If a put succeeded and the DB transaction failed, objects may lack a **SBOM** row. The upload path deletes its temporary object best-effort and deliberately does **not** delete a promoted final object, because after promotion those bytes may be the only copy of the user's evidence.
+
+**No reconcile job exists yet.** `SBOM_ORPHAN_GRACE_SECONDS` (default 7 days, validated to exceed the idempotency TTL) is the policy floor a future job must honor; nothing reads it today, so orphans accumulate until an operator intervenes.
+
+When that job is built: it **lists** orphans for operators, and automatic delete is allowed only after the grace period **and** only when no DB row references the key. Log the object key template plus hash, not the key and not the bytes. See [SBOM ingestion](sbom-ingestion.md#orphan-reconciliation).
 
 ## Tenant off-boarding
 

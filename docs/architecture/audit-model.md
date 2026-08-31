@@ -38,7 +38,7 @@ Application roles cannot "correct" an audit row. Corrections are new events.
 | `userAgent` | Optional; same policy |
 | `payload` | Redacted structured metadata: ids, hashes, policy version, states |
 
-**Must not** appear in payload or logs: raw SBOM documents, external API tokens, authorization headers, cookies, full third-party payloads, source code, sensitive object-storage URLs (including presigned/signed URLs).
+**Must not** appear in payload or logs: raw SBOM documents, object keys, filenames, parser excerpts, external API tokens, authorization headers, cookies, full third-party payloads, source code, sensitive object-storage URLs (including presigned/signed URLs). SHA-256 of original bytes **may** appear (Confidential). Session 8 creates no signed object URLs.
 
 ### Actor truth table
 
@@ -67,8 +67,8 @@ At minimum, emit events for:
 | `membership.created` / `membership.revoked` / `membership.role_changed` | Membership changes |
 | `organization.created` / `organization.archived` | Org lifecycle |
 | `asset.created` / `asset.archived` / `asset.restored` / `asset.updated` | Asset model |
-| `sbom.uploaded` / `sbom.duplicate` / `sbom.upload_rejected` | Upload recorded or rejected at the API |
-| `sbom.ingestion.completed` / `rejected` / `quarantined` / `failed` / `released_from_quarantine` | Ingestion terminals and release |
+| `sbom.uploaded` / `sbom.duplicate` / `sbom.upload_rejected` | Upload recorded or rejected at the API. `sbom.duplicate` is emitted when a user request resolves to existing evidence; Session 8 does not insert a `duplicate`-state ingestion row. |
+| `sbom.ingestion.completed` / `sbom.ingestion.rejected` / `sbom.ingestion.quarantined` / `sbom.ingestion.failed` / `sbom.ingestion.released_from_quarantine` | Ingestion terminals and release |
 | `sbom.reprocessed` | New ingestion on existing object |
 | `intelligence.imported` | OSV/KEV snapshot stored |
 | `priority.calculated` | **RiskCalculation** inserted |
@@ -87,6 +87,25 @@ At minimum, emit events for:
 | `webhook.accepted` / `webhook.rejected` | Reserved; unused until webhooks exist |
 
 Do not log authorization headers or cookies in `payload`.
+
+### SBOM ingestion events (implemented)
+
+Session 8 emits five of the SBOM actions. They split cleanly by actor: the upload events have a human behind them, the ingestion outcomes do not.
+
+| Action | Actor | Subject | Payload metadata |
+| --- | --- | --- | --- |
+| `sbom.uploaded` | `user` (tenant) with `actorUserId` and `actorMembershipId` | `sbom` / `sbomId` | `assetId`, `sbomId`, `ingestionId`, `byteLength`, `sha256`, `declaredContentType`, `parserVersion` |
+| `sbom.duplicate` | `user` (tenant) | `sbom` / `sbomId` | Same fields as `sbom.uploaded` |
+| `sbom.ingestion.completed` | `system` | `sbom_ingestion` / `ingestionId` | `sbomId`, `ingestionId`, `parserVersion` |
+| `sbom.ingestion.rejected` | `system` | `sbom_ingestion` / `ingestionId` | Same, plus the safe `failureCode` |
+| `sbom.ingestion.quarantined` | `system` | `sbom_ingestion` / `ingestionId` | Same, plus the safe `failureCode` |
+| `sbom.ingestion.failed` | `system` | `sbom_ingestion` / `ingestionId` | Same, plus the safe `failureCode` |
+
+Worker-originated events use `actorType: 'system'` with `organizationId` set and `retentionCategory: 'security'`. They are not attributed to the user who uploaded the document, because the worker acted on its own schedule; the human attribution lives on the earlier `sbom.uploaded` event and the two are joined by `sbomId`.
+
+`failureCode` is always a value from the closed safe-failure catalog in [sbom-ingestion.md](sbom-ingestion.md#failure-taxonomy). It is never an exception message, Ajv output, or a fragment of the document. Object keys, filenames, worker identifiers, and lease timestamps never appear in these payloads.
+
+`sbom.upload_rejected`, `sbom.ingestion.released_from_quarantine`, and `sbom.reprocessed` are specified above but **not yet emitted**: rejected uploads currently fail before a database write is worthwhile, and there is no quarantine-release or reprocess entry point.
 
 ## Integrity properties
 

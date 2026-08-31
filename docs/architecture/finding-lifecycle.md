@@ -4,6 +4,8 @@ A **finding** is the tenant-owned link between an asset's observed component ide
 
 **Resolved** is a **calculated conclusion** that requires stored evidence. It is not implied by **RemediationTask** completion, a compensating control description, or archive of an asset by itself.
 
+Session 8 ([ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md)) may mark an ingestion `completed` after evidence verification and graph persist **without** creating findings. `graphCompleteness` values `empty` and `no_dependencies` are not remediation evidence: `empty` does not mean the Asset contains no software, and `no_dependencies` does not prove the software has no dependencies. Future correlation is a separate additive workflow.
+
 ## Identity
 
 Stable identity:
@@ -164,7 +166,7 @@ Inconclusive must not be displayed as "fixed."
 - The previous completed SBOM recorded dependency edges and the new one has none (or far fewer than a configurable ratio).
 - The compare method is weaker than the previous observation (for example previous used PURL, new SBOM has name only).
 
-Treat those missing former components as `inconclusive` / `incomplete_sbom_coverage`, not `absent`. Same component count does not prove completeness; it only avoids this particular heuristic.
+Treat those missing former components as `inconclusive` / `incomplete_sbom_coverage`, not `absent`. Same component count does not prove completeness; it only avoids this particular heuristic. Session 8 `completed` does not imply exhaustive coverage and does not by itself support `resolved`.
 
 Withdrawn vulnerabilities: do not auto-`resolved`. Changed severity or KEV: new **RiskCalculation** only. Unsupported/archived assets: no new uploads; existing findings remain until verification rules apply.
 

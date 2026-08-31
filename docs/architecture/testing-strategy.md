@@ -72,6 +72,15 @@ Even if a glob did not attach:
 20. **Ingestion complete:** persist_graph alone does not mark `completed`.
 21. **CVE alias:** adding a CVE to an existing OSV vulnerability does not mint a duplicate finding.
 
+### Session 8 Batch 9 parser tests
+
+Persistence does not add self-edge warning behavior. The adapter continues to reject a normalized graph that violates its DTO invariants, including a remaining self-edge. Batch 9 parser tests prove:
+
+1. The parser receives a self-edge.
+2. The parser omits it from normalized edges.
+3. The parser increments the `self_dependency_skipped` warning count.
+4. Persistence receives a graph with no self-edge.
+
 Do not commit working exploit payloads.
 
 ## Fixtures

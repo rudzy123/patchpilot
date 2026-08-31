@@ -1,0 +1,16 @@
+CycloneDX JSON Schema (vendored)
+
+This directory contains JSON Schema files copied from:
+  https://github.com/CycloneDX/specification
+  tag 1.6.1
+  commit 8a27bfd1be5be0dcb2c208a34d2f4fa0b6d75bd7
+
+CycloneDX Specification is Copyright (c) OWASP Foundation. All Rights Reserved.
+The schemas are licensed under the Apache License, Version 2.0. See LICENSE
+in this directory for the license text.
+
+JSON Signature Format (jsf-0.82.schema.json) is included because the CycloneDX
+BOM schemas reference it. The upstream schema comment records that JSF was
+developed by Anders Rundgren as part of the OpenKeyStore project.
+
+PatchPilot does not download these schemas at install, test, build, runtime, or CI.

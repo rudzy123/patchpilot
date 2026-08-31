@@ -6,6 +6,19 @@ In scope: the ten security-sensitive areas in [AGENTS.md](../../AGENTS.md). Out 
 
 Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). Do not publish exploit payloads here.
 
+## Session 8 status notes
+
+[ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md) records graph-complete ingestion. Typed limits live in `@patchpilot/config`. Session 8 is now implemented end to end: HTTP upload, private object storage, outbox relay, worker-thread parser, and the ingestion processor.
+
+- `completed` means verified evidence and persisted graph. It does **not** mean exhaustive inventory or remediation. `empty` / `no_dependencies` are not “no software” / “no dependencies.”
+- Parser wall-clock budget is **worker-thread termination**. `Promise.race` around synchronous `JSON.parse` or Ajv is **not** a control and must not be substituted for one.
+- Private object storage uses tenant-and-Asset-scoped keys. No public ACLs and no signed or presigned object URLs exist; a boundary test fails the build if presigner APIs appear in production code.
+- Upload routes now exist and enforce session authentication, exact Origin match, a synchronizer CSRF token, `sbom:upload` on the active organization, a required `Idempotency-Key`, per-route size limits, and peer-IP plus per-organization rate limits with `trustProxy=false`.
+- Every ingestion failure resolves to a closed-set safe failure code. Codes are what reach logs, audit payloads, and API responses; document content, Ajv output, and exception text do not.
+- The ingestion processor verifies `objectKey` tenant scope against the reloaded **SBOM** row before storage GET. A worker thread that exits without posting a result is `parser_crash`, not a hung promise.
+- `SBOM_IDEMPOTENCY_TTL_SECONDS` must exceed twice `OBJECT_STORAGE_OPERATION_TIMEOUT_MS` at process start. Slow client streams can still outlive a reservation; renewal during upload is not implemented.
+- Still absent, and therefore still residual: web upload UI, retry and quarantine-release APIs, object-storage orphan reconciliation, BackgroundJob lease heartbeat, and idempotency reservation renewal during streaming upload.
+
 ## Assets to protect
 
 | Asset | Class | Why it matters |
@@ -53,7 +66,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Systematic data leak.
 
-**Mitigation:** Org-prefixed object keys; org-scoped uniqueness; reload aggregates in workers; no cross-org operator API without ADR.
+**Mitigation:** Org-prefixed object keys; org-scoped uniqueness; reload aggregates in workers; ingestion verifies `objectKey` scope against the reloaded **SBOM** row before GET; promote rejects cross-scope keys; no cross-org operator API without ADR.
 
 ### Malicious SBOMs
 
@@ -61,7 +74,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** XSS in UI, SSRF if fetched, parser crash, prototype pollution.
 
-**Mitigation:** CycloneDX JSON only; no URL fetch; schema and depth limits; quarantine poison; treat names as untrusted text; no `eval`.
+**Mitigation:** CycloneDX JSON 1.4–1.6 only; no URL fetch; schema, depth, node, and semantic limits from typed configuration; quarantine poison; treat names as untrusted text; no `eval`. Parser timeout uses worker-thread termination, not `Promise.race`.
 
 ### Oversized JSON
 
@@ -69,7 +82,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Memory exhaustion (DoS).
 
-**Mitigation:** 20 MiB default cap counted while streaming; reject before parse.
+**Mitigation:** `SBOM_UPLOAD_MAX_BYTES` default 20 MiB counted while streaming; reject before parse. Ordinary `REQUEST_BODY_LIMIT_BYTES` is independent.
 
 ### Deeply nested JSON
 
@@ -77,7 +90,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Worker crash, restart loops.
 
-**Mitigation:** Max depth 32; time-boxed parse; poison → quarantine not infinite retry.
+**Mitigation:** Max depth 32 (configurable); wall-clock parse via worker-thread termination; worker exit without a message → `parser_crash`; poison → quarantine not infinite retry. `Promise.race` is not a parser kill switch.
 
 ### Dependency explosion
 
@@ -173,7 +186,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Upload, accept risk, export as the user.
 
-**Mitigation:** `SameSite=Lax`, exact Origin allowlist, and a synchronizer CSRF token on authenticated mutations ([ADR 0019](../adr/0019-local-password-sessions.md)).
+**Mitigation:** `SameSite=Lax`, exact Origin allowlist, and a synchronizer CSRF token on authenticated mutations ([ADR 0019](../adr/0019-local-password-sessions.md)). Session 6 login/logout/select-organization routes and the Session 8 SBOM upload route implement this. Read routes are exempt from Origin and CSRF because they do not mutate.
 
 ### Credential leakage
 
@@ -205,7 +218,31 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** SBOM theft.
 
-**Mitigation:** Private bucket; `org/{organizationId}/.../sha256/{hash}`; no public URLs; presign later needs ADR.
+**Mitigation:** Private bucket; `org/{organizationId}/.../sha256/{hash}`; no public URLs; no ACL on any request; no presigner dependency in production code (build-enforced); no application download route. Presigning later needs an ADR. Object keys never appear in API responses, audit payloads, or logs.
+
+### Evidence tampering at rest
+
+**Threat:** Stored SBOM bytes are modified or swapped in the bucket after upload, so the parsed graph no longer reflects the evidence the user submitted.
+
+**Impact:** Inventory that silently disagrees with the recorded digest; forged component sets.
+
+**Mitigation:** The processor re-reads the stored object and verifies byte length and SHA-256 against the **SBOM** row while streaming. A mismatch yields `hash_mismatch`, which quarantines rather than retries, so a corrupted object cannot be reprocessed until it happens to pass. Residual: an attacker with both bucket write and database write can update the recorded digest too.
+
+### Orphan object accumulation
+
+**Threat:** Objects that no **SBOM** row references accumulate after failed finalization.
+
+**Impact:** Disk growth, and Restricted bytes retained with no product-level owner or lifecycle.
+
+**Mitigation:** Bounded by upload rate limits and size limits. Not otherwise mitigated: no reconciliation job exists, so this is an accepted, documented residual until one is built ([retention and deletion](../architecture/retention-and-deletion.md)).
+
+### Stalled ingestion after a retryable failure
+
+**Threat:** A transient storage failure returns the ingestion and job to `queued`, and nothing redelivers the work.
+
+**Impact:** Availability, not integrity: an ingestion silently never completes and a user believes processing is still in progress.
+
+**Mitigation:** State is left consistent and idempotently resumable so an operator replay is safe. Detection depends on watching `queued` **BackgroundJob** rows, not on an automatic retry. Residual: no automatic retry and no lease heartbeat are implemented ([reliability model](../architecture/reliability-model.md)).
 
 ### Queue duplication
 
@@ -365,7 +402,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** False `resolved`.
 
-**Mitigation:** Coverage heuristic → `inconclusive`; see [finding-lifecycle.md](../architecture/finding-lifecycle.md).
+**Mitigation:** Coverage heuristic → `inconclusive`; see [finding-lifecycle.md](../architecture/finding-lifecycle.md). Session 8 `completed` does not imply exhaustive coverage and does not by itself support `resolved`.
 
 ## Control table (material threats)
 
@@ -374,7 +411,7 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 | Threat | Asset | Attack path | Impact | Preventive | Detective | Recovery | Test | Residual | Owner |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | IDOR | Findings, SBOMs | UUID in URL without membership | Cross-tenant read | Org predicate, deny default | Authz deny metrics | Isolation incident runbook | Cross-tenant tests | Until code exists | `packages/domain`, API |
-| Broken tenancy | All tenant data | Missing WHERE; digest-only keys | Systematic leak | Prefixed keys; job reload | Anomalous org access | Isolate, rotate | Isolation + job tamper | Operator disk | Tenancy |
+| Broken tenancy | All tenant data | Missing WHERE; digest-only keys | Systematic leak | Prefixed keys; promote scope; ingest key check; job reload | Anomalous org access | Isolate, rotate | Isolation + job tamper | Operator disk | Tenancy |
 | Privilege escalation | Acceptance, creds | Role not checked | Bad accept / leak | Role matrix | Audit | Revoke session | API authz tests | Insider owner | Authz |
 | Malicious SBOM | Parser, UI | Hostile JSON | XSS, crash, SSRF | No fetch, limits, escape | Quarantine metrics | Quarantine runbook | Parser tests | GIGO | `packages/sbom` |
 | Oversized JSON | API memory | Huge body | DoS | 20 MiB proposal cap | 413 metrics | Rate limit | Size tests | Volumetric DoS | API |
@@ -390,7 +427,10 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 | SSRF | Cloud metadata | URL fetch | Cred theft | No SBOM URLs; allowlist | Egress logs | Block | Adapter tests | Mis-allowlist | Integrations |
 | SQLi | DB | Concat SQL | Takeover | Prisma | — | Restore | — | Raw SQL mistakes | Database |
 | XSS | Sessions | Component names | Session theft | Escape, CSP later | — | Rotate | UI tests | New sinks | Web |
-| CSRF | Mutations | Cross-site POST | Unwanted upload | SameSite + Origin + token | — | Revoke | API tests | Runtime not in Batch 1 | API |
+| CSRF | Mutations | Cross-site POST | Unwanted upload | SameSite + Origin + token | — | Revoke | API tests | Auth and upload routes enforce all three | API |
+| Evidence tampering at rest | SBOM bytes | Bucket write | Forged inventory | Re-read + digest verify | `hash_mismatch` quarantine | Quarantine runbook | Processor tests | Bucket + DB write together | Storage |
+| Orphan objects | Storage | Failed finalization | Disk growth, stray Restricted bytes | Rate + size limits | Manual listing | Manual delete after grace | — | No reconcile job exists | Storage |
+| Stalled retry | Availability | Transient failure, no redelivery | Ingestion never completes | Idempotent resumable state | `queued` BackgroundJob count | Operator replay | Replay tests | No auto-retry, no heartbeat | Worker |
 | Cred/secret logging | Logs | Header in Pino | Restricted leak | Redaction | Log review | Rotate | Redaction tests | Sink bypass | Logger |
 | Audit alteration | Accountability | UPDATE audit | Lost history | Insert-only | Integrity runbook | Restore | Update-fail test | Superuser | Audit |
 | Public bucket | SBOMs | ACL | Theft | Private + org keys | Cloud alerts | Make private | Adapter tests | Operator ACL | Storage |
