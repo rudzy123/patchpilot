@@ -1,10 +1,7 @@
 import type { FastifyRequest } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
-import {
-  createSbomOrganizationRateLimiter,
-  sbomHttpRateLimitKey,
-} from './sbom-rate-limit.js';
+import { createSbomOrganizationRateLimiter, sbomHttpRateLimitKey } from './sbom-rate-limit.js';
 
 function requestStub(overrides: {
   socket: { remoteAddress: string | undefined };

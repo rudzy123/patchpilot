@@ -141,6 +141,19 @@ describe('process SBOM ingestion use case', () => {
     expect(harness.storage.keys).toEqual([OBJECT_KEY]);
   });
 
+  it('rejects a stored object key whose tenant scope disagrees with the SBOM row', async () => {
+    const mismatchedKey = buildFinalSbomObjectKey({
+      organizationId: ORG_B,
+      assetId: ASSET_A,
+      sha256: SHA,
+    });
+    const harness = createHarness({ objectKey: mismatchedKey });
+    const result = await harness.execute(payload());
+    expect(result).toEqual({ kind: 'failed', code: 'processing_failed' });
+    expect(harness.storage.getCalls).toBe(0);
+    expect(harness.ingestion?.state).toBe('failed');
+  });
+
   it('quarantines a hash mismatch after GET', async () => {
     const harness = createHarness({
       body: new TextEncoder().encode('{"tampered":true}'),
@@ -240,12 +253,12 @@ function jobRecord(overrides: Partial<BackgroundJobRecord> = {}): BackgroundJobR
   };
 }
 
-function sbomRecord(): SbomRecord {
+function sbomRecord(objectKey: string = OBJECT_KEY): SbomRecord {
   return {
     id: SBOM_A,
     organizationId: ORG_A,
     assetId: ASSET_A,
-    objectKey: OBJECT_KEY,
+    objectKey,
     sha256: SHA,
     byteLength: BODY.byteLength,
     declaredContentType: 'application/json',
@@ -261,9 +274,7 @@ function sbomRecord(): SbomRecord {
   };
 }
 
-function ingestionRecord(
-  state: SbomIngestionRecord['state'] = 'accepted',
-): SbomIngestionRecord {
+function ingestionRecord(state: SbomIngestionRecord['state'] = 'accepted'): SbomIngestionRecord {
   return {
     id: INGESTION_A,
     organizationId: ORG_A,
@@ -339,6 +350,7 @@ function createHarness(
     job?: BackgroundJobRecord | undefined;
     claimConflict?: boolean;
     ingestionState?: SbomIngestionRecord['state'];
+    objectKey?: string;
     body?: Uint8Array;
     storageFailure?: ClassifiedStorageFailure;
     parser?: SbomDocumentParserPort['parse'];
@@ -350,10 +362,12 @@ function createHarness(
   let storageCallsDuringPersist = 0;
   let retryCalls = 0;
   let claimCalls = 0;
-  let persistInput: Parameters<ComponentGraphPersistencePort['persistOnceForIngestion']>[0] | undefined;
-  const job = options.job === undefined && 'job' in options ? undefined : (options.job ?? jobRecord());
+  let persistInput:
+    Parameters<ComponentGraphPersistencePort['persistOnceForIngestion']>[0] | undefined;
+  const job =
+    options.job === undefined && 'job' in options ? undefined : (options.job ?? jobRecord());
   const ingestion = ingestionRecord(options.ingestionState ?? 'accepted');
-  const sbom = sbomRecord();
+  const sbom = sbomRecord(options.objectKey);
   const body = options.body ?? BODY;
   const storage: SbomObjectStoragePort & { getCalls: number; keys: string[] } = {
     getCalls: 0,
@@ -503,7 +517,11 @@ function createHarness(
     },
     async findByAssetAndId(organizationId, assetId, sbomId) {
       operations.push('sbomMetadata.findByAssetAndId');
-      if (sbom.organizationId !== organizationId || sbom.assetId !== assetId || sbom.id !== sbomId) {
+      if (
+        sbom.organizationId !== organizationId ||
+        sbom.assetId !== assetId ||
+        sbom.id !== sbomId
+      ) {
         return undefined;
       }
       return sbom;

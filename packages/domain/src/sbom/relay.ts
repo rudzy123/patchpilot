@@ -207,9 +207,7 @@ function toQueueJob(event: ClaimableOutboxEvent, jobType: string): OutboxQueueJo
   };
 }
 
-function resolveOptions(
-  overrides: OutboxRelayDependencies['options'],
-): OutboxRelayOptions {
+function resolveOptions(overrides: OutboxRelayDependencies['options']): OutboxRelayOptions {
   return {
     batchLimit: overrides?.batchLimit ?? OUTBOX_RELAY_DEFAULTS.batchLimit,
     leaseMs: overrides?.leaseMs ?? OUTBOX_RELAY_DEFAULTS.leaseMs,

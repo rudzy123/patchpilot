@@ -130,7 +130,7 @@ Triggers and revoked DML are not WORM storage. Superusers can still rewrite hist
 
 Organization `slug` uniqueness does not reserve product route names (`api`, `health`, `login`, and similar). Do not treat the current unique index as URL-routing protection. Reserved slugs stay deferred until URL routing is implemented.
 
-[ADR 0019](../adr/0019-local-password-sessions.md) `LocalCredential` and `Session` tables, restored `actor_user_id`, and `anonymous` audit actors are in `20260827170000_audit_actor_anonymous` plus `20260827180000_local_credentials_and_sessions`. Session 5 migrations stay frozen. Session 8 graph persistence extras are `20260830120000_sbom_ingestion_graph_persistence` and are **not** frozen in this batch. Authentication HTTP routes, cookies, CSRF, and seed passwords are not in this batch.
+[ADR 0019](../adr/0019-local-password-sessions.md) `LocalCredential` and `Session` tables, restored `actor_user_id`, and `anonymous` audit actors are in `20260827170000_audit_actor_anonymous` plus `20260827180000_local_credentials_and_sessions`. Session 5 migrations stay frozen. Session 8 graph persistence is `20260830120000_sbom_ingestion_graph_persistence` and is **frozen**; do not edit it — any SQL correction requires another forward-only migration.
 
 ## Related documents
 

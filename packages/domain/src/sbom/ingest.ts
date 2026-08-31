@@ -7,7 +7,7 @@ import {
 } from './audit.js';
 import { classifySafeFailure, isSafeFailureCode, type SafeFailureCode } from './failures.js';
 import { parseSbomIngestJobPayload, type SbomIngestJobPayload } from './ingest-job.js';
-import { isFinalSbomObjectKey } from './object-keys.js';
+import { isFinalSbomObjectKey, sbomObjectKeyScope } from './object-keys.js';
 import { readVerifiedObjectBuffer } from './object-bytes.js';
 import type {
   BackgroundJobExecutionPort,
@@ -184,6 +184,22 @@ async function processSbomIngestion(
     });
   }
   if (!isFinalSbomObjectKey(sbom.objectKey)) {
+    return finalizeByCode(dependencies, {
+      payload,
+      jobId: job.id,
+      sbomId: sbom.id,
+      ingestionVersion: current.version,
+      parserVersion: current.parserVersion,
+      code: 'processing_failed',
+    });
+  }
+
+  const objectKeyScope = sbomObjectKeyScope(sbom.objectKey);
+  if (
+    objectKeyScope === undefined ||
+    objectKeyScope.organizationId !== current.organizationId ||
+    objectKeyScope.assetId !== current.assetId
+  ) {
     return finalizeByCode(dependencies, {
       payload,
       jobId: job.id,
@@ -456,11 +472,7 @@ async function finalizeTerminal(
         ? 'quarantine'
         : 'fail';
   const kind =
-    commandType === 'reject'
-      ? 'rejected'
-      : commandType === 'quarantine'
-        ? 'quarantined'
-        : 'failed';
+    commandType === 'reject' ? 'rejected' : commandType === 'quarantine' ? 'quarantined' : 'failed';
   const now = dependencies.clock.now();
   const auditInput = {
     organizationId: input.payload.organizationId,

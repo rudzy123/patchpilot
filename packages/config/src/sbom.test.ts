@@ -424,13 +424,16 @@ describe('SBOM ingestion configuration', () => {
     expectRejection(env, /Object-storage operation timeout must be less than the processing lease/);
   });
 
-  it('rejects an idempotency TTL that does not outlive object-storage operations', () => {
+  it('rejects an idempotency TTL that does not outlive put and promote object-storage operations', () => {
     const issues = sbomRelationshipIssues({
       ...defaultSbomConfig(),
       idempotencyTtlSeconds: 1,
       objectStorageOperationTimeoutMs: 2_000,
     });
     expect(issues.some((issue) => issue.path[0] === 'idempotencyTtlSeconds')).toBe(true);
+    expect(issues.find((issue) => issue.path[0] === 'idempotencyTtlSeconds')?.message).toMatch(
+      /twice the object-storage operation timeout/,
+    );
   });
 
   it('loads the idempotency TTL and orphan-grace floors together', () => {

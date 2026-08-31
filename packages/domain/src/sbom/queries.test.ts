@@ -165,11 +165,7 @@ function createHarness() {
       },
       async findByAssetAndId(organizationId: string, assetId: string, ingestionId: string) {
         const row = ingestions.get(ingestionId);
-        if (
-          row === undefined ||
-          row.organizationId !== organizationId ||
-          row.assetId !== assetId
-        ) {
+        if (row === undefined || row.organizationId !== organizationId || row.assetId !== assetId) {
           return undefined;
         }
         return row;
@@ -210,12 +206,7 @@ function asset(organizationId: string, id: string): AssetRecord {
   };
 }
 
-function sbom(
-  organizationId: string,
-  assetId: string,
-  id: string,
-  sha256: string,
-): SbomRecord {
+function sbom(organizationId: string, assetId: string, id: string, sha256: string): SbomRecord {
   return {
     id,
     organizationId,

@@ -98,10 +98,7 @@ export {
   type ProcessSbomIngestionOptions,
   type ProcessSbomIngestionOutcome,
 } from './ingest.js';
-export {
-  parseSbomIngestJobPayload,
-  type SbomIngestJobPayload,
-} from './ingest-job.js';
+export { parseSbomIngestJobPayload, type SbomIngestJobPayload } from './ingest-job.js';
 export {
   createUploadSbomUseCase,
   type SbomUploadAccepted,

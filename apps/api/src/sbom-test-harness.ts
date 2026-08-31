@@ -221,7 +221,7 @@ function createMemoryIdempotency(): SbomUploadIdempotencyPort {
       if (existing.status === 'completed') {
         return { kind: 'completed', record: existing };
       }
-        if (existing.status === 'started' && existing.expiresAt.getTime() > Date.now()) {
+      if (existing.status === 'started' && existing.expiresAt.getTime() > Date.now()) {
         if (existing.reservationFingerprint !== input.reservationFingerprint) {
           return { kind: 'conflict', record: existing };
         }

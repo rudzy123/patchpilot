@@ -72,4 +72,20 @@ describe('runParserInWorkerThread', () => {
       expect(result.graphCompleteness).toBe('no_dependencies');
     }
   });
+
+  it('treats a worker exit without a message as parser_crash', async () => {
+    const result = await runParserInWorkerThread(requestFromText('{"bomFormat":"CycloneDX"}'), {
+      timeoutMs: 15_000,
+      workerModuleUrl: resolveSiblingModuleUrl(
+        import.meta.url,
+        'exit-without-message-worker-thread',
+      ),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      disposition: 'quarantined',
+      code: 'parser_crash',
+    });
+  });
 });

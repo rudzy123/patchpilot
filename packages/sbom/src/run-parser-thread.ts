@@ -99,7 +99,7 @@ export async function runParserInWorkerThread(
       }
       settle(parserFailure('parser_crash'));
     });
-    worker.on('exit', (code) => {
+    worker.on('exit', (_code) => {
       if (settled) {
         return;
       }
@@ -107,9 +107,8 @@ export async function runParserInWorkerThread(
         settle(parserFailure('parser_timeout'));
         return;
       }
-      if (code !== 0) {
-        settle(parserFailure('parser_crash'));
-      }
+      // A worker that exits without posting a message must not leave the host Promise pending.
+      settle(parserFailure('parser_crash'));
     });
 
     worker.postMessage(request, [request.bytes]);

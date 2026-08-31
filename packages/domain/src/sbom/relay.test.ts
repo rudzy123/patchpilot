@@ -114,12 +114,9 @@ describe('outbox relay use case', () => {
   });
 
   it('dead-letters after the attempt bound without publishing again', async () => {
-    const harness = createHarness(
-      [
-        pendingEvent(EVENT_A, AGGREGATE_A, { attemptCount: 5 }),
-      ],
-      { maxAttempts: 5 },
-    );
+    const harness = createHarness([pendingEvent(EVENT_A, AGGREGATE_A, { attemptCount: 5 })], {
+      maxAttempts: 5,
+    });
     const result = await harness.relay.execute();
     expect(result.deadLettered).toBe(1);
     expect(harness.published).toHaveLength(0);
@@ -158,9 +155,9 @@ describe('outbox relay use case', () => {
   it('maps ingestion requested events to sbom.ingest and keeps Redis types out of the use case', () => {
     expect(jobTypeForOutboxEvent(SBOM_INGESTION_REQUESTED_EVENT_TYPE)).toBe(SBOM_INGEST_JOB_TYPE);
     expect(jobTypeForOutboxEvent('unknown.event')).toBeUndefined();
-    expect(outboxRetryDelayMs(1, { retryBaseMs: 5_000, retryCapMs: 900_000, random: () => 1 })).toBe(
-      5_000,
-    );
+    expect(
+      outboxRetryDelayMs(1, { retryBaseMs: 5_000, retryCapMs: 900_000, random: () => 1 }),
+    ).toBe(5_000);
     const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'relay.ts'), 'utf8');
     expect(source).not.toMatch(/bullmq|ioredis|Prisma|process\.env/);
   });
@@ -238,7 +235,16 @@ function createStore(seed: StoredEvent[]) {
   const events = new Map(seed.map((event) => [event.id, { ...event }]));
   const jobs = new Map<string, StoredJob>();
   let claimChain = Promise.resolve();
-  return { events, jobs, claimChain: { get: () => claimChain, set: (next: Promise<void>) => { claimChain = next; } } };
+  return {
+    events,
+    jobs,
+    claimChain: {
+      get: () => claimChain,
+      set: (next: Promise<void>) => {
+        claimChain = next;
+      },
+    },
+  };
 }
 
 function createHarnessFromStore(
@@ -268,7 +274,12 @@ function createHarnessFromStore(
     async claimDueBatch(input) {
       transactionOpen = true;
       const run = store.claimChain.get().then(() => claimUnsafe(store.events, input));
-      store.claimChain.set(run.then(() => undefined, () => undefined));
+      store.claimChain.set(
+        run.then(
+          () => undefined,
+          () => undefined,
+        ),
+      );
       const claimed = await run;
       transactionOpen = false;
       operations.push('claimDueBatch');

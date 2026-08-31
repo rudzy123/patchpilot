@@ -2,9 +2,7 @@ import type { SafeFailureCode, SbomParserLimits } from '@patchpilot/domain';
 
 const FORBIDDEN_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
-export type JsonStructureInspection =
-  | { ok: true }
-  | { ok: false; code: SafeFailureCode };
+export type JsonStructureInspection = { ok: true } | { ok: false; code: SafeFailureCode };
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

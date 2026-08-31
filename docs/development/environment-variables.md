@@ -39,7 +39,7 @@ Copy [`.env.example`](../../.env.example) to `.env`. Example values are **develo
 
 ## SBOM ingestion ([ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md))
 
-Required. These are reviewed **initial defaults**, not production performance guarantees; they have not been measured against representative SBOMs. Upload, parse, and graph persistence all read these values at runtime. Values must be canonical integers (no `NaN`, `Infinity`, scientific notation, or leading zeros). Parser timeout and object-storage timeout must be less than the processing lease, because no lease heartbeat exists. Idempotency TTL must outlive the maximum plausible upload object-storage operation. Orphan grace must be greater than the idempotency TTL. Object-storage credentials stay on the existing `OBJECT_STORAGE_*` secret fields and are not part of the public SBOM config object.
+Required. These are reviewed **initial defaults**, not production performance guarantees; they have not been measured against representative SBOMs. Upload, parse, and graph persistence all read these values at runtime. Values must be canonical integers (no `NaN`, `Infinity`, scientific notation, or leading zeros). Parser timeout and object-storage timeout must be less than the processing lease, because no lease heartbeat exists. Idempotency TTL must exceed twice the object-storage operation timeout so a reservation can cover temporary put and promote. Orphan grace must be greater than the idempotency TTL. Object-storage credentials stay on the existing `OBJECT_STORAGE_*` secret fields and are not part of the public SBOM config object.
 
 | Variable | Purpose |
 | --- | --- |

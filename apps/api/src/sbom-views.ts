@@ -21,7 +21,9 @@ import type {
   SbomUploadAccepted,
 } from '@patchpilot/domain';
 
-export function toSbomUploadAcceptedResponse(value: SbomUploadAccepted): SbomUploadAcceptedResponse {
+export function toSbomUploadAcceptedResponse(
+  value: SbomUploadAccepted,
+): SbomUploadAcceptedResponse {
   return sbomUploadAcceptedResponseSchema.parse({
     sbomId: value.sbomId,
     ingestionId: value.ingestionId,

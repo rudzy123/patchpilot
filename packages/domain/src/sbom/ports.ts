@@ -431,8 +431,7 @@ export type OutboxQueueJob = {
 };
 
 export type OutboxQueuePublishResult =
-  | { ok: true; duplicate: boolean }
-  | { ok: false; retryable: true };
+  { ok: true; duplicate: boolean } | { ok: false; retryable: true };
 
 /**
  * Queue adapter used by the outbox relay. Implementations live outside
@@ -559,8 +558,7 @@ export type SbomDocumentParseInput = {
 };
 
 export type SbomDocumentParseResult =
-  | { ok: true; graph: NormalizedComponentGraph }
-  | { ok: false; code: SafeFailureCode };
+  { ok: true; graph: NormalizedComponentGraph } | { ok: false; code: SafeFailureCode };
 
 /**
  * Isolate parser adapter. Domain does not import worker_threads, Ajv, or
@@ -581,7 +579,5 @@ export type SbomIngestionProcessorRepositories = {
  * Callers must not invoke object storage, Redis, or queues inside the callback.
  */
 export type SbomIngestionProcessorUnitOfWork = {
-  runInTransaction<T>(
-    work: (repos: SbomIngestionProcessorRepositories) => Promise<T>,
-  ): Promise<T>;
+  runInTransaction<T>(work: (repos: SbomIngestionProcessorRepositories) => Promise<T>): Promise<T>;
 };

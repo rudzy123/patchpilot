@@ -24,7 +24,10 @@ const SAMPLE_BODY = '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1}';
 describe('SBOM routes', () => {
   it('rejects unauthenticated access with a stable unauthorized envelope', async () => {
     const { app } = await boot({ role: 'admin' });
-    const response = await app.inject({ method: 'GET', url: `/assets/${assetIdPlaceholder}/sboms` });
+    const response = await app.inject({
+      method: 'GET',
+      url: `/assets/${assetIdPlaceholder}/sboms`,
+    });
     expect(response.statusCode).toBe(401);
     expect(response.headers['cache-control']).toBe('private, no-store');
     expectEnvelope(response, 'unauthorized', 'Authentication required.');

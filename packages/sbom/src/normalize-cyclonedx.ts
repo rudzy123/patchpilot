@@ -256,9 +256,7 @@ function normalizeOneComponent(
   };
 }
 
-function collapseDuplicateIdentities(
-  components: NormalizedComponent[],
-): {
+function collapseDuplicateIdentities(components: NormalizedComponent[]): {
   components: NormalizedComponent[];
   bomRefAlias: Map<string, string>;
   duplicateCount: number;
@@ -431,7 +429,8 @@ export function normalizeCycloneDxDocument(
   }
 
   const rootBomRef = metadataComponentBomRef(document);
-  const aliasedRoot = rootBomRef === undefined ? undefined : resolveAlias(collapsed.bomRefAlias, rootBomRef);
+  const aliasedRoot =
+    rootBomRef === undefined ? undefined : resolveAlias(collapsed.bomRefAlias, rootBomRef);
   const directBomRefs = new Set<string>();
   if (aliasedRoot !== undefined) {
     directBomRefs.add(aliasedRoot);

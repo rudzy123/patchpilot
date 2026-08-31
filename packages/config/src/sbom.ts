@@ -189,11 +189,12 @@ export function sbomRelationshipIssues(sbom: SbomConfig): SbomRelationshipIssue[
     });
   }
 
-  if (sbom.idempotencyTtlSeconds * 1000 <= sbom.objectStorageOperationTimeoutMs) {
+  const minimumUploadReservationMs = sbom.objectStorageOperationTimeoutMs * 2;
+  if (sbom.idempotencyTtlSeconds * 1000 <= minimumUploadReservationMs) {
     issues.push({
       path: ['idempotencyTtlSeconds'],
       message:
-        'Idempotency TTL must be greater than the maximum plausible upload object-storage operation.',
+        'Idempotency TTL must exceed twice the object-storage operation timeout so a reservation can cover temporary put and promote.',
     });
   }
 

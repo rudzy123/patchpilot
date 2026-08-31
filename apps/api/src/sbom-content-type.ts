@@ -1,7 +1,4 @@
-import {
-  SBOM_APPROVED_CONTENT_TYPES,
-  type SbomApprovedContentType,
-} from '@patchpilot/domain';
+import { SBOM_APPROVED_CONTENT_TYPES, type SbomApprovedContentType } from '@patchpilot/domain';
 
 export type SbomContentTypeParseResult =
   | { ok: true; contentType: SbomApprovedContentType }

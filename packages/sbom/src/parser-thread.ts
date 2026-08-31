@@ -246,7 +246,9 @@ export function validateParserWorkerSuccess(
     return graph;
   }
 
-  if (success.components.some((component) => component.name.length > limits.maxComponentNameChars)) {
+  if (
+    success.components.some((component) => component.name.length > limits.maxComponentNameChars)
+  ) {
     return err({
       code: 'unprocessable_evidence',
       message: 'Parser worker component name exceeds the typed limit.',

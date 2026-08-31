@@ -37,7 +37,11 @@ describe('SBOM ingest queue processor', () => {
       logger,
     );
 
-    expect(logs.map((row) => row.bindings['outcome'])).toEqual(['skipped', 'completed', 'rejected']);
+    expect(logs.map((row) => row.bindings['outcome'])).toEqual([
+      'skipped',
+      'completed',
+      'rejected',
+    ]);
     expect(JSON.stringify(logs)).not.toMatch(/objectKey|filename|bomFormat/);
   });
 

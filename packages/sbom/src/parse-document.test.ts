@@ -80,7 +80,9 @@ describe('parseSbomParserRequest', () => {
       const result = parseSbomParserRequest(requestFromText(text));
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.specificationVersion).toBe(fileName.replace('valid-', '').replace('.json', ''));
+        expect(result.specificationVersion).toBe(
+          fileName.replace('valid-', '').replace('.json', ''),
+        );
         expect(result.graphCompleteness).toBe('no_dependencies');
         expect(result.stats.componentCount).toBe(1);
       }
@@ -167,7 +169,9 @@ describe('parseSbomParserRequest', () => {
       code: 'not_cyclonedx',
     });
     expect(
-      parseSbomParserRequest(requestFromText(readFileSync(join(fixtureDirectory, 'unsupported-1.7.json'), 'utf8'))),
+      parseSbomParserRequest(
+        requestFromText(readFileSync(join(fixtureDirectory, 'unsupported-1.7.json'), 'utf8')),
+      ),
     ).toEqual({ ok: false, disposition: 'rejected', code: 'unsupported_spec_version' });
     expect(
       parseSbomParserRequest(
@@ -179,7 +183,9 @@ describe('parseSbomParserRequest', () => {
   it('enforces semantic component, edge, identifier, and tool limits', () => {
     expect(
       parseSbomParserRequest(
-        requestFromJson(cycloneDx(), { limits: { ...defaultSbomParserLimits(), maxComponents: 1 } }),
+        requestFromJson(cycloneDx(), {
+          limits: { ...defaultSbomParserLimits(), maxComponents: 1 },
+        }),
       ),
     ).toEqual({ ok: false, disposition: 'rejected', code: 'component_limit' });
 
