@@ -1,3 +1,4 @@
+import type { AssetRepository, AuditAppendRepository, OutboxRepository } from '../ports.js';
 import type { Result } from '../result.js';
 import type {
   BackgroundJobRecord,
@@ -175,7 +176,8 @@ export type ReserveStartedResult =
   | { kind: 'acquired'; record: IdempotencyReservationRecord }
   | { kind: 'unexpired_started'; record: IdempotencyReservationRecord }
   | { kind: 'reclaimable_expired'; record: IdempotencyReservationRecord }
-  | { kind: 'completed'; record: IdempotencyReservationRecord };
+  | { kind: 'completed'; record: IdempotencyReservationRecord }
+  | { kind: 'conflict'; record: IdempotencyReservationRecord };
 
 export type FinalizeIdempotencyInput = {
   organizationId: string;
@@ -230,7 +232,28 @@ export type PersistSbomMetadataInput = {
   receivedAt: Date;
 };
 
+export type SbomUploadRepositories = {
+  assets: Pick<AssetRepository, 'findById'>;
+  sbomMetadata: SbomMetadataPersistencePort;
+  ingestions: SbomIngestionPersistencePort;
+  uploadIdempotency: SbomUploadIdempotencyPort;
+  auditEvents: AuditAppendRepository;
+  outboxEvents: OutboxRepository;
+};
+
+/**
+ * PostgreSQL-only unit of work for SBOM upload finalization.
+ * Callers must not invoke object storage, Redis, or queues inside the callback.
+ */
+export type SbomUploadUnitOfWork = {
+  runInTransaction<T>(work: (repos: SbomUploadRepositories) => Promise<T>): Promise<T>;
+};
+
 export type SbomMetadataPersistencePort = {
+  /**
+   * Insert SBOM metadata. Unique (organization, asset, sha256) collisions throw
+   * SbomEvidenceConflictError so the surrounding transaction rolls back.
+   */
   insert(input: PersistSbomMetadataInput): Promise<SbomRecord>;
   findById(organizationId: string, sbomId: string): Promise<SbomRecord | undefined>;
   findByAssetAndId(

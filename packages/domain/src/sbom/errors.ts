@@ -1,4 +1,88 @@
 import type { AppError } from '../result.js';
+import {
+  ASSET_ARCHIVED,
+  ASSET_NOT_FOUND,
+  ORGANIZATION_CONTEXT_REQUIRED,
+  PERMISSION_DENIED,
+} from '../assets/errors.js';
+
+export { ASSET_ARCHIVED, ASSET_NOT_FOUND, ORGANIZATION_CONTEXT_REQUIRED, PERMISSION_DENIED };
+
+export type SbomUploadFailureOutcome =
+  | 'not_found'
+  | 'forbidden'
+  | 'archived'
+  | 'in_progress'
+  | 'idempotency_conflict'
+  | 'client_aborted'
+  | 'storage_failed'
+  | 'possible_orphan'
+  | 'missing_ingestion'
+  | 'internal';
+
+export type SbomUploadFailure = AppError & {
+  outcome: SbomUploadFailureOutcome;
+};
+
+export const SBOM_UPLOAD_IN_PROGRESS: SbomUploadFailure = Object.freeze({
+  code: 'conflict',
+  message: 'Upload is already in progress.',
+  outcome: 'in_progress',
+});
+
+export const SBOM_UPLOAD_IDEMPOTENCY_CONFLICT: SbomUploadFailure = Object.freeze({
+  code: 'conflict',
+  message: 'Idempotency key was reused with a different request.',
+  outcome: 'idempotency_conflict',
+});
+
+export const SBOM_UPLOAD_CLIENT_ABORTED: SbomUploadFailure = Object.freeze({
+  code: 'validation',
+  message: 'Upload was aborted.',
+  outcome: 'client_aborted',
+});
+
+export const SBOM_UPLOAD_MISSING_INGESTION: SbomUploadFailure = Object.freeze({
+  code: 'internal',
+  message: 'Existing SBOM evidence is missing a current ingestion.',
+  outcome: 'missing_ingestion',
+});
+
+export const SBOM_UPLOAD_REPLAY_UNAVAILABLE: SbomUploadFailure = Object.freeze({
+  code: 'internal',
+  message: 'Completed upload could not be reconstructed.',
+  outcome: 'internal',
+});
+
+export const SBOM_UPLOAD_INTERNAL: SbomUploadFailure = Object.freeze({
+  code: 'internal',
+  message: 'SBOM upload failed.',
+  outcome: 'internal',
+});
+
+export const SBOM_UPLOAD_POSSIBLE_ORPHAN: SbomUploadFailure = Object.freeze({
+  code: 'internal',
+  message: 'SBOM upload could not be finalized after object storage succeeded.',
+  outcome: 'possible_orphan',
+});
+
+export class SbomEvidenceConflictError extends Error {
+  public constructor() {
+    super('SBOM evidence already exists for this organization, asset, and digest.');
+    this.name = 'SbomEvidenceConflictError';
+  }
+}
+
+export function isSbomEvidenceConflictError(error: unknown): error is SbomEvidenceConflictError {
+  return error instanceof SbomEvidenceConflictError;
+}
+
+export function sbomUploadFailure(
+  error: AppError,
+  outcome: SbomUploadFailureOutcome,
+): SbomUploadFailure {
+  return { code: error.code, message: error.message, outcome };
+}
 
 export const SBOM_INVALID_CURSOR: AppError = Object.freeze({
   code: 'validation',

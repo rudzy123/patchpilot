@@ -7,6 +7,7 @@ export {
 } from './client.js';
 export { createPrismaUnitOfWork, createRepositories } from './repositories.js';
 export { createSbomPersistence, type SbomPersistenceAdapters } from './sbom-persistence.js';
+export { createSbomUploadUnitOfWork } from './sbom-upload-unit-of-work.js';
 export { developmentSeedIds, seedDevelopmentData } from './seed/development.js';
 export { boundPageSize } from './paging.js';
 export {

@@ -31,6 +31,7 @@ pnpm infrastructure:down
 - Authentication routes (Fastify inject): login/logout/session/organizations/select-organization, cookie attributes, Origin, CSRF, rotation, tenancy, audit redaction, limiter failure.
 - Worker factory: fake Redis/database, idempotent shutdown, init failure.
 - Web landing copy, landmarks, `/health` contract, and Session 6 authentication UI (login, session bootstrap, organization selector, logout, expired-session, access-denied). Web auth tests use jsdom and Testing Library; they do not start Next.js or the API.
+- Session 8 Batch 6: authorized, idempotent SBOM upload use case (no Fastify, Redis, or BullMQ).
 
 ## What integration tests cover
 
@@ -38,9 +39,10 @@ pnpm infrastructure:down
 - Redis `PING` through the worker ioredis adapter.
 - MinIO `/minio/health/live` over HTTP (no MinIO SDK).
 - Session 8 Batch 5: private streaming S3-compatible Put/Head/Copy/Get against Compose MinIO through `@patchpilot/integrations` (no public ACL, no signed URLs).
+- Session 8 Batch 6: PostgreSQL-backed upload finalization (idempotency, duplicate evidence, audit/outbox rollback). No Fastify route and no Redis/BullMQ publish.
 - Session 6: authentication persistence (digest-only sessions, audit actors) and API authentication routes against PostgreSQL (valid/invalid auth, cookie attributes, Origin, CSRF, rotation, tenancy, audit redaction, limiter failure). Redis login limiter adapter.
 
-They use the same development placeholder URLs as Compose defaults. Constraint tests create ephemeral `patchpilot_it_*` / `patchpilot_migrate_*` databases and drop them. They do not upload SBOMs or call vulnerability feeds.
+They use the same development placeholder URLs as Compose defaults. Constraint tests create ephemeral `patchpilot_it_*` / `patchpilot_migrate_*` databases and drop them; they do not stream live SBOMs or call vulnerability feeds. Session 8 Batch 6 upload integration tests use synthetic JSON streams and an in-memory storage fake.
 
 ## Determinism
 

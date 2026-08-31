@@ -10,12 +10,20 @@ export {
   SBOM_PARSER_RESULT_MAX_SERIALIZED_BYTES,
   SBOM_RAW_TEXT_MAX_LENGTH,
   SBOM_TEMPORARY_OBJECT_KEY_PATTERN,
+  SBOM_APPROVED_CONTENT_TYPES,
+  SBOM_FINAL_FINGERPRINT_PREFIX,
+  SBOM_IDEMPOTENCY_KEY_DIGEST_PREFIX,
+  SBOM_INGESTION_REQUESTED_EVENT_TYPE,
+  SBOM_RESERVATION_FINGERPRINT_PREFIX,
+  SBOM_UPLOAD_ACCEPTED_STATUS,
   SBOM_UPLOAD_IDEMPOTENCY_RESPONSE_SCHEMA_VERSION,
   SBOM_UPLOAD_IDEMPOTENCY_SCOPE,
+  SBOM_UPLOAD_PERMISSION,
   SBOM_VERSION_LABEL_MAX_LENGTH,
   SBOM_VERSION_LABEL_PATTERN,
   SHA256_HEX_PATTERN,
   UUID_PATTERN,
+  type SbomApprovedContentType,
 } from './constants.js';
 export {
   SBOM_COMPLETED_REQUIREMENTS,
@@ -28,8 +36,51 @@ export {
   SBOM_PROCESSING_REQUIRES_STARTED_AT,
   SBOM_TERMINAL_STATE,
   SBOM_UNSUPPORTED_STAGE,
+  SBOM_UPLOAD_CLIENT_ABORTED,
+  SBOM_UPLOAD_IDEMPOTENCY_CONFLICT,
+  SBOM_UPLOAD_IN_PROGRESS,
+  SBOM_UPLOAD_INTERNAL,
+  SBOM_UPLOAD_MISSING_INGESTION,
+  SBOM_UPLOAD_POSSIBLE_ORPHAN,
+  SBOM_UPLOAD_REPLAY_UNAVAILABLE,
+  SbomEvidenceConflictError,
+  isSbomEvidenceConflictError,
+  sbomUploadFailure,
   sbomValidationError,
+  type SbomUploadFailure,
+  type SbomUploadFailureOutcome,
 } from './errors.js';
+export {
+  hashFinalFingerprint,
+  hashIdempotencyKey,
+  hashReservationFingerprint,
+  isSecretIdempotencyKey,
+  lengthPrefixed,
+  resolveIdempotencyKeyHash,
+  sbomUploadIdempotencyScope,
+  wrapRawIdempotencyKey,
+  type HashedIdempotencyKey,
+  type SecretIdempotencyKey,
+} from './idempotency.js';
+export {
+  authorizeSbomUpload,
+  type AuthorizedSbomUploadActor,
+  type SbomUploadActor,
+} from './authorization.js';
+export {
+  SBOM_AUDIT_SUBJECT_TYPE,
+  sbomAuditActions,
+  sbomDuplicateAudit,
+  sbomUploadedAudit,
+} from './audit.js';
+export {
+  createUploadSbomUseCase,
+  type SbomUploadAccepted,
+  type SbomUploadLogger,
+  type UploadSbomDependencies,
+  type UploadSbomInput,
+} from './upload.js';
+export { fingerprintUploadBody, type UploadBodyFingerprint } from './body-fingerprint.js';
 export {
   fromOccurrenceVersionColumns,
   isResolvedMatchingVersion,
@@ -163,6 +214,8 @@ export {
   type SbomObjectStoragePort,
   type SbomUploadIdempotencyPort,
   type SbomUploadIdempotencyResponseIds,
+  type SbomUploadRepositories,
+  type SbomUploadUnitOfWork,
   type StorageFailureCategory,
   type SucceedBackgroundJobInput,
   type TerminalBackgroundJobFailureInput,

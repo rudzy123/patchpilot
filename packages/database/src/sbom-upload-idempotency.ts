@@ -61,13 +61,19 @@ export class PrismaSbomUploadIdempotency implements SbomUploadIdempotencyPort {
     if (existing.status === 'completed') {
       return { kind: 'completed', record: mapReservation(existing) };
     }
+    if (existing.status === 'conflict') {
+      return { kind: 'conflict', record: mapReservation(existing) };
+    }
     if (existing.status === 'started' && existing.expiresAt > now) {
+      if (existing.requestFingerprint !== reservationFingerprint) {
+        return { kind: 'conflict', record: mapReservation(existing) };
+      }
       return { kind: 'unexpired_started', record: mapReservation(existing) };
     }
     if (existing.status === 'started' && existing.expiresAt <= now) {
       return { kind: 'reclaimable_expired', record: mapReservation(existing) };
     }
-    return { kind: 'unexpired_started', record: mapReservation(existing) };
+    return { kind: 'conflict', record: mapReservation(existing) };
   }
 
   public async findUnexpiredStarted(

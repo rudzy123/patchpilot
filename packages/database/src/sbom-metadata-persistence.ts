@@ -1,7 +1,9 @@
+import { Prisma } from '@prisma/client';
 import {
   SBOM_LIST_DEFAULT_LIMIT,
   SBOM_LIST_MAX_LIMIT,
   SBOM_LIST_MIN_LIMIT,
+  SbomEvidenceConflictError,
   err,
   ok,
   type PersistSbomMetadataInput,
@@ -25,22 +27,29 @@ export class PrismaSbomMetadataPersistence implements SbomMetadataPersistencePor
   public constructor(private readonly client: PrismaClientLike) {}
 
   public async insert(input: PersistSbomMetadataInput): Promise<SbomRecord> {
-    const row = await this.client.sbom.create({
-      data: {
-        organizationId: input.organizationId,
-        assetId: input.assetId,
-        objectKey: input.objectKey,
-        sha256: requireSha256(input.sha256, 'sha256'),
-        byteLength: requirePositiveByteLength(input.byteLength, 'byteLength'),
-        declaredContentType: input.declaredContentType,
-        specificationType: input.specificationType,
-        source: input.source,
-        receivedAt: input.receivedAt,
-        uploadedByMembershipId: input.uploadedByMembershipId,
-        capturedAt: input.capturedAt,
-      },
-    });
-    return mapSbom(row);
+    try {
+      const row = await this.client.sbom.create({
+        data: {
+          organizationId: input.organizationId,
+          assetId: input.assetId,
+          objectKey: input.objectKey,
+          sha256: requireSha256(input.sha256, 'sha256'),
+          byteLength: requirePositiveByteLength(input.byteLength, 'byteLength'),
+          declaredContentType: input.declaredContentType,
+          specificationType: input.specificationType,
+          source: input.source,
+          receivedAt: input.receivedAt,
+          uploadedByMembershipId: input.uploadedByMembershipId,
+          capturedAt: input.capturedAt,
+        },
+      });
+      return mapSbom(row);
+    } catch (error) {
+      if (isSbomEvidenceUniqueViolation(error)) {
+        throw new SbomEvidenceConflictError();
+      }
+      throw error;
+    }
   }
 
   public async findById(organizationId: string, sbomId: string): Promise<SbomRecord | undefined> {
@@ -155,6 +164,25 @@ export class PrismaSbomMetadataPersistence implements SbomMetadataPersistencePor
 }
 
 export { isRootPrismaClient } from './guards.js';
+
+function isSbomEvidenceUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+    return false;
+  }
+  const target = error.meta?.['target'];
+  if (typeof target === 'string') {
+    return (
+      target === 'sbom_org_asset_sha256_key' ||
+      target === 'object_key' ||
+      target === 'sbom_object_key_key'
+    );
+  }
+  if (!Array.isArray(target)) {
+    return true;
+  }
+  const fields = target.map(String);
+  return fields.includes('sha256') || fields.includes('objectKey') || fields.includes('object_key');
+}
 
 function boundSbomListLimit(limit: number | undefined): number {
   if (limit === undefined) {

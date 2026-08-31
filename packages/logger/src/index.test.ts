@@ -70,6 +70,8 @@ describe('logger redaction', () => {
         csrfTokenHash: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
         tokenHash: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
         sessionToken: 'raw-session-token-value',
+        idempotencyKey: 'raw-idempotency-header-value',
+        rawKey: 'raw-idempotency-secret',
         peerIp: '192.0.2.10',
         accountDigest: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
         credential: { passwordHash: '$argon2id$v=19$m=19456,p=1,t=2$nestedcredhashvalue' },
@@ -104,6 +106,8 @@ describe('logger redaction', () => {
     expect(output).not.toContain('$argon2id$v=19$m=19456,t=2,p=1$compattesthash');
     expect(output).not.toContain('raw-csrf-token-value');
     expect(output).not.toContain('raw-session-token-value');
+    expect(output).not.toContain('raw-idempotency-header-value');
+    expect(output).not.toContain('raw-idempotency-secret');
     expect(output).not.toContain('192.0.2.10');
     expect(output).not.toContain(
       'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
