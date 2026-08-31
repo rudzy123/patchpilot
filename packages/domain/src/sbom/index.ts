@@ -9,6 +9,7 @@ export {
   SBOM_LIST_MIN_LIMIT,
   SBOM_PARSER_RESULT_MAX_SERIALIZED_BYTES,
   SBOM_RAW_TEXT_MAX_LENGTH,
+  SBOM_READ_PERMISSION,
   SBOM_TEMPORARY_OBJECT_KEY_PATTERN,
   SBOM_APPROVED_CONTENT_TYPES,
   SBOM_FINAL_FINGERPRINT_PREFIX,
@@ -28,11 +29,13 @@ export {
 export {
   SBOM_COMPLETED_REQUIREMENTS,
   SBOM_DUPLICATE_STATE_FORBIDDEN,
+  SBOM_INGESTION_NOT_FOUND,
   SBOM_INVALID_CURSOR,
   SBOM_INVALID_GRAPH,
   SBOM_INVALID_IDENTITY,
   SBOM_INVALID_TRANSITION,
   SBOM_INVALID_VERSION,
+  SBOM_NOT_FOUND,
   SBOM_PROCESSING_REQUIRES_STARTED_AT,
   SBOM_TERMINAL_STATE,
   SBOM_UNSUPPORTED_STAGE,
@@ -63,8 +66,11 @@ export {
   type SecretIdempotencyKey,
 } from './idempotency.js';
 export {
+  authorizeSbomRead,
   authorizeSbomUpload,
+  type AuthorizedSbomActor,
   type AuthorizedSbomUploadActor,
+  type SbomActor,
   type SbomUploadActor,
 } from './authorization.js';
 export {
@@ -80,6 +86,18 @@ export {
   type UploadSbomDependencies,
   type UploadSbomInput,
 } from './upload.js';
+export {
+  createGetSbomIngestionUseCase,
+  createGetSbomUseCase,
+  createListSbomsUseCase,
+  type GetSbomIngestionInput,
+  type GetSbomInput,
+  type ListSbomsInput,
+  type SbomDetailRecord,
+  type SbomListItemRecord,
+  type SbomQueryDependencies,
+  type SbomQueryListPage,
+} from './queries.js';
 export { fingerprintUploadBody, type UploadBodyFingerprint } from './body-fingerprint.js';
 export {
   fromOccurrenceVersionColumns,

@@ -8,6 +8,16 @@ import {
 
 export { ASSET_ARCHIVED, ASSET_NOT_FOUND, ORGANIZATION_CONTEXT_REQUIRED, PERMISSION_DENIED };
 
+export const SBOM_NOT_FOUND: AppError = Object.freeze({
+  code: 'not_found',
+  message: 'SBOM not found.',
+});
+
+export const SBOM_INGESTION_NOT_FOUND: AppError = Object.freeze({
+  code: 'not_found',
+  message: 'SBOM ingestion not found.',
+});
+
 export type SbomUploadFailureOutcome =
   | 'not_found'
   | 'forbidden'

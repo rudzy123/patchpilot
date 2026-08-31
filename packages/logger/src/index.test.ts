@@ -45,6 +45,7 @@ describe('logger redaction', () => {
             'proxy-authorization': 'Basic proxy-secret',
             'x-storage-secret': 'header-secret-value',
             'x-amz-signature': 'signed-query-secret',
+            'content-disposition': 'attachment; filename="bom.json"',
             'x-request-id': 'req-1',
           },
           body: { shouldNotAppearIfSerialized: true },
@@ -72,6 +73,8 @@ describe('logger redaction', () => {
         sessionToken: 'raw-session-token-value',
         idempotencyKey: 'raw-idempotency-header-value',
         rawKey: 'raw-idempotency-secret',
+        filename: 'bom.json',
+        originalFilename: 'customer-bom.json',
         peerIp: '192.0.2.10',
         accountDigest: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
         credential: { passwordHash: '$argon2id$v=19$m=19456,p=1,t=2$nestedcredhashvalue' },
@@ -108,6 +111,8 @@ describe('logger redaction', () => {
     expect(output).not.toContain('raw-session-token-value');
     expect(output).not.toContain('raw-idempotency-header-value');
     expect(output).not.toContain('raw-idempotency-secret');
+    expect(output).not.toContain('bom.json');
+    expect(output).not.toContain('customer-bom.json');
     expect(output).not.toContain('192.0.2.10');
     expect(output).not.toContain(
       'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',

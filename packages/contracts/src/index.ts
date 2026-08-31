@@ -57,6 +57,7 @@ export {
 } from './assets.js';
 export {
   assetSbomIdParamSchema,
+  assetSbomIngestionIdParamSchema,
   cursorPaginationQuerySchema,
   encodeSbomListCursor,
   graphCompletenessSchema,
@@ -79,6 +80,7 @@ export {
   sbomUploadAcceptedResponseSchema,
   supportedCycloneDxSpecificationVersionSchema,
   type AssetSbomIdParam,
+  type AssetSbomIngestionIdParam,
   type GraphCompletenessContract,
   type IngestionIdParam,
   type SafeFailureCategoryContract,

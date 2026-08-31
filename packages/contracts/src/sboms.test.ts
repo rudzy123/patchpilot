@@ -4,6 +4,7 @@ import { encodeSbomListCursor } from '@patchpilot/domain';
 
 import {
   assetSbomIdParamSchema,
+  assetSbomIngestionIdParamSchema,
   cursorPaginationQuerySchema,
   graphCompletenessSchema,
   ingestionIdParamSchema,
@@ -97,6 +98,17 @@ describe('sbom route params and list query', () => {
     expect(assetSbomIdParamSchema.parse({ assetId: ASSET_ID, sbomId: SBOM_ID }).sbomId).toBe(
       SBOM_ID,
     );
+    expect(
+      assetSbomIngestionIdParamSchema.parse({ assetId: ASSET_ID, ingestionId: INGESTION_ID })
+        .ingestionId,
+    ).toBe(INGESTION_ID);
+    expect(
+      assetSbomIngestionIdParamSchema.safeParse({
+        assetId: ASSET_ID,
+        ingestionId: INGESTION_ID,
+        organizationId: ASSET_ID,
+      }).success,
+    ).toBe(false);
     expect(sbomIdParamSchema.safeParse({ sbomId: 'not-a-uuid' }).success).toBe(false);
     expect(sbomIdParamSchema.safeParse({ sbomId: SBOM_ID, organizationId: ASSET_ID }).success).toBe(
       false,

@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   createArgon2PasswordHasher,
   createListActiveOrganizationsUseCase,
@@ -14,15 +16,19 @@ import {
   checkDatabaseReady,
   createPrismaUnitOfWork,
   createRepositories,
+  createSbomPersistence,
+  createSbomUploadUnitOfWork,
   disconnectPrisma,
   getPrismaClient,
 } from '@patchpilot/database';
+import { createS3SbomObjectStorage } from '@patchpilot/integrations';
 import { createLogger } from '@patchpilot/logger';
 import { startTelemetry } from '@patchpilot/observability';
 
 import { buildApi } from './app.js';
 import { createAssetRuntime } from './asset-runtime.js';
 import { createRedisLoginRateLimiter } from './redis-login-rate-limiter.js';
+import { createSbomRuntime } from './sbom-runtime.js';
 
 async function main(): Promise<void> {
   const config = loadServerConfig();
@@ -51,6 +57,33 @@ async function main(): Promise<void> {
     memberships: repos.memberships,
     unitOfWork: createPrismaUnitOfWork({ client: prisma }),
     clock,
+  });
+  const sbomPersistence = createSbomPersistence(prisma);
+  const sboms = createSbomRuntime({
+    clock,
+    createId: randomUUID,
+    assets: repos.assets,
+    uploadIdempotency: sbomPersistence.uploadIdempotency,
+    sbomMetadata: sbomPersistence.sbomMetadata,
+    ingestions: sbomPersistence.ingestions,
+    storage: createS3SbomObjectStorage({
+      endpoint: config.objectStorage.endpoint,
+      region: config.objectStorage.region,
+      accessKey: config.objectStorage.accessKey,
+      secretKey: config.objectStorage.secretKey,
+      bucket: config.objectStorage.bucket,
+      useSsl: config.objectStorage.useSsl,
+      connectionTimeoutMs: config.objectStorage.connectionTimeoutMs,
+      operationTimeoutMs: config.sbom.objectStorageOperationTimeoutMs,
+      deploymentEnvironment: config.deploymentEnvironment,
+      allowDevelopmentAdapters: config.allowDevelopmentAdapters,
+    }),
+    unitOfWork: createSbomUploadUnitOfWork(prisma),
+    logger: {
+      warn(bindings, message) {
+        logger.warn(bindings, message);
+      },
+    },
   });
   const limiter = createRedisLoginRateLimiter({
     redisUrl: config.redisUrl,
@@ -96,6 +129,7 @@ async function main(): Promise<void> {
       audit: repos.auditEvents,
     },
     assets,
+    sboms,
   });
 
   let shuttingDown = false;

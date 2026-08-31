@@ -17,6 +17,7 @@ export const SBOM_UPLOAD_IDEMPOTENCY_SCOPE = 'sbom.upload' as const;
 export const SBOM_INGEST_JOB_TYPE = 'sbom.ingest' as const;
 export const SBOM_UPLOAD_IDEMPOTENCY_RESPONSE_SCHEMA_VERSION = 1;
 export const SBOM_INGESTION_REQUESTED_EVENT_TYPE = 'sbom.ingestion.requested.v1' as const;
+export const SBOM_READ_PERMISSION = 'sbom:read' as const;
 export const SBOM_UPLOAD_PERMISSION = 'sbom:upload' as const;
 export const SBOM_IDEMPOTENCY_KEY_DIGEST_PREFIX = 'patchpilot-idempotency-v1:' as const;
 export const SBOM_RESERVATION_FINGERPRINT_PREFIX =

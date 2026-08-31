@@ -18,6 +18,31 @@ export const INVALID_REQUEST: AppError = Object.freeze({
   message: 'Invalid request.',
 });
 
+export const SBOM_CONTENT_TYPE_REQUIRED: AppError = Object.freeze({
+  code: 'validation',
+  message: 'Content-Type must be application/json or application/vnd.cyclonedx+json.',
+});
+
+export const SBOM_CHARSET_REQUIRED: AppError = Object.freeze({
+  code: 'validation',
+  message: 'UTF-8 charset is required.',
+});
+
+export const SBOM_CONTENT_TYPE_PARAMETER_REJECTED: AppError = Object.freeze({
+  code: 'validation',
+  message: 'Unsupported Content-Type parameter.',
+});
+
+export const SBOM_IDEMPOTENCY_KEY_REQUIRED: AppError = Object.freeze({
+  code: 'validation',
+  message: 'Idempotency-Key is required.',
+});
+
+export const SBOM_UPLOAD_TOO_LARGE: AppError = Object.freeze({
+  code: 'validation',
+  message: 'Upload exceeds the configured size limit.',
+});
+
 /** Public response when the in-memory HTTP auth limiter is exhausted. */
 export const AUTH_HTTP_RATE_LIMITED: AppError = Object.freeze({
   code: 'rate_limited',
@@ -25,6 +50,10 @@ export const AUTH_HTTP_RATE_LIMITED: AppError = Object.freeze({
 });
 
 export function httpStatusForError(error: AppError): number {
+  if (error.code === 'validation' && error.message === SBOM_UPLOAD_TOO_LARGE.message) {
+    return 413;
+  }
+
   switch (error.code) {
     case 'validation':
       return 400;

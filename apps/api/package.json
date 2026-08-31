@@ -2,7 +2,7 @@
   "name": "@patchpilot/api",
   "version": "0.0.0",
   "private": true,
-  "description": "Fastify HTTP API. Health, Session 6 authentication, and Session 7 asset inventory routes.",
+  "description": "Fastify HTTP API. Health, Session 6 authentication, Session 7 asset inventory, and Session 8 SBOM upload routes.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -25,6 +25,7 @@
     "@patchpilot/contracts": "workspace:*",
     "@patchpilot/database": "workspace:*",
     "@patchpilot/domain": "workspace:*",
+    "@patchpilot/integrations": "workspace:*",
     "@patchpilot/logger": "workspace:*",
     "@patchpilot/observability": "workspace:*",
     "fastify": "^5.6.2",

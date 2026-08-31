@@ -59,6 +59,8 @@ const redactPaths = [
   'idempotencyKey',
   'rawKey',
   'Idempotency-Key',
+  'filename',
+  'originalFilename',
   'headers["idempotency-key"]',
   'headers["Idempotency-Key"]',
   'req.headers["idempotency-key"]',
@@ -125,6 +127,8 @@ const redactPaths = [
   '*.session_token',
   '*.idempotencyKey',
   '*.rawKey',
+  '*.filename',
+  '*.originalFilename',
   'headers["idempotency-key"]',
   'req.headers["idempotency-key"]',
   'peerIp',
@@ -226,7 +230,8 @@ function sanitizeHeaders(headers: unknown): Record<string, unknown> {
       lower.includes('apikey') ||
       lower.includes('secret') ||
       lower.includes('signature') ||
-      lower === 'idempotency-key'
+      lower === 'idempotency-key' ||
+      lower === 'content-disposition'
     ) {
       sanitized[key] = '[Redacted]';
       continue;

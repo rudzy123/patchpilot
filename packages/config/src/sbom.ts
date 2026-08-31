@@ -6,6 +6,11 @@ import { z } from 'zod';
  * in Batch 1.
  */
 
+/** HTTP header carrying the raw upload idempotency key. The raw value is never persisted. */
+export const SBOM_IDEMPOTENCY_KEY_HEADER_NAME = 'Idempotency-Key';
+export const SBOM_IDEMPOTENCY_KEY_MIN_LENGTH = 1;
+export const SBOM_IDEMPOTENCY_KEY_MAX_LENGTH = 256;
+
 export const SBOM_UPLOAD_MAX_BYTES_DEFAULT = 20_971_520;
 export const SBOM_UPLOAD_MAX_BYTES_MIN = 65_536;
 export const SBOM_UPLOAD_MAX_BYTES_MAX = 33_554_432;

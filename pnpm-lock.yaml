@@ -77,6 +77,9 @@ importers:
       '@patchpilot/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@patchpilot/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
       '@patchpilot/logger':
         specifier: workspace:*
         version: link:../../packages/logger

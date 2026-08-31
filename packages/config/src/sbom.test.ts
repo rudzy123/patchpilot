@@ -9,6 +9,9 @@ import {
   OBJECT_STORAGE_OPERATION_TIMEOUT_MS_MAX,
   OBJECT_STORAGE_OPERATION_TIMEOUT_MS_MIN,
   OBJECT_STORAGE_REGION_DEFAULT,
+  SBOM_IDEMPOTENCY_KEY_HEADER_NAME,
+  SBOM_IDEMPOTENCY_KEY_MAX_LENGTH,
+  SBOM_IDEMPOTENCY_KEY_MIN_LENGTH,
   SBOM_IDEMPOTENCY_TTL_SECONDS_DEFAULT,
   SBOM_IDEMPOTENCY_TTL_SECONDS_MAX,
   SBOM_IDEMPOTENCY_TTL_SECONDS_MIN,
@@ -337,6 +340,12 @@ describe('SBOM ingestion configuration', () => {
     expect(config.objectStorage.connectionTimeoutMs).toBe(
       OBJECT_STORAGE_CONNECTION_TIMEOUT_MS_DEFAULT,
     );
+  });
+
+  it('exports the Idempotency-Key header contract used by upload routes', () => {
+    expect(SBOM_IDEMPOTENCY_KEY_HEADER_NAME).toBe('Idempotency-Key');
+    expect(SBOM_IDEMPOTENCY_KEY_MIN_LENGTH).toBe(1);
+    expect(SBOM_IDEMPOTENCY_KEY_MAX_LENGTH).toBe(256);
   });
 
   it('loads valid test configuration', () => {

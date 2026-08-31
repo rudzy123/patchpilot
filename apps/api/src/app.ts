@@ -4,7 +4,7 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import { LOGIN_RATE_LIMITED, type TrustedActor } from '@patchpilot/auth';
-import { type ServerConfig } from '@patchpilot/config';
+import { SBOM_IDEMPOTENCY_KEY_HEADER_NAME, type ServerConfig } from '@patchpilot/config';
 import {
   healthLiveResponseSchema,
   healthReadyResponseSchema,
@@ -20,6 +20,8 @@ import { registerAssetRoutes } from './asset-routes.js';
 import type { AssetRuntime } from './asset-runtime.js';
 import { registerAuthRoutes } from './auth-routes.js';
 import type { AuthRuntime } from './auth-runtime.js';
+import { registerSbomRoutes } from './sbom-routes.js';
+import type { SbomRuntime } from './sbom-runtime.js';
 import { readSingleHeader } from './headers.js';
 import { AUTH_HTTP_RATE_LIMITED } from './http-errors.js';
 import { resolveRequestIdentifiers } from './ids.js';
@@ -32,6 +34,7 @@ export type ApiDependencies = {
   checkDatabaseReady: DatabaseReadyCheck;
   auth: AuthRuntime;
   assets: AssetRuntime;
+  sboms: SbomRuntime;
   now?: () => string;
   generateId?: () => string;
 };
@@ -83,6 +86,7 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       dependencies.config.requestIdHeader,
       dependencies.config.correlationIdHeader,
       dependencies.config.auth.csrfHeaderName,
+      SBOM_IDEMPOTENCY_KEY_HEADER_NAME,
     ],
   });
 
@@ -193,6 +197,12 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     config: dependencies.config,
     auth: dependencies.auth,
     assets: dependencies.assets,
+  });
+
+  await registerSbomRoutes(app, {
+    config: dependencies.config,
+    auth: dependencies.auth,
+    sboms: dependencies.sboms,
   });
 
   app.addHook('onSend', async (request, _reply, payload) => {

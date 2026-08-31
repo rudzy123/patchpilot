@@ -63,6 +63,11 @@ export const sbomIngestionIdParamSchema = z.strictObject({
   ingestionId: z.uuid(),
 });
 
+export const assetSbomIngestionIdParamSchema = z.strictObject({
+  assetId: z.uuid(),
+  ingestionId: z.uuid(),
+});
+
 export const cursorPaginationQuerySchema = z.strictObject({
   limit: z.coerce.number().int().min(SBOM_LIST_MIN_LIMIT).max(SBOM_LIST_MAX_LIMIT).optional(),
   cursor: z.string().min(1).max(SBOM_RAW_TEXT_MAX_LENGTH).optional(),
@@ -156,6 +161,7 @@ export type SbomIdParam = z.infer<typeof sbomIdParamSchema>;
 export type IngestionIdParam = z.infer<typeof ingestionIdParamSchema>;
 export type AssetSbomIdParam = z.infer<typeof assetSbomIdParamSchema>;
 export type SbomIngestionIdParam = z.infer<typeof sbomIngestionIdParamSchema>;
+export type AssetSbomIngestionIdParam = z.infer<typeof assetSbomIngestionIdParamSchema>;
 export type SbomListQueryRequest = z.infer<typeof sbomListQuerySchema>;
 export type SbomUploadAcceptedResponse = z.infer<typeof sbomUploadAcceptedResponseSchema>;
 export type SbomIngestionSummary = z.infer<typeof sbomIngestionSummarySchema>;
