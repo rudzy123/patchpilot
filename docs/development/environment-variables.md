@@ -39,7 +39,7 @@ Copy [`.env.example`](../../.env.example) to `.env`. Example values are **develo
 
 ## SBOM ingestion ([ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md))
 
-Required. These are reviewed **initial defaults**, not production performance guarantees. Runtime upload and parse are not implemented in Session 8 Batch 1. Values must be canonical integers (no `NaN`, `Infinity`, scientific notation, or leading zeros). Parser timeout and object-storage timeout must be less than the processing lease. Idempotency TTL must outlive the maximum plausible upload object-storage operation. Orphan grace must be greater than the idempotency TTL. Object-storage credentials stay on the existing `OBJECT_STORAGE_*` secret fields and are not part of the public SBOM config object.
+Required. These are reviewed **initial defaults**, not production performance guarantees; they have not been measured against representative SBOMs. Upload, parse, and graph persistence all read these values at runtime. Values must be canonical integers (no `NaN`, `Infinity`, scientific notation, or leading zeros). Parser timeout and object-storage timeout must be less than the processing lease, because no lease heartbeat exists. Idempotency TTL must outlive the maximum plausible upload object-storage operation. Orphan grace must be greater than the idempotency TTL. Object-storage credentials stay on the existing `OBJECT_STORAGE_*` secret fields and are not part of the public SBOM config object.
 
 | Variable | Purpose |
 | --- | --- |
@@ -57,11 +57,11 @@ Required. These are reviewed **initial defaults**, not production performance gu
 | `SBOM_MAX_EXTERNAL_REFS_PER_COMPONENT` | Max external references per component. Default `32`. Floor `0`, ceiling `128`. |
 | `SBOM_MAX_PROPERTIES_PER_COMPONENT` | Max properties per component. Default `64`. Floor `0`, ceiling `256`. |
 | `SBOM_PARSER_TIMEOUT_MS` | Parser wall-clock budget (worker-thread termination). Default `60000`. Floor `10000`, ceiling `120000`. Must be less than `SBOM_PROCESSING_LEASE_MS`. |
-| `SBOM_PROCESSING_LEASE_MS` | BackgroundJob processing lease. Default `900000`. Floor `120000`, ceiling `1800000`. `SbomIngestion.leaseExpiresAt` is unused in Session 8. |
+| `SBOM_PROCESSING_LEASE_MS` | BackgroundJob processing lease. Default `900000`. Floor `120000`, ceiling `1800000`. No heartbeat renews it, so it must cover the worst-case run. `SbomIngestion.leaseExpiresAt` is unused and never written. |
 | `SBOM_IDEMPOTENCY_TTL_SECONDS` | IdempotencyRecord TTL. Default `86400`. Floor `3600`, ceiling `259200`. |
-| `SBOM_UPLOAD_RATE_LIMIT_MAX` | Max uploads per window per limiter key. Default `10`. Floor `1`, ceiling `60`. |
-| `SBOM_UPLOAD_RATE_LIMIT_WINDOW_SECONDS` | Upload limiter window. Default `900`. Floor `60`, ceiling `3600`. |
-| `SBOM_ORPHAN_GRACE_SECONDS` | Delay before unreferenced object cleanup. Default `604800`. Floor `7200`, ceiling `2592000`. Must be greater than `SBOM_IDEMPOTENCY_TTL_SECONDS`. |
+| `SBOM_UPLOAD_RATE_LIMIT_MAX` | Max uploads per window, applied twice: once per direct peer IP and once per authorized organization. Default `10`. Floor `1`, ceiling `60`. |
+| `SBOM_UPLOAD_RATE_LIMIT_WINDOW_SECONDS` | Upload limiter window for both limiters. Default `900`. Floor `60`, ceiling `3600`. |
+| `SBOM_ORPHAN_GRACE_SECONDS` | Policy floor for a future unreferenced-object cleanup job. Default `604800`. Floor `7200`, ceiling `2592000`. Must be greater than `SBOM_IDEMPOTENCY_TTL_SECONDS`. **No code reads this yet**; orphan cleanup is not implemented. |
 | `SBOM_PARSER_VERSION` | Safe VARCHAR(64) parser label. Default `0.1.0`. |
 | `SBOM_NORMALIZATION_VERSION` | Safe VARCHAR(64) normalization label. Default `1`. |
 

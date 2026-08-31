@@ -1,6 +1,6 @@
 # Local development setup
 
-This is the local **development foundation** through Session 6 (schema, API auth routes, and minimal web login). It is not a production deployment and it does not include product workflows (SBOM processing, scoring, or remediation).
+This is the local **development foundation** through Session 8 (schema, API auth routes, minimal web login, and the SBOM upload-to-graph pipeline). It is not a production deployment, and it does not include vulnerability correlation, scoring, remediation, or any SBOM web UI.
 
 ## Prerequisites
 
@@ -107,6 +107,34 @@ pnpm workflows:lint
 
 Environment variables are documented in [environment-variables.md](environment-variables.md). Test labels are in [testing.md](testing.md). Failures: [troubleshooting.md](troubleshooting.md) and [local infrastructure runbook](../runbooks/local-infrastructure-failure.md). GitHub Actions: [ci.md](ci.md).
 
+## Object storage (MinIO)
+
+`pnpm infrastructure:up` starts MinIO alongside PostgreSQL and Redis. It is the local stand-in for S3-compatible private object storage; nothing about it is production guidance.
+
+| Setting | Local value |
+| --- | --- |
+| API endpoint | `http://127.0.0.1:19000` (`PATCHPILOT_MINIO_API_PORT`) |
+| Console | `http://127.0.0.1:19001` (`PATCHPILOT_MINIO_CONSOLE_PORT`) |
+| Healthcheck | `GET /minio/health/live` |
+| Bucket | `OBJECT_STORAGE_BUCKET`, `patchpilot-dev` in `.env.example` |
+| Credentials | `OBJECT_STORAGE_ACCESS_KEY` / `OBJECT_STORAGE_SECRET_KEY`, matching the Compose literals |
+| TLS | `OBJECT_STORAGE_USE_SSL=false`, which must agree with the `http` endpoint scheme |
+
+PatchPilot talks to MinIO through `@aws-sdk/client-s3` with `forcePathStyle: true`. There is no MinIO JavaScript SDK dependency, and there is no presigned-URL support in any environment.
+
+The bucket is created on demand, but only under development guardrails: the deployment environment must not be `production`, `PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS` must be `true`, and the requested bucket must equal the configured one. Production never creates a missing bucket; there, a missing bucket is an operator error and surfaces as a `bucket_missing` storage failure.
+
+To verify the pipeline locally after `pnpm dev`:
+
+1. Log in through `/login` and select an organization so you hold a session and a CSRF token.
+2. `POST /assets/:assetId/sboms` with `Content-Type: application/json`, an `Origin` in `CORS_ALLOWED_ORIGINS`, the CSRF header, a unique `Idempotency-Key`, and a CycloneDX 1.4–1.6 JSON body. The repository ships no sample SBOM yet; generate one, and do not use a real customer document.
+3. Expect `202` with an `ingestionId`, and an object under `org/{organizationId}/assets/{assetId}/sboms/sha256/{sha256}` in the bucket.
+4. Poll `GET /assets/:assetId/sbom-ingestions/:ingestionId` until the state leaves `accepted`/`queued`/`processing`.
+
+If the state does not advance, the worker is the thing to check first: the relay publishes from PostgreSQL, so a stopped worker leaves `outbox_event` rows `pending` rather than losing them. See [sbom-ingestion-failure](../runbooks/sbom-ingestion-failure.md).
+
+Do not put real customer SBOMs in this bucket. Local MinIO has placeholder credentials, no TLS, and no backup.
+
 ## What this foundation does not include
 
-See [database.md](database.md) and [migrations.md](migrations.md). Do not expect registration, password reset, SBOM upload, vulnerability feeds, risk scoring, or GitHub integration in this milestone. Session 6 login uses `/login` against the API origin in `NEXT_PUBLIC_API_BASE_URL`.
+See [database.md](database.md) and [migrations.md](migrations.md). Do not expect registration, password reset, an SBOM web UI, retry or quarantine-release APIs, orphan-object cleanup, vulnerability feeds, risk scoring, or GitHub integration in this milestone. Session 6 login uses `/login` against the API origin in `NEXT_PUBLIC_API_BASE_URL`.
