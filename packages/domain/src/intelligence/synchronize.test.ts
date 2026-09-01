@@ -53,6 +53,7 @@ const BODY = new TextEncoder().encode(
 const BODY_SHA = createHash('sha256').update(BODY).digest('hex');
 
 const CONFIG: CisaKevSynchronizationConfig = {
+  kevEnabled: true,
   parserVersion: '0.1.0',
   normalizationVersion: '1',
   kevResponseMaxBytes: 65_536,
@@ -518,6 +519,9 @@ function createWorld(options: WorldOptions = {}) {
     },
     async loadCisaKevSourcePointer() {
       return { ...pointer };
+    },
+    async reconcileRuntimeEnablement() {
+      return ok({ outcome: 'unchanged' as const, version: pointer.version });
     },
     async markAttemptStarted() {
       return ok({

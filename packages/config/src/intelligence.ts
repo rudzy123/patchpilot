@@ -134,6 +134,30 @@ export const INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MIN = 5_000;
 export const INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MAX = 300_000;
 
 /**
+ * How often the worker evaluates whether a new KEV schedule window is due.
+ * This is not the KEV synchronization interval and not the stale threshold.
+ */
+export const INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_DEFAULT = 30_000;
+export const INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_MIN = 5_000;
+export const INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_MAX = 300_000;
+
+export const INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_DEFAULT = 5_000;
+export const INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_MIN = 0;
+export const INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_MAX = 60_000;
+
+/**
+ * PostgreSQL retry-reconciliation poll cadence. Redis is not retry-intent
+ * authority.
+ */
+export const INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_DEFAULT = 15_000;
+export const INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_MIN = 5_000;
+export const INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_MAX = 60_000;
+
+export const INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_DEFAULT = 15_000;
+export const INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_MIN = 1_000;
+export const INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_MAX = 120_000;
+
+/**
  * Maximum expected wall-clock for one PostgreSQL-only staging-batch
  * transaction. Lease renewal must be strictly greater than this budget so a
  * heartbeat cannot starve a short Unit of Work. Not an environment variable.
@@ -191,6 +215,10 @@ export const intelligenceConfigSchema = z.object({
   syncRetryWaitFloorMs: z.number().int().positive(),
   syncRetryWaitCeilingMs: z.number().int().positive(),
   jobLeaseRenewalIntervalMs: z.number().int().positive(),
+  kevSchedulerPollIntervalMs: z.number().int().positive(),
+  kevSchedulerStartupDelayMs: z.number().int().nonnegative(),
+  retryReconcileIntervalMs: z.number().int().positive(),
+  retryReconcileMinAgeMs: z.number().int().positive(),
 });
 
 export type IntelligenceConfig = z.infer<typeof intelligenceConfigSchema>;
@@ -385,6 +413,22 @@ export function intelligenceRelationshipIssues(
     });
   }
 
+  if (intelligence.kevSchedulerStartupDelayMs > intelligence.kevSchedulerPollIntervalMs) {
+    issues.push({
+      path: ['kevSchedulerStartupDelayMs'],
+      message:
+        'INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS must be less than or equal to INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS.',
+    });
+  }
+
+  if (intelligence.retryReconcileMinAgeMs >= intelligence.kevJobLeaseMs) {
+    issues.push({
+      path: ['retryReconcileMinAgeMs'],
+      message:
+        'INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS must be strictly less than INTELLIGENCE_KEV_JOB_LEASE_MS.',
+    });
+  }
+
   const orphanGraceMs = checkedIntegerMultiply(intelligence.orphanGraceSeconds, 1_000);
   if (orphanGraceMs === undefined || orphanGraceMs <= intelligence.kevJobLeaseMs) {
     issues.push({
@@ -507,6 +551,18 @@ export function intelligenceDefaultEnvironmentVariables(): Record<string, string
     INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS: String(
       INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_DEFAULT,
     ),
+    INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS: String(
+      INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_DEFAULT,
+    ),
+    INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS: String(
+      INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_DEFAULT,
+    ),
+    INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS: String(
+      INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_DEFAULT,
+    ),
+    INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS: String(
+      INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_DEFAULT,
+    ),
   };
 }
 
@@ -626,6 +682,22 @@ export function loadIntelligenceConfigFrom(
     jobLeaseRenewalIntervalMs: parseInteger(
       readRequired(env, 'INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS'),
       'INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS',
+    ),
+    kevSchedulerPollIntervalMs: parseInteger(
+      readRequired(env, 'INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS'),
+      'INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS',
+    ),
+    kevSchedulerStartupDelayMs: parseInteger(
+      readRequired(env, 'INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS'),
+      'INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS',
+    ),
+    retryReconcileIntervalMs: parseInteger(
+      readRequired(env, 'INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS'),
+      'INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS',
+    ),
+    retryReconcileMinAgeMs: parseInteger(
+      readRequired(env, 'INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS'),
+      'INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS',
     ),
   };
 }
@@ -807,6 +879,34 @@ export function refineIntelligenceNumericBounds(
     'jobLeaseRenewalIntervalMs',
     INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MIN,
     INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MAX,
+    addIssue,
+  );
+  bound(
+    intelligence.kevSchedulerPollIntervalMs,
+    'kevSchedulerPollIntervalMs',
+    INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_MIN,
+    INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_MAX,
+    addIssue,
+  );
+  bound(
+    intelligence.kevSchedulerStartupDelayMs,
+    'kevSchedulerStartupDelayMs',
+    INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_MIN,
+    INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_MAX,
+    addIssue,
+  );
+  bound(
+    intelligence.retryReconcileIntervalMs,
+    'retryReconcileIntervalMs',
+    INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_MIN,
+    INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_MAX,
+    addIssue,
+  );
+  bound(
+    intelligence.retryReconcileMinAgeMs,
+    'retryReconcileMinAgeMs',
+    INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_MIN,
+    INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_MAX,
     addIssue,
   );
 }

@@ -185,5 +185,6 @@ export function createIntelligenceSyncRequestedOutboxEvent(input: {
     payload: toIntelligenceOutboxPayloadJson(input.payload),
     dedupeKey: input.dedupeKey,
     occurredAt: input.occurredAt,
+    availableAt: input.occurredAt,
   };
 }

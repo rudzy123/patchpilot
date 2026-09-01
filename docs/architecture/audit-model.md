@@ -109,7 +109,7 @@ Worker-originated events use `actorType: 'system'` with `organizationId` set and
 
 ### Vulnerability-intelligence events
 
-Session 9 ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) specifies these actions. Batch 4C emits request, completion, not-modified, failure, quarantine, and KEV-updated events from persistence Units of Work. Batch 7B emits `intelligence.snapshot_stored` with the fetching-to-stored transition and `intelligence.normalization_completed` when a generation is marked complete. A scheduler and BullMQ intelligence processor are not implemented, so production workers do not yet emit these on a timer.
+Session 9 ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) specifies these actions. Batch 4C emits request, completion, not-modified, failure, quarantine, and KEV-updated events from persistence Units of Work. Batch 7B emits `intelligence.snapshot_stored` with the fetching-to-stored transition and `intelligence.normalization_completed` when a generation is marked complete. Batch 8B causes `intelligence.sync_requested` from the worker scheduler request transaction; later sync audits still come from Batch 7B persistence, not from the BullMQ adapter.
 
 | Action | When |
 | --- | --- |

@@ -54,6 +54,7 @@ import { isIntelligenceTerminalSyncRunState } from './transitions.js';
 import { verifyDenseStagedPrefix } from './staging-resume.js';
 
 export type CisaKevSynchronizationConfig = {
+  kevEnabled: boolean;
   parserVersion: string;
   normalizationVersion: string;
   kevResponseMaxBytes: number;
@@ -166,6 +167,13 @@ function parserLimits(config: CisaKevSynchronizationConfig) {
     maxCweCount: config.kevMaxCweCount,
     maxSerializedResultBytes: INTELLIGENCE_PARSER_RESULT_MAX_SERIALIZED_BYTES,
   };
+}
+
+function isPreSnapshotWithoutTrustedSnapshot(syncRun: IntelligenceSyncRunRecord): boolean {
+  if (syncRun.state === 'requested' || syncRun.state === 'retry_wait') {
+    return true;
+  }
+  return syncRun.state === 'fetching' && syncRun.snapshotId === null;
 }
 
 function safeContentType(value: string | null): IntelligenceSafeContentTypeLabel | null {
@@ -380,6 +388,10 @@ async function dispatch(
   dependencies: CisaKevSynchronizationDependencies,
   context: ExecutionContext,
 ): Promise<CisaKevSynchronizationOutcome> {
+  if (!dependencies.config.kevEnabled && isPreSnapshotWithoutTrustedSnapshot(context.syncRun)) {
+    return applyFailure(dependencies, context, 'provider_disabled', 'pre_snapshot');
+  }
+
   switch (context.syncRun.state) {
     case 'requested':
     case 'retry_wait':

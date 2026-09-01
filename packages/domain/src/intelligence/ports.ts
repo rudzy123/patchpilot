@@ -15,6 +15,7 @@ import type {
   IntelligenceSnapshotObjectKeyBuilderPort,
   TemporaryIntelligenceSnapshotObjectKey,
 } from './object-keys.js';
+import type { IntelligenceRedeliveryCandidate } from './retry-redelivery.js';
 import type {
   IntelligenceSnapshotIdentity,
   IntelligenceSnapshotRecord,
@@ -449,6 +450,28 @@ export type MarkIntelligenceDegradedFailureInput = {
   failureCode: IntelligenceSafeFailureCode;
 };
 
+export type ReconcileIntelligenceSourceEnablementInput = {
+  provider: 'cisa_kev';
+  enabled: boolean;
+};
+
+export type ReconcileIntelligenceSourceEnablementResult =
+  | { outcome: 'unchanged'; version: number }
+  | { outcome: 'updated'; version: number }
+  | { outcome: 'version_conflict'; version: number };
+
+export type ListDueIntelligenceRedeliveriesInput = {
+  now: Date;
+  minAgeMs: number;
+  limit: number;
+};
+
+export type IntelligenceRedeliveryPersistencePort = {
+  listDueRedeliveries(
+    input: ListDueIntelligenceRedeliveriesInput,
+  ): Promise<readonly IntelligenceRedeliveryCandidate[]>;
+};
+
 export type IntelligenceSourceFreshnessPort = {
   loadCurrentProviderStatus(
     provider: IntelligenceProvider,
@@ -456,6 +479,9 @@ export type IntelligenceSourceFreshnessPort = {
     now: Date,
   ): Promise<IntelligenceProviderFreshness>;
   loadCisaKevSourcePointer(): Promise<IntelligenceSourcePointer | undefined>;
+  reconcileRuntimeEnablement(
+    input: ReconcileIntelligenceSourceEnablementInput,
+  ): Promise<Result<ReconcileIntelligenceSourceEnablementResult>>;
   markAttemptStarted(
     input: MarkIntelligenceAttemptStartedInput,
   ): Promise<Result<IntelligenceProviderFreshness>>;
@@ -494,7 +520,8 @@ export type PersistRequestedIntelligenceSyncInput = {
 
 export type PersistRequestedIntelligenceSyncResult =
   | { outcome: 'created'; syncRun: IntelligenceSyncRunRecord }
-  | { outcome: 'existing_inflight'; syncRun: IntelligenceSyncRunRecord };
+  | { outcome: 'existing_inflight'; syncRun: IntelligenceSyncRunRecord }
+  | { outcome: 'duplicate_window' };
 
 export type IntelligenceSchedulerPersistencePort = {
   requestSync(

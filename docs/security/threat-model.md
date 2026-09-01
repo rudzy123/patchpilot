@@ -30,7 +30,7 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 - Parser isolation follows Session 8: parse outside transactions; `worker.terminate()` if termination is required; `Promise.race` is not a kill switch. Archive extraction limits are required; no archive dependency is selected yet.
 - Provider HTTP is allowlisted HTTPS (`node:https.request`) with redirects disabled, proxy environment ignored, and rejection of private, loopback, link-local, metadata-service, and other non-public destinations. Advisory reference URLs are never fetched.
 - DNS lookup pinning plus post-connect verification is implemented for CISA KEV. It is not DNSSEC.
-- The Batch 7B synchronization service exists and is not started by application boot. Still absent: scheduler loop, BullMQ intelligence processor, status APIs, and any Finding workflow.
+- The Batch 7B synchronization service exists. Batch 8B starts the worker scheduler, Outbox mapping, and BullMQ intelligence processor. Still absent: status APIs, matching, and any Finding workflow.
 
 ## Assets to protect
 
@@ -143,7 +143,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Incorrect future correlation and KEV enrichment; wrong **priority**; parser exhaustion. Session 9 must not turn a poisoned feed into Findings.
 
-**Mitigation:** HTTPS, allowlists, payload hashes, additive versions, retain conflicts, guarded current-projection activation, archive extraction limits, KEV worker-thread termination, no body logging. Residual: public catalogs can be wrong. Finding integration is not implemented. Scheduled synchronization is not operational.
+**Mitigation:** HTTPS, allowlists, payload hashes, additive versions, retain conflicts, guarded current-projection activation, archive extraction limits, KEV worker-thread termination, no body logging. Residual: public catalogs can be wrong. Finding integration is not implemented.
 
 ### Compromised provider credentials
 
@@ -446,7 +446,7 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 | Stolen provider/storage creds | Storage, feeds | Leak | Theft | Encrypt, config | Audit creds | Rotate | Redaction tests | Operator keys | Integrations |
 | Webhook forgery/replay | Future | Fake callback | Confused deputy | No listeners in v0.1 | — | — | When added | Future | API |
 | SSRF | Cloud metadata | URL fetch; advisory references | Cred theft | No SBOM/reference fetch; compiled allowlist; non-public destination rejection; CISA lookup-pin plus post-connect verify | Egress logs | Block | Adapter tests | Mis-allowlist; pinning is not DNSSEC | Integrations |
-| Poisoned / hostile intel archive | Shared catalog | MITM, zip bomb, incomplete activation | Wrong future match; DoS | Hashes, additive revisions, extraction limits, guarded activation, zero Findings | Quarantine / failed run | Keep last accepted catalog | Fixture + replay | Public catalogs lie; runtime not implemented | Intel |
+| Poisoned / hostile intel archive | Shared catalog | MITM, zip bomb, incomplete activation | Wrong future match; DoS | Hashes, additive revisions, extraction limits, guarded activation, zero Findings | Quarantine / failed run | Keep last accepted catalog | Fixture + replay | Public catalogs lie | Intel |
 | Partial catalog activation | Current projection | Mid-import failure treated as complete | Silent withdrawal | Staging/generation activation after complete unit | Sync failed/quarantined audit | New run; do not rewrite terminal | Persistence tests later | Staging schema deferred | Intel |
 | SQLi | DB | Concat SQL | Takeover | Prisma | — | Restore | — | Raw SQL mistakes | Database |
 | XSS | Sessions | Component names | Session theft | Escape, CSP later | — | Rotate | UI tests | New sinks | Web |

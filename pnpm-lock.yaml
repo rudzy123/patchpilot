@@ -202,6 +202,9 @@ importers:
       '@patchpilot/sbom':
         specifier: workspace:*
         version: link:../../packages/sbom
+      '@patchpilot/vulnerability-intelligence':
+        specifier: workspace:*
+        version: link:../../packages/vulnerability-intelligence
       bullmq:
         specifier: ^5.66.4
         version: 5.81.3(supports-color@7.2.0)

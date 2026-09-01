@@ -70,6 +70,18 @@ import {
   INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_DEFAULT,
   INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MAX,
   INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MIN,
+  INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_DEFAULT,
+  INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_MAX,
+  INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_MIN,
+  INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_DEFAULT,
+  INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_MAX,
+  INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_MIN,
+  INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_DEFAULT,
+  INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_MAX,
+  INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_MIN,
+  INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_DEFAULT,
+  INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_MAX,
+  INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_MIN,
   INTELLIGENCE_STAGING_TRANSACTION_BUDGET_MS,
   INTELLIGENCE_NORMALIZATION_VERSION_DEFAULT,
   INTELLIGENCE_OBJECT_STORAGE_TIMEOUT_MS_DEFAULT,
@@ -221,6 +233,18 @@ function relationshipSafeEnv(): Record<string, string> {
   );
   env['INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS'] = String(
     INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MIN,
+  );
+  env['INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS'] = String(
+    INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_MAX,
+  );
+  env['INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS'] = String(
+    INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_MIN,
+  );
+  env['INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS'] = String(
+    INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_MIN,
+  );
+  env['INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS'] = String(
+    INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_MIN,
   );
   return env;
 }
@@ -392,6 +416,30 @@ const boundedNumericLimits: Array<{
     min: INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MIN,
     max: INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MAX,
   },
+  {
+    envKey: 'INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS',
+    configKey: 'kevSchedulerPollIntervalMs',
+    min: INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_MIN,
+    max: INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_MAX,
+  },
+  {
+    envKey: 'INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS',
+    configKey: 'kevSchedulerStartupDelayMs',
+    min: INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_MIN,
+    max: INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_MAX,
+  },
+  {
+    envKey: 'INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS',
+    configKey: 'retryReconcileIntervalMs',
+    min: INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_MIN,
+    max: INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_MAX,
+  },
+  {
+    envKey: 'INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS',
+    configKey: 'retryReconcileMinAgeMs',
+    min: INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_MIN,
+    max: INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_MAX,
+  },
 ];
 
 function defaultIntelligenceConfig(): IntelligenceConfig {
@@ -446,6 +494,10 @@ describe('vulnerability intelligence configuration', () => {
       syncRetryWaitFloorMs: INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_DEFAULT,
       syncRetryWaitCeilingMs: INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_DEFAULT,
       jobLeaseRenewalIntervalMs: INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_DEFAULT,
+      kevSchedulerPollIntervalMs: INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_DEFAULT,
+      kevSchedulerStartupDelayMs: INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_DEFAULT,
+      retryReconcileIntervalMs: INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_DEFAULT,
+      retryReconcileMinAgeMs: INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_DEFAULT,
     });
     expect(config.intelligence.kevEnabled).toBe(true);
     expect(config.intelligence.osvEnabled).toBe(false);
@@ -617,6 +669,67 @@ describe('vulnerability intelligence configuration', () => {
     );
     expect(defaultIntelligenceConfig().jobLeaseRenewalIntervalMs).toBeGreaterThan(
       INTELLIGENCE_STAGING_TRANSACTION_BUDGET_MS,
+    );
+  });
+
+  it('loads the four Batch 8B scheduler and retry defaults', () => {
+    const config = defaultIntelligenceConfig();
+    expect(config.kevSchedulerPollIntervalMs).toBe(
+      INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_DEFAULT,
+    );
+    expect(config.kevSchedulerStartupDelayMs).toBe(
+      INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS_DEFAULT,
+    );
+    expect(config.retryReconcileIntervalMs).toBe(INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS_DEFAULT);
+    expect(config.retryReconcileMinAgeMs).toBe(INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_DEFAULT);
+  });
+
+  it('rejects a scheduler startup delay greater than the poll interval', () => {
+    const env = validDevelopmentEnv();
+    env['INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS'] = '5000';
+    env['INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS'] = '5001';
+    expectRejection(
+      env,
+      /INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS must be less than or equal to INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS/,
+    );
+  });
+
+  it('accepts a scheduler startup delay equal to the poll interval', () => {
+    const env = validDevelopmentEnv();
+    env['INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS'] = '15000';
+    env['INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS'] = '15000';
+    const config = loadServerConfigFrom(env);
+    expect(config.intelligence.kevSchedulerStartupDelayMs).toBe(15_000);
+    expect(config.intelligence.kevSchedulerPollIntervalMs).toBe(15_000);
+  });
+
+  it('rejects a retry reconcile minimum age that is not less than the KEV job lease', () => {
+    const issues = intelligenceRelationshipIssues({
+      ...defaultIntelligenceConfig(),
+      kevJobLeaseMs: 120_000,
+      retryReconcileMinAgeMs: 120_000,
+    });
+    expect(issueOn(issues, 'retryReconcileMinAgeMs')?.message).toMatch(
+      /INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS must be strictly less than INTELLIGENCE_KEV_JOB_LEASE_MS/,
+    );
+  });
+
+  it('accepts a retry reconcile interval equal to the retry-wait floor', () => {
+    const env = validDevelopmentEnv();
+    env['INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS'] = '30000';
+    env['INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS'] = '30000';
+    const config = loadServerConfigFrom(env);
+    expect(config.intelligence.retryReconcileIntervalMs).toBe(30_000);
+    expect(config.intelligence.syncRetryWaitFloorMs).toBe(30_000);
+  });
+
+  it('still loads when KEV is disabled', () => {
+    const env = validDevelopmentEnv();
+    env['INTELLIGENCE_KEV_ENABLED'] = 'false';
+    const config = loadServerConfigFrom(env);
+    expect(config.intelligence.kevEnabled).toBe(false);
+    expect(config.intelligence.kevSchedulerPollIntervalMs).toBe(
+      INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS_DEFAULT,
     );
   });
 

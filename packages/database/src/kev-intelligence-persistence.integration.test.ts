@@ -12,6 +12,7 @@ import {
   deriveIntelligenceProviderHealthStatus,
   parseFinalIntelligenceSnapshotObjectKey,
   type IntelligenceSnapshotRecord,
+  type PersistRequestedIntelligenceSyncResult,
   type Result,
 } from '@patchpilot/domain';
 
@@ -41,6 +42,17 @@ function requireOk<T>(result: Result<T>, label: string): T {
     throw new Error(`${label}: ${result.error.code} ${result.error.message}`);
   }
   return result.value;
+}
+
+function requireCreated(
+  result: Result<PersistRequestedIntelligenceSyncResult>,
+  label: string,
+): Extract<PersistRequestedIntelligenceSyncResult, { outcome: 'created' }> {
+  const value = requireOk(result, label);
+  if (value.outcome !== 'created') {
+    throw new Error(`${label}: expected created, got ${value.outcome}`);
+  }
+  return value;
 }
 
 function snapshotRecord(creatingSyncRunId: string, sha256: string): IntelligenceSnapshotRecord {
@@ -135,7 +147,7 @@ describe('session 9 KEV intelligence persistence adapters', () => {
     await failInflightRuns();
     const adapters = createIntelligencePersistence(prisma);
     const syncRunId = randomUUID();
-    const requested = requireOk(
+    const requested = requireCreated(
       await adapters.unitOfWork.requestSync({
         provider: 'cisa_kev',
         sourceIdentifier: 'cisa_kev_json_catalog',
@@ -148,7 +160,6 @@ describe('session 9 KEV intelligence persistence adapters', () => {
       }),
       'requestSync',
     );
-    expect(requested.outcome).toBe('created');
     const claimed = requireOk(
       await adapters.syncRuns.claimRequestedOrRetryWait({
         syncRunId: requested.syncRun.id,
@@ -332,7 +343,7 @@ describe('session 9 KEV intelligence persistence adapters', () => {
   it('creates a requested run with a system audit and outbox event, and rejects a duplicate inflight request', async () => {
     const adapters = createIntelligencePersistence(prisma);
     const syncRunId = randomUUID();
-    const created = requireOk(
+    const created = requireCreated(
       await adapters.unitOfWork.requestSync({
         provider: 'cisa_kev',
         sourceIdentifier: 'cisa_kev_json_catalog',
@@ -345,7 +356,6 @@ describe('session 9 KEV intelligence persistence adapters', () => {
       }),
       'first request',
     );
-    expect(created.outcome).toBe('created');
     expect(created.syncRun.state).toBe('requested');
     expect(created.syncRun.parserVersion).toBe(KEV_PARSER_VERSION);
     const audits = await prisma.auditEvent.findMany({
@@ -373,6 +383,9 @@ describe('session 9 KEV intelligence persistence adapters', () => {
       'duplicate request',
     );
     expect(duplicate.outcome).toBe('existing_inflight');
+    if (duplicate.outcome !== 'existing_inflight') {
+      throw new Error('duplicate request must remain existing_inflight');
+    }
     expect(duplicate.syncRun.id).toBe(syncRunId);
     expect(
       await prisma.auditEvent.count({
@@ -423,7 +436,7 @@ describe('session 9 KEV intelligence persistence adapters', () => {
     expect(outcomes.filter((item) => item.outcome === 'created')).toHaveLength(1);
     expect(outcomes.filter((item) => item.outcome === 'existing_inflight')).toHaveLength(1);
     const winner = outcomes.find((item) => item.outcome === 'created');
-    if (winner === undefined) {
+    if (winner === undefined || winner.outcome !== 'created') {
       throw new Error('missing winner');
     }
     expect(
@@ -442,6 +455,108 @@ describe('session 9 KEV intelligence persistence adapters', () => {
         failureCode: 'processing_failed',
       },
     });
+    await assertZeroFindingUnchanged();
+  });
+
+  it('returns duplicate_window for the same schedule-window key after the prior run is terminal', async () => {
+    const adapters = createIntelligencePersistence(prisma);
+    const windowKey =
+      'intelligence.sync.requested.v1|cisa_kev|cisa_kev_json_catalog|window:2026-09-01T12:00:00Z';
+    const firstId = randomUUID();
+    const created = requireCreated(
+      await adapters.unitOfWork.requestSync({
+        provider: 'cisa_kev',
+        sourceIdentifier: 'cisa_kev_json_catalog',
+        syncRunId: firstId,
+        requestedAt: NOW,
+        correlationId: `corr-${firstId}`,
+        parserVersion: KEV_PARSER_VERSION,
+        normalizationVersion: KEV_NORMALIZATION_VERSION,
+        dedupeKey: windowKey,
+      }),
+      'window first request',
+    );
+    await prisma.vulnerabilitySyncRun.update({
+      where: { id: created.syncRun.id },
+      data: {
+        state: 'failed',
+        startedAt: NOW,
+        completedAt: NOW,
+        executionAttempt: 1,
+        failureCategory: 'internal',
+        failureCode: 'processing_failed',
+      },
+    });
+    const duplicate = requireOk(
+      await adapters.unitOfWork.requestSync({
+        provider: 'cisa_kev',
+        sourceIdentifier: 'cisa_kev_json_catalog',
+        syncRunId: randomUUID(),
+        requestedAt: NOW,
+        correlationId: `corr-${randomUUID()}`,
+        parserVersion: KEV_PARSER_VERSION,
+        normalizationVersion: KEV_NORMALIZATION_VERSION,
+        dedupeKey: windowKey,
+      }),
+      'duplicate window',
+    );
+    expect(duplicate.outcome).toBe('duplicate_window');
+    expect(await prisma.vulnerabilitySyncRun.count({ where: { id: created.syncRun.id } })).toBe(1);
+    expect(
+      await prisma.auditEvent.count({
+        where: { action: 'intelligence.sync_requested', subjectId: created.syncRun.id },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.outboxEvent.count({
+        where: { eventType: 'intelligence.sync.requested.v1', dedupeKey: windowKey },
+      }),
+    ).toBe(1);
+    await assertZeroFindingUnchanged();
+  });
+
+  it('keeps existing_inflight when a nonterminal run already owns the window', async () => {
+    const adapters = createIntelligencePersistence(prisma);
+    const windowKey =
+      'intelligence.sync.requested.v1|cisa_kev|cisa_kev_json_catalog|window:2026-09-01T13:00:00Z';
+    const firstId = randomUUID();
+    requireCreated(
+      await adapters.unitOfWork.requestSync({
+        provider: 'cisa_kev',
+        sourceIdentifier: 'cisa_kev_json_catalog',
+        syncRunId: firstId,
+        requestedAt: NOW,
+        correlationId: `corr-${firstId}`,
+        parserVersion: KEV_PARSER_VERSION,
+        normalizationVersion: KEV_NORMALIZATION_VERSION,
+        dedupeKey: windowKey,
+      }),
+      'inflight window first',
+    );
+    const duplicate = requireOk(
+      await adapters.unitOfWork.requestSync({
+        provider: 'cisa_kev',
+        sourceIdentifier: 'cisa_kev_json_catalog',
+        syncRunId: randomUUID(),
+        requestedAt: NOW,
+        correlationId: `corr-${randomUUID()}`,
+        parserVersion: KEV_PARSER_VERSION,
+        normalizationVersion: KEV_NORMALIZATION_VERSION,
+        dedupeKey: windowKey,
+      }),
+      'inflight window second',
+    );
+    expect(duplicate.outcome).toBe('existing_inflight');
+    if (duplicate.outcome !== 'existing_inflight') {
+      throw new Error('expected existing_inflight');
+    }
+    expect(duplicate.syncRun.id).toBe(firstId);
+    expect(await prisma.vulnerabilitySyncRun.count({ where: { id: firstId } })).toBe(1);
+    expect(
+      await prisma.auditEvent.count({
+        where: { action: 'intelligence.sync_requested', subjectId: firstId },
+      }),
+    ).toBe(1);
     await assertZeroFindingUnchanged();
   });
 
@@ -1693,7 +1808,7 @@ describe('session 9 KEV intelligence persistence adapters', () => {
     await failInflightRuns();
     const adapters = createIntelligencePersistence(prisma);
     const syncRunId = randomUUID();
-    const requested = requireOk(
+    const requested = requireCreated(
       await adapters.unitOfWork.requestSync({
         provider: 'cisa_kev',
         sourceIdentifier: 'cisa_kev_json_catalog',

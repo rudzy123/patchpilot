@@ -7,6 +7,10 @@ import { describe, expect, it } from 'vitest';
 import { JSON_SCHEMA_VERSION_V1 } from '../json-documents.js';
 import { err, ok } from '../result.js';
 import type { OutboxEventRecord } from '../records.js';
+import {
+  INTELLIGENCE_SYNC_JOB_TYPE,
+  INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE,
+} from '../intelligence/constants.js';
 import { SBOM_INGEST_JOB_TYPE, SBOM_INGESTION_REQUESTED_EVENT_TYPE } from './constants.js';
 import type {
   BackgroundJobExecutionPort,
@@ -152,8 +156,37 @@ describe('outbox relay use case', () => {
     expect(harness.jobs.map((job) => job.outboxEventId)).toEqual([EVENT_C]);
   });
 
+  it('maps intelligence.sync.requested.v1 to intelligence.sync with organizationId null', async () => {
+    const harness = createHarness([
+      pendingEvent(EVENT_A, AGGREGATE_A, {
+        organizationId: null,
+        aggregateType: 'intelligence_sync_run',
+        eventType: INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE,
+        dedupeKey:
+          'intelligence.sync.requested.v1|cisa_kev|cisa_kev_json_catalog|window:2026-09-01T00:00:00Z',
+      }),
+    ]);
+    const result = await harness.relay.execute();
+    expect(result.published).toBe(1);
+    expect(harness.published[0]?.jobType).toBe(INTELLIGENCE_SYNC_JOB_TYPE);
+    expect(harness.published[0]?.organizationId).toBeNull();
+    expect(harness.published[0]?.jobId).toBe(
+      deterministicOutboxQueueJobId({
+        id: EVENT_A,
+        eventType: INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE,
+      }),
+    );
+    expect(JSON.stringify(harness.published[0])).not.toMatch(
+      /https:\/\/|objectKey|etag|CVE-|workerIdentifier/i,
+    );
+    expect(harness.jobs[0]?.organizationId).toBeNull();
+  });
+
   it('maps ingestion requested events to sbom.ingest and keeps Redis types out of the use case', () => {
     expect(jobTypeForOutboxEvent(SBOM_INGESTION_REQUESTED_EVENT_TYPE)).toBe(SBOM_INGEST_JOB_TYPE);
+    expect(jobTypeForOutboxEvent(INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE)).toBe(
+      INTELLIGENCE_SYNC_JOB_TYPE,
+    );
     expect(jobTypeForOutboxEvent('unknown.event')).toBeUndefined();
     expect(
       outboxRetryDelayMs(1, { retryBaseMs: 5_000, retryCapMs: 900_000, random: () => 1 }),

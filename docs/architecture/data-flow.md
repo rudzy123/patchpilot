@@ -2,7 +2,7 @@
 
 This document traces the v0.1 [MVP journey](../product/mvp-scope.md) through the modular monolith. It is a control-flow and evidence-flow description, not a network packet capture.
 
-Authorization context is established as in [tenant isolation](tenant-isolation.md). Limits and poison handling are in [SBOM ingestion](sbom-ingestion.md). Session 8 upload, parse, and graph persist follow [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md): stages `validate`, `parse`, and `persist_graph` only. Session 9 catalog import follows [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Batch 7B implements the CISA KEV synchronization service; a scheduler loop, BullMQ intelligence processor, and status API do not exist. Correlation, enrichment, scoring, findings, and remediation remain later additive workflows. Session 9 must not enqueue `finding.recalculate`. Session 8 has no web upload UI.
+Authorization context is established as in [tenant isolation](tenant-isolation.md). Limits and poison handling are in [SBOM ingestion](sbom-ingestion.md). Session 8 upload, parse, and graph persist follow [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md): stages `validate`, `parse`, and `persist_graph` only. Session 9 catalog import follows [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Batch 8B schedules KEV work and processes `intelligence.sync` on the shared worker queue. A public intelligence API does not exist. Correlation, enrichment, scoring, findings, and remediation remain later additive workflows. Session 9 must not enqueue `finding.recalculate`. Session 8 has no web upload UI.
 
 ## End-to-end journey
 
@@ -28,7 +28,7 @@ sequenceDiagram
   Relay->>Q: Publish parse job (outbox processed = BullMQ accepted)
   W->>OS: Get copy of object
   W->>PG: Validate, parse, persist graph (Session 8 completed)
-  Note over W,OSV: Session 9 Batch 7B: KEV sync service exists; not scheduled; zero Findings
+  Note over W,OSV: Session 9 Batch 8B: scheduled KEV import; zero Findings
   Note over W,OSV: Future additive: correlate, enrich, score (not Session 9)
   W->>OSV: Future correlation query if used (not Session 8 or 9 import)
   W->>KEV: Future finding enrichment from imported snapshot (not Session 9)
@@ -72,16 +72,18 @@ Asynchronous worker work:
 5. Persist **Component**, **ComponentOccurrence**, **DependencyRelationship** keyed by **this** `sbomIngestionId`.
 6. Ingestion stages are `validate`, `parse`, and `persist_graph` only. State becomes `completed` after those Session 8 steps succeed. `completed` does not imply exhaustive coverage. `correlate`, `enrich`, and `score` remain unused.
 
-## 5b. Import shared vulnerability intelligence (Session 9 Batch 7B KEV service; not scheduled)
+## 5b. Import shared vulnerability intelligence (Session 9 Batch 8B scheduled KEV)
 
 [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). System job, null organization. OSV runtime remains disabled.
 
-1. A later worker will pass only `syncRunId`, `backgroundJobId`, and worker ownership. The Batch 7B service reloads the job, OutboxEvent, and SyncRun before any CISA HTTPS.
-2. Fetch the CISA KEV JSON snapshot through restricted HTTPS. Stream once to private object storage and SHA-256 **outside** PostgreSQL. Persist snapshot metadata, hashes, and provenance in a later PostgreSQL-only transaction. Do not refetch after SyncRun reaches `stored`.
-3. Parse and normalize outside the database transaction. Stage entries in bounded PostgreSQL transactions. Activate the current projection only after a complete source unit succeeds. Partial imports must not become current.
-4. Write system audit (`intelligence.sync_*`). Do **not** create Findings, FindingObservations, Vulnerability rows, or `finding.recalculate` outbox events.
+1. The worker scheduler evaluates UTC windows and, when due, writes a requested SyncRun, `intelligence.sync_requested` audit, and `intelligence.sync.requested.v1` OutboxEvent in one PostgreSQL transaction.
+2. The Outbox relay publishes `intelligence.sync` on the existing `patchpilot` queue. `processed` means BullMQ accepted the job.
+3. The shared Worker claims the BackgroundJob, reloads OutboxEvent and SyncRun, then invokes Batch 7B with locators only. CISA is not contacted before that claim.
+4. Fetch the CISA KEV JSON snapshot through restricted HTTPS. Stream once to private object storage and SHA-256 **outside** PostgreSQL. Persist snapshot metadata, hashes, and provenance in a later PostgreSQL-only transaction. Do not refetch after SyncRun reaches `stored`.
+5. Parse and normalize outside the database transaction. Stage entries in bounded PostgreSQL transactions. Activate the current projection only after a complete source unit succeeds. Partial imports must not become current.
+6. Write system audit (`intelligence.sync_*`). Do **not** create Findings, FindingObservations, Vulnerability rows, or `finding.recalculate` outbox events.
 
-The use case exists. Application startup, Outbox relay mapping, and BullMQ Worker registration do not invoke it. Tests must not call live CISA.
+PostgreSQL uniqueness and retry state remain authority. BullMQ delayed jobs are a fast path. Tests must not call live CISA. There is no public intelligence API.
 
 ## 6. Correlate (future additive workflow, not Session 9)
 
@@ -138,7 +140,7 @@ Session 9 ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.m
 3. Content SHA-256 is import idempotency. HTTP 304 is not product not-modified. Partial units do not become the current catalog.
 4. Do **not** enqueue `finding.recalculate` or otherwise mutate Findings.
 
-A scheduler does not yet create these jobs. When a caller invokes `createCisaKevSynchronizationService`, the service resumes from persisted SyncRun state, renews the BackgroundJob lease, and uses pre-snapshot `retry_wait` versus post-snapshot job retry.
+A scheduler creates these jobs on UTC windows. `createCisaKevSynchronizationService` resumes from persisted SyncRun state, renews the BackgroundJob lease, and uses pre-snapshot `retry_wait` versus post-snapshot job retry. PostgreSQL retry reconciliation redispatches lost work. BullMQ delayed jobs are a fast path only.
 
 A **later** correlation/enrichment session may enqueue tenant-scoped recalculation after matching exists. Session 9 must not.
 

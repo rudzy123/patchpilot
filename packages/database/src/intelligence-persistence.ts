@@ -7,10 +7,13 @@ import {
 import {
   CISA_KEV_SOURCE_IDENTIFIER,
   INTELLIGENCE_ACTIVATION_CONFLICT,
+  INTELLIGENCE_AUDIT_SUBJECT_TYPE,
   INTELLIGENCE_GENERATION_COUNT_MISMATCH,
   INTELLIGENCE_GENERATION_INCOMPLETE,
   INTELLIGENCE_PARTIAL_ACTIVATION_INCONSISTENT,
+  INTELLIGENCE_RETRY_RECONCILE_BATCH_LIMIT,
   INTELLIGENCE_SYNC_JOB_TYPE,
+  INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE,
   INTELLIGENCE_TERMINAL_STATE,
   applyIntelligenceSyncRunTransition,
   classifyIntelligenceSafeFailure,
@@ -30,6 +33,7 @@ import {
   validateIntelligenceSnapshotRecord,
   validateKevNormalizedEntryRecord,
   createIntelligenceSyncRequestedOutboxEvent,
+  parseIntelligenceSyncJobPayload,
   parseIntelligenceSyncRequestedOutboxPayload,
   type ActivateKevGenerationInput,
   type ActivateKevGenerationResult,
@@ -47,6 +51,7 @@ import {
   type IntelligenceOutboxLookupPort,
   type IntelligenceProvider,
   type IntelligenceProviderFreshness,
+  type IntelligenceRedeliveryPersistencePort,
   type IntelligenceRetryWaitTransitionInput,
   type IntelligenceSchedulerPersistencePort,
   type IntelligenceSnapshotIdentity,
@@ -63,6 +68,7 @@ import {
   type KevNormalizedEntryRecord,
   type ListActiveKevEntriesPage,
   type ListActiveKevEntriesQuery,
+  type ListDueIntelligenceRedeliveriesInput,
   type MarkIntelligenceAttemptStartedInput,
   type MarkIntelligenceDegradedFailureInput,
   type MarkIntelligenceNotModifiedInput,
@@ -70,6 +76,8 @@ import {
   type MarkSuccessfulIntelligenceGenerationInput,
   type PersistRequestedIntelligenceSyncInput,
   type PersistRequestedIntelligenceSyncResult,
+  type ReconcileIntelligenceSourceEnablementInput,
+  type ReconcileIntelligenceSourceEnablementResult,
   type Result,
   type StageKevEntryBatchInput,
   type StoreFetchedSnapshotInput,
@@ -106,6 +114,7 @@ export type IntelligencePersistenceAdapters = {
   scheduler: IntelligenceSchedulerPersistencePort;
   unitOfWork: IntelligenceSyncUnitOfWork;
   outbox: IntelligenceOutboxLookupPort;
+  redelivery: IntelligenceRedeliveryPersistencePort;
 };
 
 export function createIntelligencePersistence(
@@ -117,6 +126,7 @@ export function createIntelligencePersistence(
   const freshness = new PrismaIntelligenceSourceFreshness(client);
   const unitOfWork = new PrismaIntelligenceSyncUnitOfWork(client);
   const outbox = new PrismaIntelligenceOutboxLookup(client);
+  const redelivery = new PrismaIntelligenceRedeliveryPersistence(client);
   return {
     syncRuns,
     snapshots,
@@ -125,6 +135,7 @@ export function createIntelligencePersistence(
     scheduler: unitOfWork,
     unitOfWork,
     outbox,
+    redelivery,
   };
 }
 
@@ -983,6 +994,48 @@ class PrismaIntelligenceSourceFreshness implements IntelligenceSourceFreshnessPo
     };
   }
 
+  public async reconcileRuntimeEnablement(
+    input: ReconcileIntelligenceSourceEnablementInput,
+  ): Promise<Result<ReconcileIntelligenceSourceEnablementResult>> {
+    if (input.provider !== CISA_KEV) {
+      return err(intelligenceValidationError('OSV enablement cannot be reconciled in Session 9.'));
+    }
+    const desired = input.enabled ? 'enabled' : 'disabled';
+    const source = await this.client.intelligenceSource.findUnique({
+      where: { providerKey: CISA_KEV },
+    });
+    if (source === null) {
+      return err({
+        code: 'not_found',
+        message: 'CISA KEV IntelligenceSource row is missing.',
+      });
+    }
+    if (source.state === desired) {
+      return ok({ outcome: 'unchanged' as const, version: source.version });
+    }
+    const updated = await this.client.intelligenceSource.updateMany({
+      where: {
+        providerKey: CISA_KEV,
+        version: source.version,
+        NOT: { state: desired },
+      },
+      data: {
+        state: desired,
+        version: { increment: 1 },
+      },
+    });
+    if (updated.count !== 1) {
+      const latest = await this.client.intelligenceSource.findUnique({
+        where: { providerKey: CISA_KEV },
+      });
+      return ok({
+        outcome: 'version_conflict' as const,
+        version: latest?.version ?? source.version,
+      });
+    }
+    return ok({ outcome: 'updated' as const, version: source.version + 1 });
+  }
+
   public async markAttemptStarted(input: MarkIntelligenceAttemptStartedInput) {
     if (input.provider !== CISA_KEV) {
       return err(intelligenceValidationError('OSV cannot mark a Session 9 attempt.'));
@@ -1084,13 +1137,23 @@ class PrismaIntelligenceSyncUnitOfWork
       },
       orderBy: [{ requestedAt: 'desc' }, { id: 'desc' }],
     });
-    if (inflight === null) {
-      return err({ code: 'conflict', message: 'Duplicate KEV sync request was not in-flight.' });
+    if (inflight !== null) {
+      return ok({
+        outcome: 'existing_inflight' as const,
+        syncRun: mapIntelligenceSyncRun(inflight),
+      });
     }
-    return ok({
-      outcome: 'existing_inflight' as const,
-      syncRun: mapIntelligenceSyncRun(inflight),
+    const existingWindow = await this.client.outboxEvent.findFirst({
+      where: {
+        organizationId: null,
+        eventType: INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE,
+        dedupeKey: input.dedupeKey,
+      },
     });
+    if (existingWindow !== null) {
+      return ok({ outcome: 'duplicate_window' as const });
+    }
+    return err({ code: 'conflict', message: 'Duplicate KEV sync request was not in-flight.' });
   }
 
   public async claimFetchingAttempt(input: ClaimFetchingAttemptInput) {
@@ -1849,5 +1912,121 @@ class PrismaIntelligenceOutboxLookup implements IntelligenceOutboxLookupPort {
       where: { id: input.eventId, ...organizationWhere(input.organizationId) },
     });
     return row === null ? undefined : mapOutboxEvent(row);
+  }
+}
+
+type RedeliveryRow = {
+  syncRunId: string;
+  backgroundJobId: string;
+  outboxEventId: string;
+  jobAttempt: number;
+  jobStatus: 'queued' | 'running';
+  syncRunState: string;
+  nextAttemptAt: Date | null;
+  leaseExpiresAt: Date | null;
+  dedupeKey: string;
+};
+
+class PrismaIntelligenceRedeliveryPersistence implements IntelligenceRedeliveryPersistencePort {
+  public constructor(private readonly client: PrismaClientLike) {}
+
+  public async listDueRedeliveries(input: ListDueIntelligenceRedeliveriesInput) {
+    const limit = Math.min(Math.max(1, input.limit), INTELLIGENCE_RETRY_RECONCILE_BATCH_LIMIT);
+    const minAgeMs = Math.max(0, input.minAgeMs);
+    const rows = await this.client.$queryRaw<RedeliveryRow[]>(Prisma.sql`
+      SELECT
+        vsr."id" AS "syncRunId",
+        bj."id" AS "backgroundJobId",
+        oe."id" AS "outboxEventId",
+        bj."attempt" AS "jobAttempt",
+        bj."status" AS "jobStatus",
+        vsr."state" AS "syncRunState",
+        vsr."next_attempt_at" AS "nextAttemptAt",
+        bj."lease_expires_at" AS "leaseExpiresAt",
+        oe."dedupe_key" AS "dedupeKey"
+      FROM "vulnerability_sync_run" vsr
+      INNER JOIN "outbox_event" oe
+        ON oe."aggregate_id" = vsr."id"
+        AND oe."organization_id" IS NULL
+        AND oe."aggregate_type" = ${INTELLIGENCE_AUDIT_SUBJECT_TYPE}
+        AND oe."event_type" = ${INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE}
+      INNER JOIN "background_job" bj
+        ON bj."outbox_event_id" = oe."id"
+        AND bj."organization_id" IS NULL
+        AND bj."job_type" = ${INTELLIGENCE_SYNC_JOB_TYPE}
+      WHERE vsr."provider_key" = CAST(${CISA_KEV} AS "integration_provider_key")
+        AND vsr."source_identifier" = ${CISA_KEV_SOURCE_IDENTIFIER}
+        AND vsr."state" NOT IN ('completed', 'not_modified', 'failed', 'quarantined')
+        AND bj."status" NOT IN ('failed', 'succeeded', 'dead_lettered', 'cancelled')
+        AND (
+          vsr."state" <> 'retry_wait'
+          OR (
+            vsr."next_attempt_at" IS NOT NULL
+            AND vsr."next_attempt_at" <= ${input.now}
+          )
+        )
+        AND (
+          (
+            vsr."state" = 'retry_wait'
+            AND vsr."next_attempt_at" IS NOT NULL
+            AND vsr."next_attempt_at" <= ${input.now}
+            AND (
+              bj."status" = 'queued'
+              OR (
+                bj."status" = 'running'
+                AND bj."lease_expires_at" IS NOT NULL
+                AND bj."lease_expires_at" < ${input.now}
+              )
+            )
+          )
+          OR (
+            vsr."state" IN ('stored', 'parsing', 'staging', 'activating')
+            AND bj."status" = 'queued'
+          )
+          OR (
+            bj."status" = 'running'
+            AND bj."lease_expires_at" IS NOT NULL
+            AND bj."lease_expires_at" < ${input.now}
+          )
+          OR (
+            bj."status" = 'queued'
+            AND vsr."state" IN ('requested', 'fetching')
+            AND bj."created_at" <= ${new Date(input.now.getTime() - minAgeMs)}
+            AND oe."status" = 'processed'
+          )
+        )
+      ORDER BY vsr."requested_at" ASC, vsr."id" ASC
+      LIMIT ${limit}
+    `);
+
+    const candidates = [];
+    for (const row of rows) {
+      const locator = parseIntelligenceSyncJobPayload({
+        organizationId: null,
+        outboxEventId: row.outboxEventId,
+        aggregateType: INTELLIGENCE_AUDIT_SUBJECT_TYPE,
+        aggregateId: row.syncRunId,
+        eventType: INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE,
+        dedupeKey: row.dedupeKey,
+      });
+      if (!locator.ok) {
+        continue;
+      }
+      if (row.jobStatus !== 'queued' && row.jobStatus !== 'running') {
+        continue;
+      }
+      candidates.push({
+        syncRunId: row.syncRunId,
+        backgroundJobId: row.backgroundJobId,
+        outboxEventId: row.outboxEventId,
+        jobAttempt: row.jobAttempt,
+        jobStatus: row.jobStatus,
+        syncRunState: row.syncRunState as IntelligenceSyncRunRecord['state'],
+        nextAttemptAt: row.nextAttemptAt,
+        leaseExpiresAt: row.leaseExpiresAt,
+        locator: locator.value,
+      });
+    }
+    return candidates;
   }
 }

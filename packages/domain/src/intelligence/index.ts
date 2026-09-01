@@ -24,8 +24,11 @@ export {
   INTELLIGENCE_PROVIDERS_PATH,
   INTELLIGENCE_RAW_RANSOMWARE_MAX_LENGTH,
   INTELLIGENCE_REQUEST_TOKEN_MAX_LENGTH,
+  INTELLIGENCE_RETRY_RECONCILE_BATCH_LIMIT,
   INTELLIGENCE_SAFE_CONTENT_TYPE_LABELS,
   INTELLIGENCE_SCHEDULE_WINDOW_MAX_LENGTH,
+  INTELLIGENCE_SCHEDULE_WINDOW_UTC_PATTERN,
+  INTELLIGENCE_DEDUPE_KEY_PATTERN,
   INTELLIGENCE_SNAPSHOT_AUDIT_SUBJECT_TYPE,
   INTELLIGENCE_SNAPSHOT_KEY_PREFIX,
   INTELLIGENCE_SNAPSHOT_OBJECT_KEY_MAX_LENGTH,
@@ -215,10 +218,34 @@ export {
 } from './audit.js';
 export {
   buildIntelligenceSyncRequestCommands,
+  createEvaluateKevSyncScheduleUseCase,
+  type EvaluateKevSyncScheduleDependencies,
   type IntelligenceSyncRequestPort,
+  type KevSchedulerTickOutcome,
   type RequestIntelligenceSyncCommands,
   type RequestIntelligenceSyncInput,
 } from './scheduler.js';
+export {
+  buildKevScheduleWindowDedupeKey,
+  calculateKevScheduleWindow,
+  formatUtcWindowStart,
+  type KevScheduleWindow,
+} from './schedule-window.js';
+export {
+  decideKevSyncDue,
+  type DecideKevSyncDueInput,
+  type KevSyncDueDecision,
+} from './due-decision.js';
+export { parseIntelligenceSyncJobPayload, type IntelligenceSyncJobPayload } from './sync-job.js';
+export {
+  INTELLIGENCE_REDELIVERY_JOB_TYPE,
+  INTELLIGENCE_RETRY_JOB_ID_MAX_LENGTH,
+  intelligenceInitialQueueJobId,
+  intelligenceRedispatchJobId,
+  intelligenceRetryQueueJobId,
+  isTerminalIntelligenceSyncRunState,
+  type IntelligenceRedeliveryCandidate,
+} from './retry-redelivery.js';
 export {
   collectBoundedKevSnapshotBuffer,
   type BoundedKevSnapshotBuffer,
@@ -304,6 +331,7 @@ export type {
   IntelligenceSourceFreshnessPort,
   IntelligenceSourcePointer,
   IntelligenceSchedulerPersistencePort,
+  IntelligenceRedeliveryPersistencePort,
   IntelligenceStreamCompletion,
   IntelligenceSyncRunPersistencePort,
   IntelligenceSyncUnitOfWork,
@@ -313,6 +341,7 @@ export type {
   InitializeIntelligenceDevelopmentBucketInput,
   ListActiveKevEntriesPage,
   ListActiveKevEntriesQuery,
+  ListDueIntelligenceRedeliveriesInput,
   MarkIntelligenceAttemptStartedInput,
   MarkIntelligenceDegradedFailureInput,
   MarkIntelligenceNotModifiedInput,
@@ -324,6 +353,8 @@ export type {
   PromoteIntelligenceSnapshotResult,
   PutTemporaryIntelligenceSnapshotInput,
   PutTemporaryIntelligenceSnapshotResult,
+  ReconcileIntelligenceSourceEnablementInput,
+  ReconcileIntelligenceSourceEnablementResult,
   StageKevEntryBatchInput,
   StoreFetchedSnapshotInput,
   StoreFetchedSnapshotResult,

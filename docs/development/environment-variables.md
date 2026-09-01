@@ -104,9 +104,9 @@ Values must be canonical integers (no `NaN`, `Infinity`, scientific notation, de
 
 | Variable | Purpose |
 | --- | --- |
-| `INTELLIGENCE_KEV_ENABLED` | Enables future KEV scheduling. Default `true`. `false` is allowed and disables that future work. Does not itself contact CISA or start the Batch 7B service. |
+| `INTELLIGENCE_KEV_ENABLED` | Operator enablement for KEV scheduling. Default `true`. `false` stops new scheduler ticks and retry reconciliation; already queued pre-snapshot work fails `provider_disabled`. Configuration load does not contact CISA. |
 | `INTELLIGENCE_OSV_ENABLED` | OSV runtime synchronization. Default `false`. `false` is the only valid Session 9 value. |
-| `INTELLIGENCE_KEV_SYNC_INTERVAL_SECONDS` | Planned KEV cadence. Default `86400`. Floor `3600`, ceiling `604800`. PatchPilot operational default, not a CISA SLA. No scheduler reads this yet. |
+| `INTELLIGENCE_KEV_SYNC_INTERVAL_SECONDS` | UTC schedule-window length used by the worker scheduler. Default `86400`. Floor `3600`, ceiling `604800`. PatchPilot operational default, not a CISA SLA. Distinct from the scheduler poll interval. |
 | `INTELLIGENCE_KEV_STALE_THRESHOLD_SECONDS` | Planned freshness alarm. Default `259200`. Floor `7200`, ceiling `1209600`. Must be strictly greater than the sync interval. |
 | `INTELLIGENCE_HTTP_CONNECT_TIMEOUT_MS` | TCP/TLS connect timeout for the restricted CISA adapter. Default `5000`. Floor `250`, ceiling `15000`. Must be strictly less than the total timeout. |
 | `INTELLIGENCE_HTTP_TOTAL_TIMEOUT_MS` | Whole-GET timeout. Default `60000`. Floor `5000`, ceiling `180000`. |
@@ -124,7 +124,7 @@ Values must be canonical integers (no `NaN`, `Infinity`, scientific notation, de
 | `INTELLIGENCE_PARSER_VERSION` | Safe VARCHAR(64) parser label. Default `0.1.0`. |
 | `INTELLIGENCE_NORMALIZATION_VERSION` | Safe VARCHAR(64) normalization label. Default `1`. |
 | `INTELLIGENCE_KEV_JOB_LEASE_MS` | BackgroundJob lease for a KEV sync execution. Default `600000`. Floor `120000`, ceiling `1800000`. Must exceed the worst-case HTTP retry budget plus parser and object-storage timeouts. The Batch 7B service renews this lease. |
-| `INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS` | Heartbeat interval while the Batch 7B service holds a KEV job lease. Default `60000`. Floor `5000`, ceiling `300000`. Must be strictly less than one-third of `INTELLIGENCE_KEV_JOB_LEASE_MS` and strictly greater than the 2000 ms staging-transaction budget. Does not start a scheduler. |
+| `INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS` | Heartbeat interval while the Batch 7B service holds a KEV job lease. Default `60000`. Floor `5000`, ceiling `300000`. Must be strictly less than one-third of `INTELLIGENCE_KEV_JOB_LEASE_MS` and strictly greater than the 2000 ms staging-transaction budget. Shared BullMQ `lockRenewTime` is derived from this value and must stay below half `lockDuration`. |
 | `INTELLIGENCE_OBJECT_STORAGE_TIMEOUT_MS` | Timeout for one intelligence snapshot put/get. Default `30000`. Floor `1000`, ceiling `120000`. Independent of `OBJECT_STORAGE_OPERATION_TIMEOUT_MS`. Must be strictly less than the KEV job lease. |
 | `INTELLIGENCE_ORPHAN_GRACE_SECONDS` | Policy floor for a future unreferenced intelligence-object cleanup job. Default `259200`. Floor `7200`, ceiling `2592000`. Milliseconds must be strictly greater than the KEV job lease. **No cleanup job reads this yet.** |
 | `INTELLIGENCE_SNAPSHOT_RETENTION_COUNT` | Planned immutable snapshot retention count. Default `14`. Floor `2`, ceiling `90`. |
@@ -133,6 +133,10 @@ Values must be canonical integers (no `NaN`, `Infinity`, scientific notation, de
 | `INTELLIGENCE_SYNC_MAX_ATTEMPTS` | Maximum BackgroundJob execution attempts for one SyncRun. Default `5`. Floor `1`, ceiling `8`. Queue payload does not choose this value. |
 | `INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS` | Minimum persisted `nextAttemptAt` delay after a pre-snapshot retryable failure. Default `30000`. Floor `1000`, ceiling `300000`. Must be less than or equal to the retry-wait ceiling. The use case does not sleep. |
 | `INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS` | Maximum persisted `nextAttemptAt` delay. Default `300000`. Floor `10000`, ceiling `1800000`. |
+| `INTELLIGENCE_KEV_SCHEDULER_POLL_INTERVAL_MS` | How often the worker evaluates whether a new KEV schedule window is due. Default `30000`. Floor `5000`, ceiling `300000`. This is not the KEV synchronization interval and not the stale threshold. |
+| `INTELLIGENCE_KEV_SCHEDULER_STARTUP_DELAY_MS` | Delay before the first scheduler tick. Default `5000`. Floor `0`, ceiling `60000`. Must be less than or equal to the scheduler poll interval. |
+| `INTELLIGENCE_RETRY_RECONCILE_INTERVAL_MS` | PostgreSQL retry-reconciliation poll cadence. Default `15000`. Floor `5000`, ceiling `60000`. Redis delayed jobs are a fast path only. |
+| `INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS` | Minimum age before an initial queued intelligence job is treated as lost and redispatched. Default `15000`. Floor `1000`, ceiling `120000`. Must be strictly less than `INTELLIGENCE_KEV_JOB_LEASE_MS`. |
 
 Do not add OSV archive download limits, ZIP settings, or provider URL variables. Partial intelligence generations must never become current.
 

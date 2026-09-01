@@ -2,17 +2,19 @@
 
 Use this for outbox/BullMQ lag, retries, lease expiry, or duplicate delivery. Architecture: [reliability-model.md](../architecture/reliability-model.md). PatchPilot does **not** claim exactly-once processing.
 
-One job type exists today: `sbom.ingest`, run by `apps/worker` with `concurrency: 1`.
+Two job types exist today: `sbom.ingest` and `intelligence.sync`, run by `apps/worker` on the shared `patchpilot` queue with `concurrency: 2`.
 
 ## The most important behavior to know
 
-`sbom.ingest` is enqueued with a deterministic job id and **no** `attempts` or `backoff` options, and there is **no** poller that re-executes `queued` **BackgroundJob** rows. So when a handler returns a retryable outcome:
+`sbom.ingest` is enqueued with a deterministic job id and **no** `attempts` or `backoff` options, and there is **no** poller that re-executes queued SBOM **BackgroundJob** rows. So when that handler returns a retryable outcome:
 
 1. The ingestion and the BackgroundJob both return to `queued` in one transaction.
 2. The handler throws so BullMQ records a failure.
-3. Nothing redelivers the job.
+3. Nothing redelivers the SBOM job.
 
-State is left consistent and idempotently resumable, but recovery is an **operator replay**, not an automatic retry. Treat `queued` BackgroundJob rows with no queue activity as a stall.
+SBOM state is left consistent and idempotently resumable, but SBOM recovery is an **operator replay**. Treat queued SBOM BackgroundJob rows with no queue activity as a stall.
+
+`intelligence.sync` is different: PostgreSQL `retry_wait` / queued job state is retry-intent authority. The worker retry reconciler redispatches due intelligence work. BullMQ delayed jobs are a fast path only. BullMQ `attemptsMade` is not the attempt authority. The periodic KEV scheduler does not redispatch `retry_wait`.
 
 ## Symptoms
 

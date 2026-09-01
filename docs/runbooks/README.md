@@ -2,7 +2,7 @@
 
 These runbooks are the v0.1 **operational failure plans** for security-sensitive pipelines.
 
-The SBOM ingestion pipeline, the outbox relay, and the `sbom.ingest` background job are implemented, so [SBOM ingestion failure](sbom-ingestion-failure.md), [outbox backlog](outbox-backlog.md), and [background job failure](background-job-failure.md) describe live behavior. Vulnerability intelligence sync, correlation, and scoring are not implemented; treat those runbooks as the intended response once the features exist.
+The SBOM ingestion pipeline, the outbox relay, `sbom.ingest`, and scheduled CISA KEV import are implemented, so [SBOM ingestion failure](sbom-ingestion-failure.md), [outbox backlog](outbox-backlog.md), [background job failure](background-job-failure.md), and [vulnerability sync failure](vulnerability-sync-failure.md) describe live behavior. Correlation, scoring, and a public intelligence API are not implemented.
 
 Three recoveries currently require direct database or bucket work by an instance operator, because no API covers them: requeueing a `failed` ingestion, releasing a `quarantined` one, and cleaning up orphan objects.
 

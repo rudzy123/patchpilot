@@ -1,3 +1,4 @@
+import type { Clock } from '../clock.js';
 import type { AppendAuditEventInput, CreateOutboxEventInput } from '../ports.js';
 import { err, ok, type Result } from '../result.js';
 import {
@@ -10,16 +11,23 @@ import {
 } from './constants.js';
 import { INTELLIGENCE_OSV_RUNTIME_FORBIDDEN, intelligenceValidationError } from './errors.js';
 import { intelligenceSyncRequestedAudit } from './audit.js';
+import { decideKevSyncDue } from './due-decision.js';
 import {
   buildIntelligenceSyncDedupeKey,
   createIntelligenceSyncRequestedOutboxEvent,
   parseIntelligenceSyncRequestedOutboxPayload,
   type IntelligenceSyncDedupeKeyInput,
 } from './outbox.js';
+import type {
+  IntelligenceSchedulerPersistencePort,
+  IntelligenceSourceFreshnessPort,
+  IntelligenceSyncRunPersistencePort,
+} from './ports.js';
 import {
   createRequestedIntelligenceSyncRunRecord,
   type IntelligenceSyncRunRecord,
 } from './records.js';
+import { buildKevScheduleWindowDedupeKey, calculateKevScheduleWindow } from './schedule-window.js';
 
 export type RequestIntelligenceSyncInput = {
   provider: IntelligenceProvider;
@@ -119,4 +127,92 @@ export function buildIntelligenceSyncRequestCommands(
       occurredAt: input.requestedAt,
     }),
   });
+}
+
+export type KevSchedulerTickOutcome =
+  | { kind: 'disabled' }
+  | { kind: 'shutdown' }
+  | { kind: 'not_due' }
+  | { kind: 'inflight' }
+  | { kind: 'retry_wait_inflight' }
+  | { kind: 'due_initial'; syncRunId: string }
+  | { kind: 'due_periodic'; syncRunId: string }
+  | { kind: 'duplicate_window' }
+  | { kind: 'existing_inflight'; syncRunId: string }
+  | { kind: 'persistence_failure' };
+
+export type EvaluateKevSyncScheduleDependencies = {
+  clock: Clock;
+  createId: () => string;
+  kevEnabled: boolean;
+  syncIntervalSeconds: number;
+  parserVersion: string;
+  normalizationVersion: string;
+  syncRuns: Pick<IntelligenceSyncRunPersistencePort, 'findLatestByProviderAndSource'>;
+  freshness: Pick<IntelligenceSourceFreshnessPort, 'loadCurrentProviderStatus'>;
+  scheduler: IntelligenceSchedulerPersistencePort;
+};
+
+export function createEvaluateKevSyncScheduleUseCase(
+  dependencies: EvaluateKevSyncScheduleDependencies,
+) {
+  return {
+    async execute(input: { shutdown: boolean }): Promise<KevSchedulerTickOutcome> {
+      const now = dependencies.clock.now();
+      const latest = await dependencies.syncRuns.findLatestByProviderAndSource(
+        'cisa_kev',
+        CISA_KEV_SOURCE_IDENTIFIER,
+      );
+      const freshness = await dependencies.freshness.loadCurrentProviderStatus(
+        'cisa_kev',
+        CISA_KEV_SOURCE_IDENTIFIER,
+        now,
+      );
+      const decision = decideKevSyncDue({
+        kevEnabled: dependencies.kevEnabled,
+        shutdown: input.shutdown,
+        now,
+        syncIntervalSeconds: dependencies.syncIntervalSeconds,
+        latestSyncRun: latest,
+        lastSuccessfulSyncAt: freshness.lastSuccessfulSyncAt,
+      });
+      if (decision.kind !== 'due_initial' && decision.kind !== 'due_periodic') {
+        return decision;
+      }
+
+      const window = calculateKevScheduleWindow({
+        nowEpochMs: now.getTime(),
+        syncIntervalSeconds: dependencies.syncIntervalSeconds,
+      });
+      if (!window.ok) {
+        return { kind: 'persistence_failure' };
+      }
+      const dedupeKey = buildKevScheduleWindowDedupeKey(window.value.windowStartUtc);
+      if (!dedupeKey.ok) {
+        return { kind: 'persistence_failure' };
+      }
+      const syncRunId = dependencies.createId();
+      const correlationId = dependencies.createId();
+      const requested = await dependencies.scheduler.requestSync({
+        provider: 'cisa_kev',
+        sourceIdentifier: CISA_KEV_SOURCE_IDENTIFIER,
+        syncRunId,
+        requestedAt: now,
+        correlationId,
+        parserVersion: dependencies.parserVersion,
+        normalizationVersion: dependencies.normalizationVersion,
+        dedupeKey: dedupeKey.value,
+      });
+      if (!requested.ok) {
+        return { kind: 'persistence_failure' };
+      }
+      if (requested.value.outcome === 'duplicate_window') {
+        return { kind: 'duplicate_window' };
+      }
+      if (requested.value.outcome === 'existing_inflight') {
+        return { kind: 'existing_inflight', syncRunId: requested.value.syncRun.id };
+      }
+      return { kind: decision.kind, syncRunId: requested.value.syncRun.id };
+    },
+  };
 }

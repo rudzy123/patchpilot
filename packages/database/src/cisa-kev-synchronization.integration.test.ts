@@ -35,6 +35,7 @@ const BODY_B = new TextEncoder().encode(
 );
 
 const CONFIG: CisaKevSynchronizationConfig = {
+  kevEnabled: true,
   parserVersion: KEV_PARSER_VERSION,
   normalizationVersion: KEV_NORMALIZATION_VERSION,
   kevResponseMaxBytes: 65_536,

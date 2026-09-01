@@ -2,7 +2,7 @@
   "name": "@patchpilot/worker",
   "version": "0.0.0",
   "private": true,
-  "description": "Background worker. Relays transactional outbox events to BullMQ and processes CycloneDX SBOM ingestion jobs.",
+  "description": "Background worker. Relays transactional outbox events to BullMQ, processes CycloneDX SBOM ingestion, and runs CISA KEV synchronization.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -23,6 +23,7 @@
     "@patchpilot/logger": "workspace:*",
     "@patchpilot/observability": "workspace:*",
     "@patchpilot/sbom": "workspace:*",
+    "@patchpilot/vulnerability-intelligence": "workspace:*",
     "bullmq": "^5.66.4",
     "ioredis": "^5.8.2"
   },

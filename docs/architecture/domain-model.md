@@ -92,7 +92,7 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | Evidence | | yes | yes | yes | no | yes | yes | |
 | AuditEvent | system or T | tenant when org set | yes | yes | **no** | yes | keep in v0.1 | Tenant `user` actors require membership; instance auth uses `actorUserId` |
 | IntegrationProvider | yes | | | | | | | Global provider catalog |
-| IntelligenceSource | yes | | yes | | yes | | | OSV/KEV system sync state; Session 9 runtime not implemented |
+| IntelligenceSource | yes | | yes | | yes | | | OSV/KEV system sync state; KEV worker scheduler exists; OSV runtime remains disabled |
 | Integration | | yes | yes | | yes | | | Organization-owned installation; `organizationId` required |
 | ExternalCredential | | yes | yes | | state | versions | yes | Ciphertext Restricted; attaches only to Integration |
 | OutboxEvent | system or T | tenant when org set | | | publishedAt | | | Tenant work requires `organizationId`; system intel refresh may be null |
@@ -531,7 +531,7 @@ Global catalog row for a named provider (`osv`, `cisa_kev`, `reserved`). Not ten
 
 ## IntelligenceSource
 
-System synchronization state for OSV and CISA KEV. Not a tenant installation. `providerKey` is `osv` or `cisa_kev`. Last-sync timestamps and later verified conditional-request metadata live here, not on **Integration**. Session 9 runtime sync is **not implemented**. Do not treat stored cursors or ETags as a provider guarantee. Provider freshness must not advance after a partial source unit.
+System synchronization state for OSV and CISA KEV. Not a tenant installation. `providerKey` is `osv` or `cisa_kev`. Last-sync timestamps and later verified conditional-request metadata live here, not on **Integration**. Session 9 Batch 8B runs scheduled CISA KEV import in `apps/worker`. OSV runtime, matching, and Findings remain **not implemented**. Do not treat stored cursors or ETags as a provider guarantee. Provider freshness must not advance after a partial source unit.
 
 ## Integration
 
@@ -557,7 +557,7 @@ Organization-owned installation of an **IntegrationProvider** ([ADR 0015](../adr
 | `degraded` | `enabled` | Health recovered |
 | `degraded` | `disabled` | Operator disables |
 
-v0.1 **IntelligenceSource** rows exist for OSV and CISA KEV. Session 9 runtime feed synchronization is **not implemented** ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). Tenant GitHub integrations are not enabled. A tenant **Integration** may exist for the reserved provider catalog entry; it is not used for GitHub in v0.1.
+v0.1 **IntelligenceSource** rows exist for OSV and CISA KEV. Session 9 Batch 8B schedules CISA KEV catalog import in `apps/worker` ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). OSV runtime, matching, and Findings remain unimplemented. Tenant GitHub integrations are not enabled. A tenant **Integration** may exist for the reserved provider catalog entry; it is not used for GitHub in v0.1.
 
 ## ExternalCredential
 

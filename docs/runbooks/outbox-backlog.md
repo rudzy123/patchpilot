@@ -13,7 +13,7 @@ The worker relay is implemented: claim with `FOR UPDATE SKIP LOCKED`, publish to
 | Claim lease | 30 s |
 | Max publish attempts | 5 |
 | Backoff | `min(15 min, 5 s * 2^(attempt-1))` with jitter in `[0.5, 1.0)` |
-| Queue / job name | `patchpilot` / `sbom.ingest` |
+| Queue / job name | `patchpilot` / `sbom.ingest` or `intelligence.sync` |
 | BullMQ job id | `{eventType}__{outboxEventId}` |
 
 Claiming takes due `pending` rows first, then fills the batch from `claimed` rows whose lease expired. Expired-lease recovery is part of the claim query, so there is no separate sweeper to restart.

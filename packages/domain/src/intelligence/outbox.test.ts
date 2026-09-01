@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildIntelligenceSyncDedupeKey,
+  createIntelligenceSyncRequestedOutboxEvent,
   parseIntelligenceSyncRequestedOutboxPayload,
   parsePersistedIntelligenceSyncRequestedOutboxPayload,
   toIntelligenceOutboxPayloadJson,
@@ -74,5 +75,18 @@ describe('intelligence sync requested outbox payload', () => {
         requestToken: 'x',
       }).ok,
     ).toBe(false);
+  });
+
+  it('sets availableAt to the request instant so frozen clocks can relay immediately', () => {
+    const occurredAt = new Date('2026-09-01T12:00:00.000Z');
+    const event = createIntelligenceSyncRequestedOutboxEvent({
+      syncRunId: SYNC_RUN_ID,
+      payload: validPayload,
+      dedupeKey:
+        'intelligence.sync.requested.v1|cisa_kev|cisa_kev_json_catalog|window:2026-09-01T00:00:00Z',
+      occurredAt,
+    });
+    expect(event.occurredAt).toEqual(occurredAt);
+    expect(event.availableAt).toEqual(occurredAt);
   });
 });
