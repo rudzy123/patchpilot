@@ -18,6 +18,7 @@ import {
 const SYNC_RUN_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const SNAPSHOT_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const GENERATION_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const SOURCE_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const CORRELATION_ID = 'corr-intel-1';
 const NOW = new Date('2026-08-31T16:00:00.000Z');
 
@@ -61,7 +62,11 @@ describe('intelligence audit commands', () => {
         CORRELATION_ID,
         NOW,
       ),
-      intelligenceKevUpdatedAudit(metadata, CORRELATION_ID, NOW),
+      intelligenceKevUpdatedAudit(
+        { ...metadata, intelligenceSourceId: SOURCE_ID },
+        CORRELATION_ID,
+        NOW,
+      ),
     ];
     expect(Object.values(intelligenceAuditActions)).toHaveLength(9);
     for (const command of commands) {
@@ -78,6 +83,14 @@ describe('intelligence audit commands', () => {
       expect(command.payload.metadata).not.toHaveProperty('url');
       expect(command.payload.metadata).not.toHaveProperty('findingId');
     }
+    const kevUpdated = intelligenceKevUpdatedAudit(
+      { ...metadata, intelligenceSourceId: SOURCE_ID },
+      CORRELATION_ID,
+      NOW,
+    );
+    expect(kevUpdated.subjectType).toBe('intelligence_source');
+    expect(kevUpdated.subjectId).toBe(SOURCE_ID);
+    expect(kevUpdated.subjectId).not.toBe('cisa_kev');
   });
 
   it('rejects forbidden metadata keys including CVE lists and Findings', () => {

@@ -181,20 +181,15 @@ export type IntelligenceSnapshotStoragePort = {
 export type CompareAndSetSyncRunInput = {
   syncRunId: string;
   expectedState: IntelligenceSyncRunState;
+  expectedVersion: number;
   command: IntelligenceSyncRunCommand;
 };
 
 export type ClaimIntelligenceSyncRunInput = {
   syncRunId: string;
   expectedState: 'requested' | 'retry_wait';
+  expectedVersion: number;
   claimedAt: Date;
-  leaseExpiresAt: Date;
-};
-
-export type RenewIntelligenceSyncRunLeaseInput = {
-  syncRunId: string;
-  expectedState: IntelligenceSyncRunState;
-  leaseExpiresAt: Date;
 };
 
 export type IntelligenceSyncRunPersistencePort = {
@@ -206,9 +201,6 @@ export type IntelligenceSyncRunPersistencePort = {
   ): Promise<IntelligenceSyncRunRecord | undefined>;
   claimRequestedOrRetryWait(
     input: ClaimIntelligenceSyncRunInput,
-  ): Promise<Result<IntelligenceSyncRunRecord>>;
-  renewExecutionLease(
-    input: RenewIntelligenceSyncRunLeaseInput,
   ): Promise<Result<IntelligenceSyncRunRecord>>;
   applyCompareAndSetTransition(
     input: CompareAndSetSyncRunInput,
@@ -233,6 +225,11 @@ export type IntelligenceSyncRunPersistencePort = {
 
 export type InsertIntelligenceSnapshotInput = IntelligenceSnapshotRecord;
 
+export type InsertOrReuseIntelligenceSnapshotResult = {
+  record: IntelligenceSnapshotRecord;
+  reused: boolean;
+};
+
 export type IntelligenceSnapshotPersistencePort = {
   findByProviderSourceAndSha256(
     identity: IntelligenceSnapshotIdentity,
@@ -240,6 +237,9 @@ export type IntelligenceSnapshotPersistencePort = {
   insertImmutable(
     record: InsertIntelligenceSnapshotInput,
   ): Promise<Result<IntelligenceSnapshotRecord>>;
+  insertOrReuse(
+    record: InsertIntelligenceSnapshotInput,
+  ): Promise<Result<InsertOrReuseIntelligenceSnapshotResult>>;
   findById(id: string): Promise<IntelligenceSnapshotRecord | undefined>;
   verifyIdentity(
     id: string,
@@ -251,6 +251,8 @@ export type CreateStagingKevGenerationInput = {
   id: string;
   syncRunId: string;
   snapshotId: string;
+  provider: 'cisa_kev';
+  sourceIdentifier: 'cisa_kev_json_catalog';
   expectedEntryCount: number;
   parserVersion: string;
   normalizationVersion: string;
@@ -260,6 +262,9 @@ export type CreateStagingKevGenerationInput = {
 export type StageKevEntryBatchInput = {
   generationId: string;
   snapshotId: string;
+  provider: 'cisa_kev';
+  sourceIdentifier: 'cisa_kev_json_catalog';
+  maxBatchSize: number;
   entries: readonly KevNormalizedEntryRecord[];
 };
 
@@ -269,20 +274,42 @@ export type MarkKevGenerationCompleteInput = {
   actualStagedDistinctCveCount: number;
   parserVersion: string;
   normalizationVersion: string;
+  catalogVersion: string;
+  catalogReleasedAt: Date;
   completedAt: Date;
+};
+
+export type IntelligenceJobOwnership = {
+  jobId: string;
+  workerIdentifier: string;
+  organizationId: null;
+  jobType: 'intelligence.sync';
 };
 
 export type ActivateKevGenerationInput = {
   generationId: string;
   expectedEntryCount: number;
-  actualStagedDistinctCveCount: number;
   parserVersion: string;
   normalizationVersion: string;
   provider: 'cisa_kev';
   sourceIdentifier: 'cisa_kev_json_catalog';
   snapshotId: string;
   previousActiveGenerationId: string | null;
+  expectedSourceVersion: number;
   activatedAt: Date;
+  acceptedEntryCount: number;
+  warningCount: number;
+  correlationId: string;
+  syncRunId: string;
+  expectedSyncRunState: 'activating';
+  expectedSyncRunVersion: number;
+  backgroundJob?: IntelligenceJobOwnership;
+};
+
+export type ActivateKevGenerationResult = {
+  outcome: 'activated' | 'idempotent_replay';
+  generation: KevGenerationRecord;
+  syncRun: IntelligenceSyncRunRecord;
 };
 
 export type ListActiveKevEntriesQuery = {
@@ -301,7 +328,7 @@ export type ListActiveKevEntriesPage = {
 
 export type AbandonKevGenerationInput = {
   generationId: string;
-  expectedState: 'staging';
+  expectedState: 'staging' | 'complete';
   abandonedAt: Date;
 };
 
@@ -313,7 +340,9 @@ export type AbandonKevGenerationInput = {
  * the id is null), and switches current membership. Readers must never
  * observe two active generations or a staging generation. Partial failure
  * rolls back. `markGenerationSuperseded` is not a standalone current-catalog
- * write; adapters use it only inside that atomic activation.
+ * write. Adapters refuse when `intelligence_source.active_generation_id`
+ * references the generation. Atomic activation inlines supersede with the
+ * pointer switch.
  */
 export type IntelligenceGenerationPersistencePort = {
   createStagingGeneration(
@@ -330,7 +359,7 @@ export type IntelligenceGenerationPersistencePort = {
   ): Promise<Result<KevGenerationRecord>>;
   activateCompleteGeneration(
     input: ActivateKevGenerationInput,
-  ): Promise<Result<KevGenerationRecord>>;
+  ): Promise<Result<ActivateKevGenerationResult>>;
   findActiveGeneration(
     provider: 'cisa_kev',
     sourceIdentifier: 'cisa_kev_json_catalog',
@@ -394,6 +423,81 @@ export type IntelligenceSourceFreshnessPort = {
   markDegradedFailure(
     input: MarkIntelligenceDegradedFailureInput,
   ): Promise<Result<IntelligenceProviderFreshness>>;
+};
+
+export type CompleteIntelligenceNotModifiedInput = {
+  syncRunId: string;
+  expectedState: IntelligenceSyncRunState;
+  expectedVersion: number;
+  completedAt: Date;
+  reason: IntelligenceNotModifiedReason;
+  priorAcceptedGenerationId: string;
+  correlationId: string;
+  backgroundJob?: IntelligenceJobOwnership;
+};
+
+export type PersistRequestedIntelligenceSyncInput = {
+  provider: 'cisa_kev';
+  sourceIdentifier: 'cisa_kev_json_catalog';
+  syncRunId: string;
+  requestedAt: Date;
+  correlationId: string;
+  parserVersion: string;
+  normalizationVersion: string;
+  dedupeKey: string;
+};
+
+export type PersistRequestedIntelligenceSyncResult =
+  | { outcome: 'created'; syncRun: IntelligenceSyncRunRecord }
+  | { outcome: 'existing_inflight'; syncRun: IntelligenceSyncRunRecord };
+
+export type IntelligenceSchedulerPersistencePort = {
+  requestSync(
+    input: PersistRequestedIntelligenceSyncInput,
+  ): Promise<Result<PersistRequestedIntelligenceSyncResult>>;
+};
+
+export type IntelligenceFailureTransitionInput = {
+  syncRunId: string;
+  expectedState: IntelligenceSyncRunState;
+  expectedVersion: number;
+  completedAt: Date;
+  failureCode: IntelligenceSafeFailureCode;
+  correlationId: string;
+  backgroundJob?: IntelligenceJobOwnership;
+};
+
+export type IntelligenceRetryWaitTransitionInput = {
+  syncRunId: string;
+  expectedState: IntelligenceSyncRunState;
+  expectedVersion: number;
+  nextAttemptAt: Date;
+  failureCode: IntelligenceSafeFailureCode;
+  attemptedAt: Date;
+};
+
+/**
+ * PostgreSQL-only unit of work for scheduler, activation, not-modified,
+ * retry-wait, failure, and quarantine. Inputs do not accept provider HTTP,
+ * object storage, Redis, BullMQ, or parser handles.
+ */
+export type IntelligenceSyncUnitOfWork = {
+  requestSync(
+    input: PersistRequestedIntelligenceSyncInput,
+  ): Promise<Result<PersistRequestedIntelligenceSyncResult>>;
+  activateCompleteGeneration(
+    input: ActivateKevGenerationInput,
+  ): Promise<Result<ActivateKevGenerationResult>>;
+  completeNotModified(
+    input: CompleteIntelligenceNotModifiedInput,
+  ): Promise<Result<IntelligenceSyncRunRecord>>;
+  recordRetryWait(
+    input: IntelligenceRetryWaitTransitionInput,
+  ): Promise<Result<IntelligenceSyncRunRecord>>;
+  failRun(input: IntelligenceFailureTransitionInput): Promise<Result<IntelligenceSyncRunRecord>>;
+  quarantineRun(
+    input: IntelligenceFailureTransitionInput,
+  ): Promise<Result<IntelligenceSyncRunRecord>>;
 };
 
 export type { IntelligenceSnapshotObjectKeyBuilderPort, IntelligenceSyncRequestPort };

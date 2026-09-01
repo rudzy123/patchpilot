@@ -58,6 +58,10 @@ export const FROZEN_MIGRATIONS = [
     directory: '20260830120000_sbom_ingestion_graph_persistence',
     sha256: '920e7e685aeaa69c8515053d373353385e90c1a741404f93b0b1222a0abc2446',
   },
+  {
+    directory: '20260901120000_kev_intelligence_persistence',
+    sha256: '304d31945a6698ae5adaad14cd10336a3e7bc61b85be7ad26918e3867f21a06a',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
@@ -65,6 +69,9 @@ export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
 
 export const SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE =
   '20260830120000_sbom_ingestion_graph_persistence' as const;
+
+export const SESSION_9_KEV_INTELLIGENCE_PERSISTENCE =
+  '20260901120000_kev_intelligence_persistence' as const;
 
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
@@ -76,6 +83,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260827180000_local_credentials_and_sessions',
   SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
   SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+  SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
@@ -246,4 +254,9 @@ export async function applyThroughSession6(databaseUrl: string): Promise<void> {
 export async function applyThroughSession7(databaseUrl: string): Promise<void> {
   await applyThroughSession6(databaseUrl);
   await applyMigrationSqlAndResolve(databaseUrl, SESSION_7_ASSET_INVENTORY_CONSTRAINTS);
+}
+
+export async function applyThroughSession8(databaseUrl: string): Promise<void> {
+  await applyThroughSession7(databaseUrl);
+  await applyMigrationSqlAndResolve(databaseUrl, SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE);
 }

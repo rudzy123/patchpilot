@@ -142,6 +142,7 @@ export const INTELLIGENCE_AUDIT_SUBJECT_TYPE = 'intelligence_sync_run' as const;
 export const INTELLIGENCE_SNAPSHOT_AUDIT_SUBJECT_TYPE = 'intelligence_snapshot' as const;
 export const INTELLIGENCE_GENERATION_AUDIT_SUBJECT_TYPE = 'intelligence_generation' as const;
 export const INTELLIGENCE_PROVIDER_AUDIT_SUBJECT_TYPE = 'intelligence_provider' as const;
+export const INTELLIGENCE_SOURCE_AUDIT_SUBJECT_TYPE = 'intelligence_source' as const;
 
 export const INTELLIGENCE_PROVIDERS_PATH = '/intelligence/providers' as const;
 export const INTELLIGENCE_PROVIDER_STATUS_PATH =

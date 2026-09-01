@@ -38,7 +38,12 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 | OD-8 KEV numeric limits | KEV response, count, parser, HTTP, lease, and staging-chunk bounds | Provisionally resolved for **initial KEV implementation** in `@patchpilot/config`. Values are PatchPilot safety margins from one 2026-08-31 snapshot, not CISA guarantees. |
 | OD-8 OSV archive runtime limits | Compressed/expanded `all.zip` operator download authorization | **Remains open.** Observed ~1.43 GiB / ~8.74 GiB / 890,787 entries are documented, not encoded as runtime configuration. OSV runtime remains disabled. |
 | OD-19 | Provider-neutral Vulnerability identity | **Remains open.** |
-| OD-20 | Staging database schema | **Remains open.** Active-generation staging is still required for KEV; schema is not designed in this batch. |
+
+## Closed in Session 9 Batch 4C (KEV persistence)
+
+| ID | Topic | Status after Batch 4C |
+| --- | --- | --- |
+| OD-20 staging and activation schema | Generation-scoped KEV tables, SQL state machines, atomic activation, and the `intelligence_source` active pointer | **Closed for schema.** Staging, complete, active, superseded, and abandoned generations are persisted. Activation is one PostgreSQL transaction. Object-key layout remains open. |
 
 OD-10 (instance operator identity) and OD-15 (matching algorithm) remain open.
 
@@ -62,7 +67,7 @@ OD-10 (instance operator identity) and OD-15 (matching algorithm) remain open.
 | OD-17 | MFA and account lockout | [ADR 0019](../adr/0019-local-password-sessions.md) specifies Argon2id and fail-closed login rate limits, not MFA or durable lockout. | Dual-key Redis login limits. No MFA. No lockout table. Revisit before treating the product as resistant to credential stuffing beyond those controls. |
 | OD-18 | Reverse-proxy trust hops | `trustProxy` remains false in Session 6. Production TLS topology is operator-specific. | Direct socket peer IP for login rate limits. Do not trust `X-Forwarded-For`. Document hops in a later ADR before enabling `trustProxy`. |
 | OD-19 | Provider-neutral Vulnerability identity | Existing required unique `osvId` cannot store a KEV-only CVE without a synthetic id or schema change. | Keep `osvId` until a later database-design ADR. Do not invent a Session 9 identity migration in Batch 1B. |
-| OD-20 | Intelligence object-key layout and staging generation | Final snapshot keys and the exact atomic activation model are not chosen. | Private instance-owned keys; no public or signed URLs. Staging/generation required in principle; schema deferred. |
+| OD-20 | Intelligence object-key layout | Final snapshot keys are not chosen. Staging/activation schema is implemented in Batch 4C. | Private instance-owned keys; no public or signed URLs. Do not treat the current opaque validator as a production prefix scheme. |
 | OD-21 | Session 9 scheduler, heartbeat, and retry policy | Bounded automatic retry is required; cadence and heartbeat are not. | Follow Session 8 outbox + BackgroundJob leases. Terminal runs stay historical; replay creates a new run. No lease heartbeat yet. |
 
 Related: [ADR index](../adr/README.md), [architecture risk register](../security/risk-register.md).

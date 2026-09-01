@@ -34,6 +34,7 @@ export type IntelligenceSyncRunSnapshot = {
   failureCategory: IntelligenceSafeFailureCategory | null;
   failureCode: IntelligenceSafeFailureCode | null;
   acceptedEntryCount: number | null;
+  warningCount: number | null;
   priorAcceptedGenerationId: string | null;
   notModifiedReason: IntelligenceNotModifiedReason | null;
 };
@@ -78,6 +79,7 @@ export type CompleteSyncRunCommand = {
   type: 'complete';
   completedAt: Date;
   acceptedEntryCount: number;
+  warningCount: number;
 };
 
 export type CompleteNotModifiedCommand = {
@@ -171,6 +173,7 @@ function requestedSnapshot(requestedAt: Date): IntelligenceSyncRunSnapshot {
     failureCategory: null,
     failureCode: null,
     acceptedEntryCount: null,
+    warningCount: null,
     priorAcceptedGenerationId: null,
     notModifiedReason: null,
   };
@@ -178,14 +181,23 @@ function requestedSnapshot(requestedAt: Date): IntelligenceSyncRunSnapshot {
 
 function assertRequestedInvariants(snapshot: IntelligenceSyncRunSnapshot): Result<void> {
   if (
+    snapshot.stage !== null ||
     snapshot.startedAt !== null ||
     snapshot.completedAt !== null ||
+    snapshot.nextAttemptAt !== null ||
+    snapshot.executionAttempt !== 0 ||
     snapshot.snapshotId !== null ||
-    snapshot.generationId !== null
+    snapshot.generationId !== null ||
+    snapshot.priorAcceptedGenerationId !== null ||
+    snapshot.failureCategory !== null ||
+    snapshot.failureCode !== null ||
+    snapshot.acceptedEntryCount !== null ||
+    snapshot.warningCount !== null ||
+    snapshot.notModifiedReason !== null
   ) {
     return err(
       intelligenceValidationError(
-        'requested runs cannot carry start, completion, snapshot, or generation.',
+        'requested runs cannot carry start, completion, snapshot, generation, or failure metadata.',
       ),
     );
   }
@@ -364,7 +376,10 @@ export function applyIntelligenceSyncRunTransition(
           intelligenceValidationError('completed runs require snapshotId and generationId.'),
         );
       }
-      if (!isNonNegativeSafeInteger(command.acceptedEntryCount)) {
+      if (
+        !isNonNegativeSafeInteger(command.acceptedEntryCount) ||
+        !isNonNegativeSafeInteger(command.warningCount)
+      ) {
         return err(
           intelligenceValidationError('completed runs require non-negative safe final counts.'),
         );
@@ -375,9 +390,11 @@ export function applyIntelligenceSyncRunTransition(
         stage: 'finalize',
         completedAt: command.completedAt,
         acceptedEntryCount: command.acceptedEntryCount,
+        warningCount: command.warningCount,
         failureCategory: null,
         failureCode: null,
         nextAttemptAt: null,
+        notModifiedReason: null,
       });
     }
     case 'complete_not_modified': {
@@ -492,6 +509,16 @@ export function applyIntelligenceSyncRunTransition(
 }
 
 export function assertSyncRunStateInvariants(snapshot: IntelligenceSyncRunSnapshot): Result<void> {
+  if (!isNonNegativeSafeInteger(snapshot.executionAttempt)) {
+    return err(intelligenceValidationError('executionAttempt must be non-negative.'));
+  }
+  if (
+    snapshot.completedAt !== null &&
+    snapshot.startedAt !== null &&
+    snapshot.completedAt.getTime() < snapshot.startedAt.getTime()
+  ) {
+    return err(intelligenceValidationError('completedAt cannot precede startedAt.'));
+  }
   switch (snapshot.state) {
     case 'requested':
       return assertRequestedInvariants(snapshot);
@@ -499,11 +526,15 @@ export function assertSyncRunStateInvariants(snapshot: IntelligenceSyncRunSnapsh
       if (
         snapshot.startedAt === null ||
         snapshot.stage !== 'fetch' ||
-        !isPositiveSafeInteger(snapshot.executionAttempt)
+        !isPositiveSafeInteger(snapshot.executionAttempt) ||
+        snapshot.completedAt !== null ||
+        snapshot.nextAttemptAt !== null ||
+        snapshot.failureCategory !== null ||
+        snapshot.failureCode !== null
       ) {
         return err(
           intelligenceValidationError(
-            'fetching requires startedAt, stage fetch, and a positive attempt.',
+            'fetching requires startedAt, stage fetch, a positive attempt, and no completion or failure metadata.',
           ),
         );
       }
@@ -538,25 +569,58 @@ export function assertSyncRunStateInvariants(snapshot: IntelligenceSyncRunSnapsh
       return ok(undefined);
     }
     case 'stored':
-      if (snapshot.snapshotId === null || snapshot.completedAt !== null) {
+      if (
+        snapshot.startedAt === null ||
+        snapshot.snapshotId === null ||
+        snapshot.generationId !== null ||
+        snapshot.completedAt !== null
+      ) {
         return err(
-          intelligenceValidationError('stored requires snapshotId and a null completedAt.'),
+          intelligenceValidationError(
+            'stored requires startedAt, snapshotId, a null generationId, and a null completedAt.',
+          ),
         );
       }
       return ok(undefined);
     case 'parsing':
-      if (snapshot.snapshotId === null) {
-        return err(intelligenceValidationError('parsing requires snapshotId.'));
+      if (
+        snapshot.startedAt === null ||
+        snapshot.snapshotId === null ||
+        snapshot.completedAt !== null
+      ) {
+        return err(
+          intelligenceValidationError(
+            'parsing requires startedAt, snapshotId, and a null completedAt.',
+          ),
+        );
       }
       return ok(undefined);
     case 'staging':
-      if (snapshot.snapshotId === null || snapshot.generationId === null) {
-        return err(intelligenceValidationError('staging requires snapshotId and generationId.'));
+      if (
+        snapshot.startedAt === null ||
+        snapshot.snapshotId === null ||
+        snapshot.generationId === null ||
+        snapshot.completedAt !== null
+      ) {
+        return err(
+          intelligenceValidationError(
+            'staging requires startedAt, snapshotId, generationId, and a null completedAt.',
+          ),
+        );
       }
       return ok(undefined);
     case 'activating':
-      if (snapshot.snapshotId === null || snapshot.generationId === null) {
-        return err(intelligenceValidationError('activating requires snapshotId and generationId.'));
+      if (
+        snapshot.startedAt === null ||
+        snapshot.snapshotId === null ||
+        snapshot.generationId === null ||
+        snapshot.completedAt !== null
+      ) {
+        return err(
+          intelligenceValidationError(
+            'activating requires startedAt, snapshotId, generationId, and a null completedAt.',
+          ),
+        );
       }
       return ok(undefined);
     case 'completed':
@@ -566,8 +630,12 @@ export function assertSyncRunStateInvariants(snapshot: IntelligenceSyncRunSnapsh
         snapshot.startedAt === null ||
         snapshot.completedAt === null ||
         snapshot.acceptedEntryCount === null ||
+        snapshot.warningCount === null ||
+        !isNonNegativeSafeInteger(snapshot.acceptedEntryCount) ||
+        !isNonNegativeSafeInteger(snapshot.warningCount) ||
         snapshot.failureCategory !== null ||
-        snapshot.failureCode !== null
+        snapshot.failureCode !== null ||
+        snapshot.notModifiedReason !== null
       ) {
         return err(
           intelligenceValidationError(
@@ -583,7 +651,9 @@ export function assertSyncRunStateInvariants(snapshot: IntelligenceSyncRunSnapsh
         snapshot.priorAcceptedGenerationId === null ||
         snapshot.snapshotId !== null ||
         snapshot.generationId !== null ||
-        snapshot.notModifiedReason === null
+        snapshot.notModifiedReason === null ||
+        snapshot.failureCategory !== null ||
+        snapshot.failureCode !== null
       ) {
         return err(
           intelligenceValidationError(

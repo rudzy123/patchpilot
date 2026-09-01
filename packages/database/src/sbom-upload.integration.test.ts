@@ -26,6 +26,7 @@ const BODY = Buffer.from('{"bomFormat":"CycloneDX","specVersion":"1.6"}');
 const SHA = createHash('sha256').update(BODY).digest('hex');
 const PARSER_VERSION = '0.1.0';
 const NORMALIZATION_VERSION = '1';
+const CLOCK = { now: () => new Date() };
 
 describe('session 8 sbom upload workflow persistence', () => {
   let databaseName: string;
@@ -111,7 +112,7 @@ describe('session 8 sbom upload workflow persistence', () => {
     const persistence = createSbomPersistence(prisma);
     const repos = createRepositories(prisma);
     const upload = createUploadSbomUseCase({
-      clock: { now: () => new Date('2026-08-31T12:00:00.000Z') },
+      clock: CLOCK,
       createId: () => randomUUID(),
       assets: repos.assets,
       uploadIdempotency: persistence.uploadIdempotency,
@@ -211,7 +212,7 @@ describe('session 8 sbom upload workflow persistence', () => {
     const persistence = createSbomPersistence(prisma);
     const repos = createRepositories(prisma);
     const upload = createUploadSbomUseCase({
-      clock: { now: () => new Date('2026-08-31T12:00:00.000Z') },
+      clock: CLOCK,
       createId: () => randomUUID(),
       assets: repos.assets,
       uploadIdempotency: persistence.uploadIdempotency,
@@ -272,7 +273,7 @@ function workflow(prisma: PrismaClient, storage: SbomObjectStoragePort) {
   const persistence = createSbomPersistence(prisma);
   const repos = createRepositories(prisma);
   return createUploadSbomUseCase({
-    clock: { now: () => new Date('2026-08-31T12:00:00.000Z') },
+    clock: CLOCK,
     createId: () => randomUUID(),
     assets: repos.assets,
     uploadIdempotency: persistence.uploadIdempotency,

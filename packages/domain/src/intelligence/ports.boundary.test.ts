@@ -98,7 +98,9 @@ describe('intelligence ports and zero-Finding boundary', () => {
 
   it('scopes intelligence persistence globally without organizationId or raw bodies', () => {
     const source = readFileSync(join(packageRoot, 'ports.ts'), 'utf8');
-    expect(source).not.toContain('organizationId');
+    expect(source).toContain('organizationId: null');
+    expect(source).not.toMatch(/organizationId\?: string/);
+    expect(source).not.toMatch(/organizationId: string[;,]|organizationId: string \| undefined/);
     expect(source).not.toMatch(/rawBody|rawEtag|providerError|providerException/);
     expect(source).toContain('applyCompareAndSetTransition');
     expect(source).toContain('listActiveEntries');
@@ -106,6 +108,9 @@ describe('intelligence ports and zero-Finding boundary', () => {
     expect(source).toContain('previousActiveGenerationId');
     expect(source).toContain('atomically');
     expect(source).toContain('createStagingGeneration');
+    expect(source).not.toContain('renewExecutionLease');
+    expect(source).not.toContain('leaseExpiresAt');
+    expect(source).toContain('IntelligenceSyncUnitOfWork');
     const runs: Pick<
       IntelligenceSyncRunPersistencePort,
       'findById' | 'applyCompareAndSetTransition'
@@ -153,6 +158,8 @@ describe('intelligence ports and zero-Finding boundary', () => {
       requestedAt: new Date('2026-08-31T16:00:00.000Z'),
       correlationId: 'corr-intel-1',
       syncRunId: '99999999-9999-4999-8999-999999999999',
+      parserVersion: '0.1.0',
+      normalizationVersion: '1',
       requestToken: 'manual-1',
     });
     expect(built.ok).toBe(true);
@@ -172,6 +179,8 @@ describe('intelligence ports and zero-Finding boundary', () => {
         requestedAt: new Date('2026-08-31T16:00:00.000Z'),
         correlationId: 'corr-intel-1',
         syncRunId: '99999999-9999-4999-8999-999999999999',
+        parserVersion: '0.1.0',
+        normalizationVersion: '1',
         requestToken: 'manual-1',
       }).ok,
     ).toBe(false);

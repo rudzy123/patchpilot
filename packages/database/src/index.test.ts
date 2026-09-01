@@ -88,6 +88,20 @@ describe('page bounds', () => {
 describe('public package surface', () => {
   it('does not export the persistence fixture as application API', () => {
     expect('persistTenantChangeWithAuditAndOutbox' in databasePublic).toBe(false);
+    expect('createIntelligencePersistence' in databasePublic).toBe(true);
+    expect('seedZeroFindingBaseline' in databasePublic).toBe(false);
+  });
+});
+
+describe('intelligence adapter source boundary', () => {
+  it('does not import AWS, Redis, BullMQ, or HTTP clients', () => {
+    const source = readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), 'intelligence-persistence.ts'),
+      'utf8',
+    );
+    expect(source).not.toMatch(/ioredis|bullmq|@aws-sdk|S3Client|undici|\bfetch\s*\(/);
+    expect(source).not.toContain('renewExecutionLease');
+    expect(source).not.toContain('FindingRepository');
   });
 });
 

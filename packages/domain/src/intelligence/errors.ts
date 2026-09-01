@@ -45,6 +45,17 @@ export const INTELLIGENCE_ABANDONED_GENERATION: AppError = Object.freeze({
   message: 'Abandoned KEV generations cannot activate.',
 });
 
+export const INTELLIGENCE_ACTIVATION_CONFLICT: AppError = Object.freeze({
+  code: 'conflict',
+  message: 'KEV generation activation lost the IntelligenceSource compare-and-set.',
+});
+
+export const INTELLIGENCE_PARTIAL_ACTIVATION_INCONSISTENT: AppError = Object.freeze({
+  code: 'conflict',
+  message:
+    'KEV catalog activation is inconsistent. Refusing to manufacture completion or treat an unactivated completed SyncRun as replay.',
+});
+
 export const INTELLIGENCE_INVALID_OBJECT_KEY: AppError = Object.freeze({
   code: 'validation',
   message: 'Intelligence snapshot object key is not a valid opaque internal key.',

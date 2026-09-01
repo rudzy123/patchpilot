@@ -27,6 +27,8 @@ export type RequestIntelligenceSyncInput = {
   requestedAt: Date;
   correlationId: string;
   syncRunId: string;
+  parserVersion: string;
+  normalizationVersion: string;
   scheduleWindow?: string;
   requestToken?: string;
 };
@@ -93,6 +95,8 @@ export function buildIntelligenceSyncRequestCommands(
     sourceIdentifier: input.sourceIdentifier,
     requestedAt: input.requestedAt,
     correlationId: input.correlationId,
+    parserVersion: input.parserVersion,
+    normalizationVersion: input.normalizationVersion,
   });
   if (!syncRun.ok) {
     return syncRun;

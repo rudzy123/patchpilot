@@ -319,6 +319,59 @@ enum IntegrationProviderKey {
   @@map("integration_provider_key")
 }
 
+enum IntelligenceSyncRunState {
+  requested
+  fetching
+  retry_wait
+  stored
+  parsing
+  staging
+  activating
+  completed
+  not_modified
+  failed
+  quarantined
+
+  @@map("intelligence_sync_run_state")
+}
+
+enum IntelligenceSyncRunStage {
+  fetch
+  store_snapshot
+  validate
+  parse
+  stage_generation
+  activate_generation
+  finalize
+
+  @@map("intelligence_sync_run_stage")
+}
+
+enum KevGenerationState {
+  staging
+  complete
+  active
+  superseded
+  abandoned
+
+  @@map("kev_generation_state")
+}
+
+enum KnownRansomwareCampaignUse {
+  known
+  unknown
+  other
+
+  @@map("known_ransomware_campaign_use")
+}
+
+enum IntelligenceNotModifiedReason {
+  content_sha256_unchanged
+  http_not_modified
+
+  @@map("intelligence_not_modified_reason")
+}
+
 enum ExternalCredentialStatus {
   pending
   active
@@ -1152,6 +1205,9 @@ model IntegrationProvider {
 
   intelligenceSource IntelligenceSource?
   integrations       Integration[]
+  syncRuns           VulnerabilitySyncRun[]
+  snapshots          VulnerabilityProviderSnapshot[]
+  generations        KevGeneration[]
 
   @@map("integration_provider")
 }
@@ -1164,13 +1220,153 @@ model IntelligenceSource {
   config               Json
   lastSuccessfulSyncAt DateTime?               @map("last_successful_sync_at") @db.Timestamptz(6)
   lastFailureAt        DateTime?               @map("last_failure_at") @db.Timestamptz(6)
+  lastAttemptAt        DateTime?               @map("last_attempt_at") @db.Timestamptz(6)
+  lastFailureCode      String?                 @map("last_failure_code") @db.VarChar(64)
+  activeGenerationId   String?                 @map("active_generation_id") @db.Uuid
   version              Int                     @default(1)
   createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  provider IntegrationProvider @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
+  provider         IntegrationProvider @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
+  activeGeneration KevGeneration?      @relation(fields: [activeGenerationId], references: [id], onDelete: Restrict)
 
   @@map("intelligence_source")
+}
+
+model VulnerabilitySyncRun {
+  id                         String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerKey                IntegrationProviderKey          @map("provider_key")
+  sourceIdentifier           String                          @map("source_identifier") @db.VarChar(64)
+  state                      IntelligenceSyncRunState        @default(requested)
+  stage                      IntelligenceSyncRunStage?
+  requestedAt                DateTime                        @map("requested_at") @db.Timestamptz(6)
+  startedAt                  DateTime?                       @map("started_at") @db.Timestamptz(6)
+  completedAt                DateTime?                       @map("completed_at") @db.Timestamptz(6)
+  nextAttemptAt              DateTime?                       @map("next_attempt_at") @db.Timestamptz(6)
+  executionAttempt           Int                             @default(0) @map("execution_attempt")
+  snapshotId                 String?                         @map("snapshot_id") @db.Uuid
+  generationId               String?                         @map("generation_id") @db.Uuid
+  priorAcceptedGenerationId  String?                         @map("prior_accepted_generation_id") @db.Uuid
+  parserVersion              String                          @map("parser_version") @db.VarChar(64)
+  normalizationVersion       String                          @map("normalization_version") @db.VarChar(64)
+  failureCategory            String?                         @map("failure_category") @db.VarChar(64)
+  failureCode                String?                         @map("failure_code") @db.VarChar(64)
+  acceptedEntryCount         Int?                            @map("accepted_entry_count")
+  warningCount               Int?                            @map("warning_count")
+  notModifiedReason          IntelligenceNotModifiedReason?  @map("not_modified_reason")
+  correlationId              String                          @map("correlation_id") @db.VarChar(128)
+  version                    Int                             @default(1)
+  createdAt                  DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime                        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  provider                 IntegrationProvider            @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
+  snapshot                 VulnerabilityProviderSnapshot? @relation("SyncRunCurrentSnapshot", fields: [snapshotId], references: [id], onDelete: Restrict)
+  generation               KevGeneration?                 @relation("SyncRunCurrentGeneration", fields: [generationId], references: [id], onDelete: Restrict)
+  priorAcceptedGeneration  KevGeneration?                 @relation("SyncRunPriorGeneration", fields: [priorAcceptedGenerationId], references: [id], onDelete: Restrict)
+  createdSnapshots         VulnerabilityProviderSnapshot[] @relation("SnapshotCreatingRun")
+  ownedGeneration          KevGeneration?                 @relation("GenerationOwningRun")
+
+  @@index([providerKey, sourceIdentifier, requestedAt(sort: Desc), id(sort: Desc)], map: "vulnerability_sync_run_provider_requested_idx")
+  @@map("vulnerability_sync_run")
+}
+
+model VulnerabilityProviderSnapshot {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerKey          IntegrationProviderKey @map("provider_key")
+  sourceIdentifier     String                 @map("source_identifier") @db.VarChar(64)
+  responseSha256       String                 @map("response_sha256") @db.Char(64)
+  byteLength           Int                    @map("byte_length")
+  declaredContentType  String?                @map("declared_content_type") @db.VarChar(128)
+  detectedContentType  String?                @map("detected_content_type") @db.VarChar(128)
+  objectKey            String                 @map("object_key") @db.VarChar(512)
+  retrievedAt          DateTime               @map("retrieved_at") @db.Timestamptz(6)
+  storedAt             DateTime               @map("stored_at") @db.Timestamptz(6)
+  etagHash             String?                @map("etag_hash") @db.Char(64)
+  lastModified         DateTime?              @map("last_modified") @db.Timestamptz(6)
+  creatingSyncRunId    String                 @map("creating_sync_run_id") @db.Uuid
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  provider        IntegrationProvider   @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
+  creatingSyncRun VulnerabilitySyncRun  @relation("SnapshotCreatingRun", fields: [creatingSyncRunId], references: [id], onDelete: Restrict)
+  attachedRuns    VulnerabilitySyncRun[] @relation("SyncRunCurrentSnapshot")
+  generations     KevGeneration[]
+
+  @@unique([providerKey, sourceIdentifier, responseSha256], map: "vulnerability_provider_snapshot_natural_key")
+  @@map("vulnerability_provider_snapshot")
+}
+
+model KevGeneration {
+  id                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerKey            IntegrationProviderKey @map("provider_key")
+  sourceIdentifier       String                 @map("source_identifier") @db.VarChar(64)
+  syncRunId              String                 @unique(map: "kev_generation_sync_run_uidx") @map("sync_run_id") @db.Uuid
+  snapshotId             String                 @map("snapshot_id") @db.Uuid
+  state                  KevGenerationState     @default(staging)
+  expectedEntryCount     Int                    @map("expected_entry_count")
+  stagedEntryCount       Int                    @default(0) @map("staged_entry_count")
+  parserVersion          String                 @map("parser_version") @db.VarChar(64)
+  normalizationVersion   String                 @map("normalization_version") @db.VarChar(64)
+  catalogVersion         String?                @map("catalog_version") @db.VarChar(128)
+  catalogReleasedAt      DateTime?              @map("catalog_released_at") @db.Timestamptz(6)
+  completedAt            DateTime?              @map("completed_at") @db.Timestamptz(6)
+  activatedAt            DateTime?              @map("activated_at") @db.Timestamptz(6)
+  supersededAt           DateTime?              @map("superseded_at") @db.Timestamptz(6)
+  abandonedAt            DateTime?              @map("abandoned_at") @db.Timestamptz(6)
+  version                Int                    @default(1)
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  provider              IntegrationProvider            @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
+  syncRun               VulnerabilitySyncRun           @relation("GenerationOwningRun", fields: [syncRunId], references: [id], onDelete: Restrict)
+  snapshot              VulnerabilityProviderSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  currentForSyncRuns    VulnerabilitySyncRun[]         @relation("SyncRunCurrentGeneration")
+  priorForSyncRuns      VulnerabilitySyncRun[]         @relation("SyncRunPriorGeneration")
+  intelligenceSources   IntelligenceSource[]
+  entries               KevEntry[]
+
+  @@unique([id, syncRunId], map: "kev_generation_id_sync_run_key")
+  @@index([snapshotId], map: "kev_generation_snapshot_idx")
+  @@map("kev_generation")
+}
+
+model KevEntry {
+  id                              String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  generationId                    String                      @map("generation_id") @db.Uuid
+  ordinal                         Int
+  normalizedCve                   String                      @map("normalized_cve") @db.VarChar(32)
+  vendorProject                   String                      @map("vendor_project") @db.Text
+  product                         String                      @db.Text
+  vulnerabilityName               String                      @map("vulnerability_name") @db.Text
+  dateAdded                       String                      @map("date_added") @db.Char(10)
+  shortDescription                String                      @map("short_description") @db.Text
+  requiredAction                  String                      @map("required_action") @db.Text
+  dueDate                         String                      @map("due_date") @db.Char(10)
+  knownRansomwareCampaignUse      KnownRansomwareCampaignUse  @map("known_ransomware_campaign_use")
+  rawKnownRansomwareCampaignUse   String?                     @map("raw_known_ransomware_campaign_use") @db.VarChar(64)
+  notes                           String?                     @db.Text
+  createdAt                       DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  generation KevGeneration @relation(fields: [generationId], references: [id], onDelete: Restrict)
+  cwes       KevEntryCwe[]
+
+  @@unique([generationId, normalizedCve], map: "kev_entry_generation_cve_uidx")
+  @@unique([generationId, ordinal], map: "kev_entry_generation_ordinal_uidx")
+  @@index([generationId, ordinal, id], map: "kev_entry_generation_ordinal_id_idx")
+  @@map("kev_entry")
+}
+
+model KevEntryCwe {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entryId       String   @map("entry_id") @db.Uuid
+  ordinal       Int
+  normalizedCwe String   @map("normalized_cwe") @db.VarChar(32)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  entry KevEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
+
+  @@unique([entryId, ordinal], map: "kev_entry_cwe_ordinal_uidx")
+  @@unique([entryId, normalizedCwe], map: "kev_entry_cwe_value_uidx")
+  @@map("kev_entry_cwe")
 }
 
 model Integration {

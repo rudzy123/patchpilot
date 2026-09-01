@@ -47,6 +47,8 @@ export function createRequestedIntelligenceSyncRunRecord(input: {
   sourceIdentifier: IntelligenceSourceIdentifier;
   requestedAt: Date;
   correlationId: string;
+  parserVersion: string;
+  normalizationVersion: string;
 }): Result<IntelligenceSyncRunRecord> {
   if (!isUuid(input.id)) {
     return err(intelligenceValidationError('Sync-run identifiers must be UUIDs.'));
@@ -56,6 +58,9 @@ export function createRequestedIntelligenceSyncRunRecord(input: {
   }
   if (input.provider === 'osv') {
     return err(intelligenceValidationError('OSV cannot create a Session 9 sync run.'));
+  }
+  if (!isVersionLabel(input.parserVersion) || !isVersionLabel(input.normalizationVersion)) {
+    return err(intelligenceValidationError('Parser and normalization labels must be safe.'));
   }
   return ok({
     id: input.id,
@@ -70,13 +75,18 @@ export function createRequestedIntelligenceSyncRunRecord(input: {
     executionAttempt: 0,
     snapshotId: null,
     generationId: null,
+    priorAcceptedGenerationId: null,
+    parserVersion: input.parserVersion,
+    normalizationVersion: input.normalizationVersion,
     failureCategory: null,
     failureCode: null,
     acceptedEntryCount: null,
-    priorAcceptedGenerationId: null,
+    warningCount: null,
     notModifiedReason: null,
     correlationId: input.correlationId,
+    version: 1,
     createdAt: input.requestedAt,
+    updatedAt: input.requestedAt,
   });
 }
 
@@ -93,13 +103,18 @@ export type IntelligenceSyncRunRecord = {
   executionAttempt: number;
   snapshotId: string | null;
   generationId: string | null;
+  priorAcceptedGenerationId: string | null;
+  parserVersion: string;
+  normalizationVersion: string;
   failureCategory: IntelligenceSafeFailureCategory | null;
   failureCode: IntelligenceSafeFailureCode | null;
   acceptedEntryCount: number | null;
-  priorAcceptedGenerationId: string | null;
+  warningCount: number | null;
   notModifiedReason: IntelligenceNotModifiedReason | null;
   correlationId: string;
+  version: number;
   createdAt: Date;
+  updatedAt: Date;
 };
 
 export type IntelligenceSnapshotIdentity = {
@@ -119,10 +134,6 @@ export type IntelligenceSnapshotRecord = {
   objectKey: IntelligenceSnapshotObjectKey;
   retrievedAt: Date;
   storedAt: Date;
-  parserVersion: string;
-  normalizationVersion: string;
-  catalogVersion: string | null;
-  catalogReleasedAt: Date | null;
   etagHash: string | null;
   lastModified: Date | null;
   creatingSyncRunId: string;
@@ -140,10 +151,15 @@ export type KevGenerationRecord = {
   expectedEntryCount: number;
   parserVersion: string;
   normalizationVersion: string;
+  catalogVersion: string | null;
+  catalogReleasedAt: Date | null;
   createdAt: Date;
   completedAt: Date | null;
   activatedAt: Date | null;
   supersededAt: Date | null;
+  abandonedAt: Date | null;
+  version: number;
+  updatedAt: Date;
 };
 
 export type KevNormalizedEntryRecord = {
@@ -241,16 +257,6 @@ export function validateIntelligenceSnapshotRecord(
   if (!objectKey.ok) {
     return objectKey;
   }
-  if (!isVersionLabel(record.parserVersion) || !isVersionLabel(record.normalizationVersion)) {
-    return err(intelligenceValidationError('Parser and normalization labels must be safe.'));
-  }
-  if (
-    record.catalogVersion !== null &&
-    (record.catalogVersion.length === 0 ||
-      record.catalogVersion.length > INTELLIGENCE_CATALOG_VERSION_MAX_LENGTH)
-  ) {
-    return err(intelligenceValidationError('Catalog version exceeds the bounded label length.'));
-  }
   return ok(record);
 }
 
@@ -284,7 +290,9 @@ export function canActivateKevGeneration(generation: KevGenerationRecord): Resul
     generation.completedAt === null ||
     generation.stagedEntryCount !== generation.expectedEntryCount ||
     !isNonNegativeSafeInteger(generation.stagedEntryCount) ||
-    !isNonNegativeSafeInteger(generation.expectedEntryCount)
+    !isNonNegativeSafeInteger(generation.expectedEntryCount) ||
+    generation.catalogVersion === null ||
+    generation.catalogReleasedAt === null
   ) {
     return err(INTELLIGENCE_GENERATION_COUNT_MISMATCH);
   }
@@ -342,11 +350,42 @@ export function validateKevGenerationRecord(
   ) {
     return err(intelligenceValidationError('Parser and normalization labels must be safe.'));
   }
+  if (generation.version < 1 || !Number.isInteger(generation.version)) {
+    return err(intelligenceValidationError('Generation version must be an integer >= 1.'));
+  }
+  if (
+    generation.catalogVersion !== null &&
+    (generation.catalogVersion.length === 0 ||
+      generation.catalogVersion.length > INTELLIGENCE_CATALOG_VERSION_MAX_LENGTH)
+  ) {
+    return err(intelligenceValidationError('Catalog version exceeds the bounded label length.'));
+  }
+  if (
+    generation.completedAt !== null &&
+    generation.completedAt.getTime() < generation.createdAt.getTime()
+  ) {
+    return err(intelligenceValidationError('completedAt cannot precede createdAt.'));
+  }
+  if (
+    generation.activatedAt !== null &&
+    (generation.completedAt === null ||
+      generation.activatedAt.getTime() < generation.completedAt.getTime())
+  ) {
+    return err(intelligenceValidationError('activatedAt cannot precede completedAt.'));
+  }
+  if (
+    generation.supersededAt !== null &&
+    (generation.activatedAt === null ||
+      generation.supersededAt.getTime() < generation.activatedAt.getTime())
+  ) {
+    return err(intelligenceValidationError('supersededAt cannot precede activatedAt.'));
+  }
   if (generation.state === 'staging') {
     if (
       generation.completedAt !== null ||
       generation.activatedAt !== null ||
-      generation.supersededAt !== null
+      generation.supersededAt !== null ||
+      generation.abandonedAt !== null
     ) {
       return err(
         intelligenceValidationError('Staging generations cannot expose completion or activation.'),
@@ -358,7 +397,10 @@ export function validateKevGenerationRecord(
       generation.completedAt === null ||
       generation.activatedAt !== null ||
       generation.supersededAt !== null ||
-      generation.stagedEntryCount !== generation.expectedEntryCount
+      generation.abandonedAt !== null ||
+      generation.stagedEntryCount !== generation.expectedEntryCount ||
+      generation.catalogVersion === null ||
+      generation.catalogReleasedAt === null
     ) {
       return err(
         intelligenceValidationError('Complete generations must be finished and not yet current.'),
@@ -369,7 +411,8 @@ export function validateKevGenerationRecord(
     if (
       generation.activatedAt === null ||
       generation.completedAt === null ||
-      generation.supersededAt !== null
+      generation.supersededAt !== null ||
+      generation.abandonedAt !== null
     ) {
       return err(intelligenceValidationError('Active generations must be complete.'));
     }
@@ -382,15 +425,25 @@ export function validateKevGenerationRecord(
     if (
       generation.activatedAt === null ||
       generation.completedAt === null ||
-      generation.supersededAt === null
+      generation.supersededAt === null ||
+      generation.abandonedAt !== null ||
+      generation.stagedEntryCount !== generation.expectedEntryCount ||
+      generation.catalogVersion === null ||
+      generation.catalogReleasedAt === null
     ) {
       return err(
         intelligenceValidationError('Superseded generations must have been previously current.'),
       );
     }
   }
-  if (generation.state === 'abandoned' && generation.activatedAt !== null) {
-    return err(INTELLIGENCE_ABANDONED_GENERATION);
+  if (generation.state === 'abandoned') {
+    if (
+      generation.abandonedAt === null ||
+      generation.activatedAt !== null ||
+      generation.supersededAt !== null
+    ) {
+      return err(INTELLIGENCE_ABANDONED_GENERATION);
+    }
   }
   return ok(generation);
 }

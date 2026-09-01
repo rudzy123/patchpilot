@@ -119,10 +119,12 @@ describe('intelligence sync-run transitions', () => {
         type: 'complete',
         completedAt,
         acceptedEntryCount: 3,
+        warningCount: 0,
       }),
     );
     expect(completed.state).toBe('completed');
     expect(completed.acceptedEntryCount).toBe(3);
+    expect(completed.warningCount).toBe(0);
     expect(syncRunFreshnessMayAdvance(completed)).toBe(true);
   });
 
@@ -183,6 +185,7 @@ describe('intelligence sync-run transitions', () => {
         type: 'complete',
         completedAt,
         acceptedEntryCount: 1,
+        warningCount: 0,
       }),
     );
     expect(isIntelligenceTerminalSyncRunState(completed.state)).toBe(true);
@@ -198,6 +201,7 @@ describe('intelligence sync-run transitions', () => {
         type: 'complete',
         completedAt,
         acceptedEntryCount: 1,
+        warningCount: 0,
       }).ok,
     ).toBe(false);
     expect(
@@ -205,6 +209,7 @@ describe('intelligence sync-run transitions', () => {
         type: 'complete',
         completedAt,
         acceptedEntryCount: 1,
+        warningCount: 0,
       }).ok,
     ).toBe(false);
     expect(
@@ -212,6 +217,7 @@ describe('intelligence sync-run transitions', () => {
         type: 'complete',
         completedAt,
         acceptedEntryCount: 1,
+        warningCount: 0,
       }).ok,
     ).toBe(false);
     expect(
@@ -219,6 +225,7 @@ describe('intelligence sync-run transitions', () => {
         type: 'complete',
         completedAt,
         acceptedEntryCount: 1,
+        warningCount: 0,
       }).ok,
     ).toBe(false);
     expect(isIntelligenceForbiddenSyncStage('match')).toBe(true);
@@ -263,6 +270,7 @@ describe('intelligence sync-run transitions', () => {
         type: 'complete',
         completedAt,
         acceptedEntryCount: -1,
+        warningCount: 0,
       }).ok,
     ).toBe(false);
     expect(

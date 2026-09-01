@@ -7,6 +7,7 @@ import {
   assertNoDuplicateNormalizedCves,
   canActivateKevGeneration,
   canSupersedeActiveKevGeneration,
+  createRequestedIntelligenceSyncRunRecord,
   generationIsStagingInvisible,
   generationIsVisibleToReaders,
   snapshotIdentityFieldsAreImmutable,
@@ -45,10 +46,6 @@ function snapshot(overrides: Partial<IntelligenceSnapshotRecord> = {}): Intellig
     objectKey: objectKey.value,
     retrievedAt: NOW,
     storedAt: NOW,
-    parserVersion: '0.1.0',
-    normalizationVersion: '1',
-    catalogVersion: '2026.08.31',
-    catalogReleasedAt: NOW,
     etagHash: 'b'.repeat(64),
     lastModified: NOW,
     creatingSyncRunId: SYNC_RUN_ID,
@@ -73,6 +70,11 @@ function generation(overrides: Partial<KevGenerationRecord> = {}): KevGeneration
     completedAt: NOW,
     activatedAt: null,
     supersededAt: null,
+    abandonedAt: null,
+    catalogVersion: '2026.08.31',
+    catalogReleasedAt: NOW,
+    version: 1,
+    updatedAt: NOW,
     ...overrides,
   };
 }
@@ -137,6 +139,10 @@ describe('snapshot records', () => {
     expect(key.ok).toBe(true);
     const record = snapshot();
     expect(Object.prototype.hasOwnProperty.call(record, 'organizationId')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(record, 'parserVersion')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(record, 'normalizationVersion')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(record, 'catalogVersion')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(record, 'catalogReleasedAt')).toBe(false);
   });
 });
 
@@ -158,9 +164,7 @@ describe('KEV generations', () => {
     ).toBe(false);
     const active = generation({ state: 'active', activatedAt: NOW });
     expect(validateKevGenerationRecord(active).ok).toBe(true);
-    expect(
-      validateKevGenerationRecord({ ...active, supersededAt: NOW }).ok,
-    ).toBe(false);
+    expect(validateKevGenerationRecord({ ...active, supersededAt: NOW }).ok).toBe(false);
     expect(canSupersedeActiveKevGeneration(active, generation({ id: ENTRY_ID })).ok).toBe(true);
     expect(
       canSupersedeActiveKevGeneration(active, generation({ state: 'staging', completedAt: null }))
@@ -169,6 +173,22 @@ describe('KEV generations', () => {
     expect(Object.prototype.hasOwnProperty.call(active, 'vulnerabilityId')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(active, 'findingId')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(active, 'organizationId')).toBe(false);
+    expect(active.catalogVersion).toBe('2026.08.31');
+    expect(active.catalogReleasedAt).toEqual(NOW);
+    expect(active.abandonedAt).toBeNull();
+    expect(active.parserVersion).toBe('0.1.0');
+    expect(active.normalizationVersion).toBe('1');
+    expect(
+      validateKevGenerationRecord(
+        generation({
+          state: 'abandoned',
+          completedAt: null,
+          abandonedAt: NOW,
+          catalogVersion: null,
+          catalogReleasedAt: null,
+        }),
+      ).ok,
+    ).toBe(true);
   });
 });
 
@@ -190,5 +210,30 @@ describe('KEV entries and current membership', () => {
     expect(assertNoDuplicateNormalizedCves([record, { ...record, id: SNAPSHOT_ID }]).ok).toBe(
       false,
     );
+  });
+});
+
+describe('intelligence sync-run records', () => {
+  it('stores parser and normalization versions on the run and omits lease fields', () => {
+    const created = createRequestedIntelligenceSyncRunRecord({
+      id: SYNC_RUN_ID,
+      provider: 'cisa_kev',
+      sourceIdentifier: CISA_KEV_SOURCE_IDENTIFIER,
+      requestedAt: NOW,
+      correlationId: 'corr-intel-1',
+      parserVersion: '0.1.0',
+      normalizationVersion: '1',
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) {
+      return;
+    }
+    expect(created.value.parserVersion).toBe('0.1.0');
+    expect(created.value.normalizationVersion).toBe('1');
+    expect(created.value.warningCount).toBeNull();
+    expect(created.value.version).toBe(1);
+    expect(Object.prototype.hasOwnProperty.call(created.value, 'leaseExpiresAt')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(created.value, 'workerIdentifier')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(created.value, 'organizationId')).toBe(false);
   });
 });

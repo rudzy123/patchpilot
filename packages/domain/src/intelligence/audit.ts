@@ -3,8 +3,8 @@ import type { AppendAuditEventInput } from '../ports.js';
 import {
   INTELLIGENCE_AUDIT_SUBJECT_TYPE,
   INTELLIGENCE_GENERATION_AUDIT_SUBJECT_TYPE,
-  INTELLIGENCE_PROVIDER_AUDIT_SUBJECT_TYPE,
   INTELLIGENCE_SNAPSHOT_AUDIT_SUBJECT_TYPE,
+  INTELLIGENCE_SOURCE_AUDIT_SUBJECT_TYPE,
   type IntelligenceProvider,
   type IntelligenceSourceIdentifier,
 } from './constants.js';
@@ -29,11 +29,13 @@ export type IntelligenceAuditCountMetadata = {
   provider: IntelligenceProvider;
   sourceIdentifier: IntelligenceSourceIdentifier;
   syncRunId: string;
+  intelligenceSourceId?: string;
   snapshotId?: string;
   generationId?: string;
   byteLength?: number;
   responseSha256?: string;
   entryCount?: number;
+  warningCount?: number;
   parserVersion?: string;
   normalizationVersion?: string;
   failureCode?: IntelligenceSafeFailureCode;
@@ -81,6 +83,12 @@ function toAuditPayload(metadata: IntelligenceAuditCountMetadata): AuditPayloadJ
   }
   if (metadata.entryCount !== undefined) {
     payloadMetadata['entryCount'] = metadata.entryCount;
+  }
+  if (metadata.warningCount !== undefined) {
+    payloadMetadata['warningCount'] = metadata.warningCount;
+  }
+  if (metadata.intelligenceSourceId !== undefined) {
+    payloadMetadata['intelligenceSourceId'] = metadata.intelligenceSourceId;
   }
   if (metadata.parserVersion !== undefined) {
     payloadMetadata['parserVersion'] = metadata.parserVersion;
@@ -241,14 +249,14 @@ export function intelligenceSyncQuarantinedAudit(
 }
 
 export function intelligenceKevUpdatedAudit(
-  metadata: IntelligenceAuditCountMetadata,
+  metadata: IntelligenceAuditCountMetadata & { intelligenceSourceId: string },
   correlationId: string,
   occurredAt: Date,
 ): AppendAuditEventInput {
   return intelligenceSystemAudit({
     action: intelligenceAuditActions.kevUpdated,
-    subjectType: INTELLIGENCE_PROVIDER_AUDIT_SUBJECT_TYPE,
-    subjectId: metadata.provider,
+    subjectType: INTELLIGENCE_SOURCE_AUDIT_SUBJECT_TYPE,
+    subjectId: metadata.intelligenceSourceId,
     correlationId,
     occurredAt,
     metadata,
