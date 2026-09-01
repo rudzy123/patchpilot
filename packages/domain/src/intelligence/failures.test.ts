@@ -62,6 +62,21 @@ describe('intelligence safe failure taxonomy', () => {
     expect(intelligenceFailureFreshnessMayAdvance('processing_failed')).toBe(false);
   });
 
+  it('classifies parser timeout and crash as retryable infrastructure failures', () => {
+    const timeout = classifyIntelligenceSafeFailure('parser_timeout');
+    expect(timeout.retryable).toBe(true);
+    expect(timeout.disposition).toBe('failed');
+    expect(timeout.category).toBe('parser');
+    expect(timeout.snapshotMayExist).toBe(true);
+    expect(timeout.freshnessMayAdvance).toBe(false);
+
+    const crash = classifyIntelligenceSafeFailure('parser_crash');
+    expect(crash.retryable).toBe(true);
+    expect(crash.disposition).toBe('failed');
+    expect(crash.category).toBe('parser');
+    expect(crash.snapshotMayExist).toBe(true);
+  });
+
   it('does not advance freshness for any failure or quarantine code', () => {
     for (const code of intelligenceSafeFailureCodes) {
       expect(intelligenceSafeFailureCatalog[code].freshnessMayAdvance).toBe(false);

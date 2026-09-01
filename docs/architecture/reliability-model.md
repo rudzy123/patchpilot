@@ -148,23 +148,27 @@ Delivery is **at-least-once**. PatchPilot does **not** claim exactly-once proces
 | Lease | Column | Duration | Renewal |
 | --- | --- | --- | --- |
 | Relay claim | `outbox_event.lease_expires_at` | 30 s | Reclaimed by the next claim query when expired |
-| Processor execution | `background_job.lease_expires_at` | `SBOM_PROCESSING_LEASE_MS`, default 15 min | None; see below |
+| Processor execution | `background_job.lease_expires_at` | `SBOM_PROCESSING_LEASE_MS` (SBOM ingest, default 15 min) or `INTELLIGENCE_KEV_JOB_LEASE_MS` (KEV sync, default 10 min) | SBOM ingest: none. KEV sync service: `renewLease` at stage boundaries and `INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS` |
 
 Outbox `processed` is relay success (BullMQ accepted the job), not processor completion. `SbomIngestion.leaseExpiresAt` is unused in Session 8 and is never written; ingestion state is not a lock.
 
 The BackgroundJob claim is one conditional `UPDATE` scoped by organization, succeeding only when the row is `queued` or is `running` with an expired lease, and it increments `attempt`. A lost claim is a conflict, and the processor treats it as a stalled delivery rather than proceeding unclaimed.
 
-**No lease heartbeat is implemented.** `renewLease` exists on the port and Prisma adapter and is never called. The lease must therefore be longer than the worst-case run, and typed configuration enforces that `SBOM_PARSER_TIMEOUT_MS` and `OBJECT_STORAGE_OPERATION_TIMEOUT_MS` are both below `SBOM_PROCESSING_LEASE_MS`. Raising a timeout without raising the lease fails at process start rather than producing silent double execution.
+**SBOM ingest has no lease heartbeat.** `renewLease` exists on the port and Prisma adapter and is never called for Session 8 ingestion. The SBOM lease must therefore be longer than the worst-case run, and typed configuration enforces that `SBOM_PARSER_TIMEOUT_MS` and `OBJECT_STORAGE_OPERATION_TIMEOUT_MS` are both below `SBOM_PROCESSING_LEASE_MS`. Raising a timeout without raising the lease fails at process start rather than producing silent double execution.
+
+The Batch 7B CISA KEV synchronization service renews the same BackgroundJob lease. It verifies ownership before external work and aborts HTTP, storage, and parser operations when renewal is lost. SyncRun has no lease fields. No worker currently starts that service, so production KEV jobs are not yet leased.
 
 On expiry another worker may start (**lease theft** under clock skew: still safe because handlers are idempotent). Workers must not accept a client-supplied lease owner, and lease fields never appear in public API responses.
 
 ## Retry
 
-Exponential backoff **with jitter**. Classify retryable vs not (see table above). Session 9 will require bounded automatic retry for ordinary transient provider failures; scheduler cadence, lease heartbeat, and the exact retry policy are deferred ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). Circuit-breaking, when implemented: after consecutive feed failures, **IntelligenceSource** → `degraded`; stop hammering; probe on a slow timer. Partial source units must not advance freshness.
+Exponential backoff **with jitter**. Classify retryable vs not (see table above). Session 8 SBOM ingest still has no BullMQ `attempts`/`backoff`; a retryable failure leaves resumable state until an operator replays the job.
+
+Session 9 Batch 7B bounds KEV execution attempts with `INTELLIGENCE_SYNC_MAX_ATTEMPTS` (default 5). Pre-snapshot retryable failures persist `retry_wait` and `nextAttemptAt`; the use case does not sleep. Post-snapshot retryable failures leave SyncRun in `stored`, `parsing`, `staging`, or `activating` and mark the BackgroundJob retryable so the next execution does not refetch CISA. Scheduler cadence and BullMQ intelligence redelivery are not implemented. Circuit-breaking, when implemented: after consecutive feed failures, **IntelligenceSource** → `degraded`; stop hammering; probe on a slow timer. Partial source units must not advance freshness.
 
 ## Timeouts and shutdown
 
-Outbound HTTP and storage calls have timeouts. Session 8 storage/parser timeouts are typed configuration. Session 9 provider timeouts remain deferred with other numeric limits ([OD-8](open-decisions.md); [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). Graceful shutdown: stop leasing new jobs, finish or return the current lease, then exit. Forced kill relies on lease expiry.
+Outbound HTTP and storage calls have timeouts. Session 8 storage/parser timeouts are typed configuration. Session 9 provider, parser, and object-storage timeouts are typed configuration; the Batch 7B service applies them when invoked. Graceful shutdown: stop leasing new jobs, finish or return the current lease, then exit. Forced kill relies on lease expiry. No intelligence scheduler currently leases jobs.
 
 ## Orphans and reconciliation
 

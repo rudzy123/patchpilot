@@ -494,8 +494,13 @@ export type RenewBackgroundJobLeaseInput = {
 export type RetryBackgroundJobInput = {
   organizationId: string | null;
   jobId: string;
-  failureCategory: SafeFailureCategory;
-  failureCode: SafeFailureCode;
+  workerIdentifier: string;
+  failureCategory: string;
+  failureCode: string;
+  /**
+   * Not persisted on BackgroundJob. Intelligence fetch-layer delay uses
+   * SyncRun.nextAttemptAt. Session 8 callers may still supply a Date.
+   */
   availableAt: Date;
 };
 
@@ -511,8 +516,8 @@ export type TerminalBackgroundJobFailureInput = {
   organizationId: string | null;
   jobId: string;
   workerIdentifier: string;
-  failureCategory: SafeFailureCategory;
-  failureCode: SafeFailureCode;
+  failureCategory: string;
+  failureCode: string;
   completedAt: Date;
 };
 
@@ -523,16 +528,23 @@ export type LookupTerminalBackgroundJobInput = {
 };
 
 export type LookupBackgroundJobByOutboxInput = {
-  organizationId: string;
+  organizationId: string | null;
   outboxEventId: string;
+};
+
+export type LookupBackgroundJobByIdInput = {
+  organizationId: string | null;
+  jobId: string;
 };
 
 /**
  * BackgroundJob execution. Worker leases live here, not on SbomIngestion.
- * This port does not expose BullMQ types.
+ * This port does not expose BullMQ types. `availableAt` on retry is not
+ * persisted; intelligence delay authority is SyncRun.nextAttemptAt.
  */
 export type BackgroundJobExecutionPort = {
   enqueueQueued(input: QueueBackgroundJobInput): Promise<QueuedBackgroundJob>;
+  findById(input: LookupBackgroundJobByIdInput): Promise<BackgroundJobRecord | undefined>;
   findByOutboxEventId(
     input: LookupBackgroundJobByOutboxInput,
   ): Promise<BackgroundJobRecord | undefined>;

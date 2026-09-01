@@ -73,6 +73,7 @@ export type StartStagingCommand = {
 export type StartActivatingCommand = {
   type: 'start_activating';
   generationComplete: true;
+  warningCount: number;
 };
 
 export type CompleteSyncRunCommand = {
@@ -356,11 +357,17 @@ export function applyIntelligenceSyncRunTransition(
       if (command.generationComplete !== true) {
         return err(intelligenceValidationError('activating requires a complete generation.'));
       }
+      if (!isNonNegativeSafeInteger(command.warningCount)) {
+        return err(
+          intelligenceValidationError('activating requires a non-negative safe warning count.'),
+        );
+      }
       return commit({
         ...existing.value,
         state: 'activating',
         stage: 'activate_generation',
         completedAt: null,
+        warningCount: command.warningCount,
       });
     }
     case 'complete': {

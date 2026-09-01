@@ -117,6 +117,29 @@ export const INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION_DEFAULT = 500;
 export const INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION_MIN = 50;
 export const INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION_MAX = 2_000;
 
+export const INTELLIGENCE_SYNC_MAX_ATTEMPTS_DEFAULT = 5;
+export const INTELLIGENCE_SYNC_MAX_ATTEMPTS_MIN = 1;
+export const INTELLIGENCE_SYNC_MAX_ATTEMPTS_MAX = 8;
+
+export const INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_DEFAULT = 30_000;
+export const INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_MIN = 1_000;
+export const INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_MAX = 300_000;
+
+export const INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_DEFAULT = 300_000;
+export const INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_MIN = 10_000;
+export const INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_MAX = 1_800_000;
+
+export const INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_DEFAULT = 60_000;
+export const INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MIN = 5_000;
+export const INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MAX = 300_000;
+
+/**
+ * Maximum expected wall-clock for one PostgreSQL-only staging-batch
+ * transaction. Lease renewal must be strictly greater than this budget so a
+ * heartbeat cannot starve a short Unit of Work. Not an environment variable.
+ */
+export const INTELLIGENCE_STAGING_TRANSACTION_BUDGET_MS = 2_000;
+
 export type IntelligenceCompiledKevSource = {
   origin: typeof INTELLIGENCE_KEV_ORIGIN;
   path: typeof INTELLIGENCE_KEV_PATH;
@@ -164,6 +187,10 @@ export const intelligenceConfigSchema = z.object({
   snapshotRetentionCount: z.number().int().positive(),
   stagingGenerationMaxAgeSeconds: z.number().int().positive(),
   maxStagedRowsPerTransaction: z.number().int().positive(),
+  syncMaxAttempts: z.number().int().positive(),
+  syncRetryWaitFloorMs: z.number().int().positive(),
+  syncRetryWaitCeilingMs: z.number().int().positive(),
+  jobLeaseRenewalIntervalMs: z.number().int().positive(),
 });
 
 export type IntelligenceConfig = z.infer<typeof intelligenceConfigSchema>;
@@ -333,6 +360,31 @@ export function intelligenceRelationshipIssues(
     });
   }
 
+  if (intelligence.syncRetryWaitFloorMs > intelligence.syncRetryWaitCeilingMs) {
+    issues.push({
+      path: ['syncRetryWaitFloorMs'],
+      message:
+        'INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS must be less than or equal to INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS.',
+    });
+  }
+
+  const oneThirdLease = Math.floor(intelligence.kevJobLeaseMs / 3);
+  if (intelligence.jobLeaseRenewalIntervalMs >= oneThirdLease) {
+    issues.push({
+      path: ['jobLeaseRenewalIntervalMs'],
+      message:
+        'INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS must be strictly less than one-third of INTELLIGENCE_KEV_JOB_LEASE_MS.',
+    });
+  }
+
+  if (intelligence.jobLeaseRenewalIntervalMs <= INTELLIGENCE_STAGING_TRANSACTION_BUDGET_MS) {
+    issues.push({
+      path: ['jobLeaseRenewalIntervalMs'],
+      message:
+        'INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS must be strictly greater than the PostgreSQL staging-transaction budget.',
+    });
+  }
+
   const orphanGraceMs = checkedIntegerMultiply(intelligence.orphanGraceSeconds, 1_000);
   if (orphanGraceMs === undefined || orphanGraceMs <= intelligence.kevJobLeaseMs) {
     issues.push({
@@ -447,6 +499,14 @@ export function intelligenceDefaultEnvironmentVariables(): Record<string, string
     INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION: String(
       INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION_DEFAULT,
     ),
+    INTELLIGENCE_SYNC_MAX_ATTEMPTS: String(INTELLIGENCE_SYNC_MAX_ATTEMPTS_DEFAULT),
+    INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS: String(INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_DEFAULT),
+    INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS: String(
+      INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_DEFAULT,
+    ),
+    INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS: String(
+      INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_DEFAULT,
+    ),
   };
 }
 
@@ -550,6 +610,22 @@ export function loadIntelligenceConfigFrom(
     maxStagedRowsPerTransaction: parseInteger(
       readRequired(env, 'INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION'),
       'INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION',
+    ),
+    syncMaxAttempts: parseInteger(
+      readRequired(env, 'INTELLIGENCE_SYNC_MAX_ATTEMPTS'),
+      'INTELLIGENCE_SYNC_MAX_ATTEMPTS',
+    ),
+    syncRetryWaitFloorMs: parseInteger(
+      readRequired(env, 'INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS'),
+      'INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS',
+    ),
+    syncRetryWaitCeilingMs: parseInteger(
+      readRequired(env, 'INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS'),
+      'INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS',
+    ),
+    jobLeaseRenewalIntervalMs: parseInteger(
+      readRequired(env, 'INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS'),
+      'INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS',
     ),
   };
 }
@@ -703,6 +779,34 @@ export function refineIntelligenceNumericBounds(
     'maxStagedRowsPerTransaction',
     INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION_MIN,
     INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION_MAX,
+    addIssue,
+  );
+  bound(
+    intelligence.syncMaxAttempts,
+    'syncMaxAttempts',
+    INTELLIGENCE_SYNC_MAX_ATTEMPTS_MIN,
+    INTELLIGENCE_SYNC_MAX_ATTEMPTS_MAX,
+    addIssue,
+  );
+  bound(
+    intelligence.syncRetryWaitFloorMs,
+    'syncRetryWaitFloorMs',
+    INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_MIN,
+    INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_MAX,
+    addIssue,
+  );
+  bound(
+    intelligence.syncRetryWaitCeilingMs,
+    'syncRetryWaitCeilingMs',
+    INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_MIN,
+    INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_MAX,
+    addIssue,
+  );
+  bound(
+    intelligence.jobLeaseRenewalIntervalMs,
+    'jobLeaseRenewalIntervalMs',
+    INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MIN,
+    INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MAX,
     addIssue,
   );
 }

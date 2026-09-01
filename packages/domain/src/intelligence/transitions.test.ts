@@ -84,6 +84,7 @@ function activating(): IntelligenceSyncRunSnapshot {
     applyIntelligenceSyncRunTransition(staging(), {
       type: 'start_activating',
       generationComplete: true,
+      warningCount: 0,
     }),
   );
 }
@@ -114,6 +115,15 @@ describe('intelligence sync-run transitions', () => {
     expect(parsing().state).toBe('parsing');
     expect(staging().generationId).toBe(GENERATION_ID);
     expect(activating().state).toBe('activating');
+    expect(activating().warningCount).toBe(0);
+    const withWarnings = unwrap(
+      applyIntelligenceSyncRunTransition(staging(), {
+        type: 'start_activating',
+        generationComplete: true,
+        warningCount: 2,
+      }),
+    );
+    expect(withWarnings.warningCount).toBe(2);
     const completed = unwrap(
       applyIntelligenceSyncRunTransition(activating(), {
         type: 'complete',

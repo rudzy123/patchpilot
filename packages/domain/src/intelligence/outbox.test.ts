@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE } from './constants.js';
 import {
   buildIntelligenceSyncDedupeKey,
   parseIntelligenceSyncRequestedOutboxPayload,
+  parsePersistedIntelligenceSyncRequestedOutboxPayload,
+  toIntelligenceOutboxPayloadJson,
 } from './outbox.js';
 
 const SYNC_RUN_ID = '99999999-9999-4999-8999-999999999999';
@@ -21,7 +22,14 @@ describe('intelligence sync requested outbox payload', () => {
       ok: true,
       value: validPayload,
     });
-    expect(INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE).toBe('intelligence.sync.requested.v1');
+    expect(
+      parsePersistedIntelligenceSyncRequestedOutboxPayload(
+        toIntelligenceOutboxPayloadJson(validPayload),
+      ),
+    ).toEqual({
+      ok: true,
+      value: validPayload,
+    });
   });
 
   it('rejects unknown fields, URLs, object keys, tenant IDs, and Finding IDs', () => {

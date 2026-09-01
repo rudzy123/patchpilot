@@ -21,16 +21,16 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 
 ## Session 9 status notes
 
-[ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) records an import-only shared catalog. Session 9 runtime is **not implemented**. [ADR 0010](../adr/0010-osv-correlation.md) remains future correlation, not the import path.
+[ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) records an import-only shared catalog. Session 9 is not complete. [ADR 0010](../adr/0010-osv-correlation.md) remains future correlation, not the import path.
 
-- Approved sources are OSV GCS bulk export (`all.zip` completeness baseline) and the CISA KEV JSON snapshot. Package-query APIs are not the catalog importer.
+- Approved sources are OSV GCS bulk export (`all.zip` completeness baseline) and the CISA KEV JSON snapshot. Package-query APIs are not the catalog importer. OSV runtime remains disabled.
 - Provider responses are untrusted. Raw bodies belong in private object storage. PostgreSQL stores metadata, hashes, normalized revisions, and current projections. No public or signed snapshot URLs.
-- Partial normalization must never become the current catalog. Content SHA-256 is import idempotency until conditional GET is verified.
+- Partial normalization must never become the current catalog. Content SHA-256 is import idempotency. HTTP 304 is not product not-modified.
 - Session 9 must not match components, write Findings or FindingObservations, enrich findings, score, remediate, enqueue `finding.recalculate`, or query tenant inventories.
 - Parser isolation follows Session 8: parse outside transactions; `worker.terminate()` if termination is required; `Promise.race` is not a kill switch. Archive extraction limits are required; no archive dependency is selected yet.
 - Provider HTTP is allowlisted HTTPS (`node:https.request`) with redirects disabled, proxy environment ignored, and rejection of private, loopback, link-local, metadata-service, and other non-public destinations. Advisory reference URLs are never fetched.
 - DNS lookup pinning plus post-connect verification is implemented for CISA KEV. It is not DNSSEC.
-- Still absent: complete parser, scheduler loop, status APIs, and any Finding workflow.
+- The Batch 7B synchronization service exists and is not started by application boot. Still absent: scheduler loop, BullMQ intelligence processor, status APIs, and any Finding workflow.
 
 ## Assets to protect
 
@@ -143,7 +143,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Incorrect future correlation and KEV enrichment; wrong **priority**; parser exhaustion. Session 9 must not turn a poisoned feed into Findings.
 
-**Mitigation:** HTTPS, allowlists, payload hashes, additive versions, retain conflicts, guarded current-projection activation, archive extraction limits, KEV worker-thread termination, no body logging. Residual: public catalogs can be wrong. Synchronization and Finding integration are not implemented.
+**Mitigation:** HTTPS, allowlists, payload hashes, additive versions, retain conflicts, guarded current-projection activation, archive extraction limits, KEV worker-thread termination, no body logging. Residual: public catalogs can be wrong. Finding integration is not implemented. Scheduled synchronization is not operational.
 
 ### Compromised provider credentials
 

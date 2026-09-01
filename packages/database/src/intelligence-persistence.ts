@@ -17,11 +17,14 @@ import {
   createRequestedIntelligenceSyncRunRecord,
   err,
   intelligenceKevUpdatedAudit,
+  intelligenceNormalizationCompletedAudit,
+  intelligenceSnapshotStoredAudit,
   intelligenceSyncCompletedAudit,
   intelligenceSyncFailedAudit,
   intelligenceSyncNotModifiedAudit,
   intelligenceSyncQuarantinedAudit,
   intelligenceSyncRequestedAudit,
+  intelligenceSyncStartedAudit,
   isIntelligenceTerminalSyncRunState,
   ok,
   validateIntelligenceSnapshotRecord,
@@ -30,13 +33,18 @@ import {
   parseIntelligenceSyncRequestedOutboxPayload,
   type ActivateKevGenerationInput,
   type ActivateKevGenerationResult,
+  type ClaimFetchingAttemptInput,
   type ClaimIntelligenceSyncRunInput,
   type CompareAndSetSyncRunInput,
   type CompleteIntelligenceNotModifiedInput,
+  type CompleteStagedGenerationInput,
+  type CreateStagingGenerationAndRunInput,
   type CreateStagingKevGenerationInput,
+  type InspectStagedKevPrefixInput,
   type IntelligenceFailureTransitionInput,
   type IntelligenceGenerationPersistencePort,
   type IntelligenceJobOwnership,
+  type IntelligenceOutboxLookupPort,
   type IntelligenceProvider,
   type IntelligenceProviderFreshness,
   type IntelligenceRetryWaitTransitionInput,
@@ -46,11 +54,13 @@ import {
   type IntelligenceSnapshotRecord,
   type IntelligenceSourceFreshnessPort,
   type IntelligenceSourceIdentifier,
+  type IntelligenceSourcePointer,
   type IntelligenceSyncRunPersistencePort,
   type IntelligenceSyncRunRecord,
   type IntelligenceSyncUnitOfWork,
   type InsertOrReuseIntelligenceSnapshotResult,
   type KevGenerationRecord,
+  type KevNormalizedEntryRecord,
   type ListActiveKevEntriesPage,
   type ListActiveKevEntriesQuery,
   type MarkIntelligenceAttemptStartedInput,
@@ -62,6 +72,8 @@ import {
   type PersistRequestedIntelligenceSyncResult,
   type Result,
   type StageKevEntryBatchInput,
+  type StoreFetchedSnapshotInput,
+  type StoreFetchedSnapshotResult,
   type AbandonKevGenerationInput,
   type AppError,
   type CanonicalCve,
@@ -74,10 +86,13 @@ import { isRootPrismaClient, isUuid, requireSha256, requireVersionLabel } from '
 import {
   mapIntelligenceSnapshot,
   mapIntelligenceSyncRun,
+  mapKevEntry,
   mapKevGeneration,
   mapProviderKey,
   toIntelligenceSyncRunSnapshot,
 } from './intelligence-mappers.js';
+import { mapOutboxEvent } from './mappers.js';
+import { organizationWhere } from './outbox-relay-persistence.js';
 import { createRepositories } from './repositories.js';
 
 const CISA_KEV = 'cisa_kev' as const;
@@ -90,6 +105,7 @@ export type IntelligencePersistenceAdapters = {
   freshness: IntelligenceSourceFreshnessPort;
   scheduler: IntelligenceSchedulerPersistencePort;
   unitOfWork: IntelligenceSyncUnitOfWork;
+  outbox: IntelligenceOutboxLookupPort;
 };
 
 export function createIntelligencePersistence(
@@ -100,6 +116,7 @@ export function createIntelligencePersistence(
   const generations = new PrismaIntelligenceGenerationPersistence(client);
   const freshness = new PrismaIntelligenceSourceFreshness(client);
   const unitOfWork = new PrismaIntelligenceSyncUnitOfWork(client);
+  const outbox = new PrismaIntelligenceOutboxLookup(client);
   return {
     syncRuns,
     snapshots,
@@ -107,6 +124,7 @@ export function createIntelligencePersistence(
     freshness,
     scheduler: unitOfWork,
     unitOfWork,
+    outbox,
   };
 }
 
@@ -379,22 +397,31 @@ class PrismaIntelligenceSnapshotPersistence implements IntelligenceSnapshotPersi
   public async insertOrReuse(
     record: IntelligenceSnapshotRecord,
   ): Promise<Result<InsertOrReuseIntelligenceSnapshotResult>> {
-    const inserted = await this.insertImmutable(record);
-    if (inserted.ok) {
-      return ok({ record: inserted.value, reused: false });
+    const validated = validateIntelligenceSnapshotRecord(record);
+    if (!validated.ok) {
+      return validated;
     }
-    if (inserted.error.code !== 'conflict') {
-      return inserted;
+    const identity = {
+      provider: validated.value.provider,
+      sourceIdentifier: validated.value.sourceIdentifier,
+      responseSha256: validated.value.responseSha256,
+    };
+    const existing = await this.findByProviderSourceAndSha256(identity);
+    if (existing !== undefined) {
+      return ok({ record: existing, reused: true });
     }
-    const existing = await this.findByProviderSourceAndSha256({
-      provider: record.provider,
-      sourceIdentifier: record.sourceIdentifier,
-      responseSha256: record.responseSha256,
+    // Find-then-insert is the sequential path. Concurrent writers use
+    // ON CONFLICT DO NOTHING so a unique race does not abort a PostgreSQL
+    // interactive transaction (SQLSTATE 25P02 after a caught unique violation).
+    const written = await this.client.vulnerabilityProviderSnapshot.createMany({
+      data: [snapshotCreateData(validated.value)],
+      skipDuplicates: true,
     });
-    if (existing === undefined) {
+    const loaded = await this.findByProviderSourceAndSha256(identity);
+    if (loaded === undefined) {
       return err({ code: 'conflict', message: 'Snapshot unique conflict could not be loaded.' });
     }
-    return ok({ record: existing, reused: true });
+    return ok({ record: loaded, reused: written.count === 0 });
   }
 
   public async findById(id: string): Promise<IntelligenceSnapshotRecord | undefined> {
@@ -549,6 +576,10 @@ class PrismaIntelligenceGenerationPersistence implements IntelligenceGenerationP
             input.normalizationVersion,
             'normalizationVersion',
           ),
+          ...(input.catalogVersion === undefined ? {} : { catalogVersion: input.catalogVersion }),
+          ...(input.catalogReleasedAt === undefined
+            ? {}
+            : { catalogReleasedAt: input.catalogReleasedAt }),
           createdAt: input.createdAt,
         },
       });
@@ -559,6 +590,38 @@ class PrismaIntelligenceGenerationPersistence implements IntelligenceGenerationP
       }
       throw error;
     }
+  }
+
+  public async findById(generationId: string): Promise<KevGenerationRecord | undefined> {
+    const row = await this.client.kevGeneration.findUnique({ where: { id: generationId } });
+    return row === null ? undefined : mapKevGeneration(row);
+  }
+
+  public async findBySyncRunId(syncRunId: string): Promise<KevGenerationRecord | undefined> {
+    const row = await this.client.kevGeneration.findUnique({ where: { syncRunId } });
+    return row === null ? undefined : mapKevGeneration(row);
+  }
+
+  public async inspectStagedPrefix(
+    input: InspectStagedKevPrefixInput,
+  ): Promise<KevNormalizedEntryRecord[]> {
+    if (
+      !Number.isInteger(input.limit) ||
+      input.limit < 1 ||
+      input.limit > INTELLIGENCE_KEV_MAX_VULNERABILITY_COUNT_MAX
+    ) {
+      return [];
+    }
+    const rows = await this.client.kevEntry.findMany({
+      where: {
+        generationId: input.generationId,
+        ordinal: { gte: input.fromOrdinal },
+      },
+      include: { cwes: { orderBy: { ordinal: 'asc' } } },
+      orderBy: { ordinal: 'asc' },
+      take: input.limit,
+    });
+    return rows.map((row) => mapKevEntry(row, input.snapshotId));
   }
 
   public async stageBoundedEntryBatch(
@@ -906,6 +969,20 @@ class PrismaIntelligenceSourceFreshness implements IntelligenceSourceFreshnessPo
     };
   }
 
+  public async loadCisaKevSourcePointer(): Promise<IntelligenceSourcePointer | undefined> {
+    const source = await this.client.intelligenceSource.findUnique({
+      where: { providerKey: CISA_KEV },
+    });
+    if (source === null) {
+      return undefined;
+    }
+    return {
+      sourceId: source.id,
+      version: source.version,
+      activeGenerationId: source.activeGenerationId,
+    };
+  }
+
   public async markAttemptStarted(input: MarkIntelligenceAttemptStartedInput) {
     if (input.provider !== CISA_KEV) {
       return err(intelligenceValidationError('OSV cannot mark a Session 9 attempt.'));
@@ -1016,6 +1093,22 @@ class PrismaIntelligenceSyncUnitOfWork
     });
   }
 
+  public async claimFetchingAttempt(input: ClaimFetchingAttemptInput) {
+    return runInClientTransaction(this.client, (tx) => claimFetchingAttemptTx(tx, input));
+  }
+
+  public async storeFetchedSnapshot(input: StoreFetchedSnapshotInput) {
+    return runInClientTransaction(this.client, (tx) => storeFetchedSnapshotTx(tx, input));
+  }
+
+  public async createStagingGenerationAndRun(input: CreateStagingGenerationAndRunInput) {
+    return runInClientTransaction(this.client, (tx) => createStagingGenerationAndRunTx(tx, input));
+  }
+
+  public async completeStagedGeneration(input: CompleteStagedGenerationInput) {
+    return runInClientTransaction(this.client, (tx) => completeStagedGenerationTx(tx, input));
+  }
+
   public async activateCompleteGeneration(input: ActivateKevGenerationInput) {
     return activateCompleteGenerationTx(this.client, input);
   }
@@ -1043,6 +1136,21 @@ class PrismaIntelligenceSyncUnitOfWork
         where: { providerKey: CISA_KEV },
         data: { lastAttemptAt: input.attemptedAt },
       });
+      if (input.backgroundJob !== undefined) {
+        const classification = classifyIntelligenceSafeFailure(input.failureCode);
+        const jobs = new PrismaBackgroundJobExecution(tx);
+        const retried = await jobs.markRetry({
+          organizationId: null,
+          jobId: input.backgroundJob.jobId,
+          workerIdentifier: input.backgroundJob.workerIdentifier,
+          failureCategory: classification.category,
+          failureCode: input.failureCode,
+          availableAt: input.nextAttemptAt,
+        });
+        if (!retried.ok) {
+          return err({ code: 'conflict', message: 'Background job ownership did not match.' });
+        }
+      }
       return result;
     });
   }
@@ -1131,6 +1239,225 @@ async function requestSyncTx(
     }),
   );
   return ok({ outcome: 'created' as const, syncRun: inserted.value });
+}
+
+async function claimFetchingAttemptTx(
+  tx: PrismaClientLike,
+  input: ClaimFetchingAttemptInput,
+): Promise<Result<IntelligenceSyncRunRecord>> {
+  const current = await loadSyncRun(tx, input.syncRunId);
+  if (current === undefined) {
+    return err({ code: 'not_found', message: 'Sync-run was not found.' });
+  }
+  const executionAttempt = input.expectedState === 'requested' ? 1 : current.executionAttempt + 1;
+  const claimed = await casSyncRun(tx, {
+    syncRunId: input.syncRunId,
+    expectedState: input.expectedState,
+    expectedVersion: input.expectedVersion,
+    command: {
+      type: 'start_fetching',
+      startedAt: input.claimedAt,
+      executionAttempt,
+    },
+  });
+  if (!claimed.ok) {
+    return claimed;
+  }
+  await tx.intelligenceSource.update({
+    where: { providerKey: CISA_KEV },
+    data: { lastAttemptAt: input.claimedAt },
+  });
+  const repos = createRepositories(tx);
+  await repos.auditEvents.append(
+    intelligenceSyncStartedAudit(
+      {
+        provider: CISA_KEV,
+        sourceIdentifier: CISA_KEV_SOURCE_IDENTIFIER,
+        syncRunId: input.syncRunId,
+        executionAttempt,
+      },
+      input.correlationId,
+      input.claimedAt,
+    ),
+  );
+  return claimed;
+}
+
+function reusedSnapshotMatches(
+  existing: IntelligenceSnapshotRecord,
+  candidate: IntelligenceSnapshotRecord,
+): boolean {
+  return (
+    existing.provider === candidate.provider &&
+    existing.sourceIdentifier === candidate.sourceIdentifier &&
+    existing.responseSha256 === candidate.responseSha256 &&
+    existing.byteLength === candidate.byteLength &&
+    existing.objectKey === candidate.objectKey &&
+    existing.declaredContentType === candidate.declaredContentType &&
+    existing.detectedContentType === candidate.detectedContentType
+  );
+}
+
+async function storeFetchedSnapshotTx(
+  tx: PrismaClientLike,
+  input: StoreFetchedSnapshotInput,
+): Promise<Result<StoreFetchedSnapshotResult>> {
+  const snapshots = new PrismaIntelligenceSnapshotPersistence(tx);
+  const inserted = await snapshots.insertOrReuse(input.snapshot);
+  if (!inserted.ok) {
+    return inserted;
+  }
+  if (inserted.value.reused && !reusedSnapshotMatches(inserted.value.record, input.snapshot)) {
+    return err({ code: 'conflict', message: 'Reused snapshot identity did not match.' });
+  }
+
+  if (input.notModified !== undefined) {
+    const completed = await completeNotModifiedTx(tx, {
+      syncRunId: input.syncRunId,
+      expectedState: input.expectedState,
+      expectedVersion: input.expectedVersion,
+      completedAt: input.notModified.completedAt,
+      reason: input.notModified.reason,
+      priorAcceptedGenerationId: input.notModified.priorAcceptedGenerationId,
+      correlationId: input.correlationId,
+      ...(input.notModified.backgroundJob === undefined
+        ? {}
+        : { backgroundJob: input.notModified.backgroundJob }),
+    });
+    if (!completed.ok) {
+      return completed;
+    }
+    return ok({
+      snapshot: inserted.value.record,
+      reused: inserted.value.reused,
+      syncRun: completed.value,
+      outcome: 'not_modified',
+    });
+  }
+
+  const stored = await casSyncRun(tx, {
+    syncRunId: input.syncRunId,
+    expectedState: input.expectedState,
+    expectedVersion: input.expectedVersion,
+    command: { type: 'record_stored', snapshotId: inserted.value.record.id },
+  });
+  if (!stored.ok) {
+    return stored;
+  }
+  await tx.intelligenceSource.update({
+    where: { providerKey: CISA_KEV },
+    data: { lastAttemptAt: input.snapshot.storedAt },
+  });
+  const repos = createRepositories(tx);
+  await repos.auditEvents.append(
+    intelligenceSnapshotStoredAudit(
+      {
+        provider: CISA_KEV,
+        sourceIdentifier: CISA_KEV_SOURCE_IDENTIFIER,
+        syncRunId: input.syncRunId,
+        snapshotId: inserted.value.record.id,
+        byteLength: inserted.value.record.byteLength,
+        responseSha256: inserted.value.record.responseSha256,
+      },
+      input.correlationId,
+      input.snapshot.storedAt,
+    ),
+  );
+  return ok({
+    snapshot: inserted.value.record,
+    reused: inserted.value.reused,
+    syncRun: stored.value,
+    outcome: 'stored',
+  });
+}
+
+async function createStagingGenerationAndRunTx(
+  tx: PrismaClientLike,
+  input: CreateStagingGenerationAndRunInput,
+): Promise<Result<{ generation: KevGenerationRecord; syncRun: IntelligenceSyncRunRecord }>> {
+  const generations = new PrismaIntelligenceGenerationPersistence(tx);
+  let generation: KevGenerationRecord;
+  const created = await generations.createStagingGeneration(input.generation);
+  if (created.ok) {
+    generation = created.value;
+  } else if (created.error.code === 'conflict') {
+    const existing = await generations.findBySyncRunId(input.syncRunId);
+    if (existing === undefined) {
+      return err({ code: 'conflict', message: 'A generation already exists for this sync-run.' });
+    }
+    generation = existing;
+  } else {
+    return created;
+  }
+  const staged = await casSyncRun(tx, {
+    syncRunId: input.syncRunId,
+    expectedState: input.expectedState,
+    expectedVersion: input.expectedVersion,
+    command: { type: 'start_staging', generationId: generation.id },
+  });
+  if (!staged.ok) {
+    const current = await loadSyncRun(tx, input.syncRunId);
+    if (
+      current !== undefined &&
+      current.state === 'staging' &&
+      current.generationId === generation.id
+    ) {
+      return ok({ generation, syncRun: current });
+    }
+    return staged;
+  }
+  return ok({ generation, syncRun: staged.value });
+}
+
+async function completeStagedGenerationTx(
+  tx: PrismaClientLike,
+  input: CompleteStagedGenerationInput,
+): Promise<Result<{ generation: KevGenerationRecord; syncRun: IntelligenceSyncRunRecord }>> {
+  const generations = new PrismaIntelligenceGenerationPersistence(tx);
+  const completed = await generations.markGenerationComplete(input.generation);
+  if (!completed.ok) {
+    return completed;
+  }
+  const repos = createRepositories(tx);
+  await repos.auditEvents.append(
+    intelligenceNormalizationCompletedAudit(
+      {
+        provider: CISA_KEV,
+        sourceIdentifier: CISA_KEV_SOURCE_IDENTIFIER,
+        syncRunId: input.syncRunId,
+        generationId: input.generation.generationId,
+        entryCount: input.generation.expectedEntryCount,
+        warningCount: input.warningCount,
+        parserVersion: input.generation.parserVersion,
+        normalizationVersion: input.generation.normalizationVersion,
+      },
+      input.correlationId,
+      input.generation.completedAt,
+    ),
+  );
+  const activating = await casSyncRun(tx, {
+    syncRunId: input.syncRunId,
+    expectedState: input.expectedState,
+    expectedVersion: input.expectedVersion,
+    command: {
+      type: 'start_activating',
+      generationComplete: true,
+      warningCount: input.warningCount,
+    },
+  });
+  if (!activating.ok) {
+    const current = await loadSyncRun(tx, input.syncRunId);
+    if (
+      current !== undefined &&
+      current.state === 'activating' &&
+      current.generationId === input.generation.generationId &&
+      current.warningCount === input.warningCount
+    ) {
+      return ok({ generation: completed.value, syncRun: current });
+    }
+    return activating;
+  }
+  return ok({ generation: completed.value, syncRun: activating.value });
 }
 
 async function completeNotModifiedTx(
@@ -1512,4 +1839,15 @@ async function completeOwnedJob(
     return err({ code: 'conflict', message: 'Background job ownership did not match.' });
   }
   return ok(undefined);
+}
+
+class PrismaIntelligenceOutboxLookup implements IntelligenceOutboxLookupPort {
+  public constructor(private readonly client: PrismaClientLike) {}
+
+  public async findById(input: { organizationId: null; eventId: string }) {
+    const row = await this.client.outboxEvent.findFirst({
+      where: { id: input.eventId, ...organizationWhere(input.organizationId) },
+    });
+    return row === null ? undefined : mapOutboxEvent(row);
+  }
 }

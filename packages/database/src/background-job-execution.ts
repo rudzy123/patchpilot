@@ -7,6 +7,7 @@ import {
   type BackgroundJobLease,
   type BackgroundJobRecord,
   type ClaimBackgroundJobInput,
+  type LookupBackgroundJobByIdInput,
   type LookupBackgroundJobByOutboxInput,
   type LookupTerminalBackgroundJobInput,
   type QueueBackgroundJobInput,
@@ -60,6 +61,15 @@ export class PrismaBackgroundJobExecution implements BackgroundJobExecutionPort 
         outboxEventId: input.outboxEventId,
         ...organizationWhere(input.organizationId),
       },
+    });
+    return row === null ? undefined : mapBackgroundJob(row);
+  }
+
+  public async findById(
+    input: LookupBackgroundJobByIdInput,
+  ): Promise<BackgroundJobRecord | undefined> {
+    const row = await this.client.backgroundJob.findFirst({
+      where: { id: input.jobId, ...organizationWhere(input.organizationId) },
     });
     return row === null ? undefined : mapBackgroundJob(row);
   }
@@ -126,6 +136,7 @@ export class PrismaBackgroundJobExecution implements BackgroundJobExecutionPort 
       where: {
         id: input.jobId,
         ...organizationWhere(input.organizationId),
+        workerIdentifier: input.workerIdentifier,
         status: 'running',
       },
       data: {
@@ -167,13 +178,19 @@ export class PrismaBackgroundJobExecution implements BackgroundJobExecutionPort 
       },
     });
     if (updated.count === 0) {
-      const terminal = await this.findById(input.organizationId, input.jobId);
+      const terminal = await this.findById({
+        organizationId: input.organizationId,
+        jobId: input.jobId,
+      });
       if (terminal?.status === 'succeeded') {
         return ok(terminal);
       }
       return err({ code: 'conflict', message: 'Background job was not marked succeeded.' });
     }
-    const record = await this.findById(input.organizationId, input.jobId);
+    const record = await this.findById({
+      organizationId: input.organizationId,
+      jobId: input.jobId,
+    });
     if (record === undefined) {
       return err({ code: 'not_found', message: 'Background job was not found.' });
     }
@@ -199,13 +216,19 @@ export class PrismaBackgroundJobExecution implements BackgroundJobExecutionPort 
       },
     });
     if (updated.count === 0) {
-      const terminal = await this.findById(input.organizationId, input.jobId);
+      const terminal = await this.findById({
+        organizationId: input.organizationId,
+        jobId: input.jobId,
+      });
       if (terminal?.status === 'failed') {
         return ok(terminal);
       }
       return err({ code: 'conflict', message: 'Background job was not marked failed.' });
     }
-    const record = await this.findById(input.organizationId, input.jobId);
+    const record = await this.findById({
+      organizationId: input.organizationId,
+      jobId: input.jobId,
+    });
     if (record === undefined) {
       return err({ code: 'not_found', message: 'Background job was not found.' });
     }
@@ -222,16 +245,6 @@ export class PrismaBackgroundJobExecution implements BackgroundJobExecutionPort 
         status: { in: [...TERMINAL_JOB_STATUSES] },
         outboxEvent: { dedupeKey: input.dedupeKey },
       },
-    });
-    return row === null ? undefined : mapBackgroundJob(row);
-  }
-
-  private async findById(
-    organizationId: string | null,
-    jobId: string,
-  ): Promise<BackgroundJobRecord | undefined> {
-    const row = await this.client.backgroundJob.findFirst({
-      where: { id: jobId, ...organizationWhere(organizationId) },
     });
     return row === null ? undefined : mapBackgroundJob(row);
   }

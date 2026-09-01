@@ -58,6 +58,19 @@ import {
   INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION_DEFAULT,
   INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION_MAX,
   INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION_MIN,
+  INTELLIGENCE_SYNC_MAX_ATTEMPTS_DEFAULT,
+  INTELLIGENCE_SYNC_MAX_ATTEMPTS_MAX,
+  INTELLIGENCE_SYNC_MAX_ATTEMPTS_MIN,
+  INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_DEFAULT,
+  INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_MAX,
+  INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_MIN,
+  INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_DEFAULT,
+  INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_MAX,
+  INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_MIN,
+  INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_DEFAULT,
+  INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MAX,
+  INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MIN,
+  INTELLIGENCE_STAGING_TRANSACTION_BUDGET_MS,
   INTELLIGENCE_NORMALIZATION_VERSION_DEFAULT,
   INTELLIGENCE_OBJECT_STORAGE_TIMEOUT_MS_DEFAULT,
   INTELLIGENCE_OBJECT_STORAGE_TIMEOUT_MS_MAX,
@@ -201,6 +214,13 @@ function relationshipSafeEnv(): Record<string, string> {
   env['INTELLIGENCE_ORPHAN_GRACE_SECONDS'] = String(INTELLIGENCE_ORPHAN_GRACE_SECONDS_MAX);
   env['INTELLIGENCE_STAGING_GENERATION_MAX_AGE_SECONDS'] = String(
     INTELLIGENCE_STAGING_GENERATION_MAX_AGE_SECONDS_MAX,
+  );
+  env['INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS'] = String(INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_MIN);
+  env['INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS'] = String(
+    INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_MAX,
+  );
+  env['INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS'] = String(
+    INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MIN,
   );
   return env;
 }
@@ -348,6 +368,30 @@ const boundedNumericLimits: Array<{
     min: INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION_MIN,
     max: INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION_MAX,
   },
+  {
+    envKey: 'INTELLIGENCE_SYNC_MAX_ATTEMPTS',
+    configKey: 'syncMaxAttempts',
+    min: INTELLIGENCE_SYNC_MAX_ATTEMPTS_MIN,
+    max: INTELLIGENCE_SYNC_MAX_ATTEMPTS_MAX,
+  },
+  {
+    envKey: 'INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS',
+    configKey: 'syncRetryWaitFloorMs',
+    min: INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_MIN,
+    max: INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_MAX,
+  },
+  {
+    envKey: 'INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS',
+    configKey: 'syncRetryWaitCeilingMs',
+    min: INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_MIN,
+    max: INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_MAX,
+  },
+  {
+    envKey: 'INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS',
+    configKey: 'jobLeaseRenewalIntervalMs',
+    min: INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MIN,
+    max: INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_MAX,
+  },
 ];
 
 function defaultIntelligenceConfig(): IntelligenceConfig {
@@ -398,6 +442,10 @@ describe('vulnerability intelligence configuration', () => {
       snapshotRetentionCount: INTELLIGENCE_SNAPSHOT_RETENTION_COUNT_DEFAULT,
       stagingGenerationMaxAgeSeconds: INTELLIGENCE_STAGING_GENERATION_MAX_AGE_SECONDS_DEFAULT,
       maxStagedRowsPerTransaction: INTELLIGENCE_MAX_STAGED_ROWS_PER_TRANSACTION_DEFAULT,
+      syncMaxAttempts: INTELLIGENCE_SYNC_MAX_ATTEMPTS_DEFAULT,
+      syncRetryWaitFloorMs: INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS_DEFAULT,
+      syncRetryWaitCeilingMs: INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS_DEFAULT,
+      jobLeaseRenewalIntervalMs: INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS_DEFAULT,
     });
     expect(config.intelligence.kevEnabled).toBe(true);
     expect(config.intelligence.osvEnabled).toBe(false);
@@ -523,6 +571,52 @@ describe('vulnerability intelligence configuration', () => {
     expectRejection(
       env,
       /INTELLIGENCE_HTTP_BACKOFF_FLOOR_MS must be less than or equal to INTELLIGENCE_HTTP_BACKOFF_CEILING_MS/,
+    );
+  });
+
+  it('rejects sync retry-wait floor above ceiling', () => {
+    const env = relationshipSafeEnv();
+    env['INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS'] = '300000';
+    env['INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS'] = '10000';
+    expectRejection(
+      env,
+      /INTELLIGENCE_SYNC_RETRY_WAIT_FLOOR_MS must be less than or equal to INTELLIGENCE_SYNC_RETRY_WAIT_CEILING_MS/,
+    );
+  });
+
+  it('rejects a lease-renewal interval that is not less than one-third of the job lease', () => {
+    const issues = intelligenceRelationshipIssues({
+      ...defaultIntelligenceConfig(),
+      kevJobLeaseMs: 600_000,
+      jobLeaseRenewalIntervalMs: 200_000,
+    });
+    expect(issueOn(issues, 'jobLeaseRenewalIntervalMs')?.message).toMatch(
+      /INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS must be strictly less than one-third of INTELLIGENCE_KEV_JOB_LEASE_MS/,
+    );
+  });
+
+  it('rejects a lease-renewal interval that is not greater than the staging-transaction budget', () => {
+    const issues = intelligenceRelationshipIssues({
+      ...defaultIntelligenceConfig(),
+      jobLeaseRenewalIntervalMs: INTELLIGENCE_STAGING_TRANSACTION_BUDGET_MS,
+    });
+    expect(issueOn(issues, 'jobLeaseRenewalIntervalMs')?.message).toMatch(
+      /INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS must be strictly greater than the PostgreSQL staging-transaction budget/,
+    );
+  });
+
+  it('accepts default sync-attempt and lease-renewal relationships', () => {
+    const issues = intelligenceRelationshipIssues(defaultIntelligenceConfig());
+    expect(issueOn(issues, 'syncRetryWaitFloorMs')).toBeUndefined();
+    expect(issueOn(issues, 'jobLeaseRenewalIntervalMs')).toBeUndefined();
+    expect(defaultIntelligenceConfig().syncMaxAttempts).toBe(
+      INTELLIGENCE_SYNC_MAX_ATTEMPTS_DEFAULT,
+    );
+    expect(defaultIntelligenceConfig().jobLeaseRenewalIntervalMs).toBeLessThan(
+      Math.floor(defaultIntelligenceConfig().kevJobLeaseMs / 3),
+    );
+    expect(defaultIntelligenceConfig().jobLeaseRenewalIntervalMs).toBeGreaterThan(
+      INTELLIGENCE_STAGING_TRANSACTION_BUDGET_MS,
     );
   });
 

@@ -1,9 +1,11 @@
 import type { Result } from '../result.js';
+import type { OutboxEventRecord } from '../records.js';
 import type {
   IntelligenceNotModifiedReason,
   IntelligenceProvider,
   IntelligenceSourceIdentifier,
   IntelligenceSyncRunState,
+  KnownRansomwareCampaignUse,
 } from './constants.js';
 import type { IntelligenceSafeFailureCategory, IntelligenceSafeFailureCode } from './failures.js';
 import type { IntelligenceProviderFreshness } from './freshness.js';
@@ -273,6 +275,8 @@ export type CreateStagingKevGenerationInput = {
   expectedEntryCount: number;
   parserVersion: string;
   normalizationVersion: string;
+  catalogVersion?: string;
+  catalogReleasedAt?: Date;
   createdAt: Date;
 };
 
@@ -343,6 +347,26 @@ export type ListActiveKevEntriesPage = {
   nextId: string | null;
 };
 
+export type InspectStagedKevPrefixInput = {
+  generationId: string;
+  snapshotId: string;
+  fromOrdinal: number;
+  limit: number;
+};
+
+export type IntelligenceSourcePointer = {
+  sourceId: string;
+  version: number;
+  activeGenerationId: string | null;
+};
+
+export type IntelligenceOutboxLookupPort = {
+  findById(input: {
+    organizationId: null;
+    eventId: string;
+  }): Promise<OutboxEventRecord | undefined>;
+};
+
 export type AbandonKevGenerationInput = {
   generationId: string;
   expectedState: 'staging' | 'complete';
@@ -365,12 +389,15 @@ export type IntelligenceGenerationPersistencePort = {
   createStagingGeneration(
     input: CreateStagingKevGenerationInput,
   ): Promise<Result<KevGenerationRecord>>;
+  findById(generationId: string): Promise<KevGenerationRecord | undefined>;
+  findBySyncRunId(syncRunId: string): Promise<KevGenerationRecord | undefined>;
   stageBoundedEntryBatch(
     input: StageKevEntryBatchInput,
   ): Promise<Result<{ stagedEntryCount: number }>>;
   inspectStagedCounts(
     generationId: string,
   ): Promise<{ stagedEntryCount: number; distinctCveCount: number } | undefined>;
+  inspectStagedPrefix(input: InspectStagedKevPrefixInput): Promise<KevNormalizedEntryRecord[]>;
   markGenerationComplete(
     input: MarkKevGenerationCompleteInput,
   ): Promise<Result<KevGenerationRecord>>;
@@ -428,6 +455,7 @@ export type IntelligenceSourceFreshnessPort = {
     sourceIdentifier: IntelligenceSourceIdentifier,
     now: Date,
   ): Promise<IntelligenceProviderFreshness>;
+  loadCisaKevSourcePointer(): Promise<IntelligenceSourcePointer | undefined>;
   markAttemptStarted(
     input: MarkIntelligenceAttemptStartedInput,
   ): Promise<Result<IntelligenceProviderFreshness>>;
@@ -491,6 +519,119 @@ export type IntelligenceRetryWaitTransitionInput = {
   nextAttemptAt: Date;
   failureCode: IntelligenceSafeFailureCode;
   attemptedAt: Date;
+  backgroundJob?: IntelligenceJobOwnership;
+};
+
+export type ClaimFetchingAttemptInput = {
+  syncRunId: string;
+  expectedState: 'requested' | 'retry_wait';
+  expectedVersion: number;
+  claimedAt: Date;
+  correlationId: string;
+};
+
+export type StoreFetchedSnapshotInput = {
+  snapshot: IntelligenceSnapshotRecord;
+  syncRunId: string;
+  expectedState: 'fetching';
+  expectedVersion: number;
+  correlationId: string;
+  notModified?: {
+    priorAcceptedGenerationId: string;
+    reason: 'content_sha256_unchanged';
+    completedAt: Date;
+    backgroundJob?: IntelligenceJobOwnership;
+  };
+};
+
+export type StoreFetchedSnapshotResult = {
+  snapshot: IntelligenceSnapshotRecord;
+  reused: boolean;
+  syncRun: IntelligenceSyncRunRecord;
+  outcome: 'stored' | 'not_modified';
+};
+
+export type CreateStagingGenerationAndRunInput = {
+  generation: CreateStagingKevGenerationInput;
+  syncRunId: string;
+  expectedState: 'parsing';
+  expectedVersion: number;
+};
+
+export type CompleteStagedGenerationInput = {
+  generation: MarkKevGenerationCompleteInput;
+  syncRunId: string;
+  expectedState: 'staging';
+  expectedVersion: number;
+  correlationId: string;
+  warningCount: number;
+};
+
+export type IntelligenceKevParserLimits = {
+  maxBytes: number;
+  jsonMaxDepth: number;
+  jsonMaxNodes: number;
+  jsonMaxStringBytes: number;
+  maxVulnerabilityCount: number;
+  maxTextFieldBytes: number;
+  maxCweCount: number;
+  maxSerializedResultBytes: number;
+};
+
+export type IntelligenceKevParsedEntry = {
+  ordinal: number;
+  normalizedCve: string;
+  vendorProject: string;
+  product: string;
+  vulnerabilityName: string;
+  dateAdded: string;
+  shortDescription: string;
+  requiredAction: string;
+  dueDate: string;
+  knownRansomwareCampaignUse: KnownRansomwareCampaignUse;
+  rawKnownRansomwareCampaignUse: string | null;
+  notes: string | null;
+  cwes: readonly string[];
+};
+
+export type IntelligenceKevParserWarningSummary = {
+  code: string;
+  count: number;
+};
+
+export type IntelligenceKevParserSuccess = {
+  ok: true;
+  catalogVersion: string;
+  catalogReleasedAt: string;
+  expectedEntryCount: number;
+  entries: readonly IntelligenceKevParsedEntry[];
+  entryCount: number;
+  warnings: readonly IntelligenceKevParserWarningSummary[];
+  parserVersion: string;
+  normalizationVersion: string;
+  serializedResultBytes: number;
+};
+
+export type IntelligenceKevParserFailure = {
+  ok: false;
+  disposition: 'failed' | 'quarantined';
+  category: IntelligenceSafeFailureCategory;
+  code: IntelligenceSafeFailureCode;
+};
+
+export type IntelligenceKevParserPort = {
+  parse(
+    input: {
+      requestId: string;
+      bytes: ArrayBuffer;
+      expectedSha256: string;
+      expectedByteLength: number;
+      limits: IntelligenceKevParserLimits;
+      parserVersion: string;
+      normalizationVersion: string;
+    },
+    options: { timeoutMs: number; signal?: AbortSignal },
+  ): Promise<IntelligenceKevParserSuccess | IntelligenceKevParserFailure>;
 };
 
 /**
@@ -502,6 +643,18 @@ export type IntelligenceSyncUnitOfWork = {
   requestSync(
     input: PersistRequestedIntelligenceSyncInput,
   ): Promise<Result<PersistRequestedIntelligenceSyncResult>>;
+  claimFetchingAttempt(
+    input: ClaimFetchingAttemptInput,
+  ): Promise<Result<IntelligenceSyncRunRecord>>;
+  storeFetchedSnapshot(
+    input: StoreFetchedSnapshotInput,
+  ): Promise<Result<StoreFetchedSnapshotResult>>;
+  createStagingGenerationAndRun(
+    input: CreateStagingGenerationAndRunInput,
+  ): Promise<Result<{ generation: KevGenerationRecord; syncRun: IntelligenceSyncRunRecord }>>;
+  completeStagedGeneration(
+    input: CompleteStagedGenerationInput,
+  ): Promise<Result<{ generation: KevGenerationRecord; syncRun: IntelligenceSyncRunRecord }>>;
   activateCompleteGeneration(
     input: ActivateKevGenerationInput,
   ): Promise<Result<ActivateKevGenerationResult>>;

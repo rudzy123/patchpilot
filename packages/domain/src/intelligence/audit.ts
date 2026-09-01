@@ -39,6 +39,7 @@ export type IntelligenceAuditCountMetadata = {
   parserVersion?: string;
   normalizationVersion?: string;
   failureCode?: IntelligenceSafeFailureCode;
+  executionAttempt?: number;
   durationMs?: number;
 };
 
@@ -98,6 +99,9 @@ function toAuditPayload(metadata: IntelligenceAuditCountMetadata): AuditPayloadJ
   }
   if (metadata.failureCode !== undefined) {
     payloadMetadata['failureCode'] = metadata.failureCode;
+  }
+  if (metadata.executionAttempt !== undefined) {
+    payloadMetadata['executionAttempt'] = metadata.executionAttempt;
   }
   if (metadata.durationMs !== undefined) {
     payloadMetadata['durationMs'] = metadata.durationMs;

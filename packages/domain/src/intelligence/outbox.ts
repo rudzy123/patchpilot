@@ -76,6 +76,39 @@ export function parseIntelligenceSyncRequestedOutboxPayload(
   });
 }
 
+export function parsePersistedIntelligenceSyncRequestedOutboxPayload(
+  value: unknown,
+): Result<IntelligenceSyncRequestedOutboxPayload> {
+  if (!isPlainObject(value)) {
+    return err(intelligenceValidationError('Outbox payload must be an object.'));
+  }
+  const keys = Object.keys(value);
+  if (keys.some((key) => !['schemaVersion', 'ids', 'metadata'].includes(key))) {
+    return err(intelligenceValidationError('Persisted outbox payload rejects unknown fields.'));
+  }
+  if (
+    value['schemaVersion'] !== INTELLIGENCE_OUTBOX_PAYLOAD_SCHEMA_VERSION ||
+    !isPlainObject(value['ids']) ||
+    !isPlainObject(value['metadata'])
+  ) {
+    return err(intelligenceValidationError('Persisted outbox payload fields are not valid.'));
+  }
+  const ids = value['ids'];
+  const metadata = value['metadata'];
+  if (Object.keys(ids).some((key) => key !== 'syncRunId')) {
+    return err(intelligenceValidationError('Persisted outbox ids reject unknown fields.'));
+  }
+  if (Object.keys(metadata).some((key) => key !== 'provider' && key !== 'sourceIdentifier')) {
+    return err(intelligenceValidationError('Persisted outbox metadata rejects unknown fields.'));
+  }
+  return parseIntelligenceSyncRequestedOutboxPayload({
+    schemaVersion: INTELLIGENCE_OUTBOX_PAYLOAD_SCHEMA_VERSION,
+    syncRunId: ids['syncRunId'],
+    provider: metadata['provider'],
+    sourceIdentifier: metadata['sourceIdentifier'],
+  });
+}
+
 export function toIntelligenceOutboxPayloadJson(
   payload: IntelligenceSyncRequestedOutboxPayload,
 ): OutboxPayloadJson {

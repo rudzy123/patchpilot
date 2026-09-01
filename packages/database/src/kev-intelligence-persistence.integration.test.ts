@@ -270,7 +270,7 @@ describe('session 9 KEV intelligence persistence adapters', () => {
         syncRunId: staging.id,
         expectedState: staging.state,
         expectedVersion: staging.version,
-        command: { type: 'start_activating', generationComplete: true },
+        command: { type: 'start_activating', generationComplete: true, warningCount: 0 },
       }),
       'start activating',
     );
@@ -869,7 +869,7 @@ describe('session 9 KEV intelligence persistence adapters', () => {
         syncRunId: stagingRun.id,
         expectedState: stagingRun.state,
         expectedVersion: stagingRun.version,
-        command: { type: 'start_activating', generationComplete: true },
+        command: { type: 'start_activating', generationComplete: true, warningCount: 0 },
       }),
       'mismatch activating',
     );
@@ -1392,7 +1392,7 @@ describe('session 9 KEV intelligence persistence adapters', () => {
         syncRunId: staging.id,
         expectedState: staging.state,
         expectedVersion: staging.version,
-        command: { type: 'start_activating', generationComplete: true },
+        command: { type: 'start_activating', generationComplete: true, warningCount: 0 },
       }),
       'contender activating',
     );
@@ -1492,7 +1492,7 @@ describe('session 9 KEV intelligence persistence adapters', () => {
         syncRunId: staging.id,
         expectedState: staging.state,
         expectedVersion: staging.version,
-        command: { type: 'start_activating', generationComplete: true },
+        command: { type: 'start_activating', generationComplete: true, warningCount: 0 },
       }),
       'unactivated activating',
     );
@@ -1679,6 +1679,154 @@ describe('session 9 KEV intelligence persistence adapters', () => {
     }
     await prisma.vulnerabilitySyncRun.update({
       where: { id: run.id },
+      data: {
+        state: 'failed',
+        completedAt: NOW,
+        failureCategory: 'internal',
+        failureCode: 'processing_failed',
+      },
+    });
+    await assertZeroFindingUnchanged();
+  });
+
+  it('claims fetching, stores snapshot metadata atomically, and inspects a dense staged prefix', async () => {
+    await failInflightRuns();
+    const adapters = createIntelligencePersistence(prisma);
+    const syncRunId = randomUUID();
+    const requested = requireOk(
+      await adapters.unitOfWork.requestSync({
+        provider: 'cisa_kev',
+        sourceIdentifier: 'cisa_kev_json_catalog',
+        syncRunId,
+        requestedAt: NOW,
+        correlationId: `corr-${syncRunId}`,
+        parserVersion: KEV_PARSER_VERSION,
+        normalizationVersion: KEV_NORMALIZATION_VERSION,
+        dedupeKey: `claim-${syncRunId}`,
+      }),
+      'request for claimFetchingAttempt',
+    );
+    const fetching = requireOk(
+      await adapters.unitOfWork.claimFetchingAttempt({
+        syncRunId,
+        expectedState: 'requested',
+        expectedVersion: requested.syncRun.version,
+        claimedAt: NOW,
+        correlationId: `corr-${syncRunId}`,
+      }),
+      'claimFetchingAttempt',
+    );
+    expect(fetching.state).toBe('fetching');
+    expect(fetching.executionAttempt).toBe(1);
+
+    const sha256 = uniqueKevSha();
+    const stored = requireOk(
+      await adapters.unitOfWork.storeFetchedSnapshot({
+        snapshot: snapshotRecord(syncRunId, sha256),
+        syncRunId,
+        expectedState: 'fetching',
+        expectedVersion: fetching.version,
+        correlationId: `corr-${syncRunId}`,
+      }),
+      'storeFetchedSnapshot',
+    );
+    expect(stored.outcome).toBe('stored');
+    expect(stored.syncRun.state).toBe('stored');
+    expect(stored.syncRun.snapshotId).toBe(stored.snapshot.id);
+    const audits = await prisma.auditEvent.findMany({
+      where: { action: 'intelligence.snapshot_stored', correlationId: `corr-${syncRunId}` },
+    });
+    expect(audits.length).toBeGreaterThanOrEqual(1);
+
+    const parsing = requireOk(
+      await adapters.syncRuns.recordParsing({
+        syncRunId,
+        expectedState: 'stored',
+        expectedVersion: stored.syncRun.version,
+        command: { type: 'start_parsing' },
+      }),
+      'parsing after store',
+    );
+    const staged = requireOk(
+      await adapters.unitOfWork.createStagingGenerationAndRun({
+        generation: {
+          id: randomUUID(),
+          syncRunId,
+          snapshotId: stored.snapshot.id,
+          provider: 'cisa_kev',
+          sourceIdentifier: 'cisa_kev_json_catalog',
+          expectedEntryCount: 1,
+          parserVersion: KEV_PARSER_VERSION,
+          normalizationVersion: KEV_NORMALIZATION_VERSION,
+          catalogVersion: CATALOG_VERSION,
+          catalogReleasedAt: NOW,
+          createdAt: NOW,
+        },
+        syncRunId,
+        expectedState: 'parsing',
+        expectedVersion: parsing.version,
+      }),
+      'createStagingGenerationAndRun',
+    );
+    expect(staged.syncRun.state).toBe('staging');
+    const entry = syntheticKevEntry({
+      generationId: staged.generation.id,
+      snapshotId: stored.snapshot.id,
+      ordinal: 0,
+      normalizedCve: 'CVE-2024-90001',
+    });
+    requireOk(
+      await adapters.generations.stageBoundedEntryBatch({
+        generationId: staged.generation.id,
+        snapshotId: stored.snapshot.id,
+        provider: 'cisa_kev',
+        sourceIdentifier: 'cisa_kev_json_catalog',
+        maxBatchSize: 16,
+        entries: [entry],
+      }),
+      'stage one',
+    );
+    const prefix = await adapters.generations.inspectStagedPrefix({
+      generationId: staged.generation.id,
+      snapshotId: stored.snapshot.id,
+      fromOrdinal: 0,
+      limit: 16,
+    });
+    expect(prefix).toHaveLength(1);
+    expect(prefix[0]?.ordinal).toBe(0);
+    expect(prefix[0]?.normalizedCve).toBe('CVE-2024-90001');
+    const completed = requireOk(
+      await adapters.unitOfWork.completeStagedGeneration({
+        generation: {
+          generationId: staged.generation.id,
+          expectedEntryCount: 1,
+          actualStagedDistinctCveCount: 1,
+          parserVersion: KEV_PARSER_VERSION,
+          normalizationVersion: KEV_NORMALIZATION_VERSION,
+          catalogVersion: CATALOG_VERSION,
+          catalogReleasedAt: NOW,
+          completedAt: NOW,
+        },
+        syncRunId,
+        expectedState: 'staging',
+        expectedVersion: staged.syncRun.version,
+        correlationId: `corr-${syncRunId}`,
+        warningCount: 0,
+      }),
+      'completeStagedGeneration',
+    );
+    expect(completed.generation.state).toBe('complete');
+    expect(completed.syncRun.state).toBe('activating');
+    expect(completed.syncRun.warningCount).toBe(0);
+    const normalizationAudits = await prisma.auditEvent.findMany({
+      where: {
+        action: 'intelligence.normalization_completed',
+        correlationId: `corr-${syncRunId}`,
+      },
+    });
+    expect(normalizationAudits).toHaveLength(1);
+    await prisma.vulnerabilitySyncRun.update({
+      where: { id: syncRunId },
       data: {
         state: 'failed',
         completedAt: NOW,

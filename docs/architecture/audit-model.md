@@ -107,9 +107,9 @@ Worker-originated events use `actorType: 'system'` with `organizationId` set and
 
 `sbom.upload_rejected`, `sbom.ingestion.released_from_quarantine`, and `sbom.reprocessed` are specified above but **not yet emitted**: rejected uploads currently fail before a database write is worthwhile, and there is no quarantine-release or reprocess entry point.
 
-### Vulnerability-intelligence events (design only)
+### Vulnerability-intelligence events
 
-Session 9 ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) specifies these actions. They are **not emitted**. This batch adds no database constraints and no runtime code.
+Session 9 ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) specifies these actions. Batch 4C emits request, completion, not-modified, failure, quarantine, and KEV-updated events from persistence Units of Work. Batch 7B emits `intelligence.snapshot_stored` with the fetching-to-stored transition and `intelligence.normalization_completed` when a generation is marked complete. A scheduler and BullMQ intelligence processor are not implemented, so production workers do not yet emit these on a timer.
 
 | Action | When |
 | --- | --- |

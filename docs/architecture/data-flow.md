@@ -2,7 +2,7 @@
 
 This document traces the v0.1 [MVP journey](../product/mvp-scope.md) through the modular monolith. It is a control-flow and evidence-flow description, not a network packet capture.
 
-Authorization context is established as in [tenant isolation](tenant-isolation.md). Limits and poison handling are in [SBOM ingestion](sbom-ingestion.md). Session 8 upload, parse, and graph persist follow [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md): stages `validate`, `parse`, and `persist_graph` only. Session 9 catalog import follows [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) and is **design only** (not implemented). Correlation, enrichment, scoring, findings, and remediation remain later additive workflows. Session 9 must not enqueue `finding.recalculate`. Session 8 has no web upload UI.
+Authorization context is established as in [tenant isolation](tenant-isolation.md). Limits and poison handling are in [SBOM ingestion](sbom-ingestion.md). Session 8 upload, parse, and graph persist follow [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md): stages `validate`, `parse`, and `persist_graph` only. Session 9 catalog import follows [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Batch 7B implements the CISA KEV synchronization service; a scheduler loop, BullMQ intelligence processor, and status API do not exist. Correlation, enrichment, scoring, findings, and remediation remain later additive workflows. Session 9 must not enqueue `finding.recalculate`. Session 8 has no web upload UI.
 
 ## End-to-end journey
 
@@ -28,7 +28,7 @@ sequenceDiagram
   Relay->>Q: Publish parse job (outbox processed = BullMQ accepted)
   W->>OS: Get copy of object
   W->>PG: Validate, parse, persist graph (Session 8 completed)
-  Note over W,OSV: Session 9 import (later): bulk/snapshot catalog only, zero Findings
+  Note over W,OSV: Session 9 Batch 7B: KEV sync service exists; not scheduled; zero Findings
   Note over W,OSV: Future additive: correlate, enrich, score (not Session 9)
   W->>OSV: Future correlation query if used (not Session 8 or 9 import)
   W->>KEV: Future finding enrichment from imported snapshot (not Session 9)
@@ -72,16 +72,16 @@ Asynchronous worker work:
 5. Persist **Component**, **ComponentOccurrence**, **DependencyRelationship** keyed by **this** `sbomIngestionId`.
 6. Ingestion stages are `validate`, `parse`, and `persist_graph` only. State becomes `completed` after those Session 8 steps succeed. `completed` does not imply exhaustive coverage. `correlate`, `enrich`, and `score` remain unused.
 
-## 5b. Import shared vulnerability intelligence (Session 9 design, not implemented)
+## 5b. Import shared vulnerability intelligence (Session 9 Batch 7B KEV service; not scheduled)
 
-[ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). System job, null organization:
+[ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). System job, null organization. OSV runtime remains disabled.
 
-1. Fetch OSV GCS bulk export (`all.zip` completeness baseline) and the CISA KEV JSON snapshot through allowlisted HTTPS. Do not use OSV package-query APIs. Do not query tenant package inventories.
-2. Stream to private object storage and SHA-256 **outside** PostgreSQL. Persist snapshot metadata, hashes, and provenance in a later transaction.
-3. Parse and normalize outside the database transaction. Activate the current projection only after a complete source unit succeeds. Partial imports must not become current.
-4. Write system audit (`intelligence.sync_*`). Do **not** create Findings, FindingObservations, or `finding.recalculate` outbox events.
+1. A later worker will pass only `syncRunId`, `backgroundJobId`, and worker ownership. The Batch 7B service reloads the job, OutboxEvent, and SyncRun before any CISA HTTPS.
+2. Fetch the CISA KEV JSON snapshot through restricted HTTPS. Stream once to private object storage and SHA-256 **outside** PostgreSQL. Persist snapshot metadata, hashes, and provenance in a later PostgreSQL-only transaction. Do not refetch after SyncRun reaches `stored`.
+3. Parse and normalize outside the database transaction. Stage entries in bounded PostgreSQL transactions. Activate the current projection only after a complete source unit succeeds. Partial imports must not become current.
+4. Write system audit (`intelligence.sync_*`). Do **not** create Findings, FindingObservations, Vulnerability rows, or `finding.recalculate` outbox events.
 
-Runtime import does not exist after Batch 1B.
+The use case exists. Application startup, Outbox relay mapping, and BullMQ Worker registration do not invoke it. Tests must not call live CISA.
 
 ## 6. Correlate (future additive workflow, not Session 9)
 
@@ -131,16 +131,18 @@ Runtime import does not exist after Batch 1B.
 
 ## Intelligence refresh (not user-initiated)
 
-Session 9 design ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)), **not implemented**:
+Session 9 ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)):
 
-1. System **BackgroundJob** (null organization) for OSV bulk export and KEV snapshot import.
-2. Additive source revisions. Withdrawn OSV records are retained. KEV removal is absence from a later accepted complete snapshot. Historical snapshots remain.
-3. Content SHA-256 is import idempotency until conditional GET is separately verified. Partial units do not become the current catalog and do not apply missing-record semantics.
+1. System **BackgroundJob** (null organization) for KEV snapshot import. OSV bulk export remains disabled.
+2. Additive generations. KEV removal is absence from a later accepted complete snapshot. Historical snapshots remain.
+3. Content SHA-256 is import idempotency. HTTP 304 is not product not-modified. Partial units do not become the current catalog.
 4. Do **not** enqueue `finding.recalculate` or otherwise mutate Findings.
+
+A scheduler does not yet create these jobs. When a caller invokes `createCisaKevSynchronizationService`, the service resumes from persisted SyncRun state, renews the BackgroundJob lease, and uses pre-snapshot `retry_wait` versus post-snapshot job retry.
 
 A **later** correlation/enrichment session may enqueue tenant-scoped recalculation after matching exists. Session 9 must not.
 
-Provider outage: last accepted catalog remains current; freshness is not advanced. Bounded automatic retry for transient failures is required in Session 9 runtime batches; scheduler and heartbeat remain deferred.
+Provider outage: last accepted catalog remains current; freshness is not advanced.
 
 ## What never happens on these paths
 

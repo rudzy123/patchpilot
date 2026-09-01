@@ -38,24 +38,18 @@ export function kevObjectKey() {
 }
 
 export async function failInflightSyncRuns(prisma: PrismaClient): Promise<void> {
-  const inflight = await prisma.vulnerabilitySyncRun.findMany({
-    where: {
-      state: { notIn: ['completed', 'not_modified', 'failed', 'quarantined'] },
-    },
-  });
-  for (const run of inflight) {
-    await prisma.vulnerabilitySyncRun.update({
-      where: { id: run.id },
-      data: {
-        state: 'failed',
-        startedAt: run.startedAt ?? NOW,
-        completedAt: NOW,
-        executionAttempt: Math.max(run.executionAttempt, 1),
-        failureCategory: 'internal',
-        failureCode: 'processing_failed',
-      },
-    });
-  }
+  await prisma.$executeRaw`
+    UPDATE "vulnerability_sync_run"
+    SET
+      "state" = 'failed',
+      "started_at" = COALESCE("started_at", ${NOW}),
+      "completed_at" = ${NOW},
+      "execution_attempt" = GREATEST("execution_attempt", 1),
+      "failure_category" = 'internal',
+      "failure_code" = 'processing_failed',
+      "next_attempt_at" = NULL
+    WHERE "state" NOT IN ('completed', 'not_modified', 'failed', 'quarantined')
+  `;
 }
 
 export async function createRequestedSyncRun(
