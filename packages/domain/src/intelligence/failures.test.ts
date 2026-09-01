@@ -28,6 +28,7 @@ describe('intelligence safe failure taxonomy', () => {
     ]);
     expect(intelligenceSafeFailureCodes).toContain('provider_disabled');
     expect(intelligenceSafeFailureCodes).toContain('catalog_regression');
+    expect(intelligenceSafeFailureCodes).toContain('normalized_output_too_large');
     expect(intelligenceSafeFailureCodes).not.toContain('ECONNRESET');
     expect(Object.keys(intelligenceSafeFailureCatalog)).toHaveLength(
       intelligenceSafeFailureCodes.length,
@@ -50,6 +51,14 @@ describe('intelligence safe failure taxonomy', () => {
     const regression = classifyIntelligenceSafeFailure('catalog_regression');
     expect(regression.category).toBe('catalog_regression');
     expect(regression.disposition).toBe('quarantined');
+
+    const outputTooLarge = classifyIntelligenceSafeFailure('normalized_output_too_large');
+    expect(outputTooLarge.category).toBe('structural_limit');
+    expect(outputTooLarge.disposition).toBe('quarantined');
+    expect(outputTooLarge.retryable).toBe(false);
+    expect(outputTooLarge.snapshotMayExist).toBe(true);
+    expect(outputTooLarge.freshnessMayAdvance).toBe(false);
+
     expect(intelligenceFailureFreshnessMayAdvance('processing_failed')).toBe(false);
   });
 

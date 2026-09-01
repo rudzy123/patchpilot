@@ -51,7 +51,11 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 | --- | --- | --- |
 | OD-20 object-key layout | Temporary and final instance-owned snapshot keys | **Closed.** `intelligence/cisa_kev/cisa_kev_json_catalog/tmp/{uuid}` and `intelligence/cisa_kev/cisa_kev_json_catalog/sha256/{sha256}`. No tenant identifiers, filenames, or signed URLs. |
 
-OD-10 (instance operator identity) and OD-15 (matching algorithm) remain open.
+## Closed in Session 9 Batch 6B (KEV parser)
+
+| ID | Topic | Status after Batch 6B |
+| --- | --- | --- |
+| KEV parser isolation | One-shot worker thread, transferred bytes, actual `worker.terminate()` | **Closed for parsing.** Snapshot retrieval, catalog regression, staging, and activation remain later batches. Worker `resourceLimits` remain a future hardening decision. Duplicate JSON object keys are not detected in v0.1. |
 
 ## Still open
 

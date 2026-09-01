@@ -210,6 +210,10 @@ describe('intelligence provider public contracts', () => {
     expect(intelligenceSafeFailureCodeSchema.parse('schema_invalid')).toBe('schema_invalid');
     expect(intelligenceSafeFailureCodeSchema.safeParse('ECONNRESET').success).toBe(false);
     expect([...intelligenceSafeFailureCodes]).toContain('catalog_regression');
+    expect([...intelligenceSafeFailureCodes]).toContain('normalized_output_too_large');
+    expect(intelligenceSafeFailureCodeSchema.parse('normalized_output_too_large')).toBe(
+      'normalized_output_too_large',
+    );
     expect(intelligenceDisplayName('cisa_kev')).toBe('CISA Known Exploited Vulnerabilities');
     expect(INTELLIGENCE_PROVIDER_STATUS_CACHE_CONTROL).toBe('private, no-store');
     expect(CISA_KEV_SOURCE_IDENTIFIER).toBe('cisa_kev_json_catalog');

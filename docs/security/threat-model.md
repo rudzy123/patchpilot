@@ -143,7 +143,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Incorrect future correlation and KEV enrichment; wrong **priority**; parser exhaustion. Session 9 must not turn a poisoned feed into Findings.
 
-**Mitigation:** HTTPS, allowlists, payload hashes, additive versions, retain conflicts, guarded current-projection activation, archive extraction limits, worker-thread termination, no body logging. Residual: public catalogs can be wrong. Runtime import is not implemented.
+**Mitigation:** HTTPS, allowlists, payload hashes, additive versions, retain conflicts, guarded current-projection activation, archive extraction limits, KEV worker-thread termination, no body logging. Residual: public catalogs can be wrong. Synchronization and Finding integration are not implemented.
 
 ### Compromised provider credentials
 

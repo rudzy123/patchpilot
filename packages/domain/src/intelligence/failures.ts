@@ -39,6 +39,7 @@ export const intelligenceSafeFailureCodes = [
   'json_depth',
   'json_nodes',
   'json_string_length',
+  'normalized_output_too_large',
   'schema_invalid',
   'count_mismatch',
   'duplicate_cve',
@@ -220,6 +221,13 @@ export const intelligenceSafeFailureCatalog: {
     freshnessMayAdvance: false,
   },
   json_string_length: {
+    category: 'structural_limit',
+    retryable: false,
+    disposition: 'quarantined',
+    snapshotMayExist: true,
+    freshnessMayAdvance: false,
+  },
+  normalized_output_too_large: {
     category: 'structural_limit',
     retryable: false,
     disposition: 'quarantined',
