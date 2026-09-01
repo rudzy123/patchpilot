@@ -37,8 +37,8 @@ import {
   type CanonicalCve,
 } from './normalize.js';
 import {
-  parseIntelligenceSnapshotObjectKey,
-  type IntelligenceSnapshotObjectKey,
+  parseFinalIntelligenceSnapshotObjectKey,
+  type FinalIntelligenceSnapshotObjectKey,
 } from './object-keys.js';
 
 export function createRequestedIntelligenceSyncRunRecord(input: {
@@ -131,7 +131,7 @@ export type IntelligenceSnapshotRecord = {
   byteLength: number;
   declaredContentType: IntelligenceSafeContentTypeLabel | null;
   detectedContentType: IntelligenceSafeContentTypeLabel | null;
-  objectKey: IntelligenceSnapshotObjectKey;
+  objectKey: FinalIntelligenceSnapshotObjectKey;
   retrievedAt: Date;
   storedAt: Date;
   etagHash: string | null;
@@ -253,7 +253,7 @@ export function validateIntelligenceSnapshotRecord(
   ) {
     return err(intelligenceValidationError('Snapshot content-type labels must be safe.'));
   }
-  const objectKey = parseIntelligenceSnapshotObjectKey(record.objectKey);
+  const objectKey = parseFinalIntelligenceSnapshotObjectKey(record.objectKey);
   if (!objectKey.ok) {
     return objectKey;
   }

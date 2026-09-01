@@ -77,6 +77,19 @@ describe('logger redaction', () => {
         originalFilename: 'customer-bom.json',
         peerIp: '192.0.2.10',
         accountDigest: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+        providerUrl:
+          'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json',
+        sourceUrl:
+          'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json',
+        responseHeaders: { etag: '"raw-provider-etag"', 'retry-after': '120' },
+        etag: '"raw-provider-etag"',
+        lastModified: 'Mon, 31 Aug 2026 16:00:00 GMT',
+        temporarySnapshotKey:
+          'intelligence/cisa_kev/cisa_kev_json_catalog/tmp/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        finalSnapshotKey:
+          'intelligence/cisa_kev/cisa_kev_json_catalog/sha256/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+        conditionalValidator: '"raw-provider-etag"',
+        dnsAddresses: ['203.0.113.10', '2001:db8::1'],
         credential: { passwordHash: '$argon2id$v=19$m=19456,p=1,t=2$nestedcredhashvalue' },
         databaseUrl: 'postgresql://patchpilot:operator-secret@db.internal:5432/patchpilot',
         DATABASE_URL: 'postgresql://patchpilot:operator-secret@db.internal:5432/patchpilot',
@@ -114,6 +127,12 @@ describe('logger redaction', () => {
     expect(output).not.toContain('bom.json');
     expect(output).not.toContain('customer-bom.json');
     expect(output).not.toContain('192.0.2.10');
+    expect(output).not.toContain('known_exploited_vulnerabilities.json');
+    expect(output).not.toContain('raw-provider-etag');
+    expect(output).not.toContain('Mon, 31 Aug 2026 16:00:00 GMT');
+    expect(output).not.toContain('intelligence/cisa_kev');
+    expect(output).not.toContain('203.0.113.10');
+    expect(output).not.toContain('2001:db8::1');
     expect(output).not.toContain(
       'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
     );

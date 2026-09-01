@@ -58,7 +58,7 @@ export const INTELLIGENCE_PARTIAL_ACTIVATION_INCONSISTENT: AppError = Object.fre
 
 export const INTELLIGENCE_INVALID_OBJECT_KEY: AppError = Object.freeze({
   code: 'validation',
-  message: 'Intelligence snapshot object key is not a valid opaque internal key.',
+  message: 'Intelligence snapshot object key is not a valid instance-owned snapshot key.',
 });
 
 export const INTELLIGENCE_ARBITRARY_URL_FORBIDDEN: AppError = Object.freeze({

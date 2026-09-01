@@ -113,6 +113,14 @@ export const INTELLIGENCE_CWE_MAX_COUNT = 16;
 export const INTELLIGENCE_CWE_MAX_LENGTH = 32;
 export const INTELLIGENCE_RAW_RANSOMWARE_MAX_LENGTH = 64;
 export const INTELLIGENCE_SNAPSHOT_OBJECT_KEY_MAX_LENGTH = 512;
+export const INTELLIGENCE_SNAPSHOT_KEY_PREFIX =
+  'intelligence/cisa_kev/cisa_kev_json_catalog' as const;
+export const INTELLIGENCE_UPLOAD_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+export const INTELLIGENCE_TEMPORARY_SNAPSHOT_OBJECT_KEY_PATTERN =
+  /^intelligence\/cisa_kev\/cisa_kev_json_catalog\/tmp\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+export const INTELLIGENCE_FINAL_SNAPSHOT_OBJECT_KEY_PATTERN =
+  /^intelligence\/cisa_kev\/cisa_kev_json_catalog\/sha256\/[a-f0-9]{64}$/;
 export const INTELLIGENCE_DEDUPE_KEY_MAX_LENGTH = 256;
 export const INTELLIGENCE_SCHEDULE_WINDOW_MAX_LENGTH = 64;
 export const INTELLIGENCE_REQUEST_TOKEN_MAX_LENGTH = 128;
@@ -149,4 +157,5 @@ export const INTELLIGENCE_PROVIDER_STATUS_PATH =
   '/intelligence/providers/:provider/status' as const;
 export const INTELLIGENCE_PROVIDER_STATUS_CACHE_CONTROL = 'private, no-store' as const;
 
-export const INTELLIGENCE_SNAPSHOT_OBJECT_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~/-]{0,511}$/;
+export const INTELLIGENCE_SNAPSHOT_OBJECT_KEY_PATTERN =
+  /^(?:intelligence\/cisa_kev\/cisa_kev_json_catalog\/tmp\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|intelligence\/cisa_kev\/cisa_kev_json_catalog\/sha256\/[a-f0-9]{64})$/;

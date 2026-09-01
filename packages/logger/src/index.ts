@@ -133,10 +133,28 @@ const redactPaths = [
   'req.headers["idempotency-key"]',
   'peerIp',
   'remoteAddress',
+  'dnsAddresses',
+  'providerUrl',
+  'sourceUrl',
+  'responseHeaders',
+  'etag',
+  'lastModified',
+  'temporarySnapshotKey',
+  'finalSnapshotKey',
+  'conditionalValidator',
   'accountDigest',
   'accountKey',
   '*.peerIp',
   '*.remoteAddress',
+  '*.dnsAddresses',
+  '*.providerUrl',
+  '*.sourceUrl',
+  '*.responseHeaders',
+  '*.etag',
+  '*.lastModified',
+  '*.temporarySnapshotKey',
+  '*.finalSnapshotKey',
+  '*.conditionalValidator',
   '*.accountDigest',
   '*.accountKey',
   '*.credentials',
@@ -231,7 +249,11 @@ function sanitizeHeaders(headers: unknown): Record<string, unknown> {
       lower.includes('secret') ||
       lower.includes('signature') ||
       lower === 'idempotency-key' ||
-      lower === 'content-disposition'
+      lower === 'content-disposition' ||
+      lower === 'etag' ||
+      lower === 'last-modified' ||
+      lower === 'location' ||
+      lower === 'retry-after'
     ) {
       sanitized[key] = '[Redacted]';
       continue;

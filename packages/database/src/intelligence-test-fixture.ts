@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 import {
   JSON_SCHEMA_VERSION_V1,
-  parseIntelligenceSnapshotObjectKey,
+  parseFinalIntelligenceSnapshotObjectKey,
   type CalendarDate,
   type CanonicalCve,
   type KevNormalizedEntryRecord,
@@ -19,9 +19,9 @@ import {
 
 export const KEV_PARSER_VERSION = '0.1.0';
 export const KEV_NORMALIZATION_VERSION = '1';
-export const KEV_OBJECT_KEY = 'kev-snapshot-opaque-internal-1';
 export const KEV_SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 export const KEV_SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+export const KEV_OBJECT_KEY = `intelligence/cisa_kev/cisa_kev_json_catalog/sha256/${KEV_SHA}`;
 export const NOW = new Date('2026-09-01T12:00:00.000Z');
 export const CATALOG_VERSION = '2026.09.01';
 
@@ -30,7 +30,7 @@ export function uniqueKevSha(): string {
 }
 
 export function kevObjectKey() {
-  const parsed = parseIntelligenceSnapshotObjectKey(KEV_OBJECT_KEY);
+  const parsed = parseFinalIntelligenceSnapshotObjectKey(KEV_OBJECT_KEY);
   if (!parsed.ok) {
     throw new Error(parsed.error.message);
   }
@@ -99,15 +99,16 @@ export async function createSnapshot(
   creatingSyncRunId: string,
   input?: { sha256?: string; byteLength?: number; objectKey?: string },
 ) {
+  const sha256 = input?.sha256 ?? uniqueKevSha();
   return prisma.vulnerabilityProviderSnapshot.create({
     data: {
       providerKey: 'cisa_kev',
       sourceIdentifier: 'cisa_kev_json_catalog',
-      responseSha256: input?.sha256 ?? uniqueKevSha(),
+      responseSha256: sha256,
       byteLength: input?.byteLength ?? 2048,
       declaredContentType: 'application/json',
       detectedContentType: 'application/json',
-      objectKey: input?.objectKey ?? KEV_OBJECT_KEY,
+      objectKey: input?.objectKey ?? `intelligence/cisa_kev/cisa_kev_json_catalog/sha256/${sha256}`,
       retrievedAt: NOW,
       storedAt: NOW,
       creatingSyncRunId,

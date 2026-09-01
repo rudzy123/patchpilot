@@ -357,6 +357,84 @@ export function createGetCountTransform(options: GetCountOptions): GetCountTrans
   return new GetCountTransform(options);
 }
 
+type HashCountOptions = {
+  maxBytes: number;
+  expectedByteLength?: number;
+  expectedSha256?: string;
+};
+
+export class HashCountTransform extends Transform {
+  private readonly hasher: Hash = createHash('sha256');
+  private readonly maxBytes: number;
+  private readonly expectedByteLength: number | undefined;
+  private readonly expectedSha256: string | undefined;
+  private observed = 0;
+  private digestHex: string | undefined;
+
+  public constructor(options: HashCountOptions) {
+    super({ objectMode: false });
+    this.maxBytes = options.maxBytes;
+    this.expectedByteLength = options.expectedByteLength;
+    this.expectedSha256 = options.expectedSha256;
+  }
+
+  public observedByteLength(): number {
+    return this.observed;
+  }
+
+  public sha256Hex(): string {
+    if (this.digestHex === undefined) {
+      throw new ObjectStorageStreamError('internal');
+    }
+
+    return this.digestHex;
+  }
+
+  public override _transform(
+    chunk: Buffer,
+    _encoding: BufferEncoding,
+    callback: TransformCallback,
+  ): void {
+    try {
+      this.hasher.update(chunk);
+      this.observed += chunk.byteLength;
+      if (this.observed > this.maxBytes) {
+        throw new ObjectStorageStreamError('size_limit');
+      }
+
+      this.push(chunk);
+      callback();
+    } catch (error) {
+      callback(error instanceof Error ? error : new ObjectStorageStreamError('internal'));
+    }
+  }
+
+  public override _flush(callback: TransformCallback): void {
+    try {
+      if (this.observed < 1) {
+        throw new ObjectStorageStreamError('invalid_content');
+      }
+
+      if (this.expectedByteLength !== undefined && this.observed !== this.expectedByteLength) {
+        throw new ObjectStorageStreamError('invalid_content');
+      }
+
+      this.digestHex = this.hasher.digest('hex');
+      if (this.expectedSha256 !== undefined && this.digestHex !== this.expectedSha256) {
+        throw new ObjectStorageStreamError('invalid_content');
+      }
+
+      callback();
+    } catch (error) {
+      callback(error instanceof Error ? error : new ObjectStorageStreamError('internal'));
+    }
+  }
+}
+
+export function createHashCountTransform(options: HashCountOptions): HashCountTransform {
+  return new HashCountTransform(options);
+}
+
 export function asNodeReadable(body: unknown): Readable {
   if (body instanceof Readable) {
     return body;

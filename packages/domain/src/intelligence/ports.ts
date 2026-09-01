@@ -9,8 +9,9 @@ import type { IntelligenceSafeFailureCategory, IntelligenceSafeFailureCode } fro
 import type { IntelligenceProviderFreshness } from './freshness.js';
 import type { CalendarDate, CanonicalCve } from './normalize.js';
 import type {
-  IntelligenceSnapshotObjectKey,
+  FinalIntelligenceSnapshotObjectKey,
   IntelligenceSnapshotObjectKeyBuilderPort,
+  TemporaryIntelligenceSnapshotObjectKey,
 } from './object-keys.js';
 import type {
   IntelligenceSnapshotIdentity,
@@ -25,20 +26,21 @@ import type { IntelligenceSyncRunCommand, IntelligenceSyncRunSnapshot } from './
 
 export type IntelligenceByteStream = AsyncIterable<Uint8Array>;
 
+export type IntelligenceStreamCompletion = {
+  observedByteLength: number;
+  sha256: string;
+};
+
 export type IntelligenceHttpRetryPolicy = {
   maxRetries: number;
   backoffFloorMs: number;
   backoffCeilingMs: number;
 };
 
-export type IntelligenceConditionalValidators = {
-  etagHash?: string;
-  lastModified?: Date;
-};
-
 /**
- * Provider-neutral HTTP request. The URL is resolved inside a future adapter
+ * Provider-neutral HTTP request. The URL is resolved inside the adapter
  * from the closed provider and source identifiers. Callers cannot pass a URL.
+ * Session 9 does not send If-None-Match or If-Modified-Since.
  */
 export type IntelligenceProviderHttpRequest = {
   provider: IntelligenceProvider;
@@ -49,35 +51,26 @@ export type IntelligenceProviderHttpRequest = {
   retryPolicy: IntelligenceHttpRetryPolicy;
   correlationId: string;
   signal?: AbortSignal;
-  conditional?: IntelligenceConditionalValidators;
 };
 
-export type IntelligenceProviderHttpCompletion = {
-  observedByteLength: number;
-  sha256: string;
-};
-
-export type IntelligenceOpaqueEtag = {
-  kind: 'opaque_hash';
-  sha256: string;
-};
+export type IntelligenceProviderHttpCompletion = IntelligenceStreamCompletion;
 
 export type IntelligenceProviderHttpSuccess = {
   kind: 'response';
   status: 200;
   declaredContentType: string | null;
   declaredByteLength: number | null;
-  etag: IntelligenceOpaqueEtag | null;
+  etagHash: string | null;
   lastModified: Date | null;
   body: IntelligenceByteStream;
-  completion: Promise<IntelligenceProviderHttpCompletion>;
+  completion: Promise<IntelligenceStreamCompletion>;
   cancel: () => Promise<void>;
 };
 
 export type IntelligenceProviderHttpNotModified = {
   kind: 'not_modified';
   status: 304;
-  etag: IntelligenceOpaqueEtag | null;
+  etagHash: string | null;
   lastModified: Date | null;
 };
 
@@ -85,6 +78,7 @@ export type IntelligenceProviderHttpFailure = {
   kind: 'failure';
   category: IntelligenceSafeFailureCategory;
   code: IntelligenceSafeFailureCode;
+  retryAfterMs?: number;
 };
 
 export type IntelligenceProviderHttpResult =
@@ -102,10 +96,11 @@ export type IntelligenceSnapshotStorageFailure = {
 };
 
 export type PutTemporaryIntelligenceSnapshotInput = {
-  temporaryObjectKey: IntelligenceSnapshotObjectKey;
+  temporaryObjectKey: TemporaryIntelligenceSnapshotObjectKey;
   body: IntelligenceByteStream;
   contentType: string;
   maxBytes: number;
+  declaredByteLength?: number;
   signal?: AbortSignal;
 };
 
@@ -115,24 +110,38 @@ export type PutTemporaryIntelligenceSnapshotResult = {
 };
 
 export type PromoteIntelligenceSnapshotInput = {
-  temporaryObjectKey: IntelligenceSnapshotObjectKey;
-  finalObjectKey: IntelligenceSnapshotObjectKey;
+  temporaryObjectKey: TemporaryIntelligenceSnapshotObjectKey;
+  finalObjectKey: FinalIntelligenceSnapshotObjectKey;
   expectedSha256: string;
   expectedByteLength: number;
   contentType: string;
   signal?: AbortSignal;
 };
 
+export type PromoteIntelligenceSnapshotResult = {
+  outcome: 'copied' | 'reused';
+  temporaryCleanup: 'deleted' | 'failed';
+};
+
 export type HeadIntelligenceSnapshotInput = {
-  finalObjectKey: IntelligenceSnapshotObjectKey;
+  finalObjectKey: FinalIntelligenceSnapshotObjectKey;
   signal?: AbortSignal;
 };
 
 export type IntelligenceSnapshotExistence =
-  { exists: true; byteLength: number } | { exists: false };
+  | {
+      exists: true;
+      byteLength: number;
+      sha256: string;
+      declaredContentType: string | null;
+      detectedContentType: string | null;
+      provider: 'cisa_kev';
+      sourceIdentifier: 'cisa_kev_json_catalog';
+    }
+  | { exists: false };
 
 export type GetIntelligenceSnapshotInput = {
-  finalObjectKey: IntelligenceSnapshotObjectKey;
+  finalObjectKey: FinalIntelligenceSnapshotObjectKey;
   maxBytes: number;
   expectedByteLength?: number;
   expectedSha256?: string;
@@ -142,12 +151,12 @@ export type GetIntelligenceSnapshotInput = {
 export type GetIntelligenceSnapshotResult = {
   body: IntelligenceByteStream;
   declaredByteLength?: number;
-  completion: Promise<IntelligenceProviderHttpCompletion>;
+  completion: Promise<IntelligenceStreamCompletion>;
   cancel: () => Promise<void>;
 };
 
 export type DeleteTemporaryIntelligenceSnapshotInput = {
-  temporaryObjectKey: IntelligenceSnapshotObjectKey;
+  temporaryObjectKey: TemporaryIntelligenceSnapshotObjectKey;
   signal?: AbortSignal;
 };
 
@@ -157,16 +166,24 @@ export type IntelligenceSnapshotPrivacyAssumptions = {
   signedUrlsDisabled: true;
 };
 
+export type InitializeIntelligenceDevelopmentBucketInput = {
+  explicitlyAllowed: true;
+  bucket: string;
+};
+
 export type IntelligenceSnapshotStoragePort = {
   verifyPrivateStorageAvailability(input?: {
     signal?: AbortSignal;
   }): Promise<Result<IntelligenceSnapshotPrivacyAssumptions, IntelligenceSnapshotStorageFailure>>;
+  initializeDevelopmentBucket(
+    input: InitializeIntelligenceDevelopmentBucketInput,
+  ): Promise<Result<void, IntelligenceSnapshotStorageFailure>>;
   putTemporarySnapshot(
     input: PutTemporaryIntelligenceSnapshotInput,
   ): Promise<Result<PutTemporaryIntelligenceSnapshotResult, IntelligenceSnapshotStorageFailure>>;
   promoteTemporarySnapshot(
     input: PromoteIntelligenceSnapshotInput,
-  ): Promise<Result<void, IntelligenceSnapshotStorageFailure>>;
+  ): Promise<Result<PromoteIntelligenceSnapshotResult, IntelligenceSnapshotStorageFailure>>;
   headFinalSnapshot(
     input: HeadIntelligenceSnapshotInput,
   ): Promise<Result<IntelligenceSnapshotExistence, IntelligenceSnapshotStorageFailure>>;

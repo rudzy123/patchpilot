@@ -29,7 +29,7 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 | Session 9 import role | Global, instance-owned, import-only catalog; OSV GCS bulk export + CISA KEV JSON snapshot | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Runtime is **not** implemented. |
 | Zero-Finding invariant | Import must not match components, write Findings/FindingObservations, enrich findings, score, remediate, or enqueue `finding.recalculate` | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) |
 | Import vs correlation | [ADR 0010](../adr/0010-osv-correlation.md) remains future correlation, not the Session 9 import mechanism | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) |
-| Snapshot/provenance strategy | Private raw snapshots, append-only revisions, guarded current-projection activation, content SHA-256 idempotency | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Object-key layout still open. |
+| Snapshot/provenance strategy | Private raw snapshots, append-only revisions, guarded current-projection activation, content SHA-256 idempotency | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Object-key layout closed in Batch 5B. |
 
 ## Closed in Session 9 Batch 2C (configuration)
 
@@ -43,7 +43,13 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 
 | ID | Topic | Status after Batch 4C |
 | --- | --- | --- |
-| OD-20 staging and activation schema | Generation-scoped KEV tables, SQL state machines, atomic activation, and the `intelligence_source` active pointer | **Closed for schema.** Staging, complete, active, superseded, and abandoned generations are persisted. Activation is one PostgreSQL transaction. Object-key layout remains open. |
+| OD-20 staging and activation schema | Generation-scoped KEV tables, SQL state machines, atomic activation, and the `intelligence_source` active pointer | **Closed for schema.** Staging, complete, active, superseded, and abandoned generations are persisted. Activation is one PostgreSQL transaction. |
+
+## Closed in Session 9 Batch 5B (CISA HTTPS and snapshot storage)
+
+| ID | Topic | Status after Batch 5B |
+| --- | --- | --- |
+| OD-20 object-key layout | Temporary and final instance-owned snapshot keys | **Closed.** `intelligence/cisa_kev/cisa_kev_json_catalog/tmp/{uuid}` and `intelligence/cisa_kev/cisa_kev_json_catalog/sha256/{sha256}`. No tenant identifiers, filenames, or signed URLs. |
 
 OD-10 (instance operator identity) and OD-15 (matching algorithm) remain open.
 
@@ -67,7 +73,6 @@ OD-10 (instance operator identity) and OD-15 (matching algorithm) remain open.
 | OD-17 | MFA and account lockout | [ADR 0019](../adr/0019-local-password-sessions.md) specifies Argon2id and fail-closed login rate limits, not MFA or durable lockout. | Dual-key Redis login limits. No MFA. No lockout table. Revisit before treating the product as resistant to credential stuffing beyond those controls. |
 | OD-18 | Reverse-proxy trust hops | `trustProxy` remains false in Session 6. Production TLS topology is operator-specific. | Direct socket peer IP for login rate limits. Do not trust `X-Forwarded-For`. Document hops in a later ADR before enabling `trustProxy`. |
 | OD-19 | Provider-neutral Vulnerability identity | Existing required unique `osvId` cannot store a KEV-only CVE without a synthetic id or schema change. | Keep `osvId` until a later database-design ADR. Do not invent a Session 9 identity migration in Batch 1B. |
-| OD-20 | Intelligence object-key layout | Final snapshot keys are not chosen. Staging/activation schema is implemented in Batch 4C. | Private instance-owned keys; no public or signed URLs. Do not treat the current opaque validator as a production prefix scheme. |
 | OD-21 | Session 9 scheduler, heartbeat, and retry policy | Bounded automatic retry is required; cadence and heartbeat are not. | Follow Session 8 outbox + BackgroundJob leases. Terminal runs stay historical; replay creates a new run. No lease heartbeat yet. |
 
 Related: [ADR index](../adr/README.md), [architecture risk register](../security/risk-register.md).

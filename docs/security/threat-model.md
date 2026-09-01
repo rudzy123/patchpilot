@@ -28,9 +28,9 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 - Partial normalization must never become the current catalog. Content SHA-256 is import idempotency until conditional GET is verified.
 - Session 9 must not match components, write Findings or FindingObservations, enrich findings, score, remediate, enqueue `finding.recalculate`, or query tenant inventories.
 - Parser isolation follows Session 8: parse outside transactions; `worker.terminate()` if termination is required; `Promise.race` is not a kill switch. Archive extraction limits are required; no archive dependency is selected yet.
-- Provider HTTP, when implemented, is allowlisted HTTPS with redirects disabled initially and rejection of private, loopback, link-local, metadata-service, and other non-public destinations. Advisory reference URLs are never fetched.
-- DNS connection pinning is not promised until the provider-HTTP batch proves a viable Node 24 design.
-- Still absent: measured archive sizes, numeric production limits, object-key layout, scheduler, status APIs, and any Finding workflow.
+- Provider HTTP is allowlisted HTTPS (`node:https.request`) with redirects disabled, proxy environment ignored, and rejection of private, loopback, link-local, metadata-service, and other non-public destinations. Advisory reference URLs are never fetched.
+- DNS lookup pinning plus post-connect verification is implemented for CISA KEV. It is not DNSSEC.
+- Still absent: complete parser, scheduler loop, status APIs, and any Finding workflow.
 
 ## Assets to protect
 
@@ -175,7 +175,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Cloud credential theft, internal scan.
 
-**Mitigation:** No SBOM URL fetch; no fetch of provider reference or note URLs; compiled provider allowlist; HTTPS only; redirects disabled initially; reject private, loopback, link-local, metadata-service, and other non-public destinations; timeouts and size limits; no arbitrary caller URL. Residual: mis-allowlist. DNS pinning is not yet a claimed control.
+**Mitigation:** No SBOM URL fetch; no fetch of provider reference or note URLs; compiled provider allowlist; HTTPS only via `node:https.request`; redirects disabled; proxy environment ignored; reject private, loopback, link-local, metadata-service, and other non-public destinations; DNS lookup pinning plus post-connect verification (not DNSSEC); timeouts and size limits; no arbitrary caller URL. Residual: mis-allowlist; pinning is not DNSSEC.
 
 ### SQL injection
 
@@ -445,7 +445,7 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 | Poisoned feeds | Catalog | MITM/compromise | Wrong priority | HTTPS, hashes, additive | Stale/degraded | Keep last good | Fixture conflicts | Public catalogs lie | Intel |
 | Stolen provider/storage creds | Storage, feeds | Leak | Theft | Encrypt, config | Audit creds | Rotate | Redaction tests | Operator keys | Integrations |
 | Webhook forgery/replay | Future | Fake callback | Confused deputy | No listeners in v0.1 | — | — | When added | Future | API |
-| SSRF | Cloud metadata | URL fetch; advisory references | Cred theft | No SBOM/reference fetch; compiled allowlist; non-public destination rejection | Egress logs | Block | Adapter tests | Mis-allowlist; DNS pinning not claimed | Integrations |
+| SSRF | Cloud metadata | URL fetch; advisory references | Cred theft | No SBOM/reference fetch; compiled allowlist; non-public destination rejection; CISA lookup-pin plus post-connect verify | Egress logs | Block | Adapter tests | Mis-allowlist; pinning is not DNSSEC | Integrations |
 | Poisoned / hostile intel archive | Shared catalog | MITM, zip bomb, incomplete activation | Wrong future match; DoS | Hashes, additive revisions, extraction limits, guarded activation, zero Findings | Quarantine / failed run | Keep last accepted catalog | Fixture + replay | Public catalogs lie; runtime not implemented | Intel |
 | Partial catalog activation | Current projection | Mid-import failure treated as complete | Silent withdrawal | Staging/generation activation after complete unit | Sync failed/quarantined audit | New run; do not rewrite terminal | Persistence tests later | Staging schema deferred | Intel |
 | SQLi | DB | Concat SQL | Takeover | Prisma | — | Restore | — | Raw SQL mistakes | Database |

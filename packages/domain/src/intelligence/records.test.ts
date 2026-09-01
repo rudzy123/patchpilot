@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { buildFinalSbomObjectKey } from '../sbom/object-keys.js';
 import { CISA_KEV_SOURCE_IDENTIFIER } from './constants.js';
-import { parseIntelligenceSnapshotObjectKey } from './object-keys.js';
+import {
+  parseFinalIntelligenceSnapshotObjectKey,
+  parseIntelligenceSnapshotObjectKey,
+} from './object-keys.js';
 import {
   assertNoDuplicateNormalizedCves,
   canActivateKevGeneration,
@@ -31,9 +34,11 @@ const SHA = 'a'.repeat(64);
 const NOW = new Date('2026-08-31T16:00:00.000Z');
 
 function snapshot(overrides: Partial<IntelligenceSnapshotRecord> = {}): IntelligenceSnapshotRecord {
-  const objectKey = parseIntelligenceSnapshotObjectKey('kev-snapshot-opaque-internal-1');
+  const objectKey = parseFinalIntelligenceSnapshotObjectKey(
+    `intelligence/cisa_kev/cisa_kev_json_catalog/sha256/${SHA}`,
+  );
   if (!objectKey.ok) {
-    throw new Error('expected opaque key');
+    throw new Error('expected final intelligence snapshot key');
   }
   return {
     id: SNAPSHOT_ID,
@@ -124,7 +129,7 @@ describe('snapshot records', () => {
     ).toBe(false);
   });
 
-  it('keeps object keys internal, opaque, and distinct from SBOM keys', () => {
+  it('keeps object keys internal, content-addressed, and distinct from SBOM keys', () => {
     expect(parseIntelligenceSnapshotObjectKey('https://example.invalid/object').ok).toBe(false);
     expect(
       parseIntelligenceSnapshotObjectKey(
@@ -135,7 +140,9 @@ describe('snapshot records', () => {
         }),
       ).ok,
     ).toBe(false);
-    const key = parseIntelligenceSnapshotObjectKey('kev-snapshot-opaque-internal-1');
+    const key = parseFinalIntelligenceSnapshotObjectKey(
+      `intelligence/cisa_kev/cisa_kev_json_catalog/sha256/${SHA}`,
+    );
     expect(key.ok).toBe(true);
     const record = snapshot();
     expect(Object.prototype.hasOwnProperty.call(record, 'organizationId')).toBe(false);

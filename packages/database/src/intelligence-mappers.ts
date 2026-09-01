@@ -2,7 +2,7 @@ import {
   CISA_KEV_SOURCE_IDENTIFIER,
   isIntelligenceSafeFailureCode,
   intelligenceSafeFailureCategories,
-  parseIntelligenceSnapshotObjectKey,
+  parseFinalIntelligenceSnapshotObjectKey,
   type CalendarDate,
   type CanonicalCve,
   type IntelligenceNotModifiedReason,
@@ -191,7 +191,7 @@ export function toIntelligenceSyncRunSnapshot(
 }
 
 export function mapIntelligenceSnapshot(row: SnapshotRow): IntelligenceSnapshotRecord {
-  const objectKey = parseIntelligenceSnapshotObjectKey(row.objectKey);
+  const objectKey = parseFinalIntelligenceSnapshotObjectKey(row.objectKey);
   if (!objectKey.ok) {
     throw new Error(objectKey.error.message);
   }

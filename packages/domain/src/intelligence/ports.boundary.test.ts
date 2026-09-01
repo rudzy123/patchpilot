@@ -55,11 +55,13 @@ describe('intelligence ports and zero-Finding boundary', () => {
     const source = readFileSync(join(packageRoot, 'ports.ts'), 'utf8');
     expect(source).not.toMatch(/url\?: string|url: string/);
     expect(source).toContain('body: IntelligenceByteStream');
-    expect(source).toContain('completion: Promise<IntelligenceProviderHttpCompletion>');
+    expect(source).toContain('completion: Promise<IntelligenceStreamCompletion>');
     expect(source).toContain('cancel: () => Promise<void>');
     expect(source).not.toContain('IncomingMessage');
     expect(source).not.toContain('redirectUrl');
     expect(source).not.toContain('redirectTarget');
+    expect(source).not.toMatch(/conditional\?:/);
+    expect(source).not.toMatch(/If-None-Match:/);
     expect(INTELLIGENCE_ARBITRARY_URL_FORBIDDEN.message).toContain('caller-supplied URLs');
     const request: IntelligenceProviderHttpRequest = {
       provider: 'cisa_kev',
@@ -85,9 +87,14 @@ describe('intelligence ports and zero-Finding boundary', () => {
     const source = readFileSync(join(packageRoot, 'ports.ts'), 'utf8');
     expect(source).not.toMatch(/S3Client|PutObjectCommand|GetObjectCommand|@aws-sdk/);
     expect(source).not.toContain('publicUrl');
-    expect(source).toContain('IntelligenceSnapshotObjectKey');
+    expect(source).toContain('TemporaryIntelligenceSnapshotObjectKey');
+    expect(source).toContain('FinalIntelligenceSnapshotObjectKey');
+    expect(source).toContain('initializeDevelopmentBucket');
+    expect(source).toContain('temporaryCleanup');
     expect(source).not.toContain('SbomObjectKey');
-    const key = parseIntelligenceSnapshotObjectKey('kev-snapshot-opaque-internal-1');
+    const key = parseIntelligenceSnapshotObjectKey(
+      `intelligence/cisa_kev/cisa_kev_json_catalog/sha256/${'a'.repeat(64)}`,
+    );
     expect(key.ok).toBe(true);
     const storage: Pick<IntelligenceSnapshotStoragePort, 'putTemporarySnapshot'> = {
       putTemporarySnapshot: async (input) =>

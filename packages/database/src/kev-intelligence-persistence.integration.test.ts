@@ -10,7 +10,7 @@ import { INTELLIGENCE_KEV_STALE_THRESHOLD_SECONDS_DEFAULT } from '@patchpilot/co
 import {
   INTELLIGENCE_PARTIAL_ACTIVATION_INCONSISTENT,
   deriveIntelligenceProviderHealthStatus,
-  parseIntelligenceSnapshotObjectKey,
+  parseFinalIntelligenceSnapshotObjectKey,
   type IntelligenceSnapshotRecord,
   type Result,
 } from '@patchpilot/domain';
@@ -44,7 +44,7 @@ function requireOk<T>(result: Result<T>, label: string): T {
 }
 
 function snapshotRecord(creatingSyncRunId: string, sha256: string): IntelligenceSnapshotRecord {
-  const objectKey = parseIntelligenceSnapshotObjectKey(KEV_OBJECT_KEY);
+  const objectKey = parseFinalIntelligenceSnapshotObjectKey(KEV_OBJECT_KEY);
   if (!objectKey.ok) {
     throw new Error(objectKey.error.message);
   }
