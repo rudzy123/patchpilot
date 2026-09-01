@@ -2,7 +2,7 @@
   "name": "@patchpilot/domain",
   "version": "0.0.0",
   "private": true,
-  "description": "Framework-independent domain kernel, persistence ports, SBOM ingestion contracts, and lifecycle catalogs.",
+  "description": "Framework-independent domain kernel, persistence ports, SBOM ingestion, and KEV intelligence contracts.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {

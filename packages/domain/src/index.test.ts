@@ -9,6 +9,10 @@ import {
   evidenceKinds,
   findingStates,
   graphCompletenessValues,
+  intelligenceProviders,
+  intelligenceSyncRunStates,
+  intelligenceSyncRunTerminalStates,
+  kevGenerationStates,
   MAX_PAGE_SIZE,
   membershipRoles,
   MIN_PAGE_SIZE,
@@ -65,6 +69,25 @@ describe('lifecycle catalogs', () => {
       'failed',
     ]);
     expect(sbomSpecificationVersions).not.toContain('1.7');
+  });
+
+  it('closes Session 9 intelligence providers, sync-run states, and generation states', () => {
+    expect(intelligenceProviders).toEqual(['cisa_kev', 'osv']);
+    expect(intelligenceSyncRunStates[0]).toBe('requested');
+    expect(intelligenceSyncRunTerminalStates).toEqual([
+      'completed',
+      'not_modified',
+      'failed',
+      'quarantined',
+    ]);
+    expect(kevGenerationStates).toEqual([
+      'staging',
+      'complete',
+      'active',
+      'superseded',
+      'abandoned',
+    ]);
+    expect(intelligenceSyncRunStates).not.toContain('match');
   });
 });
 

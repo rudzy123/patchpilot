@@ -601,6 +601,12 @@ importers:
 
   packages/vulnerability-intelligence:
     dependencies:
+      '@patchpilot/config':
+        specifier: workspace:*
+        version: link:../config
+      '@patchpilot/domain':
+        specifier: workspace:*
+        version: link:../domain
       ajv:
         specifier: 8.20.0
         version: 8.20.0
