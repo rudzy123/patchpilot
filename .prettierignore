@@ -20,3 +20,4 @@ CHANGELOG.md
 .tsc-check
 deploy/compose/data
 packages/sbom/vendor
+packages/vulnerability-intelligence/vendor

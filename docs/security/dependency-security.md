@@ -48,9 +48,39 @@ Official JSON schemas for CycloneDX **1.4**, **1.5**, and **1.6** are stored und
 
 Normal **install, test, build, runtime, and CI do not download schemas**. Re-vendoring is a maintainer-only script (`scripts/vendor-cyclonedx-json-schema.mjs --execute`) that is not a lifecycle or CI script.
 
+## Session 9 Batch 3B approved dependencies
+
+Installed as exact versions (no caret or tilde ranges) on `@patchpilot/vulnerability-intelligence`. These versions were already resolved in the workspace lockfile by Session 8. No `pnpm.overrides` entry was added. `allowBuilds` was not changed. No `minimumReleaseAge` exclusion was added. No ZIP, archive, HTTP-client, CISA/OSV SDK, or second JSON Schema validator was installed.
+
+| Package | Version | License | Where | Purpose in this batch |
+| --- | --- | --- | --- | --- |
+| `ajv` | 8.20.0 | MIT | `@patchpilot/vulnerability-intelligence` | Compile the vendored CISA KEV JSON Schema offline (draft-07, strict) |
+| `ajv-formats` | 3.0.1 | MIT | `@patchpilot/vulnerability-intelligence` | `date` and `date-time` formats only; no URL fetch |
+| `secure-json-parse` | 4.1.0 | BSD-3-Clause | `@patchpilot/vulnerability-intelligence` | Reject `__proto__` / `constructor.prototype` keys in untrusted JSON tests |
+
+Not installed: ZIP or archive packages (`yauzl`, `unzipper`, `node-stream-zip`, `fflate`, `adm-zip`, `jszip`), provider or CISA/OSV SDKs, HTTP clients (`node-fetch`, `axios`, `got`, `undici` as a direct dependency), `ajv-formats-draft2019`, `ajv-keywords`, a second JSON Schema validator, `packageurl-js`, database packages, BullMQ, Redis, native addons, or schema-download packages.
+
+## Vendored CISA KEV JSON Schema
+
+The official CISA KEV JSON Schema is stored under `packages/vulnerability-intelligence/vendor/cisa-kev-schema/`.
+
+- Source URL: `https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities_schema.json`
+- First-vendor SHA-256: `577f4ccc06b7b7c6a109e1a0d6457a26db7fc5219398ff2e287b9a7e14e2d9ef`
+- Byte length: 3407
+- Draft: JSON Schema draft-07
+- Internal `$ref`: exactly `#/$defs/vulnerability` (no remote references)
+- Formats: exactly `date` and `date-time`
+- License: CC0-1.0 (`LICENSE` plus `NOTICE` in that directory)
+- Provenance: `PROVENANCE.json` and `SHA256SUMS`
+- Role: official JSON Schema for the CISA KEV JSON catalog, **not** the catalog body
+
+The production KEV catalog JSON is **not** stored in the repository. Install, test, build, runtime, and CI do **not** download this schema. Re-vendoring is a maintainer-only script (`scripts/vendor-cisa-kev-schema.mjs --execute`) that is not a lifecycle, Turbo, or CI script. A changed upstream schema hash requires a new explicit review; the expected hash is not updated silently.
+
+Batch 3B does not add provider HTTP runtime, a worker thread, a database migration, or Finding integration.
+
 ## Remaining `pnpm audit` findings
 
-Re-run on 2026-08-29 against `feat/sbom-ingestion` after Session 8 Batch 2 local verification, both before and after the new dependencies (`pnpm audit` exit 1; `pnpm audit --prod` exit 1). No `pnpm.overrides` entry hides an advisory. Session 8 Batch 2 did not add a second advisory. The remaining finding is the same Prisma-transitive `deepmerge-ts` advisory recorded after the observability cut and Session 6.
+Re-run on 2026-08-29 against `feat/sbom-ingestion` after Session 8 Batch 2 local verification, both before and after the new dependencies (`pnpm audit` exit 1; `pnpm audit --prod` exit 1). Session 9 Batch 3B reuses the same `ajv@8.20.0`, `ajv-formats@3.0.1`, and `secure-json-parse@4.1.0` versions already in the lockfile. No `pnpm.overrides` entry hides an advisory. Batch 3B must not add a second advisory. The remaining finding is the same Prisma-transitive `deepmerge-ts` advisory recorded after the observability cut and Session 6.
 
 | Advisory | Package | Severity | How it is reached | Residual status |
 | --- | --- | --- | --- | --- |

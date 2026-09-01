@@ -600,6 +600,16 @@ importers:
   packages/typescript-config: {}
 
   packages/vulnerability-intelligence:
+    dependencies:
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
+      ajv-formats:
+        specifier: 3.0.1
+        version: 3.0.1(ajv@8.20.0)
+      secure-json-parse:
+        specifier: 4.1.0
+        version: 4.1.0
     devDependencies:
       '@patchpilot/eslint-config':
         specifier: workspace:*
