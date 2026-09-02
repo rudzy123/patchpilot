@@ -13,6 +13,9 @@ import {
   intelligenceSyncRunStates,
   intelligenceSyncRunTerminalStates,
   kevGenerationStates,
+  kevMembershipStatuses,
+  forbiddenIdentityFieldNames,
+  CVE_IDENTITY_BATCH_LOOKUP_MAX,
   MAX_PAGE_SIZE,
   membershipRoles,
   MIN_PAGE_SIZE,
@@ -88,6 +91,14 @@ describe('lifecycle catalogs', () => {
       'abandoned',
     ]);
     expect(intelligenceSyncRunStates).not.toContain('match');
+  });
+
+  it('exposes canonical CVE identity without Finding or tenant fields', () => {
+    expect(CVE_IDENTITY_BATCH_LOOKUP_MAX).toBe(100);
+    expect(kevMembershipStatuses).toEqual(['unavailable', 'absent', 'listedInActiveKev']);
+    expect(forbiddenIdentityFieldNames).toContain('organizationId');
+    expect(forbiddenIdentityFieldNames).toContain('findingId');
+    expect(forbiddenIdentityFieldNames).toContain('osvId');
   });
 });
 
