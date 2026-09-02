@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -126,5 +126,15 @@ describe('outbox claim SQL', () => {
     );
     expect(source).toMatch(/WHERE "status" = 'pending'[\s\S]*?FOR UPDATE SKIP LOCKED/);
     expect(source).toMatch(/WHERE "status" = 'claimed'[\s\S]*?FOR UPDATE SKIP LOCKED/);
+  });
+});
+
+describe('Session 10 Batch 3B persistence boundary', () => {
+  const srcDir = path.dirname(fileURLToPath(import.meta.url));
+
+  it('does not ship a CveIdentity persistence adapter or mapper yet', () => {
+    expect(existsSync(path.join(srcDir, 'cve-identity-persistence.ts'))).toBe(false);
+    expect(existsSync(path.join(srcDir, 'cve-identity-mappers.ts'))).toBe(false);
+    expect('createCveIdentityPersistence' in databasePublic).toBe(false);
   });
 });

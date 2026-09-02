@@ -32,6 +32,17 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 - DNS lookup pinning plus post-connect verification is implemented for CISA KEV. It is not DNSSEC.
 - The Batch 7B synchronization service exists. Batch 8B starts the worker scheduler, Outbox mapping, and BullMQ intelligence processor. Batch 9B adds authenticated sanitized provider-status GETs (`intelligence:read`; [ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)). Still absent: web dashboard, manual sync/retry, detailed SyncRun APIs, matching, and any Finding workflow. OD-10 remains open. Status GETs do not call CISA and do not write AuditEvent rows.
 
+## Session 10 status notes
+
+[ADR 0023](../adr/0023-provider-neutral-cve-identity.md) records provider-neutral canonical CVE identity. Batch 3B applied and froze migration `20260902120000_canonical_cve_identity` (SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). The persistent development database has eleven finished migrations.
+
+- Canonical identity is global and append-only. It is not tenant-owned and has no `organization_id`.
+- The advisory-to-CVE link is source-free. Provenance stays on `VulnerabilitySourceRecord` and KEV generations.
+- Backfill copies only exact canonical `vulnerability.cve_id` values. Malformed legacy values remain unlinked and unrepaired. Tests must not print those values.
+- Unicode lookalikes, lowercase, and whitespace variants do not match the POSIX CHECK. They cannot collide with a canonical identity string.
+- KEV membership remains a later read-time equality against the active generation. Listing in KEV is not tenant exposure and is not implemented in this batch.
+- Session 10 remains zero-Finding. The identity migration must not write Findings, FindingObservations, Evidence, RiskCalculations, or `finding.recalculate`.
+
 ## Assets to protect
 
 | Asset | Class | Why it matters |

@@ -905,9 +905,10 @@ model Vulnerability {
   createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  aliases      VulnerabilityAlias[]
-  sourceRecords VulnerabilitySourceRecord[]
-  findings     Finding[]
+  aliases          VulnerabilityAlias[]
+  sourceRecords    VulnerabilitySourceRecord[]
+  findings         Finding[]
+  cveIdentityLinks VulnerabilityCveIdentityLink[]
 
   @@index([cveId], map: "vulnerability_cve_idx")
   @@map("vulnerability")
@@ -953,6 +954,29 @@ model VulnerabilitySourceRecord {
   @@index([vulnerabilityId, retrievedAt], map: "vulnerability_source_record_vuln_retrieved_idx")
   @@index([source, sourceIdentity], map: "vulnerability_source_record_provider_idx")
   @@map("vulnerability_source_record")
+}
+
+model CveIdentity {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cve       String   @unique(map: "cve_identity_cve_uidx") @db.VarChar(28)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  links VulnerabilityCveIdentityLink[]
+
+  @@map("cve_identity")
+}
+
+model VulnerabilityCveIdentityLink {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vulnerabilityId String   @map("vulnerability_id") @db.Uuid
+  cveIdentityId   String   @map("cve_identity_id") @db.Uuid
+  linkedAt        DateTime @default(now()) @map("linked_at") @db.Timestamptz(6)
+
+  vulnerability Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict)
+  cveIdentity   CveIdentity   @relation(fields: [cveIdentityId], references: [id], onDelete: Restrict)
+
+  @@unique([vulnerabilityId, cveIdentityId], map: "vulnerability_cve_identity_natural_key")
+  @@map("vulnerability_cve_identity")
 }
 
 model Finding {

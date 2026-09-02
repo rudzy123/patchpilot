@@ -16,6 +16,7 @@ import {
   SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
   SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
   SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
+  SESSION_10_CANONICAL_CVE_IDENTITY,
   applyMigrationSqlAndResolve,
   applySession3Schema,
   applyThroughAuditActorAnonymous,
@@ -25,6 +26,7 @@ import {
   applyThroughSession6,
   applyThroughSession7,
   applyThroughSession8,
+  applyThroughSession9,
   createEphemeralDatabase,
   deployMigrations,
   dropEphemeralDatabase,
@@ -52,6 +54,8 @@ const PRISMA_TABLES = [
   'vulnerability',
   'vulnerability_alias',
   'vulnerability_source_record',
+  'cve_identity',
+  'vulnerability_cve_identity',
   'finding',
   'finding_observation',
   'risk_policy',
@@ -93,6 +97,8 @@ const PRISMA_FOREIGN_KEYS = [
   'audit_event_actor_user_id_fkey',
   'intelligence_source_active_generation_id_fkey',
   'vulnerability_sync_run_generation_owned_fkey',
+  'vulnerability_cve_identity_vulnerability_id_fkey',
+  'vulnerability_cve_identity_cve_identity_id_fkey',
 ] as const;
 
 const SQL_ONLY_CHECKS = [
@@ -153,6 +159,7 @@ const SQL_ONLY_CHECKS = [
   'kev_entry_ransomware_raw_chk',
   'kev_entry_cwe_value_chk',
   'intelligence_source_active_provider_chk',
+  'cve_identity_cve_chk',
 ] as const;
 
 const SQL_ONLY_INDEXES = [
@@ -186,6 +193,8 @@ const SQL_ONLY_INDEXES = [
   'kev_entry_cwe_value_uidx',
   'kev_generation_incomplete_age_idx',
   'kev_entry_generation_ordinal_id_idx',
+  'cve_identity_cve_uidx',
+  'vulnerability_cve_identity_natural_key',
 ] as const;
 
 const SQL_ONLY_TRIGGERS = [
@@ -204,6 +213,8 @@ const SQL_ONLY_TRIGGERS = [
   'vulnerability_provider_snapshot_append_only',
   'kev_entry_append_only',
   'kev_entry_cwe_append_only',
+  'cve_identity_append_only',
+  'vulnerability_cve_identity_append_only',
 ] as const;
 
 const SQL_ONLY_FUNCTIONS = [
@@ -515,10 +526,255 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
   expect(findingColumns).toContain('organization_id');
   expect(findingColumns).toContain('vulnerability_id');
   expect(findingColumns).not.toContain('generation_id');
+
+  await assertCanonicalCveIdentityCatalog(client);
+}
+
+async function assertCanonicalCveIdentityCatalog(client: PrismaClient): Promise<void> {
+  const tables = await names(
+    client,
+    `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'`,
+  );
+  expect(tables).toContain('cve_identity');
+  expect(tables).toContain('vulnerability_cve_identity');
+
+  const identityColumns = await names(
+    client,
+    `SELECT column_name AS name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'cve_identity'`,
+  );
+  expect(identityColumns.sort()).toEqual(['created_at', 'cve', 'id']);
+
+  const linkColumns = await names(
+    client,
+    `SELECT column_name AS name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'vulnerability_cve_identity'`,
+  );
+  expect(linkColumns.sort()).toEqual(['cve_identity_id', 'id', 'linked_at', 'vulnerability_id']);
+
+  const forbiddenColumns = await client.$queryRaw<
+    Array<{ table_name: string; column_name: string }>
+  >`
+    SELECT table_name, column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name IN ('cve_identity', 'vulnerability_cve_identity')
+      AND column_name IN (
+        'organization_id',
+        'membership_id',
+        'user_id',
+        'asset_id',
+        'sbom_id',
+        'sbom_ingestion_id',
+        'component_id',
+        'component_occurrence_id',
+        'finding_id',
+        'finding_observation_id',
+        'evidence_id',
+        'risk_calculation_id',
+        'remediation_task_id',
+        'integration_id',
+        'provider_key',
+        'source_identifier',
+        'kev_generation_id',
+        'kev_entry_id',
+        'source',
+        'provider',
+        'updated_at',
+        'first_seen_at',
+        'observed_at',
+        'created_at'
+      )
+      AND NOT (
+        table_name = 'cve_identity' AND column_name = 'created_at'
+      )
+  `;
+  expect(forbiddenColumns).toEqual([]);
+
+  const osvId = await client.$queryRaw<
+    Array<{ is_nullable: string; data_type: string; character_maximum_length: number | null }>
+  >`
+    SELECT is_nullable, data_type, character_maximum_length
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'vulnerability' AND column_name = 'osv_id'
+  `;
+  expect(osvId[0]?.is_nullable).toBe('NO');
+  expect(osvId[0]?.character_maximum_length).toBe(128);
+
+  const cveId = await client.$queryRaw<
+    Array<{ is_nullable: string; data_type: string; character_maximum_length: number | null }>
+  >`
+    SELECT is_nullable, data_type, character_maximum_length
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'vulnerability' AND column_name = 'cve_id'
+  `;
+  expect(cveId[0]?.is_nullable).toBe('YES');
+  expect(cveId[0]?.character_maximum_length).toBe(32);
+
+  const findingVulnerabilityId = await client.$queryRaw<Array<{ is_nullable: string }>>`
+    SELECT is_nullable
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'finding'
+      AND column_name = 'vulnerability_id'
+  `;
+  expect(findingVulnerabilityId[0]?.is_nullable).toBe('NO');
+
+  const identityCve = await client.$queryRaw<
+    Array<{
+      is_nullable: string;
+      character_maximum_length: number | null;
+      datetime_precision: number | null;
+    }>
+  >`
+    SELECT is_nullable, character_maximum_length, datetime_precision
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'cve_identity' AND column_name = 'cve'
+  `;
+  expect(identityCve[0]?.is_nullable).toBe('NO');
+  expect(identityCve[0]?.character_maximum_length).toBe(28);
+
+  const identityCreatedAt = await client.$queryRaw<
+    Array<{ datetime_precision: number | null; data_type: string }>
+  >`
+    SELECT datetime_precision, data_type
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'cve_identity' AND column_name = 'created_at'
+  `;
+  expect(identityCreatedAt[0]?.datetime_precision).toBe(6);
+
+  const linkedAt = await client.$queryRaw<
+    Array<{ datetime_precision: number | null; is_nullable: string }>
+  >`
+    SELECT datetime_precision, is_nullable
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'vulnerability_cve_identity'
+      AND column_name = 'linked_at'
+  `;
+  expect(linkedAt[0]?.datetime_precision).toBe(6);
+  expect(linkedAt[0]?.is_nullable).toBe('NO');
+
+  const indexes = await names(
+    client,
+    `SELECT indexname AS name FROM pg_indexes WHERE schemaname = 'public'`,
+  );
+  expect(indexes).toContain('cve_identity_pkey');
+  expect(indexes).toContain('cve_identity_cve_uidx');
+  expect(indexes).toContain('vulnerability_cve_identity_pkey');
+  expect(indexes).toContain('vulnerability_cve_identity_natural_key');
+
+  const reverseLinkIndexes = await client.$queryRaw<Array<{ indexname: string }>>`
+    SELECT indexname
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename = 'vulnerability_cve_identity'
+      AND indexdef ~ '\\(cve_identity_id'
+  `;
+  expect(reverseLinkIndexes).toEqual([]);
+
+  const checkDef = await names(
+    client,
+    `SELECT pg_get_constraintdef(oid) AS name
+     FROM pg_constraint
+     WHERE conname = 'cve_identity_cve_chk'`,
+  );
+  expect(checkDef[0]).toContain('^CVE-[0-9]{4}-[0-9]{4,19}$');
+
+  const vulnerabilityCveCheck = await names(
+    client,
+    `SELECT conname AS name
+     FROM pg_constraint
+     WHERE contype = 'c'
+       AND conrelid = 'vulnerability'::regclass
+       AND conname LIKE '%cve%'`,
+  );
+  expect(vulnerabilityCveCheck).toEqual([]);
+
+  const identityFks = await client.$queryRaw<
+    Array<{ conname: string; foreign_table: string; delete_rule: string; update_rule: string }>
+  >`
+    SELECT
+      c.conname,
+      conf.relname AS foreign_table,
+      CASE c.confdeltype
+        WHEN 'r' THEN 'RESTRICT'
+        WHEN 'a' THEN 'NO ACTION'
+        WHEN 'c' THEN 'CASCADE'
+        ELSE c.confdeltype::text
+      END AS delete_rule,
+      CASE c.confupdtype
+        WHEN 'r' THEN 'RESTRICT'
+        WHEN 'a' THEN 'NO ACTION'
+        WHEN 'c' THEN 'CASCADE'
+        ELSE c.confupdtype::text
+      END AS update_rule
+    FROM pg_constraint c
+    JOIN pg_class rel ON rel.oid = c.conrelid
+    JOIN pg_class conf ON conf.oid = c.confrelid
+    JOIN pg_namespace n ON n.oid = rel.relnamespace
+    WHERE n.nspname = 'public'
+      AND rel.relname = 'vulnerability_cve_identity'
+      AND c.contype = 'f'
+    ORDER BY c.conname
+  `;
+  expect(identityFks).toEqual([
+    {
+      conname: 'vulnerability_cve_identity_cve_identity_id_fkey',
+      foreign_table: 'cve_identity',
+      delete_rule: 'RESTRICT',
+      update_rule: 'CASCADE',
+    },
+    {
+      conname: 'vulnerability_cve_identity_vulnerability_id_fkey',
+      foreign_table: 'vulnerability',
+      delete_rule: 'RESTRICT',
+      update_rule: 'CASCADE',
+    },
+  ]);
+
+  const forbiddenFks = await client.$queryRaw<Array<{ conname: string }>>`
+    SELECT c.conname
+    FROM pg_constraint c
+    JOIN pg_class rel ON rel.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = rel.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.contype = 'f'
+      AND rel.relname IN ('cve_identity', 'vulnerability_cve_identity')
+      AND (
+        c.confrelid = 'organization'::regclass
+        OR c.confrelid = 'finding'::regclass
+        OR c.confrelid = 'finding_observation'::regclass
+        OR c.confrelid = 'component'::regclass
+        OR c.confrelid = 'component_occurrence'::regclass
+        OR c.confrelid = 'asset'::regclass
+        OR c.confrelid = 'sbom'::regclass
+        OR c.confrelid = 'evidence'::regclass
+        OR c.confrelid = 'kev_entry'::regclass
+        OR c.confrelid = 'kev_generation'::regclass
+        OR c.confrelid = 'outbox_event'::regclass
+        OR c.confrelid = 'background_job'::regclass
+      )
+  `;
+  expect(forbiddenFks).toEqual([]);
+
+  const identityCount = await client.$queryRaw<Array<{ count: bigint | number | string }>>`
+    SELECT COUNT(*)::bigint AS count FROM "cve_identity"
+  `;
+  const linkCount = await client.$queryRaw<Array<{ count: bigint | number | string }>>`
+    SELECT COUNT(*)::bigint AS count FROM "vulnerability_cve_identity"
+  `;
+  expect(Number(identityCount[0]?.count)).toBe(0);
+  expect(Number(linkCount[0]?.count)).toBe(0);
 }
 
 describe('frozen migrations', () => {
-  it('keeps Session 3 through Session 9 KEV-persistence SQL byte-stable', async () => {
+  it('keeps Session 3 through Session 10 canonical CVE identity SQL byte-stable', async () => {
+    expect(FROZEN_MIGRATIONS).toHaveLength(11);
+    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(11);
+    expect(FROZEN_MIGRATIONS.map((item) => item.directory)).toEqual([
+      ...EXPECTED_APPLIED_MIGRATIONS,
+    ]);
     for (const frozen of FROZEN_MIGRATIONS) {
       const digest = await sha256File(frozenMigrationFile(frozen.directory));
       expect(digest).toBe(frozen.sha256);
@@ -529,6 +785,23 @@ describe('frozen migrations', () => {
     const sqlDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../prisma/sql');
     expect(existsSync(path.join(sqlDir, 'tenant-model-extras.sql'))).toBe(false);
     expect(existsSync(path.join(sqlDir, 'review-corrections-extras.sql'))).toBe(false);
+  });
+
+  it('lists the Session 10 canonical CVE identity migration once, last, and frozen', () => {
+    expect(
+      EXPECTED_APPLIED_MIGRATIONS.filter((name) => name === SESSION_10_CANONICAL_CVE_IDENTITY),
+    ).toEqual([SESSION_10_CANONICAL_CVE_IDENTITY]);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-1)).toBe(SESSION_10_CANONICAL_CVE_IDENTITY);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-2)).toBe(SESSION_9_KEV_INTELLIGENCE_PERSISTENCE);
+    expect(
+      FROZEN_MIGRATIONS.filter((item) => item.directory === SESSION_10_CANONICAL_CVE_IDENTITY),
+    ).toEqual([
+      {
+        directory: SESSION_10_CANONICAL_CVE_IDENTITY,
+        sha256: '2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba',
+      },
+    ]);
+    expect(existsSync(frozenMigrationFile(SESSION_10_CANONICAL_CVE_IDENTITY))).toBe(true);
   });
 });
 
@@ -762,6 +1035,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
+        SESSION_10_CANONICAL_CVE_IDENTITY,
       ]);
       expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
 
@@ -835,6 +1109,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
+        SESSION_10_CANONICAL_CVE_IDENTITY,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -965,6 +1240,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
+        SESSION_10_CANONICAL_CVE_IDENTITY,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -1018,6 +1294,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
+        SESSION_10_CANONICAL_CVE_IDENTITY,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1060,6 +1337,7 @@ describe('migrations', { timeout: 90_000 }, () => {
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
+        SESSION_10_CANONICAL_CVE_IDENTITY,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1100,6 +1378,49 @@ describe('migrations', { timeout: 90_000 }, () => {
       );
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
+        SESSION_10_CANONICAL_CVE_IDENTITY,
+      ]);
+      await assertFinalMigratedSchema(client);
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades a Session 9 database by applying only canonical CVE identity', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughSession9(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore).toEqual([
+        ...SESSION_6_COMPLETE_MIGRATIONS,
+        SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+        SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+        SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
+      ]);
+      expect(appliedBefore).not.toContain(SESSION_10_CANONICAL_CVE_IDENTITY);
+      const tablesBefore = await names(
+        client,
+        `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'`,
+      );
+      expect(tablesBefore).toContain('kev_generation');
+      expect(tablesBefore).not.toContain('cve_identity');
+      expect(tablesBefore).not.toContain('vulnerability_cve_identity');
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        SESSION_10_CANONICAL_CVE_IDENTITY,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1136,6 +1457,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         ephemeral.databaseUrl,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
       );
+      await applyMigrationSqlAndResolve(ephemeral.databaseUrl, SESSION_10_CANONICAL_CVE_IDENTITY);
       await assertFinalMigratedSchema(client);
 
       const checkDef = await names(
@@ -1222,6 +1544,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
+        SESSION_10_CANONICAL_CVE_IDENTITY,
       ]);
       await assertFinalMigratedSchema(client);
 

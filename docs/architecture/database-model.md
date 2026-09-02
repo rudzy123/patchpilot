@@ -1,6 +1,6 @@
 # Database model
 
-This is the Session 5–9 persistence design for PatchPilot. It implements the v0.1 [domain model](domain-model.md) in PostgreSQL through Prisma in `packages/database`. Session 8 Batch 4 adds graph-completeness columns, nullable Component `ecosystem`, occurrence `version_known`, insert-once graph persistence, outbox claim/execution adapters, and SQL-only CHECKs. Session 9 Batch 4C adds instance-owned KEV intelligence tables, generation-scoped entries, and PostgreSQL-only sync-run adapters. `SbomIngestion.leaseExpiresAt` remains **unused** in Session 8. Provider HTTP, snapshot object-storage runtime, KEV parsing, workers, and upload HTTP routes for intelligence are **not** implemented here.
+This is the Session 5–10 persistence design for PatchPilot. It implements the v0.1 [domain model](domain-model.md) in PostgreSQL through Prisma in `packages/database`. Session 8 Batch 4 adds graph-completeness columns, nullable Component `ecosystem`, occurrence `version_known`, insert-once graph persistence, outbox claim/execution adapters, and SQL-only CHECKs. Session 9 Batch 4C adds instance-owned KEV intelligence tables, generation-scoped entries, and PostgreSQL-only sync-run adapters. Session 10 Batch 3B applied and froze global `cve_identity` and `vulnerability_cve_identity` tables (`20260902120000_canonical_cve_identity`, SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). The persistent development database has eleven finished migrations. Persistence adapters and active-KEV derivation are **not** implemented. `SbomIngestion.leaseExpiresAt` remains **unused** in Session 8. Provider HTTP, snapshot object-storage runtime, KEV parsing, workers, and upload HTTP routes for intelligence are **not** implemented here.
 
 Opaque IDs are UUIDs (`gen_random_uuid()`). Timestamps are `TIMESTAMPTZ` stored in UTC. Prisma lives only in `packages/database`. Domain ports in `packages/domain` do not import Prisma types.
 
@@ -15,7 +15,7 @@ Opaque IDs are UUIDs (`gen_random_uuid()`). Timestamps are `TIMESTAMPTZ` stored 
 | `integration_provider` | `finding`, `finding_observation`, org `risk_policy` (`scope = organization`) |
 | `intelligence_source` (OSV / CISA KEV sync state and active KEV pointer) | `risk_calculation`, `remediation_task`, `risk_acceptance` |
 | `vulnerability_sync_run`, `vulnerability_provider_snapshot`, `kev_generation`, `kev_entry`, `kev_entry_cwe` | `evidence`, tenant `audit_event` |
-| | `integration` (`organization_id` required), `external_credential` |
+| `cve_identity`, `vulnerability_cve_identity` | `integration` (`organization_id` required), `external_credential` |
 | | tenant `outbox_event`, `background_job` (when org set), `idempotency_record` |
 
 `user` is instance-level. Access to tenant data is via `membership`. Listing users is still scoped by membership in a later API session. `local_credential` and `session` are instance-level. `session.active_organization_id` is a selector only.
@@ -46,7 +46,7 @@ Related tenant rows must share an organization. Prisma unique `(organization_id,
 
 Built-in risk policies use `scope = builtin` and `organization_id` null. Organization policies use `scope = organization` and a non-null `organization_id`. A check constraint ties those two columns. A trigger rejects a `risk_calculation` whose policy belongs to a different organization. Published policies cannot be deleted; identity and definition cannot change after `published_at` is set. The only allowed published-status change is `published` → `retired`.
 
-OSV and CISA KEV synchronization is `intelligence_source`, not a tenant `integration`. Session 9 KEV catalog rows are instance-owned and have no `organization_id`. They do not reference `vulnerability`, `finding`, `component`, or `sbom`. Reader-visible current KEV membership is `intelligence_source.active_generation_id` pointing at a generation whose `state` is `active`. `BackgroundJob` remains the execution lease; `vulnerability_sync_run.version` is compare-and-set only. System `outbox_event` and `audit_event` rows may use `organization_id` null. `integration.organization_id` is required. Tenant credentials attach only to an organization-owned `integration`. `last_failure_code` and `last_failure_at` are sticky historical metadata: a later successful activation or `not_modified` advances `last_successful_sync_at` and `last_attempt_at` and does not clear the previous safe failure fields.
+OSV and CISA KEV synchronization is `intelligence_source`, not a tenant `integration`. Session 9 KEV catalog rows are instance-owned and have no `organization_id`. They do not reference `vulnerability`, `finding`, `component`, or `sbom`. Session 10 canonical CVE identity tables are also instance-owned and have no `organization_id`. They do not reference KEV, Finding, Component, Asset, or SBOM rows. Reader-visible current KEV membership is `intelligence_source.active_generation_id` pointing at a generation whose `state` is `active`. Future membership derivation compares `cve_identity.cve` to active `kev_entry.normalized_cve`; that read is not implemented in Batch 3B. `BackgroundJob` remains the execution lease; `vulnerability_sync_run.version` is compare-and-set only. System `outbox_event` and `audit_event` rows may use `organization_id` null. `integration.organization_id` is required. Tenant credentials attach only to an organization-owned `integration`. `last_failure_code` and `last_failure_at` are sticky historical metadata: a later successful activation or `not_modified` advances `last_successful_sync_at` and `last_attempt_at` and does not clear the previous safe failure fields.
 
 ## Identifiers, time, and concurrency
 
@@ -75,11 +75,11 @@ Do not store raw SBOM bytes, provider payloads, tokens, or source code in JSON.
 
 ## Deletion
 
-Foreign keys use `ON DELETE RESTRICT`. Evidentiary tables are not cascade-deleted. Organization archive is a status change. v0.1 has no product hard-delete of evidence. Append-only triggers reject `UPDATE`/`DELETE` on `audit_event`, `finding_observation`, `risk_calculation`, `vulnerability_source_record`, `evidence`, `vulnerability_provider_snapshot`, `kev_entry`, and `kev_entry_cwe`.
+Foreign keys use `ON DELETE RESTRICT`. Evidentiary tables are not cascade-deleted. Organization archive is a status change. v0.1 has no product hard-delete of evidence. Append-only triggers reject `UPDATE`/`DELETE` on `audit_event`, `finding_observation`, `risk_calculation`, `vulnerability_source_record`, `evidence`, `vulnerability_provider_snapshot`, `kev_entry`, `kev_entry_cwe`, `cve_identity`, and `vulnerability_cve_identity`.
 
 ## SchemaFoundation
 
-Session 3 created a technical `SchemaFoundation` table. Migration `20260827120000_tenant_model` drops it. Later forward-only corrections are `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, and `20260827160000_policy_creator_membership`. Session 6 authentication persistence is `20260827170000_audit_actor_anonymous` plus `20260827180000_local_credentials_and_sessions`. Session 7 asset inventory extras are `20260828120000_asset_inventory_constraints`. Session 8 graph persistence extras are `20260830120000_sbom_ingestion_graph_persistence`. Session 9 KEV intelligence extras are `20260901120000_kev_intelligence_persistence` and are **frozen**. Committed `migration.sql` files are authoritative, including SQL extras Prisma cannot express. Duplicate `prisma/sql` extras files are not applied independently and are not kept. Frozen Session 3 through Session 9 migration files are unchanged. Any SQL correction after freeze requires another forward-only migration.
+Session 3 created a technical `SchemaFoundation` table. Migration `20260827120000_tenant_model` drops it. Later forward-only corrections are `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, and `20260827160000_policy_creator_membership`. Session 6 authentication persistence is `20260827170000_audit_actor_anonymous` plus `20260827180000_local_credentials_and_sessions`. Session 7 asset inventory extras are `20260828120000_asset_inventory_constraints`. Session 8 graph persistence extras are `20260830120000_sbom_ingestion_graph_persistence`. Session 9 KEV intelligence extras are `20260901120000_kev_intelligence_persistence` and are **frozen**. Session 10 canonical CVE identity is `20260902120000_canonical_cve_identity` and is **frozen** (SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). It has been applied to the persistent development database. Committed `migration.sql` files are authoritative, including SQL extras Prisma cannot express. Duplicate `prisma/sql` extras files are not applied independently and are not kept. Frozen Session 3 through Session 10 migration files are unchanged. Any SQL correction after freeze requires another forward-only migration.
 
 ## Row-Level Security
 
@@ -87,7 +87,7 @@ RLS is **not** enabled. Application predicates and compound FKs are the v0.1 con
 
 ## Check constraints (SQL extras)
 
-Prisma cannot express every invariant. Those extras are defined only in committed `migration.sql` files. Migrations `20260827120000_tenant_model`, `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, `20260827160000_policy_creator_membership`, `20260827180000_local_credentials_and_sessions`, `20260828120000_asset_inventory_constraints`, `20260830120000_sbom_ingestion_graph_persistence`, and `20260901120000_kev_intelligence_persistence` add named checks, including:
+Prisma cannot express every invariant. Those extras are defined only in committed `migration.sql` files. Migrations `20260827120000_tenant_model`, `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, `20260827160000_policy_creator_membership`, `20260827180000_local_credentials_and_sessions`, `20260828120000_asset_inventory_constraints`, `20260830120000_sbom_ingestion_graph_persistence`, `20260901120000_kev_intelligence_persistence`, and `20260902120000_canonical_cve_identity` add named checks, including:
 
 | Constraint | Invariant |
 | --- | --- |
@@ -113,6 +113,7 @@ Prisma cannot express every invariant. Those extras are defined only in committe
 | Archive / completed / failure-code timestamp consistency | Status and timestamps agree |
 | `sbom_ingestion_*_chk` / `component_occurrence_version_known_chk` / `component_ecosystem_null_or_nonempty_chk` | Session 8 graph completeness, counts, labels, known/unknown versions, nullable ecosystem |
 | `idempotency_record_status_response_chk` | Generic started/completed/conflict response matrix; not SBOM-specific |
+| `cve_identity_cve_chk` | Exact canonical `^CVE-[0-9]{4}-[0-9]{4,19}$`; no trim, case-fold, or CITEXT. `vulnerability.cve_id` has no CHECK |
 
 Partial unique indexes cover active asset names per organization, builtin vs org risk-policy versions, NULL-safe asset-owner identity, non-null SBOM ingestion idempotency keys, one active risk acceptance per finding, outbox/audit replay keys, and available outbox work. Ingestion uniqueness is **not** `(sbom_id, parser_version)`: retries keep history via `attempt_number`, and a newer parser may reprocess the same SBOM.
 
@@ -122,7 +123,7 @@ Every index maps to a documented access or uniqueness need: organization slug; m
 
 ## Append-only enforcement
 
-`BEFORE UPDATE OR DELETE` triggers reject mutation of `audit_event`, `finding_observation`, `risk_calculation`, `vulnerability_source_record`, and `evidence`. A BEFORE INSERT trigger `patchpilot_audit_actor_membership_user` enforces that tenant audit actors match Membership user and organization. Published `risk_policy` rows cannot change identity or definition; they cannot be deleted; they may only move `published` → `retired`. Trigger functions set `search_path = pg_catalog, public` so they do not inherit the caller search path. These controls do not prevent a superuser from rewriting history.
+`BEFORE UPDATE OR DELETE` triggers reject mutation of `audit_event`, `finding_observation`, `risk_calculation`, `vulnerability_source_record`, `evidence`, `cve_identity`, and `vulnerability_cve_identity`. A BEFORE INSERT trigger `patchpilot_audit_actor_membership_user` enforces that tenant audit actors match Membership user and organization. Published `risk_policy` rows cannot change identity or definition; they cannot be deleted; they may only move `published` → `retired`. Trigger functions set `search_path = pg_catalog, public` so they do not inherit the caller search path. These controls do not prevent a superuser from rewriting history.
 
 ## Limitations
 
@@ -130,7 +131,7 @@ Triggers and revoked DML are not WORM storage. Superusers can still rewrite hist
 
 Organization `slug` uniqueness does not reserve product route names (`api`, `health`, `login`, and similar). Do not treat the current unique index as URL-routing protection. Reserved slugs stay deferred until URL routing is implemented.
 
-[ADR 0019](../adr/0019-local-password-sessions.md) `LocalCredential` and `Session` tables, restored `actor_user_id`, and `anonymous` audit actors are in `20260827170000_audit_actor_anonymous` plus `20260827180000_local_credentials_and_sessions`. Session 5 migrations stay frozen. Session 8 graph persistence is `20260830120000_sbom_ingestion_graph_persistence` and is **frozen**; do not edit it — any SQL correction requires another forward-only migration. Session 9 KEV intelligence persistence is `20260901120000_kev_intelligence_persistence` and is **frozen**; do not edit it — any SQL correction requires another forward-only migration.
+[ADR 0019](../adr/0019-local-password-sessions.md) `LocalCredential` and `Session` tables, restored `actor_user_id`, and `anonymous` audit actors are in `20260827170000_audit_actor_anonymous` plus `20260827180000_local_credentials_and_sessions`. Session 5 migrations stay frozen. Session 8 graph persistence is `20260830120000_sbom_ingestion_graph_persistence` and is **frozen**; do not edit it — any SQL correction requires another forward-only migration. Session 9 KEV intelligence persistence is `20260901120000_kev_intelligence_persistence` and is **frozen**; do not edit it — any SQL correction requires another forward-only migration. Session 10 canonical CVE identity is `20260902120000_canonical_cve_identity` and is **frozen**; do not edit it — any SQL correction requires another forward-only migration. Frozen SHA-256: `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`. The persistent development database has eleven finished migrations.
 
 ## Related documents
 
