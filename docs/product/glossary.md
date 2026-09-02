@@ -55,7 +55,7 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **SBOM ingestion** | One processing attempt against an SBOM artifact. Prior attempts are retained. |
 | **Component occurrence** | Tenant-owned observation of a versionless **Component** in a specific SBOM ingestion. |
 | **Risk policy** | Versioned scoring definition. Shared table with `scope` `builtin` (null organization) or `organization`. Published versions are immutable and cannot be deleted. |
-| **Intelligence source** | Global OSV/CISA KEV synchronization state. Not a tenant installation. CISA KEV scheduled import exists in the worker; OSV runtime is not implemented. |
+| **Intelligence source** | Global OSV/CISA KEV synchronization state. Not a tenant installation. CISA KEV scheduled import exists in the worker; authenticated provider-status GET routes exist (`intelligence:read`). OSV runtime, ZIP processing, matching, Findings, a dashboard, and manual sync/retry are not implemented. |
 | **Integration** | Organization-owned installation of a provider catalog entry. `organizationId` is required. |
 | **Risk calculation** | Append-only stored priority snapshot with factors, policy version, and engine version. |
 | **Outbox event** | Transactional outbox row (`pending` → `claimed` → `processed`, or `failed` / `dead_lettered`). At-least-once; not exactly-once. |
