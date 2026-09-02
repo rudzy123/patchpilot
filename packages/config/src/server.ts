@@ -19,6 +19,12 @@ import {
   PRODUCTION_SESSION_COOKIE_NAME,
   authConfigSchema,
 } from './auth.js';
+import {
+  intelligenceConfigSchema,
+  intelligenceRelationshipIssues,
+  loadIntelligenceConfigFrom,
+  refineIntelligenceNumericBounds,
+} from './intelligence.js';
 import { hydrateProcessEnvFromDevelopmentFiles } from './load-env-files.js';
 import { parseBoolean, parseInteger, readOptional, readRequired } from './read-env.js';
 import {
@@ -74,6 +80,7 @@ export const serverConfigSchema = z
       connectionTimeoutMs: z.number().int().positive(),
     }),
     sbom: sbomConfigSchema,
+    intelligence: intelligenceConfigSchema,
     openTelemetry: z.object({
       enabled: z.boolean(),
       tracesEndpoint: z.string().min(1).optional(),
@@ -171,6 +178,22 @@ export const serverConfigSchema = z
       });
     }
 
+    refineIntelligenceNumericBounds(value.intelligence, (issue) => {
+      context.addIssue({
+        code: 'custom',
+        path: ['intelligence', ...issue.path],
+        message: issue.message,
+      });
+    });
+
+    for (const issue of intelligenceRelationshipIssues(value.intelligence)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['intelligence', ...issue.path],
+        message: issue.message,
+      });
+    }
+
     if (value.deploymentEnvironment === 'production' && !redisUrlHasPassword(value.redisUrl)) {
       context.addIssue({
         code: 'custom',
@@ -254,6 +277,7 @@ export function loadServerConfigFrom(
       requestIdHeader: readRequired(env, 'REQUEST_ID_HEADER'),
       correlationIdHeader: readRequired(env, 'CORRELATION_ID_HEADER'),
       sbom: loadSbomConfigFrom(env),
+      intelligence: loadIntelligenceConfigFrom(env),
       auth: {
         sessionAbsoluteTtlSeconds: parseInteger(
           readRequired(env, 'AUTH_SESSION_ABSOLUTE_TTL_SECONDS'),

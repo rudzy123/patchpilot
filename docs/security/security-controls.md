@@ -58,9 +58,12 @@ Canonical rules: [security.mdc](../../.cursor/rules/security.mdc). Threats: [thr
 
 ### C9 SSRF and egress
 
-- Allowlisted OSV/KEV hosts.
-- Blocked link-local and metadata ranges.
-- Timeouts and response size limits.
+- Allowlisted OSV/KEV hosts. Session 9 runtime allowlist is `www.cisa.gov` only.
+- `node:https.request` with `agent: false`; ambient proxy variables are ignored.
+- Redirects rejected. No caller-supplied URLs.
+- DNS lookup pinning plus post-connect `remoteAddress` verification. This is not DNSSEC.
+- Blocked loopback, private, link-local, metadata, documentation, multicast, and reserved destinations.
+- Timeouts and response size limits. Identity `Content-Encoding` only.
 
 ### C10 Webhook readiness (dormant)
 

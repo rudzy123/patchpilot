@@ -18,11 +18,11 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **Graph completeness** | `empty`, `no_dependencies`, `partial`, or `complete` on a completed ingestion. `empty` does not mean the Asset contains no software. `no_dependencies` does not prove the software has no dependencies. |
 | **Component** | A package or library listed in an SBOM. Domain **Component** is **versionless** identity (type/namespace/name or ecosystem/namespace/name). Version lives on **ComponentOccurrence**. |
 | **Dependency relationship** | An edge between components as recorded in the SBOM. Observed fact, not a risk score. Unknown dependency refs reject Session 8 ingestion. Self-edges are skipped as warnings. Cycles are preserved. |
-| **Vulnerability record** | Intelligence about a vulnerability (for example a CVE) from a named source, with provenance. |
-| **Finding** | Tenant-owned link between an **asset**'s **versionless** component identity and a **vulnerability record** (OSV id). Spans ingestions. Per-ingestion presence is a **Finding observation**, not a new finding when identity matches. |
-| **Correlation** | Matching components to vulnerability records using defined identifiers and recorded method. |
-| **CISA KEV** | CISA Known Exploited Vulnerabilities catalog. Used to **enrich** applicable findings. KEV listing is not by itself proof of exploitation in the user’s environment. |
-| **Enrichment** | Additional observed or catalog data attached to a finding, with source and time. Distinct from the priority calculation. |
+| **Vulnerability record** | Intelligence about a vulnerability (for example a CVE) from a named source, with provenance. Session 9 imports these into a shared catalog; it does not match them to tenant components. |
+| **Finding** | Tenant-owned link between an **asset**'s **versionless** component identity and a **vulnerability record** (OSV id). Spans ingestions. Per-ingestion presence is a **Finding observation**, not a new finding when identity matches. Generic Finding persistence exists; Session 9 must not create or modify Findings. |
+| **Correlation** | Matching components to vulnerability records using defined identifiers and recorded method. Future work ([ADR 0010](../adr/0010-osv-correlation.md)). Not the Session 9 import mechanism. |
+| **CISA KEV** | CISA Known Exploited Vulnerabilities catalog. Session 9 imports the official JSON snapshot into the shared catalog. Later, KEV may **enrich** applicable findings ([ADR 0011](../adr/0011-cisa-kev-enrichment.md)). KEV listing is not by itself proof of exploitation in the user’s environment and is not a complete vulnerability catalog. |
+| **Enrichment** | Additional observed or catalog data attached to a finding, with source and time. Distinct from the priority calculation. Session 9 does not enrich Findings. |
 | **Priority** | The stored, explainable ranking for a finding under a versioned policy. **Risk score** means the same until an ADR splits the terms. Not an exploit proof. |
 | **Environmental risk** | Product name for that calculated priority, including environment-specific factors. Still a calculated conclusion, not a fact. |
 | **Policy version** | Identifier of the scoring rules used. Stored with each calculated priority. |
@@ -34,7 +34,11 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **Re-scan** | Processing a newer SBOM for an asset and comparing prior findings. |
 | **Resolved (on rescan)** | A calculated conclusion that the affected component is no longer observed **in range** on the **current** completed ingestion (greatest SBOM `receivedAt`, not last worker to finish) with **adequate coverage**. Requires stored observation evidence; not implied by ticket status or KEV absence. |
 | **Audit event** | Append-only record of a security- or remediation-sensitive operation (see `security.mdc`). Never updated in place. |
-| **Shared catalog** | Non-tenant data such as vulnerability intelligence and KEV snapshots. May be global. Findings that use it remain tenant-owned. |
+| **Shared catalog** | Instance-owned, non-tenant vulnerability intelligence and KEV snapshots. Not duplicated per Organization and not publicly accessible. Findings that later use it remain tenant-owned. |
+| **Current projection** | Mutable shared-catalog view of an advisory activated only after a complete source unit succeeds. Distinct from immutable raw snapshots and source revisions. |
+| **Source revision** | Append-only normalized provider record (plus structured children) with provenance. Not rewritten in place. |
+| **Withdrawn (OSV)** | Provider fact: the advisory has an explicit withdrawn timestamp. The record is retained. Distinct from absence in an incomplete or per-ecosystem export. |
+| **Missing from authoritative snapshot** | Provider record absent from a later accepted complete snapshot (KEV current membership). Historical snapshots remain. Not a Finding mutation in Session 9. |
 | **Provenance** | Source, retrieved-at (UTC), and source identity for intelligence or evidence. Updates are versioned or additive, never a silent in-place replace. |
 | **Outbox** | Transactional outbox row used to schedule background work without I/O inside the same database transaction as the state change. |
 | **Idempotency** | Reprocessing the same job or retried mutation does not create duplicate side effects. For tenant-owned work, uniqueness is scoped to the organization. |
@@ -51,7 +55,7 @@ Terms below are used in product and engineering docs. Prefer these words in UI c
 | **SBOM ingestion** | One processing attempt against an SBOM artifact. Prior attempts are retained. |
 | **Component occurrence** | Tenant-owned observation of a versionless **Component** in a specific SBOM ingestion. |
 | **Risk policy** | Versioned scoring definition. Shared table with `scope` `builtin` (null organization) or `organization`. Published versions are immutable and cannot be deleted. |
-| **Intelligence source** | Global OSV/CISA KEV synchronization state. Not a tenant installation. |
+| **Intelligence source** | Global OSV/CISA KEV synchronization state. Not a tenant installation. CISA KEV scheduled import exists in the worker; authenticated provider-status GET routes exist (`intelligence:read`). OSV runtime, ZIP processing, matching, Findings, a dashboard, and manual sync/retry are not implemented. |
 | **Integration** | Organization-owned installation of a provider catalog entry. `organizationId` is required. |
 | **Risk calculation** | Append-only stored priority snapshot with factors, policy version, and engine version. |
 | **Outbox event** | Transactional outbox row (`pending` → `claimed` → `processed`, or `failed` / `dead_lettered`). At-least-once; not exactly-once. |

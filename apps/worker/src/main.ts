@@ -1,28 +1,41 @@
+import { randomUUID } from 'node:crypto';
+
 import { loadServerConfig } from '@patchpilot/config';
 import {
   checkDatabaseReady,
+  createIntelligencePersistence,
   createSbomIngestionProcessorUnitOfWork,
   createSbomPersistence,
   disconnectPrisma,
   getPrismaClient,
 } from '@patchpilot/database';
 import {
+  createCisaKevSynchronizationService,
+  createEvaluateKevSyncScheduleUseCase,
   createProcessSbomIngestionUseCase,
   createRelayOutboxBatchUseCase,
   createSystemClock,
 } from '@patchpilot/domain';
-import { createEmptyJobRegistry, createS3SbomObjectStorage } from '@patchpilot/integrations';
+import { createS3SbomObjectStorage } from '@patchpilot/integrations';
 import { createLogger } from '@patchpilot/logger';
 import { startTelemetry } from '@patchpilot/observability';
 import { createWorkerThreadSbomParser } from '@patchpilot/sbom';
 
 import { createWorkerApp } from './app.js';
 import { createBullmqOutboxPublisher } from './bullmq-outbox-publisher.js';
+import {
+  cisaKevSynchronizationConfigFrom,
+  createWorkerIntelligenceAdapters,
+  verifyPrivateIntelligenceStorage,
+} from './intelligence-composition.js';
+import { createIntelligenceJobRedispatch } from './intelligence-job-redispatch.js';
+import { createIntelligenceRuntime } from './intelligence-runtime.js';
+import { processIntelligenceSyncQueueJob } from './intelligence-sync-processor.js';
 import { createOutboxRelayRuntime } from './outbox-relay-runtime.js';
 import { sbomParserLimitsFromConfig } from './parser-limits.js';
 import { createBullmqConnectionOptions } from './queue-connection.js';
+import { createPatchpilotJobRegistry, createPatchpilotQueueWorker } from './queue-job-router.js';
 import { createRedisConnection } from './redis.js';
-import { createSbomIngestProcessor } from './sbom-ingest-processor.js';
 import { createBackgroundJobWorkerIdentifier } from './worker-identifier.js';
 
 async function main(): Promise<void> {
@@ -32,6 +45,14 @@ async function main(): Promise<void> {
     level: config.logLevel,
     pretty: config.prettyLogs && config.deploymentEnvironment !== 'production',
   });
+  const domainLog = {
+    info(bindings: Record<string, unknown>, message: string) {
+      logger.info(bindings, message);
+    },
+    warn(bindings: Record<string, unknown>, message: string) {
+      logger.warn(bindings, message);
+    },
+  };
   const telemetry = await startTelemetry({
     serviceName: 'worker',
     enabled: config.openTelemetry.enabled,
@@ -42,9 +63,12 @@ async function main(): Promise<void> {
   const redis = createRedisConnection(config.redisUrl);
   const prisma = getPrismaClient({ databaseUrl: config.databaseUrl });
   const persistence = createSbomPersistence(prisma);
+  const intelligence = createIntelligencePersistence(prisma);
   const connection = createBullmqConnectionOptions(config.redisUrl);
   const publisher = createBullmqOutboxPublisher({ connection });
+  const redispatch = createIntelligenceJobRedispatch({ connection });
   const clock = createSystemClock();
+  const workerIdentifier = createBackgroundJobWorkerIdentifier();
   const relay = createRelayOutboxBatchUseCase({
     clock,
     outbox: persistence.outboxRelay,
@@ -82,7 +106,7 @@ async function main(): Promise<void> {
     graph: persistence.componentGraph,
     processorWork: createSbomIngestionProcessorUnitOfWork(prisma),
     options: {
-      workerIdentifier: createBackgroundJobWorkerIdentifier(),
+      workerIdentifier,
       processingLeaseMs: config.sbom.processingLeaseMs,
       parserLimits: sbomParserLimitsFromConfig(config.sbom),
     },
@@ -92,18 +116,87 @@ async function main(): Promise<void> {
       },
     },
   });
-  const ingestionProcessor = createSbomIngestProcessor({
+  const intelligenceAdapters = createWorkerIntelligenceAdapters(config, logger);
+  const synchronize = createCisaKevSynchronizationService({
+    clock,
+    createId: () => randomUUID(),
+    config: cisaKevSynchronizationConfigFrom(config.intelligence),
+    jobs: persistence.backgroundJobs,
+    outbox: intelligence.outbox,
+    syncRuns: intelligence.syncRuns,
+    snapshots: intelligence.snapshots,
+    generations: intelligence.generations,
+    freshness: intelligence.freshness,
+    http: intelligenceAdapters.http,
+    storage: intelligenceAdapters.snapshotStorage,
+    parser: intelligenceAdapters.parser,
+    unitOfWork: intelligence.unitOfWork,
+    logger: {
+      info(bindings, message) {
+        logger.info(bindings, message);
+      },
+      warn(bindings, message) {
+        logger.warn(bindings, message);
+      },
+    },
+  });
+  const evaluateSchedule = createEvaluateKevSyncScheduleUseCase({
+    clock,
+    createId: () => randomUUID(),
+    kevEnabled: config.intelligence.kevEnabled,
+    syncIntervalSeconds: config.intelligence.kevSyncIntervalSeconds,
+    parserVersion: config.intelligence.parserVersion,
+    normalizationVersion: config.intelligence.normalizationVersion,
+    syncRuns: intelligence.syncRuns,
+    freshness: intelligence.freshness,
+    scheduler: intelligence.scheduler,
+  });
+  const intelligenceRuntime = createIntelligenceRuntime({
+    kevEnabled: config.intelligence.kevEnabled,
+    evaluate: (input) => evaluateSchedule.execute(input),
+    redelivery: intelligence.redelivery,
+    redispatch,
+    freshness: intelligence.freshness,
+    logger: domainLog,
+    schedulerPollIntervalMs: config.intelligence.kevSchedulerPollIntervalMs,
+    schedulerStartupDelayMs: config.intelligence.kevSchedulerStartupDelayMs,
+    retryReconcileIntervalMs: config.intelligence.retryReconcileIntervalMs,
+    retryReconcileMinAgeMs: config.intelligence.retryReconcileMinAgeMs,
+  });
+  const queueWorker = createPatchpilotQueueWorker({
     connection,
-    execute: (payload) => processIngestion.execute(payload),
-    logger,
+    processSbom: (payload) => processIngestion.execute(payload),
+    processIntelligence: (job) =>
+      processIntelligenceSyncQueueJob(job, {
+        clock,
+        jobs: persistence.backgroundJobs,
+        outbox: intelligence.outbox,
+        syncRuns: intelligence.syncRuns,
+        execute: (input) => synchronize.execute(input),
+        redispatch,
+        workerIdentifier,
+        kevJobLeaseMs: config.intelligence.kevJobLeaseMs,
+        logger: domainLog,
+        signal: intelligenceRuntime.signal,
+      }),
+    logger: domainLog,
+    sbomProcessingLeaseMs: config.sbom.processingLeaseMs,
+    kevJobLeaseMs: config.intelligence.kevJobLeaseMs,
+    jobLeaseRenewalIntervalMs: config.intelligence.jobLeaseRenewalIntervalMs,
   });
   const worker = createWorkerApp({
     logger,
     telemetry,
     redis,
     checkDatabaseReady: (timeoutMs) => checkDatabaseReady(timeoutMs),
-    jobRegistry: createEmptyJobRegistry(),
-    ingestionProcessor,
+    verifyPrivateStorage: () =>
+      verifyPrivateIntelligenceStorage({
+        storage: intelligenceAdapters.snapshotStorage,
+        config,
+      }),
+    jobRegistry: createPatchpilotJobRegistry(),
+    queueWorker,
+    intelligenceRuntime,
     outboxRelay,
     shutdownTimeoutMs: config.shutdownTimeoutMs,
     readinessTimeoutMs: config.readinessTimeoutMs,

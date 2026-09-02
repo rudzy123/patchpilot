@@ -45,7 +45,7 @@ Do not put raw authorization headers in trace attributes.
 ## Logs
 
 - JSON logs via `packages/logger`.
-- Redact: authorization headers, cookies, API tokens, GitHub tokens and installation tokens, raw SBOMs, private source code, private repository content, plaintext credentials, complete vulnerability-feed payloads, object-storage **signed URLs**.
+- Redact: authorization headers, cookies, API tokens, GitHub tokens and installation tokens, raw SBOMs, private source code, private repository content, plaintext credentials, complete vulnerability-feed payloads, object-storage **signed URLs**, provider URLs, DNS answers, remote addresses, raw ETag / Last-Modified, intelligence snapshot object keys, and response headers.
 - Component names may appear as **truncated** untrusted strings in debug logs only when needed; prefer ids and hashes (`sha256` prefix).
 - Log finding **priority** as a number plus policy version, not as "exploitable."
 

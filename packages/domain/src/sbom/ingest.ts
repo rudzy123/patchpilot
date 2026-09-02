@@ -341,6 +341,7 @@ async function loadProcessingIngestion(
   await dependencies.jobs.markRetry({
     organizationId: input.payload.organizationId,
     jobId: input.jobId,
+    workerIdentifier: input.workerIdentifier,
     failureCategory: classifySafeFailure('queue_unavailable').category,
     failureCode: 'queue_unavailable',
     availableAt: input.now,
@@ -452,6 +453,7 @@ async function releaseForRetry(
     await repos.backgroundJobs.markRetry({
       organizationId: input.payload.organizationId,
       jobId: input.jobId,
+      workerIdentifier: dependencies.options.workerIdentifier,
       failureCategory: classification.category,
       failureCode: input.code,
       availableAt: now,

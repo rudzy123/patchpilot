@@ -24,6 +24,7 @@ export const PERMISSIONS = {
   integrationRead: 'integration:read',
   integrationManage: 'integration:manage',
   auditRead: 'audit:read',
+  intelligenceRead: 'intelligence:read',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -49,6 +50,7 @@ export const permissionCatalog: readonly Permission[] = Object.freeze([
   PERMISSIONS.integrationRead,
   PERMISSIONS.integrationManage,
   PERMISSIONS.auditRead,
+  PERMISSIONS.intelligenceRead,
 ]);
 
 const VIEWER_PERMISSIONS: readonly Permission[] = [
@@ -60,6 +62,7 @@ const VIEWER_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.findingRead,
   PERMISSIONS.policyRead,
   PERMISSIONS.auditRead,
+  PERMISSIONS.intelligenceRead,
 ];
 
 const MEMBER_PERMISSIONS: readonly Permission[] = [

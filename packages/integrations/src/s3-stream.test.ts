@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createGetCountTransform,
+  createHashCountTransform,
   createPutInspectTransform,
   readableFromByteStream,
   sniffSbomPrefix,
@@ -78,6 +79,24 @@ describe('PutInspectTransform', () => {
     const transform = createPutInspectTransform({ maxBytes: 1024 });
     await expect(collect(transform, Buffer.from('%PDF-1.4 rest'))).rejects.toMatchObject({
       category: 'invalid_content',
+    });
+  });
+});
+
+describe('HashCountTransform', () => {
+  it('counts and hashes original bytes without sniffing JSON structure', async () => {
+    const payload = Buffer.from('[]');
+    const transform = createHashCountTransform({ maxBytes: 1024 });
+    const collected = await collect(transform, payload);
+    expect(collected.equals(payload)).toBe(true);
+    expect(transform.observedByteLength()).toBe(payload.byteLength);
+    expect(transform.sha256Hex()).toBe(createHash('sha256').update(payload).digest('hex'));
+  });
+
+  it('rejects over-limit streams during consumption', async () => {
+    const transform = createHashCountTransform({ maxBytes: 2 });
+    await expect(collect(transform, Buffer.from('abcd'))).rejects.toMatchObject({
+      category: 'size_limit',
     });
   });
 });

@@ -14,6 +14,7 @@ export default [
       'docs/**',
       'deploy/compose/data/**',
       'packages/sbom/vendor/**',
+      'packages/vulnerability-intelligence/vendor/**',
     ],
   },
   ...baseConfig,

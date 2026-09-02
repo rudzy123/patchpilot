@@ -15,6 +15,7 @@ import {
   SESSION_6_THROUGH_ANONYMOUS_MIGRATIONS,
   SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
   SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+  SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
   applyMigrationSqlAndResolve,
   applySession3Schema,
   applyThroughAuditActorAnonymous,
@@ -23,6 +24,7 @@ import {
   applyThroughSession5,
   applyThroughSession6,
   applyThroughSession7,
+  applyThroughSession8,
   createEphemeralDatabase,
   deployMigrations,
   dropEphemeralDatabase,
@@ -67,6 +69,11 @@ const PRISMA_TABLES = [
   'outbox_event',
   'background_job',
   'idempotency_record',
+  'vulnerability_sync_run',
+  'vulnerability_provider_snapshot',
+  'kev_generation',
+  'kev_entry',
+  'kev_entry_cwe',
 ] as const;
 
 const PRISMA_FOREIGN_KEYS = [
@@ -84,6 +91,8 @@ const PRISMA_FOREIGN_KEYS = [
   'session_user_id_fkey',
   'session_active_organization_id_fkey',
   'audit_event_actor_user_id_fkey',
+  'intelligence_source_active_generation_id_fkey',
+  'vulnerability_sync_run_generation_owned_fkey',
 ] as const;
 
 const SQL_ONLY_CHECKS = [
@@ -125,6 +134,25 @@ const SQL_ONLY_CHECKS = [
   'component_ecosystem_null_or_nonempty_chk',
   'component_occurrence_version_known_chk',
   'idempotency_record_status_response_chk',
+  'vulnerability_sync_run_requested_chk',
+  'vulnerability_sync_run_fetching_chk',
+  'vulnerability_sync_run_retry_wait_chk',
+  'vulnerability_sync_run_stored_chk',
+  'vulnerability_sync_run_parsing_chk',
+  'vulnerability_sync_run_staging_chk',
+  'vulnerability_sync_run_activating_chk',
+  'vulnerability_sync_run_completed_chk',
+  'vulnerability_sync_run_not_modified_chk',
+  'vulnerability_sync_run_failed_chk',
+  'vulnerability_sync_run_quarantined_chk',
+  'vulnerability_provider_snapshot_sha256_chk',
+  'vulnerability_provider_snapshot_object_key_chk',
+  'kev_generation_complete_chk',
+  'kev_generation_active_chk',
+  'kev_entry_cve_chk',
+  'kev_entry_ransomware_raw_chk',
+  'kev_entry_cwe_value_chk',
+  'intelligence_source_active_provider_chk',
 ] as const;
 
 const SQL_ONLY_INDEXES = [
@@ -143,6 +171,21 @@ const SQL_ONLY_INDEXES = [
   'outbox_event_claimed_lease_idx',
   'background_job_outbox_event_uidx',
   'sbom_ingestion_org_sbom_created_idx',
+  'outbox_event_system_dedupe_idx',
+  'outbox_event_tenant_dedupe_idx',
+  'audit_event_system_replay_idx',
+  'audit_event_tenant_replay_idx',
+  'vulnerability_provider_snapshot_natural_key',
+  'kev_generation_sync_run_uidx',
+  'kev_generation_one_active_uidx',
+  'vulnerability_sync_run_inflight_uidx',
+  'vulnerability_sync_run_retry_wait_idx',
+  'kev_entry_generation_cve_uidx',
+  'kev_entry_generation_ordinal_uidx',
+  'kev_entry_cwe_ordinal_uidx',
+  'kev_entry_cwe_value_uidx',
+  'kev_generation_incomplete_age_idx',
+  'kev_entry_generation_ordinal_id_idx',
 ] as const;
 
 const SQL_ONLY_TRIGGERS = [
@@ -157,6 +200,10 @@ const SQL_ONLY_TRIGGERS = [
   'sbom_identity_immutable',
   'risk_calculation_policy_org_consistency',
   'background_job_outbox_org_consistency',
+  'intelligence_source_active_generation',
+  'vulnerability_provider_snapshot_append_only',
+  'kev_entry_append_only',
+  'kev_entry_cwe_append_only',
 ] as const;
 
 const SQL_ONLY_FUNCTIONS = [
@@ -167,6 +214,7 @@ const SQL_ONLY_FUNCTIONS = [
   'patchpilot_risk_policy_org_consistency',
   'patchpilot_job_outbox_org_consistency',
   'patchpilot_audit_actor_membership_user',
+  'patchpilot_intelligence_source_active_generation',
 ] as const;
 
 async function names(client: PrismaClient, sql: string): Promise<string[]> {
@@ -361,10 +409,116 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
   for (const fn of searchPaths) {
     expect(fn.proconfig?.some((entry) => entry.includes('search_path=pg_catalog'))).toBe(true);
   }
+
+  const syncRunStates = await names(
+    client,
+    `SELECT e.enumlabel AS name
+     FROM pg_enum e
+     JOIN pg_type t ON t.oid = e.enumtypid
+     JOIN pg_namespace n ON n.oid = t.typnamespace
+     WHERE n.nspname = 'public' AND t.typname = 'intelligence_sync_run_state'
+     ORDER BY e.enumsortorder`,
+  );
+  expect(syncRunStates).toEqual([
+    'requested',
+    'fetching',
+    'retry_wait',
+    'stored',
+    'parsing',
+    'staging',
+    'activating',
+    'completed',
+    'not_modified',
+    'failed',
+    'quarantined',
+  ]);
+
+  const generationStates = await names(
+    client,
+    `SELECT e.enumlabel AS name
+     FROM pg_enum e
+     JOIN pg_type t ON t.oid = e.enumtypid
+     JOIN pg_namespace n ON n.oid = t.typnamespace
+     WHERE n.nspname = 'public' AND t.typname = 'kev_generation_state'
+     ORDER BY e.enumsortorder`,
+  );
+  expect(generationStates).toEqual(['staging', 'complete', 'active', 'superseded', 'abandoned']);
+
+  const sourceColumns = await names(
+    client,
+    `SELECT column_name AS name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'intelligence_source'`,
+  );
+  expect(sourceColumns).toContain('active_generation_id');
+  expect(sourceColumns).toContain('last_attempt_at');
+  expect(sourceColumns).toContain('last_failure_code');
+  expect(sourceColumns).not.toContain('organization_id');
+
+  const newTableColumns = await client.$queryRaw<
+    Array<{ table_name: string; column_name: string }>
+  >`
+    SELECT table_name, column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name IN (
+        'vulnerability_sync_run',
+        'vulnerability_provider_snapshot',
+        'kev_generation',
+        'kev_entry',
+        'kev_entry_cwe'
+      )
+  `;
+  expect(newTableColumns.some((row) => row.column_name === 'organization_id')).toBe(false);
+
+  const findingFks = await client.$queryRaw<Array<{ conname: string }>>`
+    SELECT c.conname
+    FROM pg_constraint c
+    JOIN pg_class rel ON rel.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = rel.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.contype = 'f'
+      AND rel.relname IN (
+        'vulnerability_sync_run',
+        'vulnerability_provider_snapshot',
+        'kev_generation',
+        'kev_entry',
+        'kev_entry_cwe'
+      )
+      AND (
+        c.confrelid = 'finding'::regclass
+        OR c.confrelid = 'finding_observation'::regclass
+        OR c.confrelid = 'organization'::regclass
+        OR c.confrelid = 'component'::regclass
+        OR c.confrelid = 'vulnerability'::regclass
+      )
+  `;
+  expect(findingFks).toEqual([]);
+
+  const syntheticOrg = await client.$queryRaw<Array<{ slug: string }>>`
+    SELECT slug FROM organization WHERE slug IN ('global', 'system', 'intelligence')
+  `;
+  expect(syntheticOrg).toEqual([]);
+
+  const vulnerabilityColumns = await names(
+    client,
+    `SELECT column_name AS name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'vulnerability'`,
+  );
+  expect(vulnerabilityColumns).toContain('osv_id');
+  expect(vulnerabilityColumns).toContain('cve_id');
+
+  const findingColumns = await names(
+    client,
+    `SELECT column_name AS name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'finding'`,
+  );
+  expect(findingColumns).toContain('organization_id');
+  expect(findingColumns).toContain('vulnerability_id');
+  expect(findingColumns).not.toContain('generation_id');
 }
 
 describe('frozen migrations', () => {
-  it('keeps Session 3 through Session 8 graph-persistence SQL byte-stable', async () => {
+  it('keeps Session 3 through Session 9 KEV-persistence SQL byte-stable', async () => {
     for (const frozen of FROZEN_MIGRATIONS) {
       const digest = await sha256File(frozenMigrationFile(frozen.directory));
       expect(digest).toBe(frozen.sha256);
@@ -378,7 +532,10 @@ describe('frozen migrations', () => {
   });
 });
 
-describe('migrations', () => {
+// GitHub Actions applies these upgrade paths in ~16–28s each after Session 9
+// (local ~4–13s). The default 30s package timeout failed PR Integration on
+// the Session 6 180000 CHECK path, which also applies Sessions 7–9 SQL.
+describe('migrations', { timeout: 90_000 }, () => {
   it('applies every migration to a clean isolated database', async () => {
     const ephemeral = await createEphemeralDatabase('migrate');
     const client = new PrismaClient({
@@ -604,6 +761,7 @@ describe('migrations', () => {
         '20260827180000_local_credentials_and_sessions',
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+        SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
       ]);
       expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
 
@@ -676,6 +834,7 @@ describe('migrations', () => {
         '20260827180000_local_credentials_and_sessions',
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+        SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -805,6 +964,7 @@ describe('migrations', () => {
         '20260827180000_local_credentials_and_sessions',
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+        SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -857,6 +1017,7 @@ describe('migrations', () => {
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+        SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -898,6 +1059,47 @@ describe('migrations', () => {
       );
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+        SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
+      ]);
+      await assertFinalMigratedSchema(client);
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades a Session 8 database by applying only KEV intelligence persistence', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughSession8(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore).toEqual([
+        ...SESSION_6_COMPLETE_MIGRATIONS,
+        SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+        SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+      ]);
+      expect(appliedBefore).not.toContain(SESSION_9_KEV_INTELLIGENCE_PERSISTENCE);
+      const tablesBefore = await names(
+        client,
+        `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'`,
+      );
+      expect(tablesBefore).not.toContain('kev_generation');
+      expect(tablesBefore).not.toContain('vulnerability_sync_run');
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -929,6 +1131,10 @@ describe('migrations', () => {
       await applyMigrationSqlAndResolve(
         ephemeral.databaseUrl,
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+      );
+      await applyMigrationSqlAndResolve(
+        ephemeral.databaseUrl,
+        SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
       );
       await assertFinalMigratedSchema(client);
 
@@ -1015,6 +1221,7 @@ describe('migrations', () => {
         '20260827180000_local_credentials_and_sessions',
         SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+        SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
 

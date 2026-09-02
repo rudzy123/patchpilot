@@ -1,6 +1,6 @@
 # Local development setup
 
-This is the local **development foundation** through Session 8 (schema, API auth routes, minimal web login, and the SBOM upload-to-graph pipeline). It is not a production deployment, and it does not include vulnerability correlation, scoring, remediation, or any SBOM web UI.
+This is the local **development foundation** through Session 9 Batch 9B (schema, API auth routes, minimal web login, the SBOM upload-to-graph pipeline, and KEV catalog import when enabled). It is not a production deployment. It does not include vulnerability correlation, Findings from intelligence, scoring, remediation, an SBOM web UI, or a vulnerability dashboard.
 
 ## Prerequisites
 
@@ -137,4 +137,4 @@ Do not put real customer SBOMs in this bucket. Local MinIO has placeholder crede
 
 ## What this foundation does not include
 
-See [database.md](database.md) and [migrations.md](migrations.md). Do not expect registration, password reset, an SBOM web UI, retry or quarantine-release APIs, orphan-object cleanup, vulnerability feeds, risk scoring, or GitHub integration in this milestone. Session 6 login uses `/login` against the API origin in `NEXT_PUBLIC_API_BASE_URL`.
+See [database.md](database.md) and [migrations.md](migrations.md). Do not expect registration, password reset, an SBOM web UI, retry or quarantine-release APIs, orphan-object cleanup, risk scoring, advisory matching, Findings from intelligence, a vulnerability dashboard, or GitHub integration in this milestone. KEV runtime synchronization exists when `INTELLIGENCE_KEV_ENABLED=true`; OSV runtime remains disabled (`INTELLIGENCE_OSV_ENABLED=true` is rejected). Local tests use synthetic provider data; ordinary CI and test suites do not call live CISA. Do not download the production KEV catalog by hand. Operators may inspect sanitized state with the authenticated provider-status GET routes (`intelligence:read` and an active Organization). Session 6 login uses `/login` against the API origin in `NEXT_PUBLIC_API_BASE_URL`.

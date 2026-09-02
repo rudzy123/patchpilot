@@ -19,6 +19,19 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 - `SBOM_IDEMPOTENCY_TTL_SECONDS` must exceed twice `OBJECT_STORAGE_OPERATION_TIMEOUT_MS` at process start. Slow client streams can still outlive a reservation; renewal during upload is not implemented.
 - Still absent, and therefore still residual: web upload UI, retry and quarantine-release APIs, object-storage orphan reconciliation, BackgroundJob lease heartbeat, and idempotency reservation renewal during streaming upload.
 
+## Session 9 status notes
+
+[ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) records an import-only shared catalog. Session 9 is not complete. [ADR 0010](../adr/0010-osv-correlation.md) remains future correlation, not the import path.
+
+- Approved sources are OSV GCS bulk export (`all.zip` completeness baseline) and the CISA KEV JSON snapshot. Package-query APIs are not the catalog importer. OSV runtime remains disabled.
+- Provider responses are untrusted. Raw bodies belong in private object storage. PostgreSQL stores metadata, hashes, normalized revisions, and current projections. No public or signed snapshot URLs.
+- Partial normalization must never become the current catalog. Content SHA-256 is import idempotency. HTTP 304 is not product not-modified.
+- Session 9 must not match components, write Findings or FindingObservations, enrich findings, score, remediate, enqueue `finding.recalculate`, or query tenant inventories.
+- Parser isolation follows Session 8: parse outside transactions; `worker.terminate()` if termination is required; `Promise.race` is not a kill switch. Archive extraction limits are required; no archive dependency is selected yet.
+- Provider HTTP is allowlisted HTTPS (`node:https.request`) with redirects disabled, proxy environment ignored, and rejection of private, loopback, link-local, metadata-service, and other non-public destinations. Advisory reference URLs are never fetched.
+- DNS lookup pinning plus post-connect verification is implemented for CISA KEV. It is not DNSSEC.
+- The Batch 7B synchronization service exists. Batch 8B starts the worker scheduler, Outbox mapping, and BullMQ intelligence processor. Batch 9B adds authenticated sanitized provider-status GETs (`intelligence:read`; [ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)). Still absent: web dashboard, manual sync/retry, detailed SyncRun APIs, matching, and any Finding workflow. OD-10 remains open. Status GETs do not call CISA and do not write AuditEvent rows.
+
 ## Assets to protect
 
 | Asset | Class | Why it matters |
@@ -126,11 +139,11 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 ### Poisoned vulnerability feeds
 
-**Threat:** Compromised OSV/KEV content or MITM.
+**Threat:** Compromised OSV/KEV content, MITM, or a zip-bomb / hostile archive.
 
-**Impact:** Incorrect correlation and KEV enrichment; wrong **priority**.
+**Impact:** Incorrect future correlation and KEV enrichment; wrong **priority**; parser exhaustion. Session 9 must not turn a poisoned feed into Findings.
 
-**Mitigation:** HTTPS, allowlists, payload hashes, additive versions, retain conflicts, freshness display, no silent overwrite. Residual: public catalogs can be wrong.
+**Mitigation:** HTTPS, allowlists, payload hashes, additive versions, retain conflicts, guarded current-projection activation, archive extraction limits, KEV worker-thread termination, no body logging. Residual: public catalogs can be wrong. Finding integration is not implemented.
 
 ### Compromised provider credentials
 
@@ -158,11 +171,11 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 ### SSRF
 
-**Threat:** Fetch SBOM URLs, license URLs, user-controlled intel endpoints, link-local metadata.
+**Threat:** Fetch SBOM URLs, license URLs, advisory `references`, KEV notes, user-controlled intel endpoints, or link-local metadata.
 
 **Impact:** Cloud credential theft, internal scan.
 
-**Mitigation:** No SBOM URL fetch; adapter allowlists; block link-local/metadata; timeouts and size limits; no user-controlled internal URLs.
+**Mitigation:** No SBOM URL fetch; no fetch of provider reference or note URLs; compiled provider allowlist; HTTPS only via `node:https.request`; redirects disabled; proxy environment ignored; reject private, loopback, link-local, metadata-service, and other non-public destinations; DNS lookup pinning plus post-connect verification (not DNSSEC); timeouts and size limits; no arbitrary caller URL. Residual: mis-allowlist; pinning is not DNSSEC.
 
 ### SQL injection
 
@@ -372,13 +385,21 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Mitigation:** Idempotent handlers; org-scoped unique keys.
 
+### Partial catalog activation
+
+**Threat:** A failed mid-archive import becomes the visible current catalog or applies missing-record semantics.
+
+**Impact:** Silent withdrawal of still-valid advisories, or mixed old/new current state.
+
+**Mitigation:** Activate current projection only after a complete source unit succeeds; staging or generation-based activation; do not advance freshness on partial failure ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). Residual: staging schema is deferred.
+
 ### Missing provider data
 
 **Threat:** OSV/KEV gap presented as "not vulnerable."
 
 **Impact:** False safety.
 
-**Mitigation:** Freshness display; no match ≠ proof of safety; KEV absence is not proof of non-exploitation.
+**Mitigation:** Freshness display; no match ≠ proof of safety; KEV absence is not proof of non-exploitation. Session 9 import does not create Findings, so a missing catalog row is not a tenant "all clear."
 
 ### Open instance registration
 
@@ -394,7 +415,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** False findings or misses.
 
-**Mitigation:** Adapter-based versions; no fuzzy match; record method; tests with fixtures.
+**Mitigation:** Session 9 must not run matching. Future correlation: adapter-based versions; no fuzzy match; record method; tests with fixtures ([ADR 0010](../adr/0010-osv-correlation.md), [OD-15](../architecture/open-decisions.md)).
 
 ### Incomplete SBOM coverage
 
@@ -424,7 +445,9 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 | Poisoned feeds | Catalog | MITM/compromise | Wrong priority | HTTPS, hashes, additive | Stale/degraded | Keep last good | Fixture conflicts | Public catalogs lie | Intel |
 | Stolen provider/storage creds | Storage, feeds | Leak | Theft | Encrypt, config | Audit creds | Rotate | Redaction tests | Operator keys | Integrations |
 | Webhook forgery/replay | Future | Fake callback | Confused deputy | No listeners in v0.1 | — | — | When added | Future | API |
-| SSRF | Cloud metadata | URL fetch | Cred theft | No SBOM URLs; allowlist | Egress logs | Block | Adapter tests | Mis-allowlist | Integrations |
+| SSRF | Cloud metadata | URL fetch; advisory references | Cred theft | No SBOM/reference fetch; compiled allowlist; non-public destination rejection; CISA lookup-pin plus post-connect verify | Egress logs | Block | Adapter tests | Mis-allowlist; pinning is not DNSSEC | Integrations |
+| Poisoned / hostile intel archive | Shared catalog | MITM, zip bomb, incomplete activation | Wrong future match; DoS | Hashes, additive revisions, extraction limits, guarded activation, zero Findings | Quarantine / failed run | Keep last accepted catalog | Fixture + replay | Public catalogs lie | Intel |
+| Partial catalog activation | Current projection | Mid-import failure treated as complete | Silent withdrawal | Staging/generation activation after complete unit | Sync failed/quarantined audit | New run; do not rewrite terminal | Persistence tests later | Staging schema deferred | Intel |
 | SQLi | DB | Concat SQL | Takeover | Prisma | — | Restore | — | Raw SQL mistakes | Database |
 | XSS | Sessions | Component names | Session theft | Escape, CSP later | — | Rotate | UI tests | New sinks | Web |
 | CSRF | Mutations | Cross-site POST | Unwanted upload | SameSite + Origin + token | — | Revoke | API tests | Auth and upload routes enforce all three | API |

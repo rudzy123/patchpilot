@@ -404,6 +404,16 @@ function createHarness(
       }
       return job;
     },
+    async findById(input) {
+      operations.push('jobs.findById');
+      if (job === undefined || job.id !== input.jobId) {
+        return undefined;
+      }
+      if (job.organizationId !== input.organizationId) {
+        return undefined;
+      }
+      return job;
+    },
     async claimExecution() {
       claimCalls += 1;
       operations.push('jobs.claimExecution');

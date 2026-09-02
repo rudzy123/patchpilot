@@ -7,12 +7,12 @@ Passing tests do not make a deployment production-ready. Each job type still nee
 ## Write path
 
 1. Validate at the HTTP or scheduler boundary.
-2. Perform object-storage I/O **outside** a transaction (SBOM put).
-3. Transaction: domain state + **OutboxEvent** + **AuditEvent**.
+2. Perform object-storage I/O **outside** a transaction (SBOM put; later, intelligence snapshot put).
+3. Transaction: domain state + **OutboxEvent** + **AuditEvent**. No Redis, provider HTTP, or object-storage I/O inside that transaction.
 4. Relay publishes to BullMQ; marks outbox `processedAt` (status `processed`). **OutboxEvent** `processed` means BullMQ **accepted** the job, not that the worker finished. Outbox row statuses are `pending`, `claimed`, `processed`, `failed`, `dead_lettered`. Delivery is at-least-once; the schema does not claim exactly-once.
-5. Worker runs; retries; dead-letters poison. **BackgroundJob** represents actual processor execution. Statuses remain `pending`, `queued`, `running`, `succeeded`, `failed`, `dead_lettered`, `cancelled`.
+5. Worker runs; retries; dead-letters poison. **BackgroundJob** represents actual processor execution. Statuses remain `pending`, `queued`, `running`, `succeeded`, `failed`, `dead_lettered`, `cancelled`. Terminal Session 9 sync runs remain historical; operator replay creates a **new** run rather than rewriting a terminal run.
 
-If step 3 fails after step 2, an orphan object may exist. A reconcile job lists unreferenced keys in the org prefix and does not delete until retention policy says so.
+If step 3 fails after step 2, an orphan object may exist. For tenant SBOM objects, a future reconcile job lists unreferenced keys in the org prefix and does not delete until retention policy says so. Intelligence snapshot orphans are instance-owned; their key layout is not defined yet and must not use a tenant org prefix.
 
 If step 4 duplicates (relay retry), the queue may deliver twice. Handlers use `dedupeKey`.
 
@@ -68,7 +68,7 @@ The relay is a poll loop in `apps/worker`. Values below are the implemented cons
 | Max publish attempts | 5 |
 | Backoff | `min(900_000 ms, 5_000 ms * 2^(attempt-1))` scaled by jitter in `[0.5, 1.0)` |
 | Queue | `patchpilot` |
-| Job name | `sbom.ingest` |
+| Job name | `sbom.ingest` or `intelligence.sync` |
 | BullMQ job id | `{eventType}__{outboxEventId}` |
 
 Claiming uses `FOR UPDATE SKIP LOCKED` over due `pending` rows ordered by `available_at`, then `id`, and fills any remaining batch capacity from `claimed` rows whose lease has expired. Expired-lease recovery is part of the claim query; there is no separate sweeper.
@@ -108,7 +108,7 @@ Tenant uniqueness always includes `organizationId`.
 | RiskCalculation | org + finding + `inputFingerprint` (canonical hash of reason, `policyDefinitionSha256`, sorted intel source record ids, `sbomIngestionId` or null, asset context version or null, override id or null). Intel refresh and ingest docs must use this same key — not a shorter `(finding, sourceRecordId, policyVersion)` tuple. |
 | RiskAcceptance create | `Idempotency-Key` + org; at most one `active` acceptance per finding |
 | Export create | `Idempotency-Key` + org |
-| System intel refresh outbox | `eventType` + non-null `dedupeKey` (cursor/`payloadSha256`); unique on `(eventType, dedupeKey)` because `organizationId` is null |
+| System intel refresh outbox | `eventType` + non-null `dedupeKey` (content SHA-256 of the source unit); unique on `(eventType, dedupeKey)` because `organizationId` is null. Do not treat unverified HTTP validators as the idempotency key. |
 | Audit | Do not duplicate on replay: unique `(organizationId, action, subjectId, correlationId)` for tenant events. System events require a non-null `correlationId` and unique `(action, subjectId, correlationId)` where `organizationId` IS NULL. |
 
 Replay of the same job twice produces one tenant-visible effect (required test).
@@ -118,7 +118,7 @@ Replay of the same job twice produces one tenant-visible effect (required test).
 - Two uploads of different hashes for one asset: both proceed; rescan compare and `lastSuccessfulSbomIngestionId` use the `completed` ingestion whose SBOM `receivedAt` is greatest, **not** the last worker to finish.
 - Two workers correlating the same SBOM: unique constraints prevent duplicate findings; second worker updates observations idempotently.
 - Risk acceptance vs rescan: last completed transaction wins; both leave audit rows.
-- Intel refresh vs ingest: calculations are append-only; last `currentRiskCalculationId` update is a compare-and-set on finding row version if needed.
+- Intel refresh vs ingest: Session 9 import must not write Findings or `finding.recalculate`. When a later correlation session exists, calculations are append-only; last `currentRiskCalculationId` update is a compare-and-set on finding row version if needed.
 
 ## Poison and DLQ
 
@@ -131,7 +131,7 @@ Dead-lettered jobs retain payload **ids** only (no raw SBOM). Operators replay a
 | PostgreSQL | Unavailable | API 503, worker lag | Operator restore; do not skip migrations |
 | Redis | Unavailable | Relay lag, publish errors | Outbox remains; drain when Redis returns. PostgreSQL is source of truth |
 | Object storage | Unavailable | Upload 503 | No SBOM row; user retries |
-| OSV/KEV | Outage | IntelligenceSource `degraded` | Use last snapshot; see [vulnerability intelligence](vulnerability-intelligence.md) |
+| OSV/KEV | Outage | Derived public `healthStatus` `degraded` or `stale` (provider-status projection). Persisted `IntelligenceSource.state` is `enabled` or `disabled`, not the public degraded flag. | Last **accepted** catalog remains current; do not activate a partial import. See [vulnerability intelligence](vulnerability-intelligence.md). Session 9 KEV import runtime exists; OSV runtime remains disabled. |
 
 ## Partial parse
 
@@ -148,23 +148,27 @@ Delivery is **at-least-once**. PatchPilot does **not** claim exactly-once proces
 | Lease | Column | Duration | Renewal |
 | --- | --- | --- | --- |
 | Relay claim | `outbox_event.lease_expires_at` | 30 s | Reclaimed by the next claim query when expired |
-| Processor execution | `background_job.lease_expires_at` | `SBOM_PROCESSING_LEASE_MS`, default 15 min | None; see below |
+| Processor execution | `background_job.lease_expires_at` | `SBOM_PROCESSING_LEASE_MS` (SBOM ingest, default 15 min) or `INTELLIGENCE_KEV_JOB_LEASE_MS` (KEV sync, default 10 min) | SBOM ingest: none. KEV sync service: `renewLease` at stage boundaries and `INTELLIGENCE_JOB_LEASE_RENEWAL_INTERVAL_MS` |
 
 Outbox `processed` is relay success (BullMQ accepted the job), not processor completion. `SbomIngestion.leaseExpiresAt` is unused in Session 8 and is never written; ingestion state is not a lock.
 
 The BackgroundJob claim is one conditional `UPDATE` scoped by organization, succeeding only when the row is `queued` or is `running` with an expired lease, and it increments `attempt`. A lost claim is a conflict, and the processor treats it as a stalled delivery rather than proceeding unclaimed.
 
-**No lease heartbeat is implemented.** `renewLease` exists on the port and Prisma adapter and is never called. The lease must therefore be longer than the worst-case run, and typed configuration enforces that `SBOM_PARSER_TIMEOUT_MS` and `OBJECT_STORAGE_OPERATION_TIMEOUT_MS` are both below `SBOM_PROCESSING_LEASE_MS`. Raising a timeout without raising the lease fails at process start rather than producing silent double execution.
+**SBOM ingest has no lease heartbeat.** `renewLease` exists on the port and Prisma adapter and is never called for Session 8 ingestion. The SBOM lease must therefore be longer than the worst-case run, and typed configuration enforces that `SBOM_PARSER_TIMEOUT_MS` and `OBJECT_STORAGE_OPERATION_TIMEOUT_MS` are both below `SBOM_PROCESSING_LEASE_MS`. Raising a timeout without raising the lease fails at process start rather than producing silent double execution.
+
+The Batch 7B CISA KEV synchronization service renews the same BackgroundJob lease. It verifies ownership before external work and aborts HTTP, storage, and parser operations when renewal is lost. SyncRun has no lease fields. Batch 8B starts that service from the shared `patchpilot` Worker (`concurrency: 2`). `lockDuration` covers the longer of the SBOM and KEV leases.
 
 On expiry another worker may start (**lease theft** under clock skew: still safe because handlers are idempotent). Workers must not accept a client-supplied lease owner, and lease fields never appear in public API responses.
 
 ## Retry
 
-Exponential backoff **with jitter**. Classify retryable vs not (see table above). Circuit-breaking: after consecutive feed failures, **IntelligenceSource** → `degraded`; stop hammering; probe on a slow timer.
+Exponential backoff **with jitter**. Classify retryable vs not (see table above). Session 8 SBOM ingest still has no BullMQ `attempts`/`backoff`; a retryable failure leaves resumable state until an operator replays the job.
+
+Session 9 Batch 8B bounds KEV execution attempts with `INTELLIGENCE_SYNC_MAX_ATTEMPTS` (default 5). Pre-snapshot retryable failures persist `retry_wait` and `nextAttemptAt`; the use case does not sleep. The periodic scheduler does not redispatch `retry_wait`. Post-snapshot retryable failures leave SyncRun in `stored`, `parsing`, `staging`, or `activating` and mark the BackgroundJob retryable so the next execution does not refetch CISA. PostgreSQL retry reconciliation is the durable path; BullMQ delayed jobs are a fast path. Public `degraded` health is derived by the provider-status projection from the active generation, last successful synchronization, a later failure timestamp, and stale-threshold precedence. It is not a persisted `IntelligenceSource.state`. Partial source units must not advance freshness.
 
 ## Timeouts and shutdown
 
-Outbound HTTP and storage calls have timeouts (intel defaults in [vulnerability-intelligence.md](vulnerability-intelligence.md)). Graceful shutdown: stop leasing new jobs, finish or return the current lease, then exit. Forced kill relies on lease expiry.
+Outbound HTTP and storage calls have timeouts. Session 8 storage/parser timeouts are typed configuration. Session 9 provider, parser, and object-storage timeouts are typed configuration; the Batch 7B service applies them when invoked. Graceful shutdown: stop the KEV scheduler and retry reconciler, stop leasing new jobs, abort active intelligence work, finish or return the current lease, then exit. Forced kill relies on lease expiry. Shutdown does not mark a run failed solely because the process is stopping.
 
 ## Orphans and reconciliation
 
@@ -172,7 +176,7 @@ One reconciliation path is implemented: the relay's per-batch sweep that creates
 
 Object-storage orphan cleanup is **not** implemented. `SBOM_ORPHAN_GRACE_SECONDS` (default 7 days, validated to exceed the idempotency TTL) is the policy floor a future job must honor; nothing reads it today. Orphans arise when a temporary-object delete fails, or when a promote succeeded and the database transaction then failed. The final object is intentionally retained in the second case because it may be the only copy of the evidence. See [SBOM ingestion](sbom-ingestion.md#orphan-reconciliation).
 
-Still unimplemented and needed before those pipelines run: stale `running` sweeps, intel cursor recovery, expired **RiskAcceptance**, and expired **manual_override** calculations. Runbooks: [docs/runbooks/](../runbooks/README.md).
+Session 9 KEV scheduler, bounded provider retry, PostgreSQL retry reconciliation, staging, and atomic activation are implemented. Still unimplemented: object-storage orphan cleanup (including intelligence final-snapshot orphans), stale `running` job sweeps, OSV runtime, expired **RiskAcceptance**, and expired **manual_override** calculations. Delivery remains at-least-once; PatchPilot does not claim exactly-once. Runbooks: [docs/runbooks/](../runbooks/README.md).
 
 ## Backup, RPO, RTO (proposals)
 
@@ -188,5 +192,7 @@ Restore both stores together. Degraded mode during provider outages: last intel 
 ## Related documents
 
 - [SBOM ingestion](sbom-ingestion.md)
+- [Vulnerability intelligence](vulnerability-intelligence.md)
+- [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)
 - [Observability](observability.md)
 - [Deployment model](deployment-model.md)

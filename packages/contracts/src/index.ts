@@ -96,6 +96,30 @@ export {
   type SbomUploadAcceptedResponse,
   type SupportedCycloneDxSpecificationVersion,
 } from './sboms.js';
+export {
+  INTELLIGENCE_PROVIDER_STATUS_CACHE_CONTROL,
+  INTELLIGENCE_PROVIDER_STATUS_PATH,
+  INTELLIGENCE_PROVIDERS_PATH,
+  expectedDisabledKevPublicStatus,
+  expectedOsvPublicStatus,
+  intelligenceDisplayName,
+  intelligenceProviderDetailResponseSchema,
+  intelligenceProviderHealthStatusSchema,
+  intelligenceProviderImplementationStatusSchema,
+  intelligenceProviderListResponseSchema,
+  intelligenceProviderParamSchema,
+  intelligenceProviderSchema,
+  intelligenceProviderStatusSchema,
+  intelligencePublicFailureCodeSchema,
+  type IntelligenceProviderContract,
+  type IntelligenceProviderDetailResponse,
+  type IntelligenceProviderHealthStatusContract,
+  type IntelligenceProviderImplementationStatusContract,
+  type IntelligenceProviderListResponse,
+  type IntelligenceProviderParam,
+  type IntelligenceProviderStatus,
+  type IntelligencePublicFailureCodeContract,
+} from './intelligence.js';
 
 export const healthServiceSchema = z.enum(['api', 'web', 'worker']);
 

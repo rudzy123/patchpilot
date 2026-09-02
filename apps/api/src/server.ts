@@ -18,6 +18,7 @@ import {
   createRepositories,
   createSbomPersistence,
   createSbomUploadUnitOfWork,
+  createIntelligenceStatusReader,
   disconnectPrisma,
   getPrismaClient,
 } from '@patchpilot/database';
@@ -27,6 +28,7 @@ import { startTelemetry } from '@patchpilot/observability';
 
 import { buildApi } from './app.js';
 import { createAssetRuntime } from './asset-runtime.js';
+import { createIntelligenceRuntime } from './intelligence-runtime.js';
 import { createRedisLoginRateLimiter } from './redis-login-rate-limiter.js';
 import { createSbomRuntime } from './sbom-runtime.js';
 
@@ -130,6 +132,12 @@ async function main(): Promise<void> {
     },
     assets,
     sboms,
+    intelligence: createIntelligenceRuntime({
+      status: createIntelligenceStatusReader(prisma),
+      kevEnabled: config.intelligence.kevEnabled,
+      staleThresholdSeconds: config.intelligence.kevStaleThresholdSeconds,
+      now: () => clock.now(),
+    }),
   });
 
   let shuttingDown = false;

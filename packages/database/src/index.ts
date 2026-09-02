@@ -7,6 +7,11 @@ export {
 } from './client.js';
 export { createPrismaUnitOfWork, createRepositories } from './repositories.js';
 export { createSbomPersistence, type SbomPersistenceAdapters } from './sbom-persistence.js';
+export {
+  createIntelligencePersistence,
+  type IntelligencePersistenceAdapters,
+} from './intelligence-persistence.js';
+export { createIntelligenceStatusReader } from './intelligence-status.js';
 export { createSbomUploadUnitOfWork } from './sbom-upload-unit-of-work.js';
 export { createSbomIngestionProcessorUnitOfWork } from './sbom-ingestion-processor-unit-of-work.js';
 export { developmentSeedIds, seedDevelopmentData } from './seed/development.js';

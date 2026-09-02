@@ -1,3 +1,7 @@
+import {
+  INTELLIGENCE_SYNC_JOB_TYPE,
+  INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE,
+} from '../intelligence/constants.js';
 import type { Clock } from '../clock.js';
 import {
   OUTBOX_RELAY_BATCH_LIMIT,
@@ -60,6 +64,9 @@ export const OUTBOX_RELAY_DEFAULTS: Omit<OutboxRelayOptions, 'random'> = {
 export function jobTypeForOutboxEvent(eventType: string): string | undefined {
   if (eventType === SBOM_INGESTION_REQUESTED_EVENT_TYPE) {
     return SBOM_INGEST_JOB_TYPE;
+  }
+  if (eventType === INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE) {
+    return INTELLIGENCE_SYNC_JOB_TYPE;
   }
   return undefined;
 }

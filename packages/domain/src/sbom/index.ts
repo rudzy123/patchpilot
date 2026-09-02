@@ -235,6 +235,7 @@ export {
   type HeadObjectInput,
   type IdempotencyReservationRecord,
   type InitializeDevelopmentBucketInput,
+  type LookupBackgroundJobByIdInput,
   type LookupBackgroundJobByOutboxInput,
   type LookupTerminalBackgroundJobInput,
   type MarkOutboxProcessedInput,

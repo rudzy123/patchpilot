@@ -11,5 +11,8 @@ describe('integration ports', () => {
     expect(deferredIntegrationNotes.minioAdapter).toBe('s3-compatible-streaming-adapter');
     expect(deferredIntegrationNotes.s3Client).toBe('wired-static-credentials');
     expect(deferredIntegrationNotes.objectKeyConvention).toBe('org-asset-sha256');
+    expect(deferredIntegrationNotes.intelligenceObjectKeyConvention).toBe(
+      'intelligence-cisa-kev-sha256',
+    );
   });
 });

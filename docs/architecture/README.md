@@ -1,8 +1,8 @@
 # Architecture
 
-This directory is the v0.1 architecture design for PatchPilot. Sessions 3–4 scaffolded application shells, CI, and governance. Session 5 adds the PostgreSQL tenant schema and persistence adapters. Session 6 implements local-password authentication. Session 7 persists asset inventory. Session 8 Batch 1 records [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md) and typed SBOM limits. Session 8 Batch 5 implements the private streaming S3-compatible object-storage adapter. Session 8 Batch 6 implements the framework-independent authorized SBOM upload use case. Live upload HTTP, parse runtime, and graph persistence from the worker are **not** implemented yet. Product APIs for correlation, live feeds, and scoring are **not** implemented.
+This directory is the v0.1 architecture design for PatchPilot. Sessions 3–4 scaffolded application shells, CI, and governance. Session 5 adds the PostgreSQL tenant schema and persistence adapters. Session 6 implements local-password authentication. Session 7 persists asset inventory. Session 8 implements CycloneDX JSON upload, private object storage, outbox relay, worker-thread parse, and graph persistence ([ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md)). Session 9 Batch 1B records [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) (import-only shared catalog). Subsequent Session 9 batches implement KEV import runtime: restricted CISA HTTPS and private snapshot storage, isolated parsing, crash-safe synchronization, the worker scheduler/processor/retry reconciler, and authenticated sanitized provider-status GETs ([ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)). Advisory matching, Findings, risk scoring, OSV runtime, manual sync, detailed SyncRun APIs, and a dashboard remain **not** implemented.
 
-Decisions in this directory follow the Architecture Decision Records under [docs/adr/](../adr/README.md). ADRs 0001–0020 are **Accepted** for v0.1. Remaining gaps are listed in [open-decisions.md](open-decisions.md). OD-1, OD-2, and OD-3 are closed by [ADR 0019](../adr/0019-local-password-sessions.md). Session 8 ingestion completion is closed by [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md). OD-14 is unchanged.
+Decisions in this directory follow the Architecture Decision Records under [docs/adr/](../adr/README.md). ADRs 0001–0022 are **Accepted** for v0.1. Remaining gaps are listed in [open-decisions.md](open-decisions.md). OD-1, OD-2, and OD-3 are closed by [ADR 0019](../adr/0019-local-password-sessions.md). Session 8 ingestion completion is closed by [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md). Session 9 import-only catalog access is closed by [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Sanitized provider-status authorization is closed by [ADR 0022](../adr/0022-intelligence-provider-status-authorization.md). [ADR 0010](../adr/0010-osv-correlation.md) remains future correlation. OD-14 is unchanged.
 
 ## How to read this set
 
@@ -28,7 +28,7 @@ When two documents describe the same rule, treat this table as the source of tru
 | Asset ownership and environments | [asset-model.md](asset-model.md) |
 | Ingestion limits, hashing, quarantine | [sbom-ingestion.md](sbom-ingestion.md) |
 | Session 8 `completed` and graph completeness | [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md) |
-| Intelligence provenance and matching | [vulnerability-intelligence.md](vulnerability-intelligence.md) |
+| Intelligence provenance, Session 9 import, and future matching | [vulnerability-intelligence.md](vulnerability-intelligence.md) and [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) |
 | Finding states and rescan conclusions | [finding-lifecycle.md](finding-lifecycle.md) |
 | Scoring, factors, policy versions | [risk-policy.md](risk-policy.md) |
 | Remediation tasks and risk acceptance | [remediation-lifecycle.md](remediation-lifecycle.md) |
@@ -41,7 +41,7 @@ When two documents describe the same rule, treat this table as the source of tru
 
 ## What this design set does not claim
 
-- Product workflows (SBOM processing, scoring, remediation) are specified here. Authentication HTTP exists (Session 6). Session 8 Batch 6 adds the authorized upload use case; Fastify upload routes, parse runtime, and graph persistence from the worker are **not** implemented yet.
+- Product workflows (SBOM processing, scoring, remediation) are specified here. Authentication HTTP exists (Session 6). Session 8 upload-to-graph is implemented. Session 9 KEV import runtime and sanitized provider-status APIs are implemented. Advisory matching, Findings, enrichment, scoring, OSV runtime, manual sync, detailed SyncRun APIs, and a dashboard remain later.
 - The foundation does not claim SOC 2, ISO 27001, FedRAMP, PCI, HIPAA, or any other compliance status.
 
 ## Open decisions

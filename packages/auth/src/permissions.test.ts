@@ -40,6 +40,7 @@ const matrix: Record<Permission, Record<MembershipRole, boolean>> = {
   [PERMISSIONS.integrationRead]: { viewer: false, member: false, admin: true, owner: true },
   [PERMISSIONS.integrationManage]: { viewer: false, member: false, admin: true, owner: true },
   [PERMISSIONS.auditRead]: { viewer: true, member: true, admin: true, owner: true },
+  [PERMISSIONS.intelligenceRead]: { viewer: true, member: true, admin: true, owner: true },
 };
 
 const roles: readonly MembershipRole[] = ['viewer', 'member', 'admin', 'owner'];
@@ -52,6 +53,17 @@ describe('permission catalog', () => {
         expect(hasPermission(role, permission)).toBe(matrix[permission][role]);
       }
     }
+  });
+
+  it('grants intelligence:read to every role and does not reuse integration:read', () => {
+    expect(hasPermission('viewer', PERMISSIONS.intelligenceRead)).toBe(true);
+    expect(hasPermission('member', PERMISSIONS.intelligenceRead)).toBe(true);
+    expect(hasPermission('admin', PERMISSIONS.intelligenceRead)).toBe(true);
+    expect(hasPermission('owner', PERMISSIONS.intelligenceRead)).toBe(true);
+    expect(hasPermission('viewer', PERMISSIONS.integrationRead)).toBe(false);
+    expect(hasPermission('member', PERMISSIONS.integrationRead)).toBe(false);
+    expect(PERMISSIONS.intelligenceRead).toBe('intelligence:read');
+    expect(PERMISSIONS.intelligenceRead).not.toBe(PERMISSIONS.integrationRead);
   });
 
   it('denies by default when the actor has no Organization context', () => {

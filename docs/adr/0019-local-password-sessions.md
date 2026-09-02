@@ -100,8 +100,9 @@ Deny by default. Check **permission constants**, not scattered role comparisons.
 | `integration:read` | | | yes | yes |
 | `integration:manage` | | | yes | yes |
 | `audit:read` | yes | yes | yes | yes |
+| `intelligence:read` | yes | yes | yes | yes |
 
-A later ADR may supersede this catalog. Owner can both request and approve risk acceptance; that residual is documented, not a bypass.
+A later ADR may supersede this catalog. Owner can both request and approve risk acceptance; that residual is documented, not a bypass. [ADR 0022](0022-intelligence-provider-status-authorization.md) adds `intelligence:read` for sanitized global provider-status GETs. It does not supersede this catalog, reuse `integration:read`, or close instance-operator identity.
 
 ### Login abuse controls
 
