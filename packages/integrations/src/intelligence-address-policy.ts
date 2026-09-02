@@ -227,6 +227,18 @@ export function isApprovedPublicIpv6(address: string): boolean {
     return isApprovedPublicIpv4(sixToFour);
   }
 
+  /**
+   * IPv4-compatible IPv6 (RFC 4291, deprecated): high 96 bits are zero and
+   * the low 32 bits are an IPv4 address (`::10.0.0.1`). Distinct from
+   * IPv4-mapped (`::ffff:x.x.x.x`), NAT64 (`64:ff9b::/96`), and 6to4
+   * (`2002::/16`). Ordinary public native IPv6 has a non-zero high 96 bits
+   * and is not treated as embedded IPv4. `::` and `::1` are rejected above.
+   */
+  const ipv4Compatible = extractEmbeddedIpv4(value, IPV6_PREFIX_96_MASK, 0n);
+  if (ipv4Compatible !== undefined) {
+    return isApprovedPublicIpv4(ipv4Compatible);
+  }
+
   return true;
 }
 

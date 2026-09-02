@@ -131,7 +131,7 @@ Dead-lettered jobs retain payload **ids** only (no raw SBOM). Operators replay a
 | PostgreSQL | Unavailable | API 503, worker lag | Operator restore; do not skip migrations |
 | Redis | Unavailable | Relay lag, publish errors | Outbox remains; drain when Redis returns. PostgreSQL is source of truth |
 | Object storage | Unavailable | Upload 503 | No SBOM row; user retries |
-| OSV/KEV | Outage | IntelligenceSource `degraded` (when runtime exists) | Last **accepted** catalog remains current; do not activate a partial import. See [vulnerability intelligence](vulnerability-intelligence.md). Session 9 import is design only. |
+| OSV/KEV | Outage | Derived public `healthStatus` `degraded` or `stale` (provider-status projection). Persisted `IntelligenceSource.state` is `enabled` or `disabled`, not the public degraded flag. | Last **accepted** catalog remains current; do not activate a partial import. See [vulnerability intelligence](vulnerability-intelligence.md). Session 9 KEV import runtime exists; OSV runtime remains disabled. |
 
 ## Partial parse
 
@@ -164,7 +164,7 @@ On expiry another worker may start (**lease theft** under clock skew: still safe
 
 Exponential backoff **with jitter**. Classify retryable vs not (see table above). Session 8 SBOM ingest still has no BullMQ `attempts`/`backoff`; a retryable failure leaves resumable state until an operator replays the job.
 
-Session 9 Batch 8B bounds KEV execution attempts with `INTELLIGENCE_SYNC_MAX_ATTEMPTS` (default 5). Pre-snapshot retryable failures persist `retry_wait` and `nextAttemptAt`; the use case does not sleep. The periodic scheduler does not redispatch `retry_wait`. Post-snapshot retryable failures leave SyncRun in `stored`, `parsing`, `staging`, or `activating` and mark the BackgroundJob retryable so the next execution does not refetch CISA. PostgreSQL retry reconciliation is the durable path; BullMQ delayed jobs are a fast path. Circuit-breaking, when implemented: after consecutive feed failures, **IntelligenceSource** → `degraded`; stop hammering; probe on a slow timer. Partial source units must not advance freshness.
+Session 9 Batch 8B bounds KEV execution attempts with `INTELLIGENCE_SYNC_MAX_ATTEMPTS` (default 5). Pre-snapshot retryable failures persist `retry_wait` and `nextAttemptAt`; the use case does not sleep. The periodic scheduler does not redispatch `retry_wait`. Post-snapshot retryable failures leave SyncRun in `stored`, `parsing`, `staging`, or `activating` and mark the BackgroundJob retryable so the next execution does not refetch CISA. PostgreSQL retry reconciliation is the durable path; BullMQ delayed jobs are a fast path. Public `degraded` health is derived by the provider-status projection from the active generation, last successful synchronization, a later failure timestamp, and stale-threshold precedence. It is not a persisted `IntelligenceSource.state`. Partial source units must not advance freshness.
 
 ## Timeouts and shutdown
 
@@ -176,7 +176,7 @@ One reconciliation path is implemented: the relay's per-batch sweep that creates
 
 Object-storage orphan cleanup is **not** implemented. `SBOM_ORPHAN_GRACE_SECONDS` (default 7 days, validated to exceed the idempotency TTL) is the policy floor a future job must honor; nothing reads it today. Orphans arise when a temporary-object delete fails, or when a promote succeeded and the database transaction then failed. The final object is intentionally retained in the second case because it may be the only copy of the evidence. See [SBOM ingestion](sbom-ingestion.md#orphan-reconciliation).
 
-Still unimplemented and needed before those pipelines run: stale `running` sweeps, Session 9 import (scheduler, bounded provider retry, archive measurement, staging activation), intel orphan reconciliation, expired **RiskAcceptance**, and expired **manual_override** calculations. Runbooks: [docs/runbooks/](../runbooks/README.md).
+Session 9 KEV scheduler, bounded provider retry, PostgreSQL retry reconciliation, staging, and atomic activation are implemented. Still unimplemented: object-storage orphan cleanup (including intelligence final-snapshot orphans), stale `running` job sweeps, OSV runtime, expired **RiskAcceptance**, and expired **manual_override** calculations. Delivery remains at-least-once; PatchPilot does not claim exactly-once. Runbooks: [docs/runbooks/](../runbooks/README.md).
 
 ## Backup, RPO, RTO (proposals)
 

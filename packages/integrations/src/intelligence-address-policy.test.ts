@@ -72,6 +72,36 @@ describe('intelligence address policy', () => {
     expect(isApprovedPublicIpv6('2002:0808:0808::1')).toBe(true);
   });
 
+  it('rejects IPv4-compatible IPv6 embeddings of blocked IPv4 addresses', () => {
+    expect(isApprovedPublicIpv6('::10.0.0.1')).toBe(false);
+    expect(isApprovedPublicIpv6('::127.0.0.1')).toBe(false);
+    expect(isApprovedPublicIpv6('::169.254.169.254')).toBe(false);
+    expect(isApprovedPublicIpv6('0:0:0:0:0:0:10.0.0.1')).toBe(false);
+    expect(
+      selectPinnedPublicAddress([
+        { address: '::10.0.0.1', family: 6 },
+        { address: '::127.0.0.1', family: 6 },
+        { address: '::169.254.169.254', family: 6 },
+        { address: '0:0:0:0:0:0:10.0.0.1', family: 6 },
+      ]),
+    ).toBeUndefined();
+    expect(
+      selectPinnedPublicAddress([
+        { address: '::10.0.0.1', family: 6 },
+        { address: '2001:4860:4860::8888', family: 6 },
+      ]),
+    ).toEqual({ address: '2001:4860:4860::8888', family: 6 });
+    expect(isApprovedPublicIpv6('2001:4860:4860::8888')).toBe(true);
+    expect(isApprovedPublicIpv4('1.1.1.1')).toBe(true);
+    expect(isApprovedPublicIpv6('::8.8.8.8')).toBe(true);
+    expect(isApprovedPublicIpv6('::')).toBe(false);
+    expect(isApprovedPublicIpv6('::1')).toBe(false);
+    expect(isApprovedPublicIpv6('::ffff:10.0.0.1')).toBe(false);
+    expect(isApprovedPublicIpv6('64:ff9b::10.0.0.1')).toBe(false);
+    expect(isApprovedPublicIpv6('2002:0a00:0001::1')).toBe(false);
+    expect(isApprovedPublicIpv6('2002:0808:0808::1')).toBe(true);
+  });
+
   it('rejects a pin mismatch after connect', () => {
     expect(pinnedAddressMatchesSocket({ address: '1.1.1.1', family: 4 }, '8.8.8.8', 'IPv4')).toBe(
       false,

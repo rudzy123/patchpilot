@@ -408,4 +408,44 @@ describe('intelligence sync processor', () => {
     );
     expect(JSON.stringify(logs)).not.toMatch(/https:\/\/|etag|cve-|objectKey|www\.cisa\.gov/i);
   });
+
+  it('resolves a claimed requested job as provider_disabled without retry', async () => {
+    const added: unknown[] = [];
+    const claimed: number[] = [];
+    let executed = 0;
+    let createdRuns = 0;
+    await processIntelligenceSyncQueueJob(
+      { name: 'intelligence.sync', id: '1', data: LOCATOR },
+      {
+        clock: { now: () => NOW },
+        jobs: jobsPort({
+          job: jobRecord({ status: 'queued' }),
+          claimed,
+        }),
+        outbox: { findById: async () => eventRecord() },
+        syncRuns: {
+          findById: async () => syncRun({ state: 'requested' }),
+        },
+        execute: async () => {
+          executed += 1;
+          return { kind: 'failed', code: 'provider_disabled' };
+        },
+        redispatch: {
+          add: async (input) => {
+            added.push(input);
+            createdRuns += 1;
+            return { ok: true, duplicate: false };
+          },
+          close: async () => undefined,
+        },
+        workerIdentifier: WORKER,
+        kevJobLeaseMs: 600_000,
+        logger: silent,
+      },
+    );
+    expect(claimed).toEqual([1]);
+    expect(executed).toBe(1);
+    expect(added).toEqual([]);
+    expect(createdRuns).toBe(0);
+  });
 });

@@ -26,7 +26,7 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 
 | ID | Topic | Closed by |
 | --- | --- | --- |
-| Session 9 import role | Global, instance-owned, import-only catalog; OSV GCS bulk export + CISA KEV JSON snapshot | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Runtime is **not** implemented. |
+| Session 9 import role | Global, instance-owned, import-only catalog; OSV GCS bulk export + CISA KEV JSON snapshot | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). At Batch 1B acceptance (2026-08-31) runtime was **not** implemented. Later Session 9 batches delivered KEV runtime; OSV runtime remains deferred. |
 | Zero-Finding invariant | Import must not match components, write Findings/FindingObservations, enrich findings, score, remediate, or enqueue `finding.recalculate` | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) |
 | Import vs correlation | [ADR 0010](../adr/0010-osv-correlation.md) remains future correlation, not the Session 9 import mechanism | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) |
 | Snapshot/provenance strategy | Private raw snapshots, append-only revisions, guarded current-projection activation, content SHA-256 idempotency | [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Object-key layout closed in Batch 5B. |
@@ -55,7 +55,7 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 
 | ID | Topic | Status after Batch 6B |
 | --- | --- | --- |
-| KEV parser isolation | One-shot worker thread, transferred bytes, actual `worker.terminate()` | **Closed for parsing.** Snapshot retrieval, catalog regression, staging, and activation remain later batches. Worker `resourceLimits` remain a future hardening decision. Duplicate JSON object keys are not detected in v0.1. |
+| KEV parser isolation | One-shot worker thread, transferred bytes, actual `worker.terminate()` | **Closed for parsing** in Batch 6B (historical). Snapshot retrieval, catalog regression, staging, and activation were later delivered in Batches 5B–8B. Worker `resourceLimits` remain a future hardening decision. Duplicate JSON object keys are not detected in v0.1. |
 
 ## Closed in Session 9 Batch 9B (ADR 0022)
 

@@ -54,9 +54,11 @@ Fix the underlying cause, then replay the BullMQ job. The claim is a conditional
 
 ### `running` past the lease
 
-There is no heartbeat: `renewLease` exists on the port and adapter and is never called. A `running` row past its lease means the worker died, or the run genuinely exceeded `SBOM_PROCESSING_LEASE_MS` (default 15 minutes).
+There is no heartbeat for **SBOM ingest**: `renewLease` exists on the port and adapter and is never called for Session 8. A `running` SBOM row past its lease means the worker died, or the run genuinely exceeded `SBOM_PROCESSING_LEASE_MS` (default 15 minutes).
 
-The row is claimable again, but nothing redelivers it. Replay the job. Double execution is safe because graph persistence is insert-once per `sbomIngestionId`, but if runs routinely approach the lease, raise `SBOM_PROCESSING_LEASE_MS` rather than tolerating the overlap. Configuration requires the parser and object-storage timeouts to stay below the lease, so raise the lease first.
+The row is claimable again, but nothing redelivers an SBOM job. Replay the job. Double execution is safe because graph persistence is insert-once per `sbomIngestionId`, but if runs routinely approach the lease, raise `SBOM_PROCESSING_LEASE_MS` rather than tolerating the overlap. Configuration requires the parser and object-storage timeouts to stay below the lease, so raise the lease first.
+
+KEV synchronization renews the same BackgroundJob lease during execution. After lease expiry, another worker may claim the job and resume from persisted SyncRun state. Shutdown does not mark the SyncRun failed.
 
 ### Terminal failure
 
@@ -68,7 +70,18 @@ Only `queued` jobs may move to `cancelled` before start. Do not cancel another o
 
 ### Graceful shutdown
 
-The worker stops accepting work, closes the ingest processor, stops the relay (aborting its poll delay and letting the in-flight batch finish), quits Redis, then shuts down telemetry. A forced kill relies on lease expiry, which without a heartbeat means up to the full lease before the job is claimable again.
+Committed `apps/worker` stop order:
+
+1. `acceptingWork` becomes false.
+2. Intelligence runtime stop: abort in-flight synchronization (cancellation), then the KEV scheduler stops, then the retry reconciler stops.
+3. Queue worker intake closes.
+4. Outbox relay closes.
+5. Intelligence redispatch/queue publisher resources close.
+6. Redis quits.
+7. Telemetry shuts down where present.
+8. Prisma disconnects last.
+
+Shutdown does **not** terminally fail a SyncRun solely because the process is stopping. A forced kill relies on lease-expiry recovery: another worker may claim the BackgroundJob after `lease_expires_at`. Session 9 KEV work renews the BackgroundJob lease during execution; SBOM ingest still has no heartbeat, so its lease must exceed the worst-case run.
 
 ## Verification
 

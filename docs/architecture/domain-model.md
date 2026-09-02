@@ -122,7 +122,7 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | RemediationTask | `open`, `assigned`, `in_progress`, `blocked`, `completed`, `cancelled` | [remediation-lifecycle.md](remediation-lifecycle.md) |
 | RiskAcceptance | `active`, `expired`, `revoked`, `superseded` | [remediation-lifecycle.md](remediation-lifecycle.md) |
 | BackgroundJob | `pending`, `queued`, `running`, `succeeded`, `failed`, `dead_lettered`, `cancelled` | [reliability-model.md](reliability-model.md) |
-| Integration | `disabled`, `enabled`, `degraded` | this document (also **IntelligenceSource**) |
+| Integration | `disabled`, `enabled`, `degraded` | this document. **IntelligenceSource** reuses the same stored enum for `enabled`/`disabled` runtime enablement; public `healthStatus` `degraded` is **derived**, not a required persisted IntelligenceSource state |
 | ExternalCredential | `pending`, `active`, `rotating`, `expired`, `revoked`, `failed_validation` | this document |
 
 SBOM (the evidence document) has no workflow state of its own; processing state lives on **SBOMIngestion**.
@@ -531,7 +531,7 @@ Global catalog row for a named provider (`osv`, `cisa_kev`, `reserved`). Not ten
 
 ## IntelligenceSource
 
-System synchronization state for OSV and CISA KEV. Not a tenant installation. `providerKey` is `osv` or `cisa_kev`. Last-sync timestamps and later verified conditional-request metadata live here, not on **Integration**. Session 9 Batch 8B runs scheduled CISA KEV import in `apps/worker`. OSV runtime, matching, and Findings remain **not implemented**. Do not treat stored cursors or ETags as a provider guarantee. Provider freshness must not advance after a partial source unit.
+System synchronization state for OSV and CISA KEV. Not a tenant installation. `providerKey` is `osv` or `cisa_kev`. Last-sync timestamps and later verified conditional-request metadata live here, not on **Integration**. Session 9 Batch 8B runs scheduled CISA KEV import in `apps/worker`. Authenticated provider-status GETs ([ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)) expose a derived `healthStatus`. Public `degraded` is computed from the active generation, last successful synchronization, a later failure timestamp, and stale-threshold precedence (stale wins). Persisted `IntelligenceSource.state` is reconciled to `enabled` or `disabled`; it is not the public degraded flag. OSV runtime, matching, and Findings remain **not implemented**. Do not treat stored cursors or ETags as a provider guarantee. Provider freshness must not advance after a partial source unit.
 
 ## Integration
 

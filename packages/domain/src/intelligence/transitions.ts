@@ -116,6 +116,7 @@ export type IntelligenceSyncRunCommand =
   | QuarantineSyncRunCommand;
 
 const failableStates = [
+  'requested',
   'fetching',
   'retry_wait',
   'stored',

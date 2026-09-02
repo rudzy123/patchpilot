@@ -344,6 +344,37 @@ describe('CisaKevHttpsTransport', () => {
     expect((await transport().fetchCatalog(baseRequest())).kind).toBe('response');
   });
 
+  it('rejects DNS that returns only IPv4-compatible blocked IPv6 and never starts HTTPS', async () => {
+    const logs: string[] = [];
+    lookupImpl = (_hostname, _options, callback) => {
+      callback(null, [{ address: '::10.0.0.1', family: 6 }]);
+    };
+    const client = createCisaKevHttpsTransport(
+      { connectTimeoutMs: 200, totalTimeoutMs: 1000, maxBytes: 4096 },
+      {
+        lookup,
+        request,
+        clock: { now: () => new Date('2026-09-01T12:00:00.000Z') },
+        delay: async () => undefined,
+        jitter: (value) => value,
+        logger: {
+          info(bindings, message) {
+            logs.push(`${message}:${JSON.stringify(bindings)}`);
+          },
+          warn(bindings, message) {
+            logs.push(`${message}:${JSON.stringify(bindings)}`);
+          },
+        },
+      },
+    );
+    expect(await client.fetchCatalog(baseRequest())).toMatchObject({
+      kind: 'failure',
+      code: 'dns_rejected',
+    });
+    expect(recordedOptions).toHaveLength(0);
+    expect(JSON.stringify(logs)).not.toMatch(/::10\.0\.0\.1|10\.0\.0\.1/);
+  });
+
   it('rejects a pin mismatch and repeats DNS on retry', async () => {
     remainingResponses = [
       {

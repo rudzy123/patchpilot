@@ -31,4 +31,16 @@ describe('intelligence worker zero-Finding boundary', () => {
       expect(source, filePath).not.toContain('www.cisa.gov');
     }
   });
+
+  it('keeps the intelligence processor registered independently of KEV enablement', () => {
+    const main = readFileSync(join(workerSrc, 'main.ts'), 'utf8');
+    expect(main).toContain('processIntelligenceSyncQueueJob');
+    expect(main).toContain('processIntelligence:');
+    const router = readFileSync(join(workerSrc, 'queue-job-router.ts'), 'utf8');
+    expect(router).toContain('INTELLIGENCE_SYNC_JOB_TYPE');
+    expect(router).toContain('processIntelligence');
+    const runtime = readFileSync(join(workerSrc, 'intelligence-runtime.ts'), 'utf8');
+    expect(runtime).toContain('if (loopsStarted || !options.kevEnabled)');
+    expect(runtime).not.toContain('processIntelligence');
+  });
 });

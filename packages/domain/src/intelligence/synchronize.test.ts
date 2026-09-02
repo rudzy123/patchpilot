@@ -11,8 +11,11 @@ import { toIntelligenceOutboxPayloadJson } from './outbox.js';
 import type { BackgroundJobExecutionPort } from '../sbom/ports.js';
 import {
   applyIntelligenceSyncRunTransition,
+  isIntelligenceTerminalSyncRunState,
   type IntelligenceSyncRunSnapshot,
 } from './transitions.js';
+import { decideKevSyncDue } from './due-decision.js';
+import { classifyIntelligenceSafeFailure } from './failures.js';
 import {
   buildFinalIntelligenceSnapshotObjectKey,
   parseFinalIntelligenceSnapshotObjectKey,
@@ -150,6 +153,7 @@ type WorldOptions = {
   renewFailsAfter?: number;
   markRetryFails?: boolean;
   failRunFails?: boolean;
+  kevEnabled?: boolean;
   activeGeneration?: KevGenerationRecord;
   activeSnapshotSha?: string;
 };
@@ -161,6 +165,9 @@ function createWorld(options: WorldOptions = {}) {
   const generations = new Map<string, KevGenerationRecord>();
   const entries = new Map<string, KevNormalizedEntryRecord[]>();
   const counters = { http: 0, get: 0, parse: 0, promote: 0, renew: 0 };
+  const audits: string[] = [];
+  const freshnessState = { lastSuccessfulSyncAt: null as Date | null };
+  let requestSyncCalls = 0;
   let idSeq = 1;
   const createId = () => {
     const value = `00000000-0000-4000-8000-${idSeq.toString(16).padStart(12, '0')}`;
@@ -674,6 +681,7 @@ function createWorld(options: WorldOptions = {}) {
 
   const unitOfWork: IntelligenceSyncUnitOfWork = {
     async requestSync() {
+      requestSyncCalls += 1;
       return err({ code: 'conflict', message: 'unused' });
     },
     async claimFetchingAttempt(input) {
@@ -850,11 +858,30 @@ function createWorld(options: WorldOptions = {}) {
       if (options.failRunFails === true) {
         return err({ code: 'conflict', message: 'fail cas' });
       }
-      return cas(input.expectedState, input.expectedVersion, {
+      const failed = cas(input.expectedState, input.expectedVersion, {
         type: 'fail',
         completedAt: input.completedAt,
         failureCode: input.failureCode,
       });
+      if (!failed.ok) {
+        return failed;
+      }
+      audits.push('intelligence.sync_failed');
+      if (input.backgroundJob !== undefined) {
+        const classification = classifyIntelligenceSafeFailure(input.failureCode);
+        const marked = await jobs.markTerminalFailure({
+          organizationId: null,
+          jobId: input.backgroundJob.jobId,
+          workerIdentifier: input.backgroundJob.workerIdentifier,
+          failureCategory: classification.category,
+          failureCode: input.failureCode,
+          completedAt: input.completedAt,
+        });
+        if (!marked.ok) {
+          return err({ code: 'conflict', message: 'Background job ownership did not match.' });
+        }
+      }
+      return failed;
     },
     async quarantineRun(input) {
       return cas(input.expectedState, input.expectedVersion, {
@@ -877,7 +904,10 @@ function createWorld(options: WorldOptions = {}) {
   const dependencies: CisaKevSynchronizationDependencies = {
     clock: { now: () => NOW },
     createId,
-    config: CONFIG,
+    config: {
+      ...CONFIG,
+      kevEnabled: options.kevEnabled ?? CONFIG.kevEnabled,
+    },
     jobs,
     outbox,
     syncRuns,
@@ -902,6 +932,9 @@ function createWorld(options: WorldOptions = {}) {
     event,
     logs,
     counters,
+    audits,
+    freshnessState,
+    requestSyncCalls: () => requestSyncCalls,
     objects,
     snapshots,
     generations,
@@ -993,6 +1026,79 @@ describe('createCisaKevSynchronizationService', () => {
     });
     expect(result.kind).toBe('retry_wait');
     expect(world.counters.http).toBe(0);
+  });
+
+  it('terminates a requested SyncRun as provider_disabled before provider HTTP', async () => {
+    const findings = [{ id: 'finding-baseline', status: 'open' }];
+    const observations = [{ id: 'observation-baseline', findingId: 'finding-baseline' }];
+    const vulnerabilities: unknown[] = [];
+    const vulnerabilityAliases: unknown[] = [];
+    const vulnerabilitySourceRecords: unknown[] = [];
+    const findingQuery = async (): Promise<never> => {
+      throw new Error('Finding and component repositories must not be queried.');
+    };
+
+    const world = createWorld({ kevEnabled: false });
+    const originalEvent = { ...world.event, payload: world.event.payload };
+    const result = await world.service.execute({
+      syncRunId: SYNC_RUN_ID,
+      backgroundJobId: JOB_ID,
+      workerIdentifier: WORKER,
+    });
+
+    expect(result).toEqual({ kind: 'failed', code: 'provider_disabled' });
+    expect(world.run.state).toBe('failed');
+    expect(isIntelligenceTerminalSyncRunState(world.run.state)).toBe(true);
+    expect(world.run.failureCode).toBe('provider_disabled');
+    expect(world.run.failureCategory).toBe('configuration');
+    expect(world.run.completedAt).toEqual(NOW);
+    expect(world.run.startedAt).toBeNull();
+    expect(world.run.executionAttempt).toBe(0);
+    expect(world.run.snapshotId).toBeNull();
+    expect(world.run.generationId).toBeNull();
+    expect(world.run.requestedAt).toEqual(NOW);
+    expect(world.job.status).toBe('failed');
+    expect(world.job.failureCode).toBe('provider_disabled');
+    expect(world.audits).toEqual(['intelligence.sync_failed']);
+    expect(world.counters.http).toBe(0);
+    expect(world.counters.get).toBe(0);
+    expect(world.counters.parse).toBe(0);
+    expect(world.counters.promote).toBe(0);
+    expect(world.snapshots.size).toBe(0);
+    expect(world.generations.size).toBe(0);
+    expect(world.pointer.activeGenerationId).toBeNull();
+    expect(world.freshnessState.lastSuccessfulSyncAt).toBeNull();
+    expect(world.requestSyncCalls()).toBe(0);
+    expect(world.event.id).toBe(originalEvent.id);
+    expect(world.event.eventType).toBe(originalEvent.eventType);
+    expect(
+      decideKevSyncDue({
+        kevEnabled: true,
+        shutdown: false,
+        now: NOW,
+        syncIntervalSeconds: 86_400,
+        latestSyncRun: world.run,
+        lastSuccessfulSyncAt: world.freshnessState.lastSuccessfulSyncAt,
+      }),
+    ).toEqual({ kind: 'due_initial' });
+
+    const replay = await world.service.execute({
+      syncRunId: SYNC_RUN_ID,
+      backgroundJobId: JOB_ID,
+      workerIdentifier: WORKER,
+    });
+    expect(replay).toEqual({ kind: 'failed', code: 'provider_disabled' });
+    expect(world.audits).toEqual(['intelligence.sync_failed']);
+    expect(world.counters.http).toBe(0);
+    expect(world.run.executionAttempt).toBe(0);
+    expect(world.pointer.activeGenerationId).toBeNull();
+
+    expect(findings).toEqual([{ id: 'finding-baseline', status: 'open' }]);
+    expect(observations).toEqual([{ id: 'observation-baseline', findingId: 'finding-baseline' }]);
+    expect(vulnerabilities).toEqual([]);
+    expect(vulnerabilityAliases).toEqual([]);
+    expect(vulnerabilitySourceRecords).toEqual([]);
+    await expect(findingQuery()).rejects.toThrow(/must not be queried/);
   });
 
   it('claims requested, fetches once, stages bounded batches, and activates', async () => {

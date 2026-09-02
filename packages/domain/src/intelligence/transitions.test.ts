@@ -138,6 +138,75 @@ describe('intelligence sync-run transitions', () => {
     expect(syncRunFreshnessMayAdvance(completed)).toBe(true);
   });
 
+  it('allows requested to fail with provider_disabled without starting execution', () => {
+    const failed = applyIntelligenceSyncRunTransition(requested(), {
+      type: 'fail',
+      completedAt,
+      failureCode: 'provider_disabled',
+    });
+    expect(failed.ok).toBe(true);
+    if (!failed.ok) {
+      return;
+    }
+    expect(failed.value.state).toBe('failed');
+    expect(failed.value.completedAt).toEqual(completedAt);
+    expect(failed.value.startedAt).toBeNull();
+    expect(failed.value.executionAttempt).toBe(0);
+    expect(failed.value.failureCategory).toBe('configuration');
+    expect(failed.value.failureCode).toBe('provider_disabled');
+    expect(failed.value.snapshotId).toBeNull();
+    expect(failed.value.generationId).toBeNull();
+    expect(failed.value.priorAcceptedGenerationId).toBeNull();
+    expect(failed.value.acceptedEntryCount).toBeNull();
+    expect(failed.value.notModifiedReason).toBeNull();
+    expect(failed.value.requestedAt).toEqual(requestedAt);
+    expect(isIntelligenceTerminalSyncRunState(failed.value.state)).toBe(true);
+    expect(syncRunFreshnessMayAdvance(failed.value)).toBe(false);
+    expect(
+      applyIntelligenceSyncRunTransition(failed.value, {
+        type: 'start_fetching',
+        startedAt,
+        executionAttempt: 1,
+      }).ok,
+    ).toBe(false);
+    expect(
+      applyIntelligenceSyncRunTransition(failed.value, {
+        type: 'fail',
+        completedAt,
+        failureCode: 'provider_disabled',
+      }).ok,
+    ).toBe(false);
+    expect(
+      applyIntelligenceSyncRunTransition(requested(), {
+        type: 'complete',
+        completedAt,
+        acceptedEntryCount: 1,
+        warningCount: 0,
+      }).ok,
+    ).toBe(false);
+    expect(
+      applyIntelligenceSyncRunTransition(requested(), {
+        type: 'complete_not_modified',
+        completedAt,
+        priorAcceptedGenerationId: PRIOR_GENERATION_ID,
+        reason: 'content_sha256_unchanged',
+      }).ok,
+    ).toBe(false);
+    expect(
+      applyIntelligenceSyncRunTransition(requested(), {
+        type: 'quarantine',
+        completedAt,
+        failureCode: 'schema_invalid',
+      }).ok,
+    ).toBe(false);
+    expect(
+      applyIntelligenceSyncRunTransition(requested(), {
+        type: 'record_stored',
+        snapshotId: SNAPSHOT_ID,
+      }).ok,
+    ).toBe(false);
+  });
+
   it('allows failed from each non-requested in-progress state', () => {
     for (const snapshot of [
       fetching(),
