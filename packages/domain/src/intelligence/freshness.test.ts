@@ -51,8 +51,26 @@ describe('intelligence provider freshness', () => {
         implementationStatus: 'available',
         lastSuccessfulSyncAt: NOW,
         staleThresholdSeconds: 60,
+        now: new Date(NOW.getTime() + 60_000),
+      }),
+    ).toEqual({ healthStatus: 'current', stale: false });
+    expect(
+      deriveIntelligenceProviderHealthStatus({
+        provider: 'cisa_kev',
+        implementationStatus: 'available',
+        lastSuccessfulSyncAt: NOW,
+        staleThresholdSeconds: 60,
         now: new Date(NOW.getTime() + 61_000),
       }),
     ).toEqual({ healthStatus: 'stale', stale: true });
+    expect(
+      deriveIntelligenceProviderHealthStatus({
+        provider: 'cisa_kev',
+        implementationStatus: 'available',
+        lastSuccessfulSyncAt: new Date(NOW.getTime() + 5_000),
+        staleThresholdSeconds: 60,
+        now: NOW,
+      }),
+    ).toEqual({ healthStatus: 'current', stale: false });
   });
 });

@@ -46,12 +46,17 @@ export function deriveIntelligenceProviderHealthStatus(input: {
   if (!isPositiveSafeInteger(input.staleThresholdSeconds)) {
     return { healthStatus: 'never_synchronized', stale: false };
   }
-  const elapsedSeconds = (input.now.getTime() - input.lastSuccessfulSyncAt.getTime()) / 1000;
+  const elapsedSeconds = elapsedFreshnessAgeSeconds(input.now, input.lastSuccessfulSyncAt);
   const stale = elapsedSeconds > input.staleThresholdSeconds;
   return {
     healthStatus: stale ? 'stale' : 'current',
     stale,
   };
+}
+
+export function elapsedFreshnessAgeSeconds(now: Date, lastSuccessfulSyncAt: Date): number {
+  const elapsedSeconds = (now.getTime() - lastSuccessfulSyncAt.getTime()) / 1000;
+  return elapsedSeconds < 0 ? 0 : elapsedSeconds;
 }
 
 export function intelligenceFreshnessMayAdvanceForState(

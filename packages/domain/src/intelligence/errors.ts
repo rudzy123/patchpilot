@@ -66,6 +66,21 @@ export const INTELLIGENCE_ARBITRARY_URL_FORBIDDEN: AppError = Object.freeze({
   message: 'Provider HTTP ports do not accept caller-supplied URLs.',
 });
 
+export const INTELLIGENCE_STATUS_UNAVAILABLE: AppError = Object.freeze({
+  code: 'internal',
+  message: 'Intelligence status is temporarily unavailable.',
+});
+
+export const INTELLIGENCE_STATUS_INCONSISTENT: AppError = Object.freeze({
+  code: 'internal',
+  message: 'An internal error occurred.',
+});
+
+export const INTELLIGENCE_PROVIDER_NOT_FOUND: AppError = Object.freeze({
+  code: 'not_found',
+  message: 'Not found.',
+});
+
 export function intelligenceValidationError(message: string): AppError {
   return {
     code: 'validation',

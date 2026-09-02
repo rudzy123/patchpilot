@@ -135,6 +135,8 @@ Must not appear: raw body, object key, full provider URL, provider error text, r
 
 Replay uniqueness for these system events: non-null `correlationId` and unique `(action, subjectId, correlationId)` among rows where `organizationId` IS NULL.
 
+Routine `GET /intelligence/providers` and `GET /intelligence/providers/:provider/status` ([ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)) do **not** create `AuditEvent` rows. Do not add `intelligence.status_read`. Session `lastSeenAt` bookkeeping from session resolution is allowed. Synchronization still emits the `intelligence.sync_*` actions above.
+
 ## Integrity properties
 
 - Insert audit in the **same transaction** as the state change it describes, when both are PostgreSQL rows.

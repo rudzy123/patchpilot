@@ -36,11 +36,16 @@ export type IntelligenceProviderImplementationStatus =
 export const intelligenceProviderHealthStatuses = [
   'current',
   'stale',
+  'degraded',
   'never_synchronized',
   'disabled',
   'deferred',
 ] as const;
 export type IntelligenceProviderHealthStatus = (typeof intelligenceProviderHealthStatuses)[number];
+
+export const INTELLIGENCE_PROVIDER_LIST_ORDER = ['cisa_kev', 'osv'] as const;
+
+export const INTELLIGENCE_READ_PERMISSION = 'intelligence:read' as const;
 
 export const intelligenceSyncRunStates = [
   'requested',

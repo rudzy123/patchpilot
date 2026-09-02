@@ -57,6 +57,14 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 | --- | --- | --- |
 | KEV parser isolation | One-shot worker thread, transferred bytes, actual `worker.terminate()` | **Closed for parsing.** Snapshot retrieval, catalog regression, staging, and activation remain later batches. Worker `resourceLimits` remain a future hardening decision. Duplicate JSON object keys are not detected in v0.1. |
 
+## Closed in Session 9 Batch 9B (ADR 0022)
+
+| ID | Topic | Closed by |
+| --- | --- | --- |
+| Provider-status authorization | Authenticated `intelligence:read` over instance-owned global status; active Organization is access context, not data scope | [ADR 0022](../adr/0022-intelligence-provider-status-authorization.md) |
+
+OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cross-organization operator bypass, manual sync, retry, detailed SyncRun APIs, or a dashboard.
+
 ## Still open
 
 | ID | Topic | Why it is open | Interim default for design and first implementation |

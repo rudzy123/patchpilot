@@ -28,7 +28,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApi } from './app.js';
 import { createAssetRuntime } from './asset-runtime.js';
-import { TEST_ORIGIN, VALID_PASSWORD, emptySbomRuntime } from './auth-test-harness.js';
+import {
+  TEST_ORIGIN,
+  VALID_PASSWORD,
+  emptyIntelligenceRuntime,
+  emptySbomRuntime,
+} from './auth-test-harness.js';
 
 const SOCKET_IP = '192.0.2.10';
 
@@ -134,6 +139,7 @@ describe('authentication routes persistence', () => {
       },
       assets,
       sboms: emptySbomRuntime(),
+      intelligence: emptyIntelligenceRuntime(config),
     });
 
     const loggedIn = await app.inject({
@@ -287,6 +293,7 @@ describe('authentication routes persistence', () => {
       },
       assets,
       sboms: emptySbomRuntime(),
+      intelligence: emptyIntelligenceRuntime(config),
     });
     const known = await app.inject({
       method: 'POST',

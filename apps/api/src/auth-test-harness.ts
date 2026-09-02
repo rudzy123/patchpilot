@@ -47,6 +47,7 @@ import { buildApi } from './app.js';
 import type { AssetRuntime } from './asset-runtime.js';
 import type { AuthRuntime } from './auth-runtime.js';
 import type { DatabaseReadyCheck } from './app.js';
+import { createIntelligenceRuntime, type IntelligenceRuntime } from './intelligence-runtime.js';
 import type { SbomRuntime } from './sbom-runtime.js';
 
 export const VALID_PASSWORD = 'correct-horse-battery';
@@ -85,6 +86,7 @@ export async function buildTestApi(options?: {
   harness?: AuthTestHarness;
   assets?: AssetRuntime;
   sboms?: SbomRuntime;
+  intelligence?: IntelligenceRuntime;
 }) {
   const harness = options?.harness ?? createAuthTestHarness(options);
   const app = await buildApi({
@@ -94,6 +96,8 @@ export async function buildTestApi(options?: {
     auth: harness.auth,
     assets: options?.assets ?? emptyAssetRuntime(),
     sboms: options?.sboms ?? emptySbomRuntime(),
+    intelligence:
+      options?.intelligence ?? emptyIntelligenceRuntime(options?.config ?? harness.config),
     ...(options?.now === undefined ? {} : { now: options.now }),
     ...(options?.generateId === undefined ? {} : { generateId: options.generateId }),
   });
@@ -245,6 +249,30 @@ export function emptySbomRuntime(): SbomRuntime {
       },
     },
   };
+}
+
+export function emptyIntelligenceRuntime(config: ServerConfig): IntelligenceRuntime {
+  return createIntelligenceRuntime({
+    status: {
+      async loadCisaKevStatus() {
+        return {
+          kind: 'found' as const,
+          snapshot: {
+            sourceState: 'disabled',
+            lastSuccessfulSyncAt: null,
+            lastAttemptAt: null,
+            lastFailureAt: null,
+            lastFailureCode: null,
+            activeGenerationId: null,
+            generation: null,
+          },
+        };
+      },
+    },
+    kevEnabled: config.intelligence.kevEnabled,
+    staleThresholdSeconds: config.intelligence.kevStaleThresholdSeconds,
+    now: () => new Date('2026-09-02T12:00:00.000Z'),
+  });
 }
 
 function collectingLogger() {

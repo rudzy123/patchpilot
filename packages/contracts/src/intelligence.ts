@@ -1,5 +1,6 @@
 import {
   INTELLIGENCE_CATALOG_VERSION_MAX_LENGTH,
+  INTELLIGENCE_PROVIDER_LIST_ORDER,
   INTELLIGENCE_PROVIDER_STATUS_CACHE_CONTROL,
   INTELLIGENCE_PROVIDER_STATUS_PATH,
   INTELLIGENCE_PROVIDERS_PATH,
@@ -8,7 +9,7 @@ import {
   intelligenceProviderHealthStatuses,
   intelligenceProviderImplementationStatuses,
   intelligenceProviders,
-  intelligenceSafeFailureCodes,
+  intelligencePublicFailureCodes,
   type IntelligenceProvider,
 } from '@patchpilot/domain';
 import { z } from 'zod';
@@ -28,7 +29,7 @@ export const intelligenceProviderImplementationStatusSchema = z.enum(
   intelligenceProviderImplementationStatuses,
 );
 export const intelligenceProviderHealthStatusSchema = z.enum(intelligenceProviderHealthStatuses);
-export const intelligenceSafeFailureCodeSchema = z.enum(intelligenceSafeFailureCodes);
+export const intelligencePublicFailureCodeSchema = z.enum(intelligencePublicFailureCodes);
 
 export const intelligenceProviderParamSchema = z.strictObject({
   provider: intelligenceProviderSchema,
@@ -51,7 +52,7 @@ const publicProviderStatusBaseSchema = z.strictObject({
     .nullable(),
   latestAcceptedCatalogReleasedAt: utcTimestampSchema.nullable(),
   currentEntryCount: z.number().int().nonnegative().nullable(),
-  lastSafeFailureCode: intelligenceSafeFailureCodeSchema.nullable(),
+  lastSafeFailureCode: intelligencePublicFailureCodeSchema.nullable(),
   lastFailureAt: utcTimestampSchema.nullable(),
 });
 
@@ -73,11 +74,14 @@ function assertPublicProviderStatus(
     }
     if (
       value.lastSuccessfulSyncAt !== null ||
+      value.lastAttemptAt !== null ||
       value.latestAcceptedCatalogVersion !== null ||
       value.latestAcceptedCatalogReleasedAt !== null ||
-      value.currentEntryCount !== null
+      value.currentEntryCount !== null ||
+      value.lastSafeFailureCode !== null ||
+      value.lastFailureAt !== null
     ) {
-      failWithMessage(ctx, 'OSV must not expose accepted catalog freshness.');
+      failWithMessage(ctx, 'OSV must not expose accepted catalog freshness or failure fields.');
     }
     return;
   }
@@ -86,6 +90,7 @@ function assertPublicProviderStatus(
     if (value.healthStatus !== 'disabled' || value.stale || value.runtimeEnabled) {
       failWithMessage(ctx, 'Disabled providers are not stale, current, or runtime-enabled.');
     }
+    assertAcceptedCatalogFields(value, ctx, value.lastSuccessfulSyncAt !== null);
     return;
   }
 
@@ -95,30 +100,69 @@ function assertPublicProviderStatus(
   }
 
   if (value.lastSuccessfulSyncAt === null) {
-    if (value.healthStatus === 'current' || value.healthStatus === 'stale' || value.stale) {
-      failWithMessage(ctx, 'No accepted KEV generation means status is never current or stale.');
-    }
     if (
-      value.latestAcceptedCatalogVersion !== null ||
-      value.latestAcceptedCatalogReleasedAt !== null ||
-      value.currentEntryCount !== null
+      value.healthStatus === 'current' ||
+      value.healthStatus === 'stale' ||
+      value.healthStatus === 'degraded' ||
+      value.stale
     ) {
-      failWithMessage(ctx, 'Absent accepted generation requires nullable catalog fields.');
+      failWithMessage(
+        ctx,
+        'No accepted KEV generation means status is never current, stale, or degraded.',
+      );
     }
+    assertAcceptedCatalogFields(value, ctx, false);
     if (value.healthStatus !== 'never_synchronized') {
       failWithMessage(ctx, 'Available KEV without an accepted generation is never_synchronized.');
     }
     return;
   }
 
-  if (value.healthStatus !== 'current' && value.healthStatus !== 'stale') {
-    failWithMessage(ctx, 'Accepted KEV generation status is current or stale.');
+  if (
+    value.healthStatus !== 'current' &&
+    value.healthStatus !== 'stale' &&
+    value.healthStatus !== 'degraded'
+  ) {
+    failWithMessage(ctx, 'Accepted KEV generation status is current, stale, or degraded.');
   }
   if (value.stale !== (value.healthStatus === 'stale')) {
     failWithMessage(ctx, 'stale must be true only when healthStatus is stale.');
   }
-  if (value.latestAcceptedCatalogVersion === null || value.currentEntryCount === null) {
-    failWithMessage(ctx, 'Accepted generation requires catalog version and entry count.');
+  if (value.healthStatus === 'degraded') {
+    if (value.lastFailureAt === null || value.lastSafeFailureCode === null) {
+      failWithMessage(
+        ctx,
+        'Degraded KEV status requires a mapped public failure code and timestamp.',
+      );
+    }
+  }
+  assertAcceptedCatalogFields(value, ctx, true);
+}
+
+function assertAcceptedCatalogFields(
+  value: z.infer<typeof publicProviderStatusBaseSchema>,
+  ctx: z.RefinementCtx,
+  required: boolean,
+): void {
+  const hasCatalog =
+    value.latestAcceptedCatalogVersion !== null ||
+    value.latestAcceptedCatalogReleasedAt !== null ||
+    value.currentEntryCount !== null;
+  if (required) {
+    if (
+      value.latestAcceptedCatalogVersion === null ||
+      value.latestAcceptedCatalogReleasedAt === null ||
+      value.currentEntryCount === null
+    ) {
+      failWithMessage(
+        ctx,
+        'Accepted generation requires catalog version, release timestamp, and entry count.',
+      );
+    }
+    return;
+  }
+  if (hasCatalog) {
+    failWithMessage(ctx, 'Absent accepted generation requires nullable catalog fields.');
   }
 }
 
@@ -133,13 +177,14 @@ export const intelligenceProviderListResponseSchema = z
   .superRefine((value, ctx) => {
     const names = value.providers.map((provider) => provider.provider);
     if (
-      new Set(names).size !== names.length ||
-      !names.includes('cisa_kev') ||
-      !names.includes('osv')
+      names.length !== 2 ||
+      names[0] !== INTELLIGENCE_PROVIDER_LIST_ORDER[0] ||
+      names[1] !== INTELLIGENCE_PROVIDER_LIST_ORDER[1] ||
+      new Set(names).size !== names.length
     ) {
       ctx.addIssue({
         code: 'custom',
-        message: 'Provider list must contain cisa_kev and osv exactly once.',
+        message: 'Provider list must contain cisa_kev then osv exactly once.',
       });
     }
   });
@@ -152,6 +197,9 @@ export type IntelligenceProviderImplementationStatusContract = z.infer<
 >;
 export type IntelligenceProviderHealthStatusContract = z.infer<
   typeof intelligenceProviderHealthStatusSchema
+>;
+export type IntelligencePublicFailureCodeContract = z.infer<
+  typeof intelligencePublicFailureCodeSchema
 >;
 export type IntelligenceProviderParam = z.infer<typeof intelligenceProviderParamSchema>;
 export type IntelligenceProviderStatus = z.infer<typeof intelligenceProviderStatusSchema>;

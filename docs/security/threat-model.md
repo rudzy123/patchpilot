@@ -30,7 +30,7 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 - Parser isolation follows Session 8: parse outside transactions; `worker.terminate()` if termination is required; `Promise.race` is not a kill switch. Archive extraction limits are required; no archive dependency is selected yet.
 - Provider HTTP is allowlisted HTTPS (`node:https.request`) with redirects disabled, proxy environment ignored, and rejection of private, loopback, link-local, metadata-service, and other non-public destinations. Advisory reference URLs are never fetched.
 - DNS lookup pinning plus post-connect verification is implemented for CISA KEV. It is not DNSSEC.
-- The Batch 7B synchronization service exists. Batch 8B starts the worker scheduler, Outbox mapping, and BullMQ intelligence processor. Still absent: status APIs, matching, and any Finding workflow.
+- The Batch 7B synchronization service exists. Batch 8B starts the worker scheduler, Outbox mapping, and BullMQ intelligence processor. Batch 9B adds authenticated sanitized provider-status GETs (`intelligence:read`; [ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)). Still absent: web dashboard, manual sync/retry, detailed SyncRun APIs, matching, and any Finding workflow. OD-10 remains open. Status GETs do not call CISA and do not write AuditEvent rows.
 
 ## Assets to protect
 

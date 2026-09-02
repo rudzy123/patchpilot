@@ -33,7 +33,7 @@ Authorization is **server-side** in use cases and repository adapters, not solel
 
 Exports are tenant-owned. Default: `member` and above may export. An organization setting may restrict export to `admin`/`owner` without changing historical export **Evidence**.
 
-Instance operator ([OD-10](open-decisions.md)) may manage **system** integrations and shared catalogs only.
+Instance operator ([OD-10](open-decisions.md)) may manage **system** integrations and shared catalogs only. Session 9 Batch 9B does not create that operator identity. Authenticated members with `intelligence:read` may read **sanitized global** provider status ([ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)). The active Organization is required product-access context and is not an `organizationId` predicate on those global rows. Two Organizations receive the same payload when global status is unchanged. This is not a tenant-evidence dump and not a dashboard.
 
 ## How repository methods require organization scope
 
@@ -138,7 +138,7 @@ v0.1 has no self-service hard delete of an organization. Archive hides writes. P
 | Plane | Examples | Data scope |
 | --- | --- | --- |
 | Tenant admin | Invite members, archive asset, publish org policy override, rotate **ExternalCredential** | Single authorized organization |
-| Instance operator | Enable system OSV/KEV integration, set refresh schedule, inspect queue lag, restore backups | Shared catalogs, infrastructure. **No** API that lists all orgs' SBOMs. Session 9 has no instance-operator or provider-status API yet. |
+| Instance operator | Enable system OSV/KEV integration, set refresh schedule, inspect queue lag, restore backups | Shared catalogs, infrastructure. **No** API that lists all orgs' SBOMs. Session 9 Batch 9B lets authenticated members with `intelligence:read` read **sanitized global** provider status. That is not an instance-operator console and does not list tenant evidence. OD-10 remains open. |
 | Break-glass | None in v0.1 | A cross-organization operator bypass requires an accepted ADR |
 
 Backup restoration is an infrastructure action. Application login after restore still uses membership. Operators should treat database and object-storage backups as **Restricted** ([data classification](data-classification.md)).

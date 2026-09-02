@@ -2,7 +2,7 @@
 
 This document traces the v0.1 [MVP journey](../product/mvp-scope.md) through the modular monolith. It is a control-flow and evidence-flow description, not a network packet capture.
 
-Authorization context is established as in [tenant isolation](tenant-isolation.md). Limits and poison handling are in [SBOM ingestion](sbom-ingestion.md). Session 8 upload, parse, and graph persist follow [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md): stages `validate`, `parse`, and `persist_graph` only. Session 9 catalog import follows [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Batch 8B schedules KEV work and processes `intelligence.sync` on the shared worker queue. A public intelligence API does not exist. Correlation, enrichment, scoring, findings, and remediation remain later additive workflows. Session 9 must not enqueue `finding.recalculate`. Session 8 has no web upload UI.
+Authorization context is established as in [tenant isolation](tenant-isolation.md). Limits and poison handling are in [SBOM ingestion](sbom-ingestion.md). Session 8 upload, parse, and graph persist follow [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md): stages `validate`, `parse`, and `persist_graph` only. Session 9 catalog import follows [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Batch 8B schedules KEV work and processes `intelligence.sync` on the shared worker queue. Batch 9B adds sanitized authenticated provider-status GETs ([ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)). Those GETs do not call CISA, Redis, BullMQ, MinIO, the parser, or the scheduler. Correlation, enrichment, scoring, findings, remediation, dashboards, and manual synchronization remain later additive workflows. Session 9 must not enqueue `finding.recalculate`. Session 8 has no web upload UI.
 
 ## End-to-end journey
 
@@ -29,6 +29,7 @@ sequenceDiagram
   W->>OS: Get copy of object
   W->>PG: Validate, parse, persist graph (Session 8 completed)
   Note over W,OSV: Session 9 Batch 8B: scheduled KEV import; zero Findings
+  User->>API: GET sanitized provider status (Batch 9B; no CISA)
   Note over W,OSV: Future additive: correlate, enrich, score (not Session 9)
   W->>OSV: Future correlation query if used (not Session 8 or 9 import)
   W->>KEV: Future finding enrichment from imported snapshot (not Session 9)
@@ -83,7 +84,17 @@ Asynchronous worker work:
 5. Parse and normalize outside the database transaction. Stage entries in bounded PostgreSQL transactions. Activate the current projection only after a complete source unit succeeds. Partial imports must not become current.
 6. Write system audit (`intelligence.sync_*`). Do **not** create Findings, FindingObservations, Vulnerability rows, or `finding.recalculate` outbox events.
 
-PostgreSQL uniqueness and retry state remain authority. BullMQ delayed jobs are a fast path. Tests must not call live CISA. There is no public intelligence API.
+PostgreSQL uniqueness and retry state remain authority. BullMQ delayed jobs are a fast path. Tests must not call live CISA.
+
+## 5c. Read sanitized provider status (Session 9 Batch 9B)
+
+[ADR 0022](../adr/0022-intelligence-provider-status-authorization.md). Authenticated product GET. No OpenAPI. No dashboard.
+
+1. Authenticate the session cookie. Require an active Organization and `intelligence:read`. The Organization is access context only.
+2. Reject a GET body (`400`). Unknown provider paths return `404`. Do not require mutation CSRF.
+3. Derive OSV as deferred without a database read. Load one bounded CISA `IntelligenceSource` row joined to the active generation. Use `expectedEntryCount`. Do not COUNT `KevEntry`.
+4. Map internal failure codes to the public allowlist. Apply KEV health precedence (disabled, never_synchronized, stale over degraded, degraded, current).
+5. Respond `Cache-Control: private, no-store`. Do not write `AuditEvent`, `OutboxEvent`, `BackgroundJob`, Findings, or intelligence rows. Session `lastSeenAt` bookkeeping from session resolution is allowed.
 
 ## 6. Correlate (future additive workflow, not Session 9)
 

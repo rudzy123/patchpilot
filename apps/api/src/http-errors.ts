@@ -1,6 +1,6 @@
 import { LOGIN_UNAVAILABLE } from '@patchpilot/auth';
 import { errorEnvelopeSchema } from '@patchpilot/contracts';
-import type { AppError } from '@patchpilot/domain';
+import { INTELLIGENCE_STATUS_UNAVAILABLE, type AppError } from '@patchpilot/domain';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 export const ORIGIN_NOT_ALLOWED: AppError = Object.freeze({
@@ -70,7 +70,10 @@ export function httpStatusForError(error: AppError): number {
     case 'unprocessable_evidence':
       return 422;
     case 'internal':
-      return error.message === LOGIN_UNAVAILABLE.message ? 503 : 500;
+      return error.message === LOGIN_UNAVAILABLE.message ||
+        error.message === INTELLIGENCE_STATUS_UNAVAILABLE.message
+        ? 503
+        : 500;
   }
 }
 

@@ -20,6 +20,8 @@ import { registerAssetRoutes } from './asset-routes.js';
 import type { AssetRuntime } from './asset-runtime.js';
 import { registerAuthRoutes } from './auth-routes.js';
 import type { AuthRuntime } from './auth-runtime.js';
+import { registerIntelligenceRoutes } from './intelligence-routes.js';
+import type { IntelligenceRuntime } from './intelligence-runtime.js';
 import { registerSbomRoutes } from './sbom-routes.js';
 import type { SbomRuntime } from './sbom-runtime.js';
 import { readSingleHeader } from './headers.js';
@@ -35,6 +37,7 @@ export type ApiDependencies = {
   auth: AuthRuntime;
   assets: AssetRuntime;
   sboms: SbomRuntime;
+  intelligence: IntelligenceRuntime;
   now?: () => string;
   generateId?: () => string;
 };
@@ -203,6 +206,12 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     config: dependencies.config,
     auth: dependencies.auth,
     sboms: dependencies.sboms,
+  });
+
+  await registerIntelligenceRoutes(app, {
+    config: dependencies.config,
+    auth: dependencies.auth,
+    intelligence: dependencies.intelligence,
   });
 
   app.addHook('onSend', async (request, _reply, payload) => {

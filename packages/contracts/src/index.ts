@@ -110,7 +110,7 @@ export {
   intelligenceProviderParamSchema,
   intelligenceProviderSchema,
   intelligenceProviderStatusSchema,
-  intelligenceSafeFailureCodeSchema,
+  intelligencePublicFailureCodeSchema,
   type IntelligenceProviderContract,
   type IntelligenceProviderDetailResponse,
   type IntelligenceProviderHealthStatusContract,
@@ -118,6 +118,7 @@ export {
   type IntelligenceProviderListResponse,
   type IntelligenceProviderParam,
   type IntelligenceProviderStatus,
+  type IntelligencePublicFailureCodeContract,
 } from './intelligence.js';
 
 export const healthServiceSchema = z.enum(['api', 'web', 'worker']);

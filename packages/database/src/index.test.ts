@@ -89,19 +89,32 @@ describe('public package surface', () => {
   it('does not export the persistence fixture as application API', () => {
     expect('persistTenantChangeWithAuditAndOutbox' in databasePublic).toBe(false);
     expect('createIntelligencePersistence' in databasePublic).toBe(true);
+    expect('createIntelligenceStatusReader' in databasePublic).toBe(true);
     expect('seedZeroFindingBaseline' in databasePublic).toBe(false);
   });
 });
 
 describe('intelligence adapter source boundary', () => {
   it('does not import AWS, Redis, BullMQ, or HTTP clients', () => {
-    const source = readFileSync(
+    const persistence = readFileSync(
       path.join(path.dirname(fileURLToPath(import.meta.url)), 'intelligence-persistence.ts'),
       'utf8',
     );
-    expect(source).not.toMatch(/ioredis|bullmq|@aws-sdk|S3Client|undici|\bfetch\s*\(/);
-    expect(source).not.toContain('renewExecutionLease');
-    expect(source).not.toContain('FindingRepository');
+    const status = readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), 'intelligence-status.ts'),
+      'utf8',
+    );
+    for (const source of [persistence, status]) {
+      expect(source).not.toMatch(/ioredis|bullmq|@aws-sdk|S3Client|undici|\bfetch\s*\(/);
+      expect(source).not.toContain('renewExecutionLease');
+      expect(source).not.toContain('FindingRepository');
+    }
+    expect(status).not.toMatch(
+      /organizationId|kevEntry|\$executeRaw|\.create\(|\.update\(|\.delete\(/,
+    );
+    expect(status).toContain("providerKey: 'cisa_kev'");
+    expect(status).toContain('expectedEntryCount');
+    expect(status).not.toContain("providerKey: 'osv'");
   });
 });
 

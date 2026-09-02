@@ -19,10 +19,12 @@ export {
   INTELLIGENCE_OUTBOX_PAYLOAD_SCHEMA_VERSION,
   INTELLIGENCE_PARSER_RESULT_MAX_SERIALIZED_BYTES,
   INTELLIGENCE_PROVIDER_AUDIT_SUBJECT_TYPE,
+  INTELLIGENCE_PROVIDER_LIST_ORDER,
   INTELLIGENCE_PROVIDER_STATUS_CACHE_CONTROL,
   INTELLIGENCE_PROVIDER_STATUS_PATH,
   INTELLIGENCE_PROVIDERS_PATH,
   INTELLIGENCE_RAW_RANSOMWARE_MAX_LENGTH,
+  INTELLIGENCE_READ_PERMISSION,
   INTELLIGENCE_REQUEST_TOKEN_MAX_LENGTH,
   INTELLIGENCE_RETRY_RECONCILE_BATCH_LIMIT,
   INTELLIGENCE_SAFE_CONTENT_TYPE_LABELS,
@@ -70,6 +72,33 @@ export {
   type KnownRansomwareCampaignUse,
 } from './constants.js';
 export {
+  authorizeIntelligenceRead,
+  deriveCisaKevProviderStatus,
+  intelligenceEnablementMismatches,
+  synthesizeDeferredOsvStatus,
+  type CisaKevStatusGeneration,
+  type CisaKevStatusSnapshot,
+  type IntelligenceProviderStatusProjection,
+  type IntelligenceStatusActor,
+} from './provider-status.js';
+export {
+  createIntelligenceStatusQueryUseCase,
+  type GetIntelligenceProviderStatusInput,
+  type IntelligenceProviderStatusList,
+  type IntelligenceProviderStatusReadPort,
+  type IntelligenceStatusQueryDependencies,
+  type IntelligenceStatusQueryLogger,
+  type IntelligenceStatusReadResult,
+  type ListIntelligenceProviderStatusInput,
+} from './status-query.js';
+export {
+  intelligencePublicFailureCodes,
+  isIntelligencePublicFailureCode,
+  mapInternalFailureCodeToPublic,
+  publicFailureCodeEqualsInternalCode,
+  type IntelligencePublicFailureCode,
+} from './public-failure-codes.js';
+export {
   INTELLIGENCE_ABANDONED_GENERATION,
   INTELLIGENCE_ACTIVATION_CONFLICT,
   INTELLIGENCE_ARBITRARY_URL_FORBIDDEN,
@@ -82,6 +111,9 @@ export {
   INTELLIGENCE_INVALID_TRANSITION,
   INTELLIGENCE_OSV_RUNTIME_FORBIDDEN,
   INTELLIGENCE_PARTIAL_ACTIVATION_INCONSISTENT,
+  INTELLIGENCE_PROVIDER_NOT_FOUND,
+  INTELLIGENCE_STATUS_INCONSISTENT,
+  INTELLIGENCE_STATUS_UNAVAILABLE,
   INTELLIGENCE_TERMINAL_STATE,
   intelligenceValidationError,
 } from './errors.js';
@@ -164,6 +196,7 @@ export {
 } from './records.js';
 export {
   deriveIntelligenceProviderHealthStatus,
+  elapsedFreshnessAgeSeconds,
   intelligenceFreshnessMayAdvanceForState,
   isIntelligenceProviderHealthStatus,
   isIntelligenceProviderImplementationStatus,
