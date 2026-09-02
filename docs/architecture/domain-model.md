@@ -409,7 +409,7 @@ This row is a current projection. Authoritative provenance lives on **Vulnerabil
 
 ## CveIdentity
 
-Global, instance-owned canonical CVE registry. One row per exact `CVE-[0-9]{4}-[0-9]{4,19}` string. Session 10 Batch 3B applied and froze this as `cve_identity` (`20260902120000_canonical_cve_identity`, SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). The table is append-only. It has no organization, provider, KEV, Finding, or Component fields. `createdAt` is the only timestamp. Persistence adapters and active-KEV derivation are not implemented. The persistent development database has eleven finished migrations.
+Global, instance-owned canonical CVE registry. One row per exact `CVE-[0-9]{4}-[0-9]{4,19}` string. Session 10 Batch 3B applied and froze this as `cve_identity` (`20260902120000_canonical_cve_identity`, SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). The table is append-only. It has no organization, provider, KEV, Finding, or Component fields. `createdAt` is the only timestamp and is database-generated. Session 10 Batch 4B implements `createCveIdentityPersistence` insert-once adapters. Unique conflicts reload the stored row. Batch lookup is bounded to 100 inputs. Active-KEV derivation is not implemented. The persistent development database has eleven finished migrations.
 
 | Field (logical) | Notes |
 | --- | --- |
@@ -419,7 +419,7 @@ Global, instance-owned canonical CVE registry. One row per exact `CVE-[0-9]{4}-[
 
 ## VulnerabilityCveIdentityLink
 
-Append-only many-to-many between an existing **Vulnerability** advisory and a **CveIdentity**. The logical link is source-free. `linkedAt` is the only timestamp. Multiple advisories may share one CVE without merging. One advisory may link to more than one CVE. Session 10 Batch 3B completed a canonical-only backfill of exact values already stored in `vulnerability.cve_id`. Malformed legacy values remain unchanged and unlinked. No Vulnerability merge occurred. `osvId` remains required and unique. `cveId` remains unchanged. `KevEntry` remains unchanged.
+Append-only many-to-many between an existing **Vulnerability** advisory and a **CveIdentity**. The logical link is source-free. `linkedAt` is the only timestamp and is supplied by the ensure command; existing values are never overwritten. Multiple advisories may share one CVE without merging. One advisory may link to more than one CVE. Session 10 Batch 3B completed a canonical-only backfill of exact values already stored in `vulnerability.cve_id`. Malformed legacy values remain unchanged and unlinked. No Vulnerability merge occurred. `osvId` remains required and unique. `cveId` remains unchanged. `KevEntry` remains unchanged. Batch 4B keyset listing is ordered by `cveIdentityId` and bounded 1–100. Invalid limits are rejected.
 
 | Field (logical) | Notes |
 | --- | --- |

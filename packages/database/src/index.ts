@@ -11,6 +11,10 @@ export {
   createIntelligencePersistence,
   type IntelligencePersistenceAdapters,
 } from './intelligence-persistence.js';
+export {
+  createCveIdentityPersistence,
+  type CveIdentityPersistenceAdapters,
+} from './cve-identity-persistence.js';
 export { createIntelligenceStatusReader } from './intelligence-status.js';
 export { createSbomUploadUnitOfWork } from './sbom-upload-unit-of-work.js';
 export { createSbomIngestionProcessorUnitOfWork } from './sbom-ingestion-processor-unit-of-work.js';

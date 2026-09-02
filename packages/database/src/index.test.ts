@@ -129,12 +129,17 @@ describe('outbox claim SQL', () => {
   });
 });
 
-describe('Session 10 Batch 3B persistence boundary', () => {
+describe('Session 10 Batch 4B public exports', () => {
   const srcDir = path.dirname(fileURLToPath(import.meta.url));
 
-  it('does not ship a CveIdentity persistence adapter or mapper yet', () => {
-    expect(existsSync(path.join(srcDir, 'cve-identity-persistence.ts'))).toBe(false);
-    expect(existsSync(path.join(srcDir, 'cve-identity-mappers.ts'))).toBe(false);
-    expect('createCveIdentityPersistence' in databasePublic).toBe(false);
+  it('exports the CVE identity factory and not mapper internals', () => {
+    expect(existsSync(path.join(srcDir, 'cve-identity-persistence.ts'))).toBe(true);
+    expect(existsSync(path.join(srcDir, 'cve-identity-mappers.ts'))).toBe(true);
+    expect('createCveIdentityPersistence' in databasePublic).toBe(true);
+    expect('mapCveIdentity' in databasePublic).toBe(false);
+    expect('mapVulnerabilityCveIdentityLink' in databasePublic).toBe(false);
+    expect('CveIdentityMappingError' in databasePublic).toBe(false);
+    expect('PrismaCveIdentityPersistence' in databasePublic).toBe(false);
+    expect('uniqueTargetTokens' in databasePublic).toBe(false);
   });
 });
