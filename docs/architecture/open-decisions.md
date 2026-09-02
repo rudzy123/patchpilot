@@ -37,7 +37,7 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 | --- | --- | --- |
 | OD-8 KEV numeric limits | KEV response, count, parser, HTTP, lease, and staging-chunk bounds | Provisionally resolved for **initial KEV implementation** in `@patchpilot/config`. Values are PatchPilot safety margins from one 2026-08-31 snapshot, not CISA guarantees. |
 | OD-8 OSV archive runtime limits | Compressed/expanded `all.zip` operator download authorization | **Remains open.** Observed ~1.43 GiB / ~8.74 GiB / 890,787 entries are documented, not encoded as runtime configuration. OSV runtime remains disabled. |
-| OD-19 | Provider-neutral Vulnerability identity | **Remains open.** |
+| OD-19 | Provider-neutral Vulnerability identity | **Partially resolved** for canonical CVE identity by [ADR 0023](../adr/0023-provider-neutral-cve-identity.md). Full advisory-identity replacement of `osvId` remains open. Persistence is not in Batch 1B. |
 
 ## Closed in Session 9 Batch 4C (KEV persistence)
 
@@ -65,6 +65,17 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 
 OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cross-organization operator bypass, manual sync, retry, detailed SyncRun APIs, or a dashboard.
 
+## Closed in Session 10 Batch 1B (ADR 0023)
+
+| ID | Topic | Status after Batch 1B |
+| --- | --- | --- |
+| OD-19 canonical CVE identity | Global `CveIdentity` plus append-only `VulnerabilityCveIdentityLink` | **Partially resolved.** [ADR 0023](../adr/0023-provider-neutral-cve-identity.md) accepts the identity model and domain ports. Persistence, the forward-only migration, and read-only active-KEV derivation are **not** implemented in Batch 1B. |
+| Full provider-neutral Vulnerability advisory identity | Replacing required unique `Vulnerability.osvId` | **Remains open.** `osvId` stays required and unique. |
+| OSV runtime | Session 9/10 import of OSV dumps | **Remains deferred.** `INTELLIGENCE_OSV_ENABLED=true` stays rejected. |
+| Finding correlation | Advisory-to-component matching and Finding writes | **Remains blocked** by the ADR 0023 four-condition gate and [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) zero-Finding. |
+| Risk integration | Known-exploitation as a scored factor | **Remains deferred.** The production policy engine has no scoring implementation. |
+| Finding APIs | Tenant Finding HTTP | **Remain absent.** Session 10 does not add them. |
+
 ## Still open
 
 | ID | Topic | Why it is open | Interim default for design and first implementation |
@@ -84,7 +95,7 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | OD-16 | Reserved organization slugs | Product URL routing is not implemented. A unique slug is not enough to keep `api`, `health`, `login`, and similar names off tenant routes. | Document the gap; do not invent a reserved-slug list in the database until routing exists. |
 | OD-17 | MFA and account lockout | [ADR 0019](../adr/0019-local-password-sessions.md) specifies Argon2id and fail-closed login rate limits, not MFA or durable lockout. | Dual-key Redis login limits. No MFA. No lockout table. Revisit before treating the product as resistant to credential stuffing beyond those controls. |
 | OD-18 | Reverse-proxy trust hops | `trustProxy` remains false in Session 6. Production TLS topology is operator-specific. | Direct socket peer IP for login rate limits. Do not trust `X-Forwarded-For`. Document hops in a later ADR before enabling `trustProxy`. |
-| OD-19 | Provider-neutral Vulnerability identity | Existing required unique `osvId` cannot store a KEV-only CVE without a synthetic id or schema change. | Keep `osvId` until a later database-design ADR. Do not invent a Session 9 identity migration in Batch 1B. |
+| OD-19 | Provider-neutral Vulnerability identity | Existing required unique `osvId` cannot store a KEV-only CVE without a synthetic id or schema change. Canonical CVE identity is accepted by [ADR 0023](../adr/0023-provider-neutral-cve-identity.md) as domain/ADR only. | Keep `osvId` required and unique. Persist `CveIdentity` in a later Session 10 forward-only migration. Do not treat the Batch 1B domain types as a shipped schema. Full advisory-identity replacement remains open. |
 | OD-21 | Session 9 scheduler, heartbeat, and retry policy | Bounded automatic retry is required; cadence is not. | Follow Session 8 outbox + BackgroundJob leases. Terminal runs stay historical; replay creates a new run. Batch 8B runs a UTC schedule-window scheduler, maps `intelligence.sync.requested.v1` to `intelligence.sync`, and redispatches from PostgreSQL. BullMQ delayed jobs are a fast path only. BackgroundJob remains the only execution lease. |
 
 Related: [ADR index](../adr/README.md), [architecture risk register](../security/risk-register.md).
