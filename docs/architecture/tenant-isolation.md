@@ -61,7 +61,7 @@ Idempotency keys and upload hashes are unique per **organization** (and asset wh
 
 ## Global intelligence versus tenant-owned data
 
-Normalized vulnerability intelligence is **instance-owned** and shared ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). It is not duplicated into every Organization. Global ownership does **not** make the catalog publicly accessible. Raw snapshot bytes stay in private object storage. Tenant **Findings** remain tenant-owned. Session 9 import must not query tenant package inventories and must not write Findings.
+Normalized vulnerability intelligence is **instance-owned** and shared ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). It is not duplicated into every Organization. Global ownership does **not** make the catalog publicly accessible. Raw snapshot bytes stay in private object storage. Tenant **Findings** remain tenant-owned. Session 9 import must not query tenant package inventories and must not write Findings. Session 10 Batch 5B active-catalog membership is a global read of `IntelligenceSource`, the active `KevGeneration`, and at most two `KevEntry` rows. It accepts no `organizationId`, does not query Findings or Components, and does not prove tenant exposure.
 
 | Global / shared catalog | Tenant-owned |
 | --- | --- |
@@ -70,7 +70,7 @@ Normalized vulnerability intelligence is **instance-owned** and shared ([ADR 002
 | Built-in **RiskPolicy** (`scope = builtin`) | Org **RiskPolicy** (`scope = organization`) |
 | CISA KEV snapshots (as source records) | **Asset**, **AssetOwner**, **Environment** |
 | **IntegrationProvider** | **SBOM**, **SBOMIngestion**, **Component**, **ComponentOccurrence**, **DependencyRelationship** |
-| **IntelligenceSource** for OSV/KEV sync | **Finding**, **FindingObservation**, **RiskCalculation** |
+| **IntelligenceSource** for OSV/KEV sync; **CveIdentity** | **Finding**, **FindingObservation**, **RiskCalculation** |
 | | **RemediationTask**, **RiskAcceptance**, **Evidence** |
 | | Tenant **AuditEvent** |
 | | Tenant **Integration** / **ExternalCredential** (unused for GitHub in v0.1) |

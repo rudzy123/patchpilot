@@ -40,7 +40,7 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 - The advisory-to-CVE link is source-free. Provenance stays on `VulnerabilitySourceRecord` and KEV generations.
 - Backfill copies only exact canonical `vulnerability.cve_id` values. Malformed legacy values remain unlinked and unrepaired. Tests must not print those values.
 - Unicode lookalikes, lowercase, and whitespace variants do not match the POSIX CHECK. They cannot collide with a canonical identity string.
-- KEV membership remains a later read-time equality against the active generation. Listing in KEV is not tenant exposure and is not implemented in this batch.
+- KEV membership is read-time exact equality against the accepted active generation (Session 10 Batch 5B). Listing in KEV is active-catalog membership, not tenant exposure, and is not a Finding.
 - Session 10 remains zero-Finding. The identity migration must not write Findings, FindingObservations, Evidence, RiskCalculations, or `finding.recalculate`.
 
 ## Assets to protect

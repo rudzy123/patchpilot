@@ -62,7 +62,7 @@ Decision deadline: before the first implementing PR for that area, unless noted.
 | R50 | Unicode or case-variant CVE strings colliding with canonical identity | L | H | P1 | Intel | POSIX CHECK, `VARCHAR(28)`, default collation, no CITEXT, no silent trim/upper | Application ports must still reject noncanonical input | Identity persistence adapters | mitigated-in-design |
 | R51 | Immutable identity or link row cannot be corrected in place | M | M | P2 | Intel | Append-only triggers; no update/delete path; forward-fix migration later if needed | Wrong exact canonical insert is permanent without a later migration | Before adapter writes | mitigated-in-design |
 | R52 | Future tenant Finding join omitting the trusted organization predicate | M | H | P0 | Tenancy | Identity tables have no `organization_id`; any later Finding join must apply authorized org first | Runtime join does not exist in Batch 3B | First Finding/KEV read path | mitigated-in-design |
-| R53 | KEV membership treated as tenant exposure | M | H | P1 | Intel / Findings | No KEV foreign key; membership is later read-time equality only; zero-Finding remains | Derivation and Finding APIs are not implemented | First KEV membership read | mitigated-in-design |
+| R53 | KEV membership treated as tenant exposure | M | H | P1 | Intel / Findings | No KEV foreign key; Batch 5B membership is snapshot-relative exact equality with explicit freshness; zero-Finding remains | Finding APIs and enrichment are not implemented; stale or disabled-with-history absence must not be treated as live CISA absence | First Finding/KEV enrichment path | mitigated-in-design |
 
 ## P0 meaning
 

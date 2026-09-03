@@ -100,6 +100,18 @@ describe('lifecycle catalogs', () => {
     expect(forbiddenIdentityFieldNames).toContain('findingId');
     expect(forbiddenIdentityFieldNames).toContain('osvId');
   });
+
+  it('exports the active-catalog membership use case and closed freshness values', async () => {
+    const domainPublic = await import('./index.js');
+    expect('createQueryActiveKevMembershipUseCase' in domainPublic).toBe(true);
+    expect('parseQueryActiveKevMembershipInput' in domainPublic).toBe(true);
+    expect('deriveActiveKevCatalogFreshness' in domainPublic).toBe(true);
+    expect(domainPublic.activeKevCatalogFreshnessValues).toEqual([
+      'current',
+      'stale',
+      'disabled_with_history',
+    ]);
+  });
 });
 
 describe('page size bounds', () => {

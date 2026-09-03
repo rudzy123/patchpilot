@@ -16,6 +16,7 @@ export {
   type CveIdentityPersistenceAdapters,
 } from './cve-identity-persistence.js';
 export { createIntelligenceStatusReader } from './intelligence-status.js';
+export { createActiveKevMembershipPersistence } from './active-kev-membership.js';
 export { createSbomUploadUnitOfWork } from './sbom-upload-unit-of-work.js';
 export { createSbomIngestionProcessorUnitOfWork } from './sbom-ingestion-processor-unit-of-work.js';
 export { developmentSeedIds, seedDevelopmentData } from './seed/development.js';

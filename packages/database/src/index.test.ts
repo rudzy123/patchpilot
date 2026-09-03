@@ -143,3 +143,15 @@ describe('Session 10 Batch 4B public exports', () => {
     expect('uniqueTargetTokens' in databasePublic).toBe(false);
   });
 });
+
+describe('Session 10 Batch 5B public exports', () => {
+  const srcDir = path.dirname(fileURLToPath(import.meta.url));
+
+  it('exports the active KEV membership factory and not query internals', () => {
+    expect(existsSync(path.join(srcDir, 'active-kev-membership.ts'))).toBe(true);
+    expect('createActiveKevMembershipPersistence' in databasePublic).toBe(true);
+    expect('PrismaActiveKevMembershipPersistence' in databasePublic).toBe(false);
+    expect('mapLoadedSource' in databasePublic).toBe(false);
+    expect('SOURCE_SELECT' in databasePublic).toBe(false);
+  });
+});
