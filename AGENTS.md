@@ -148,18 +148,23 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - No Finding repositories or lifecycle code is added. No match-evaluation model, observation ensure, risk, API, worker, Outbox, or matching runtime is added.
 - OSV runtime remains disabled. ZIP remains absent. The implemented ecosystem set remains empty.
 
-### Session 11 Batch 3A
+### Session 11 Batch 3A-P
 
 These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
 
 - Session 11 Batch 3A implements OSV metadata contracts in `@patchpilot/vulnerability-intelligence`: source identifiers, inventory scope, source-license registry, object-key parser, family-candidate extraction, permission enums, evidence provenance contracts, pre-retrieval classification, and post-parse confirmation.
 - The immutable versioned source-license registry (`osv_source_license_registry_v1`) defines 9 sources: MAL, GHSA, PYSEC, GO, RUSTSEC, GSD, EEF-CVE, OSV, ECHO.
-- **Zero sources are eligible for body retrieval** until exact verified provenance is incorporated. All 7 sources reported under open-source licenses (MAL Apache-2.0, GHSA/PYSEC/GO/EEF-CVE CC-BY-4.0, RUSTSEC CC0-1.0, GSD archived) fail closed due to `evidence: null`.
-- `OsvBodyRetrievalReasonCode` includes `license_evidence_unavailable`. Registry entries with null evidence return `bodyRetrieval: 'ineligible'`, `bodyRetrievalReason: 'license_evidence_unavailable'`, and `bodyScopeDisposition: 'legal_review_required'`.
-- MAL internal matching remains prohibited (malicious-package semantics not approved by ADR 0025). OSV family fails closed (ambiguous provenance). ECHO requires legal review (proprietary).
+- **Session 11 Batch 3A-P incorporates verified source-license provenance.** Seven sources (MAL, GHSA, PYSEC, GO, RUSTSEC, GSD, EEF-CVE) now have complete evidence and are **eligible for body retrieval**.
+- MAL: Apache-2.0. Body retrieval eligible. Internal matching prohibited (malicious-package semantics not approved by ADR 0025).
+- GHSA: CC-BY-4.0. Attribution required.
+- PYSEC: CC-BY-4.0. Attribution required.
+- GO: CC-BY-4.0 for /data/ directory. Attribution required.
+- RUSTSEC: CC0-1.0 source-level with per-advisory license field. External exposure conservative until post-parse confirmation.
+- GSD: CC0-1.0 public domain dedication. Archived status independent from licensing permission.
+- EEF-CVE: CC-BY-4.0. Attribution required. Dynamic HTML evidence.
+- OSV family fails closed (ambiguous aggregator provenance). ECHO fails closed (proprietary, no public license).
 - Evidence provenance contracts define required fields: requested URL, final URL, redirects, HTTP status, media type, content encoding, byte count, SHA-256, retrieval timestamp, work covered, mutable-URL indicator.
-- **Provenance gate:** Body retrieval, private retention, normalization, and internal matching may not proceed until exact verified provenance is incorporated for each source in a future checkpoint (Session 11 Batch 3B or later).
-- No OSV transport, parser, listing handler, body retrieval, persistence, scheduler, worker, API, or runtime exists. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 11 remains zero-Finding.
+- No OSV transport, parser, listing handler, body retrieval, persistence, scheduler, worker, API, or runtime exists. Body retrieval implementation remains future work. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 11 remains zero-Finding.
 
 ## Target repository layout
 
