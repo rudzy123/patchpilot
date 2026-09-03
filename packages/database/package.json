@@ -34,7 +34,7 @@
   "dependencies": {
     "@patchpilot/config": "workspace:*",
     "@patchpilot/domain": "workspace:*",
-    "@prisma/client": "^6.19.0"
+    "@prisma/client": "^7.10.0"
   },
   "devDependencies": {
     "@patchpilot/eslint-config": "workspace:*",
