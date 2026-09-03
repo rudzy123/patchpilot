@@ -36,7 +36,7 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 | ID | Topic | Status after Batch 2C |
 | --- | --- | --- |
 | OD-8 KEV numeric limits | KEV response, count, parser, HTTP, lease, and staging-chunk bounds | Provisionally resolved for **initial KEV implementation** in `@patchpilot/config`. Values are PatchPilot safety margins from one 2026-08-31 snapshot, not CISA guarantees. |
-| OD-8 OSV archive runtime limits | Compressed/expanded `all.zip` operator download authorization | **Remains open.** Observed ~1.43 GiB / ~8.74 GiB / 890,787 entries are documented, not encoded as runtime configuration. OSV runtime remains disabled. |
+| OD-8 OSV archive runtime limits | Compressed/expanded `all.zip` operator download authorization | **Deferred and not authorized.** [ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md) does not approve `all.zip` as the first implementation. ZIP remains absent. Dated Session 9 size observations in [vulnerability-intelligence.md](vulnerability-intelligence.md) are non-contractual and are not download authorization. OSV runtime remains disabled. |
 | OD-19 | Provider-neutral Vulnerability identity | **Partially resolved** for canonical CVE identity by [ADR 0023](../adr/0023-provider-neutral-cve-identity.md). Migration `20260902120000_canonical_cve_identity` is applied and frozen on the persistent development database (eleven migrations; SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). Batch 4B ships `createCveIdentityPersistence`. Batch 5B adds read-only active-catalog membership derivation. Full advisory-identity replacement of `osvId` remains open. |
 
 ## Closed in Session 9 Batch 4C (KEV persistence)
@@ -76,6 +76,25 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | Risk integration | Known-exploitation as a scored factor | **Remains deferred.** The production policy engine has no scoring implementation. |
 | Finding APIs | Tenant Finding HTTP | **Remain absent.** Session 10 does not add them. |
 
+## Closed in Session 11 Batch 1B (ADR 0024)
+
+| ID | Topic | Status after Batch 1B |
+| --- | --- | --- |
+| Affected-version authority | Which provider supplies package-specific affected versions | **Closed as direction.** [ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md) selects OSV. CISA KEV remains an exploitation signal only. Tenant SBOMs remain inventory. Canonical CVE identity remains identifier linkage. Current `VulnerabilityNormalizedJson.affectedPackages` is not matching authority. |
+| Tenant package query APIs | `POST /v1/query` and other queries that send tenant PURLs, names, or versions | **Rejected** for the approved foundation. Tenant inventory must not leave the instance. |
+| OSV acquisition model | How the instance obtains OSV data | **Instance-owned catalog acquisition** is the approved direction. Acquisition is independent of tenant matching. Provider data is stored privately and activated atomically. Exact host, path, listing, licensing, removal semantics, and limits remain subject to transport and provenance review. Implementation is not authorized until that review completes. |
+| Provider object export | Allowlisted HTTPS objects from a closed OSV-controlled host | **Preferred direction to investigate** for the first implementation. Not implemented. Arbitrary public bucket listing is not automatically safe. |
+| Per-advisory OSV API | Fetch by known instance-owned advisory ID | **Deferred** as a possible later reconciliation mechanism. Not a complete catalog. Must not accept tenant package identifiers. |
+| `all.zip` | OSV full-database ZIP export | **Not approved** for initial implementation. [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) completeness-baseline research remains historical context. |
+| Ecosystem archives | Per-ecosystem ZIP subsets | **Deferred.** Still require ZIP. Completeness and global deletion/withdrawal authority are unproven. Closed ecosystems belong to future ADR 0025. |
+| Hybrid acquisition | Object export plus optional per-ID reconciliation, archive only after measured approval | **Permitted later refinement.** Must not include tenant package queries. |
+| ZIP / archive support | Archive extraction, ZIP dependency, compressed/expanded limits | **Deferred and not authorized.** No ZIP dependency. Not closed as implemented. |
+| OSV runtime | `INTELLIGENCE_OSV_ENABLED=true` | **Remains rejected** until transport, licensing, limits, parser, persistence, frozen migration, zero-Finding tests, runbooks, and adversarial review all pass. Batch 1B does not enable OSV. |
+| Matching completeness | Advisory-to-component version evaluation | **Not complete.** Session 11 remains zero-Finding. Matching is Session 12 or later. Package identity and comparators remain future ADR 0025. |
+| Provider ingestion completeness | OSV transport, parser, snapshots, generations, scheduler, worker | **Not complete.** No OSV runtime exists. |
+| Finding evidence and lifecycle | Match evidence, Finding writes, observations | **Remain for future ADR 0026.** Finding writes are Session 13 or later, subject to all gates. |
+| Full provider-neutral Vulnerability advisory identity | Replacing required unique `Vulnerability.osvId` | **Remains open** ([OD-19](#still-open)). This ADR does not make `osvId` nullable. |
+
 ## Still open
 
 | ID | Topic | Why it is open | Interim default for design and first implementation |
@@ -84,14 +103,14 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | OD-5 | Production object-storage vendor | The port is S3-compatible; AWS, MinIO, or GCS interop is an operations choice. | Provider-neutral port ([ADR 0008](../adr/0008-private-object-storage.md)). Local Compose uses MinIO. Production uses any S3-compatible private bucket the operator provides. |
 | OD-6 | Application-layer package split | Use cases could live in `packages/domain` or a dedicated package. | Use cases live in `packages/domain` as application services. Revisit only if the package becomes unwieldy. |
 | OD-7 | Priority vs risk score split | Glossary treats them as the same until an ADR splits them. | Keep **priority** as the stored calculated ranking. **Risk score** is a synonym. Do not introduce a second authoritative number. |
-| OD-8 | Exact outbound rate-limit and import size numbers | KEV limits are provisionally in `@patchpilot/config`. OSV archive runtime limits are still not an operator download authorization. Conditional GET is not the KEV protocol. | Use the typed KEV bounds. Keep `INTELLIGENCE_OSV_ENABLED=false`. Do not treat earlier prose (30 req/min, 5 MiB) as provider SLAs. Do not encode the deferred ~1.8 GiB / ~11 GiB OSV discussion values as Session 9 configuration. |
+| OD-8 | Exact outbound rate-limit and import size numbers | KEV limits are provisionally in `@patchpilot/config`. OSV object, listing, parser, and worker limits are not selected. ZIP remains deferred and unauthorized. Conditional GET is not the KEV protocol. | Use the typed KEV bounds. Keep `INTELLIGENCE_OSV_ENABLED=false`. Do not treat earlier prose (30 req/min, 5 MiB) as provider SLAs. Do not encode dated or discussion-only OSV archive sizes as configuration or as first-implementation authorization. |
 | OD-9 | Notification channels | Email, chat, or in-app-only is unspecified. | In-app state and exports only for MVP. No outbound notification provider. |
 | OD-10 | Instance operator identity | How a self-hosted admin authenticates separately from organization membership. | A config-gated bootstrap user that can manage **IntelligenceSource** rows and shared catalogs only. No cross-organization read of tenant evidence. A bypass ADR is required before any cross-org operator console. |
 | OD-11 | Team semantics | Teams are in the domain model; MVP journey does not require them. | Persist Team and optional AssetOwner.teamId. Do not block the MVP journey on teams. |
 | OD-12 | RepositoryConnection provider | GitHub is not MVP. | Persist the entity with status `not_configured`. No webhooks, no tokens, no repo API calls. |
 | OD-13 | Backup encryption and off-site copies | Operator responsibility for a self-hosted system. | Document duties in [deployment-model.md](deployment-model.md) and [retention-and-deletion.md](retention-and-deletion.md). Do not ship a hosted backup service. |
 | OD-14 | CycloneDX minor versions beyond 1.6 | Spec will evolve. | Allowlist 1.4, 1.5, and 1.6. New versions need an ADR and parser tests. |
-| OD-15 | Matching algorithm details beyond OSV ranges | PURL aliases, CPE, and fuzzy name match are high-risk. | Exact ecosystem + package + version using OSV ranges and PURL when present. No fuzzy name match in MVP. Session 9 must not run matching ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). |
+| OD-15 | Matching algorithm details beyond OSV ranges | PURL aliases, CPE, comparators, and fuzzy name match are high-risk. Package identity belongs to future ADR 0025. | Do not run matching in Session 9 or Session 11. Tenant package query APIs are rejected ([ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md)). No fuzzy name match. Do not match against current `affectedPackages` JSON. |
 | OD-16 | Reserved organization slugs | Product URL routing is not implemented. A unique slug is not enough to keep `api`, `health`, `login`, and similar names off tenant routes. | Document the gap; do not invent a reserved-slug list in the database until routing exists. |
 | OD-17 | MFA and account lockout | [ADR 0019](../adr/0019-local-password-sessions.md) specifies Argon2id and fail-closed login rate limits, not MFA or durable lockout. | Dual-key Redis login limits. No MFA. No lockout table. Revisit before treating the product as resistant to credential stuffing beyond those controls. |
 | OD-18 | Reverse-proxy trust hops | `trustProxy` remains false in Session 6. Production TLS topology is operator-specific. | Direct socket peer IP for login rate limits. Do not trust `X-Forwarded-For`. Document hops in a later ADR before enabling `trustProxy`. |

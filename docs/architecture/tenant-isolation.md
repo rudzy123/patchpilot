@@ -61,7 +61,7 @@ Idempotency keys and upload hashes are unique per **organization** (and asset wh
 
 ## Global intelligence versus tenant-owned data
 
-Normalized vulnerability intelligence is **instance-owned** and shared ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). It is not duplicated into every Organization. Global ownership does **not** make the catalog publicly accessible. Raw snapshot bytes stay in private object storage. Tenant **Findings** remain tenant-owned. Session 9 import must not query tenant package inventories and must not write Findings. Session 10 Batch 5B active-catalog membership is a global read of `IntelligenceSource`, the active `KevGeneration`, and at most two `KevEntry` rows. It accepts no `organizationId`, does not query Findings or Components, and does not prove tenant exposure.
+Normalized vulnerability intelligence is **instance-owned** and shared ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)). It is not duplicated into every Organization. Global ownership does **not** make the catalog publicly accessible. Raw snapshot bytes stay in private object storage. Tenant **Findings** remain tenant-owned. Session 9 import and Session 11 acquisition must not query tenant package inventories, must not send tenant PURLs, package names, or versions to a provider, and must not write Findings ([ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md)). Session 10 Batch 5B active-catalog membership is a global read of `IntelligenceSource`, the active `KevGeneration`, and at most two `KevEntry` rows. It accepts no `organizationId`, does not query Findings or Components, and does not prove tenant exposure.
 
 | Global / shared catalog | Tenant-owned |
 | --- | --- |
@@ -109,7 +109,7 @@ Do not include exploit payloads. Minimal fixtures only.
 4. On mismatch, the job **fails terminal** to the dead-letter path without mutating, and an operational metric fires. It does not "repair" by writing to the payload org.
 5. Process one organization's data per job.
 
-System jobs (Session 9 OSV/KEV catalog import, [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) have null organization and must **not** write tenant findings, enqueue `finding.recalculate`, or query tenant package inventories. A later correlation workflow may emit tenant-scoped outbox events per affected org/finding. Targeted package queries, if ever used, are **per-organization** jobs outside Session 9 import and must not persist tenant package names on global catalog rows.
+System jobs (Session 9 OSV/KEV catalog import, [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md); Session 11 acquisition direction, [ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md)) have null organization and must **not** write tenant findings, enqueue `finding.recalculate`, or query tenant package inventories. A later correlation workflow may emit tenant-scoped outbox events per affected org/finding. Tenant package query APIs are **rejected** for the approved foundation. Matching, when it exists later, reads the accepted local catalog and must not send tenant PURLs, package names, or versions to a provider.
 
 ## How cache keys include organization context
 

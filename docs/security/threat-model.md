@@ -23,11 +23,11 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 
 [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) records an import-only shared catalog. Session 9 is not complete. [ADR 0010](../adr/0010-osv-correlation.md) remains future correlation, not the import path.
 
-- Approved sources are OSV GCS bulk export (`all.zip` completeness baseline) and the CISA KEV JSON snapshot. Package-query APIs are not the catalog importer. OSV runtime remains disabled.
+- Session 9 recorded OSV GCS bulk export (`all.zip` completeness baseline) and the CISA KEV JSON snapshot. [ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md) does **not** approve `all.zip` for the first implementation. Tenant package-query APIs are rejected. OSV runtime remains disabled.
 - Provider responses are untrusted. Raw bodies belong in private object storage. PostgreSQL stores metadata, hashes, normalized revisions, and current projections. No public or signed snapshot URLs.
 - Partial normalization must never become the current catalog. Content SHA-256 is import idempotency. HTTP 304 is not product not-modified.
 - Session 9 must not match components, write Findings or FindingObservations, enrich findings, score, remediate, enqueue `finding.recalculate`, or query tenant inventories.
-- Parser isolation follows Session 8: parse outside transactions; `worker.terminate()` if termination is required; `Promise.race` is not a kill switch. Archive extraction limits are required; no archive dependency is selected yet.
+- Parser isolation follows Session 8: parse outside transactions; `worker.terminate()` if termination is required; `Promise.race` is not a kill switch. ZIP remains deferred and unauthorized; no archive dependency is selected or authorized.
 - Provider HTTP is allowlisted HTTPS (`node:https.request`) with redirects disabled, proxy environment ignored, and rejection of private, loopback, link-local, metadata-service, and other non-public destinations. Advisory reference URLs are never fetched.
 - DNS lookup pinning plus post-connect verification is implemented for CISA KEV. It is not DNSSEC.
 - The Batch 7B synchronization service exists. Batch 8B starts the worker scheduler, Outbox mapping, and BullMQ intelligence processor. Batch 9B adds authenticated sanitized provider-status GETs (`intelligence:read`; [ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)). Still absent: web dashboard, manual sync/retry, detailed SyncRun APIs, matching, and any Finding workflow. OD-10 remains open. Status GETs do not call CISA and do not write AuditEvent rows.
@@ -42,6 +42,15 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 - Unicode lookalikes, lowercase, and whitespace variants do not match the POSIX CHECK. They cannot collide with a canonical identity string.
 - KEV membership is read-time exact equality against the accepted active generation (Session 10 Batch 5B). Listing in KEV is active-catalog membership, not tenant exposure, and is not a Finding.
 - Session 10 remains zero-Finding. The identity migration must not write Findings, FindingObservations, Evidence, RiskCalculations, or `finding.recalculate`.
+
+## Session 11 status notes
+
+[ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md) selects OSV as the future affected-version authority and instance-owned catalog acquisition as the approved direction. Exact object/listing transport remains unreviewed. Implementation is not authorized until that review completes.
+
+- Tenant package query APIs are rejected. Tenant PURLs, package names, and versions must not be sent to a provider.
+- CISA KEV remains an independent exploitation signal. Tenant SBOMs remain inventory. OSV data alone does not prove tenant exposure and does not create a Finding.
+- ZIP remains absent and unauthorized. `all.zip` is not the first-implementation assumption. No archive dependency is authorized.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. No OSV runtime, matching, fan-out, or Finding write exists. Session 11 remains zero-Finding.
 
 ## Assets to protect
 
