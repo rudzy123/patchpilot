@@ -24,7 +24,7 @@
     "@patchpilot/observability": "workspace:*",
     "@patchpilot/sbom": "workspace:*",
     "@patchpilot/vulnerability-intelligence": "workspace:*",
-    "bullmq": "^5.66.4",
+    "bullmq": "^6.3.2",
     "ioredis": "^5.8.2"
   },
   "devDependencies": {
