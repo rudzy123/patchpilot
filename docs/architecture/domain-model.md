@@ -28,6 +28,8 @@ erDiagram
   Component ||--o{ ComponentOccurrence : appears_as
   ComponentOccurrence ||--o{ DependencyRelationship : from
   Vulnerability ||--o{ VulnerabilitySourceRecord : sourced_as
+  Vulnerability ||--o{ VulnerabilityCveIdentityLink : linked_as
+  CveIdentity ||--o{ VulnerabilityCveIdentityLink : has
   Organization ||--o{ Finding : owns
   Finding }o--|| Vulnerability : references
   Finding ||--o{ FindingObservation : observed_in
@@ -81,6 +83,8 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | ComponentOccurrence | | yes | | yes | no | yes | yes | Per **SBOMIngestion** |
 | DependencyRelationship | | yes | | yes | no | yes | yes | Observed edge per ingestion |
 | Vulnerability | yes | | | | current projection; withdrawn flag additive | additive | | Shared identity; unique `osvId` is a known later-migration constraint |
+| CveIdentity | yes | | | yes | no | yes | | One canonical CVE string; `createdAt` only |
+| VulnerabilityCveIdentityLink | yes | | | yes | no | yes | | Source-free advisory-to-CVE link; `linkedAt` only |
 | VulnerabilitySourceRecord | yes | | | yes | no | yes | yes | Never silent overwrite |
 | Finding | | yes | | | state | | yes | Current calc pointer may move |
 | FindingObservation | | yes | | yes | no | yes | yes | Per **SBOMIngestion** compare |
@@ -103,7 +107,9 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | Pair | Distinction |
 | --- | --- |
 | **Component** vs **ComponentOccurrence** | Versionless package identity vs this package **version** listed in **this ingestion** |
-| **Vulnerability** vs **Finding** | Shared intel vs tenant+asset observation of it. Session 9 import must not create Findings. |
+| **Vulnerability** vs **CveIdentity** | OSV-keyed advisory row vs one canonical CVE string. Sharing a CVE does not merge advisories. |
+| **CveIdentity** vs KEV membership | Identity is the CVE string. Session 10 Batch 5B derives **active-catalog membership** by exact read-time equality of that string against active `KevEntry.normalizedCve`. Membership is not tenant exposure, not a Finding, and does not require an identity row. |
+| **Vulnerability** vs **Finding** | Shared intel vs tenant+asset observation of it. Session 9 import must not create Findings. Session 10 remains zero-Finding. |
 | **VulnerabilitySourceRecord** vs **Vulnerability** | Immutable normalized source revision vs mutable current projection activated only after a complete source unit succeeds. Repeated retrieval of unchanged bytes is not a new revision; a newer `normalizationVersion` may create one. Withdrawal and missing-from-authoritative-snapshot are separate facts. |
 | Vulnerability **severity** vs **priority** | Source fact vs calculated ranking |
 | **Finding** vs **FindingObservation** | Stable identity vs per-ingestion presence/absence/inconclusive (a **calculated** compare result) |
@@ -401,6 +407,27 @@ Normalized, **shared catalog** current projection for a vulnerability identity (
 
 This row is a current projection. Authoritative provenance lives on **VulnerabilitySourceRecord**. Future **Finding** identity uses `osvId` (internal `id` as FK). `cveId` and `aliases` may appear later; adding a CVE must **not** change finding identity or create a second finding.
 
+## CveIdentity
+
+Global, instance-owned canonical CVE registry. One row per exact `CVE-[0-9]{4}-[0-9]{4,19}` string. Session 10 Batch 3B applied and froze this as `cve_identity` (`20260902120000_canonical_cve_identity`, SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). The table is append-only. It has no organization, provider, KEV, Finding, or Component fields. `createdAt` is the only timestamp and is database-generated. Session 10 Batch 4B implements `createCveIdentityPersistence` insert-once adapters. Unique conflicts reload the stored row. Batch lookup is bounded to 100 inputs. Session 10 Batch 5B derives active-catalog membership for one exact canonical CVE without reading or writing this table. A CVE may be listed in the accepted KEV generation with no `CveIdentity` row. The persistent development database has eleven finished migrations.
+
+| Field (logical) | Notes |
+| --- | --- |
+| `id` | UUID |
+| `cve` | Exact canonical CVE; globally unique; SQL CHECK; `VARCHAR(28)` |
+| `createdAt` | Insert timestamp |
+
+## VulnerabilityCveIdentityLink
+
+Append-only many-to-many between an existing **Vulnerability** advisory and a **CveIdentity**. The logical link is source-free. `linkedAt` is the only timestamp and is supplied by the ensure command; existing values are never overwritten. Multiple advisories may share one CVE without merging. One advisory may link to more than one CVE. Session 10 Batch 3B completed a canonical-only backfill of exact values already stored in `vulnerability.cve_id`. Malformed legacy values remain unchanged and unlinked. No Vulnerability merge occurred. `osvId` remains required and unique. `cveId` remains unchanged. `KevEntry` remains unchanged. Batch 4B keyset listing is ordered by `cveIdentityId` and bounded 1–100. Invalid limits are rejected.
+
+| Field (logical) | Notes |
+| --- | --- |
+| `id` | UUID |
+| `vulnerabilityId` | Existing advisory |
+| `cveIdentityId` | Canonical identity |
+| `linkedAt` | Association-establishment timestamp |
+
 ## VulnerabilitySourceRecord
 
 An **immutable normalized source revision**, not a retrieval log and not a raw provider body. Raw bodies belong in private object storage; PostgreSQL stores hashes, metadata, and the normalized revision. Uniqueness is `(source, sourceIdentity, payloadSha256, normalizationVersion)`. The same source bytes may be normalized again by a newer normalizer. Repeated retrieval of unchanged content does not need another revision. Content SHA-256 is import idempotency until conditional GET is separately verified.
@@ -531,7 +558,7 @@ Global catalog row for a named provider (`osv`, `cisa_kev`, `reserved`). Not ten
 
 ## IntelligenceSource
 
-System synchronization state for OSV and CISA KEV. Not a tenant installation. `providerKey` is `osv` or `cisa_kev`. Last-sync timestamps and later verified conditional-request metadata live here, not on **Integration**. Session 9 Batch 8B runs scheduled CISA KEV import in `apps/worker`. Authenticated provider-status GETs ([ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)) expose a derived `healthStatus`. Public `degraded` is computed from the active generation, last successful synchronization, a later failure timestamp, and stale-threshold precedence (stale wins). Persisted `IntelligenceSource.state` is reconciled to `enabled` or `disabled`; it is not the public degraded flag. OSV runtime, matching, and Findings remain **not implemented**. Do not treat stored cursors or ETags as a provider guarantee. Provider freshness must not advance after a partial source unit.
+System synchronization state for OSV and CISA KEV. Not a tenant installation. `providerKey` is `osv` or `cisa_kev`. Last-sync timestamps and later verified conditional-request metadata live here, not on **Integration**. Session 9 Batch 8B runs scheduled CISA KEV import in `apps/worker`. Authenticated provider-status GETs ([ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)) expose a derived `healthStatus`. Public `degraded` is computed from the active generation, last successful synchronization, a later failure timestamp, and stale-threshold precedence (stale wins). Persisted `IntelligenceSource.state` is reconciled to `enabled` or `disabled`; it is not the public degraded flag. Session 10 Batch 5B derives active-catalog membership from the accepted active generation pointer; that read is not a Finding and is not tenant exposure. OSV runtime, matching, and Findings remain **not implemented**. Do not treat stored cursors or ETags as a provider guarantee. Provider freshness must not advance after a partial source unit.
 
 ## Integration
 

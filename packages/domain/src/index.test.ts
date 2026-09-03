@@ -13,6 +13,9 @@ import {
   intelligenceSyncRunStates,
   intelligenceSyncRunTerminalStates,
   kevGenerationStates,
+  kevMembershipStatuses,
+  forbiddenIdentityFieldNames,
+  CVE_IDENTITY_BATCH_LOOKUP_MAX,
   MAX_PAGE_SIZE,
   membershipRoles,
   MIN_PAGE_SIZE,
@@ -88,6 +91,27 @@ describe('lifecycle catalogs', () => {
       'abandoned',
     ]);
     expect(intelligenceSyncRunStates).not.toContain('match');
+  });
+
+  it('exposes canonical CVE identity without Finding or tenant fields', () => {
+    expect(CVE_IDENTITY_BATCH_LOOKUP_MAX).toBe(100);
+    expect(kevMembershipStatuses).toEqual(['unavailable', 'absent', 'listedInActiveKev']);
+    expect(forbiddenIdentityFieldNames).toContain('organizationId');
+    expect(forbiddenIdentityFieldNames).toContain('findingId');
+    expect(forbiddenIdentityFieldNames).toContain('osvId');
+  });
+
+  it('exports the active-catalog membership use case and closed freshness values', async () => {
+    const domainPublic = await import('./index.js');
+    expect('createQueryActiveKevMembershipUseCase' in domainPublic).toBe(true);
+    expect('parseQueryActiveKevMembershipInput' in domainPublic).toBe(true);
+    expect('deriveActiveKevCatalogFreshness' in domainPublic).toBe(true);
+    expect('boundCveIdentityListLimit' in domainPublic).toBe(false);
+    expect(domainPublic.activeKevCatalogFreshnessValues).toEqual([
+      'current',
+      'stale',
+      'disabled_with_history',
+    ]);
   });
 });
 

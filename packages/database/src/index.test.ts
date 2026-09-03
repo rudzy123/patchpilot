@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -126,5 +126,32 @@ describe('outbox claim SQL', () => {
     );
     expect(source).toMatch(/WHERE "status" = 'pending'[\s\S]*?FOR UPDATE SKIP LOCKED/);
     expect(source).toMatch(/WHERE "status" = 'claimed'[\s\S]*?FOR UPDATE SKIP LOCKED/);
+  });
+});
+
+describe('Session 10 Batch 4B public exports', () => {
+  const srcDir = path.dirname(fileURLToPath(import.meta.url));
+
+  it('exports the CVE identity factory and not mapper internals', () => {
+    expect(existsSync(path.join(srcDir, 'cve-identity-persistence.ts'))).toBe(true);
+    expect(existsSync(path.join(srcDir, 'cve-identity-mappers.ts'))).toBe(true);
+    expect('createCveIdentityPersistence' in databasePublic).toBe(true);
+    expect('mapCveIdentity' in databasePublic).toBe(false);
+    expect('mapVulnerabilityCveIdentityLink' in databasePublic).toBe(false);
+    expect('CveIdentityMappingError' in databasePublic).toBe(false);
+    expect('PrismaCveIdentityPersistence' in databasePublic).toBe(false);
+    expect('uniqueTargetTokens' in databasePublic).toBe(false);
+  });
+});
+
+describe('Session 10 Batch 5B public exports', () => {
+  const srcDir = path.dirname(fileURLToPath(import.meta.url));
+
+  it('exports the active KEV membership factory and not query internals', () => {
+    expect(existsSync(path.join(srcDir, 'active-kev-membership.ts'))).toBe(true);
+    expect('createActiveKevMembershipPersistence' in databasePublic).toBe(true);
+    expect('PrismaActiveKevMembershipPersistence' in databasePublic).toBe(false);
+    expect('mapLoadedSource' in databasePublic).toBe(false);
+    expect('SOURCE_SELECT' in databasePublic).toBe(false);
   });
 });

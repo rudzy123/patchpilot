@@ -13,14 +13,15 @@ PatchPilot uses **forward-only** Prisma migrations against PostgreSQL.
 7. Session 7 asset inventory constraints are `20260828120000_asset_inventory_constraints`: the default Asset list keyset index (`asset_org_status_name_id_idx`), drop of redundant `asset_org_status_idx`, and `AssetExternalIdentifier` namespace/value CHECKs.
 8. Session 8 graph persistence is `20260830120000_sbom_ingestion_graph_persistence`. It is frozen. Do not edit it. Any SQL correction requires another forward-only migration.
 9. Session 9 KEV intelligence persistence is `20260901120000_kev_intelligence_persistence`. It is frozen. Do not edit it. Any SQL correction requires another forward-only migration.
-10. Do not edit Session 3, Session 5, Session 6, Session 7, Session 8, Session 9, or the committed correction migration files. Those SQL files are the authoritative extras (checks, partial unique indexes, triggers). There is no separately applied `prisma/sql/*.sql` extras source.
-11. There is no down migration. Rollback is restore-from-backup or a **forward-fix** migration.
+10. Session 10 canonical CVE identity is `20260902120000_canonical_cve_identity`. Batch 3B applied it to the persistent development database (eleven finished migrations) and froze it. Frozen SHA-256: `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`. Do not edit it. Any SQL correction requires another forward-only migration. Batch 4B adds persistence adapters only; it does not change this migration. The header comments inside that frozen `migration.sql` refer to the historical Batch 3A stage before independent review, persistent application, and freeze. Those comments must not be edited because their bytes are covered by the frozen SHA-256.
+11. Do not edit Session 3, Session 5, Session 6, Session 7, Session 8, Session 9, Session 10, or the committed correction migration files. Those SQL files are the authoritative extras (checks, partial unique indexes, triggers). There is no separately applied `prisma/sql/*.sql` extras source.
+12. There is no down migration. Rollback is restore-from-backup or a **forward-fix** migration.
 
 ## Paths
 
 ### Clean database
 
-`pnpm db:migrate:deploy` on an empty database applies Session 3, Session 5, the Session 5 corrective migrations, Session 6 authentication persistence, Session 7 asset inventory constraints, Session 8 graph persistence, then Session 9 KEV intelligence persistence. The placeholder table exists only between Session 3 and Session 5.
+`pnpm db:migrate:deploy` on an empty database applies Session 3, Session 5, the Session 5 corrective migrations, Session 6 authentication persistence, Session 7 asset inventory constraints, Session 8 graph persistence, Session 9 KEV intelligence persistence, then Session 10 canonical CVE identity. Isolated migration tests use that eleven-migration sequence. The persistent development database has those eleven frozen migrations, including `20260902120000_canonical_cve_identity`. The placeholder table exists only between Session 3 and Session 5.
 
 ### Upgrade from Session 3
 
@@ -28,23 +29,27 @@ A database that already has `SchemaFoundation` applies `20260827120000_tenant_mo
 
 ### Upgrade from Session 5
 
-A database that already has `20260827120000_tenant_model` applies `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, `20260827160000_policy_creator_membership`, `20260827170000_audit_actor_anonymous`, `20260827180000_local_credentials_and_sessions`, `20260828120000_asset_inventory_constraints`, `20260830120000_sbom_ingestion_graph_persistence`, and `20260901120000_kev_intelligence_persistence`. Do not reset the database or delete Docker volumes.
+A database that already has `20260827120000_tenant_model` applies `20260827140000_review_corrections`, `20260827150000_evidence_export_snapshot_chk`, `20260827160000_policy_creator_membership`, `20260827170000_audit_actor_anonymous`, `20260827180000_local_credentials_and_sessions`, `20260828120000_asset_inventory_constraints`, `20260830120000_sbom_ingestion_graph_persistence`, `20260901120000_kev_intelligence_persistence`, and `20260902120000_canonical_cve_identity`. Do not reset the database or delete Docker volumes.
 
 ### Upgrade from Session 5 after policy-creator membership
 
-A database that already has `20260827160000_policy_creator_membership` applies the two Session 6 authentication migrations, `20260828120000_asset_inventory_constraints`, `20260830120000_sbom_ingestion_graph_persistence`, and `20260901120000_kev_intelligence_persistence`. Existing tenant `user` audit rows receive `actor_user_id` from `membership` during that migration. The append-only trigger is disabled only for that backfill and is re-enabled before the migration completes. Runtime UPDATE/DELETE of `audit_event` remains forbidden.
+A database that already has `20260827160000_policy_creator_membership` applies the two Session 6 authentication migrations, `20260828120000_asset_inventory_constraints`, `20260830120000_sbom_ingestion_graph_persistence`, `20260901120000_kev_intelligence_persistence`, and `20260902120000_canonical_cve_identity`. Existing tenant `user` audit rows receive `actor_user_id` from `membership` during that migration. The append-only trigger is disabled only for that backfill and is re-enabled before the migration completes. Runtime UPDATE/DELETE of `audit_event` remains forbidden.
 
 ### Upgrade from Session 6 (current main)
 
-A database that already has `20260827180000_local_credentials_and_sessions` applies `20260828120000_asset_inventory_constraints`, `20260830120000_sbom_ingestion_graph_persistence`, and `20260901120000_kev_intelligence_persistence`. Do not reset the database or delete Docker volumes.
+A database that already has `20260827180000_local_credentials_and_sessions` applies `20260828120000_asset_inventory_constraints`, `20260830120000_sbom_ingestion_graph_persistence`, `20260901120000_kev_intelligence_persistence`, and `20260902120000_canonical_cve_identity`. Do not reset the database or delete Docker volumes.
 
 ### Upgrade from Session 7
 
-A database that already has `20260828120000_asset_inventory_constraints` applies `20260830120000_sbom_ingestion_graph_persistence` then `20260901120000_kev_intelligence_persistence`. Existing completed ingestion rows without graph completeness evidence fail the Session 8 migration rather than receiving invented counts. Do not reset the database or delete Docker volumes.
+A database that already has `20260828120000_asset_inventory_constraints` applies `20260830120000_sbom_ingestion_graph_persistence`, `20260901120000_kev_intelligence_persistence`, then `20260902120000_canonical_cve_identity`. Existing completed ingestion rows without graph completeness evidence fail the Session 8 migration rather than receiving invented counts. Do not reset the database or delete Docker volumes.
 
 ### Upgrade from Session 8
 
-A database that already has `20260830120000_sbom_ingestion_graph_persistence` applies only `20260901120000_kev_intelligence_persistence`. The migration adds KEV intelligence tables and additive `intelligence_source` columns. It does not rewrite Vulnerability or Finding rows. Do not reset the database or delete Docker volumes.
+A database that already has `20260830120000_sbom_ingestion_graph_persistence` applies `20260901120000_kev_intelligence_persistence` then `20260902120000_canonical_cve_identity`. The Session 9 migration adds KEV intelligence tables and additive `intelligence_source` columns. It does not rewrite Vulnerability or Finding rows. Do not reset the database or delete Docker volumes.
+
+### Upgrade from Session 9
+
+A database that already has `20260901120000_kev_intelligence_persistence` applies only `20260902120000_canonical_cve_identity`. The migration creates two global append-only tables, a canonical CVE CHECK, and backfills only exact canonical values already stored in `vulnerability.cve_id`. Malformed legacy `cve_id` values remain unlinked and unchanged. Vulnerability rows are not merged. `osv_id` and `cve_id` are not rewritten. KEV and Finding tables are unchanged. Isolated tests cover this path. Batch 3B applied and froze this migration on the persistent development database. Do not reset the database or delete Docker volumes.
 
 ## Locks and transactions
 
