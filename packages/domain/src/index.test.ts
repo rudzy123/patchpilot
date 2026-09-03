@@ -106,6 +106,7 @@ describe('lifecycle catalogs', () => {
     expect('createQueryActiveKevMembershipUseCase' in domainPublic).toBe(true);
     expect('parseQueryActiveKevMembershipInput' in domainPublic).toBe(true);
     expect('deriveActiveKevCatalogFreshness' in domainPublic).toBe(true);
+    expect('boundCveIdentityListLimit' in domainPublic).toBe(false);
     expect(domainPublic.activeKevCatalogFreshnessValues).toEqual([
       'current',
       'stale',

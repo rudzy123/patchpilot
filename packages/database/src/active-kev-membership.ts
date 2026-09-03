@@ -27,7 +27,6 @@ type SelectedEntry = {
 };
 
 type SelectedGeneration = {
-  id: string;
   providerKey: string;
   sourceIdentifier: string;
   state: string;
@@ -39,7 +38,6 @@ type SelectedGeneration = {
 
 type SelectedSource = {
   providerKey: string;
-  state: string;
   lastSuccessfulSyncAt: Date | null;
   activeGenerationId: string | null;
   activeGeneration: SelectedGeneration | null;
@@ -166,12 +164,10 @@ class PrismaActiveKevMembershipPersistence implements ActiveKevMembershipReadPor
         where: { providerKey: CISA_KEV_PROVIDER },
         select: {
           providerKey: true,
-          state: true,
           lastSuccessfulSyncAt: true,
           activeGenerationId: true,
           activeGeneration: {
             select: {
-              id: true,
               providerKey: true,
               sourceIdentifier: true,
               state: true,

@@ -36,6 +36,7 @@ function entryRow(
 }
 
 function generationRow(overrides?: {
+  id?: string;
   state?: string;
   providerKey?: string;
   sourceIdentifier?: string;
@@ -45,7 +46,7 @@ function generationRow(overrides?: {
   entries?: ReturnType<typeof entryRow>[];
 }) {
   return {
-    id: GENERATION_ID,
+    id: overrides?.id ?? GENERATION_ID,
     providerKey: overrides?.providerKey ?? 'cisa_kev',
     sourceIdentifier: overrides?.sourceIdentifier ?? 'cisa_kev_json_catalog',
     state: overrides?.state ?? 'active',
@@ -168,6 +169,23 @@ describe('active KEV membership adapter queries', () => {
       };
     };
     expect(args.where).toEqual({ providerKey: 'cisa_kev' });
+    expect(Object.keys(args.select).sort()).toEqual([
+      'activeGeneration',
+      'activeGenerationId',
+      'lastSuccessfulSyncAt',
+      'providerKey',
+    ]);
+    expect(args.select).not.toHaveProperty('state');
+    expect(Object.keys(args.select.activeGeneration.select).sort()).toEqual([
+      'catalogReleasedAt',
+      'catalogVersion',
+      'entries',
+      'expectedEntryCount',
+      'providerKey',
+      'sourceIdentifier',
+      'state',
+    ]);
+    expect(args.select.activeGeneration.select).not.toHaveProperty('id');
     expect(args.select.activeGeneration.select.entries.where).toEqual({ normalizedCve: CVE_A });
     expect(args.select.activeGeneration.select.entries.take).toBe(2);
     expect(Object.keys(args.select.activeGeneration.select.entries.select).sort()).toEqual([
@@ -357,5 +375,55 @@ describe('activation-race query pinning', () => {
     if (result.ok && result.value.kind === 'present') {
       expect(result.value.catalogVersion).toBe(CATALOG_VERSION);
     }
+  });
+
+  it('keeps a self-consistent observation when activation switches during a split nested read', async () => {
+    const g1Id = GENERATION_ID;
+    const g2Id = '22222222-2222-4222-8222-222222222222';
+    const g1 = generationRow({
+      id: g1Id,
+      catalogVersion: '2099.10.01',
+      catalogReleasedAt: new Date('2026-01-01T00:00:00.000Z'),
+      entries: [entryRow({ dateAdded: '2024-01-15', dueDate: '2024-02-15' })],
+    });
+    const g2 = generationRow({
+      id: g2Id,
+      catalogVersion: '2099.10.02',
+      catalogReleasedAt: new Date('2026-06-01T00:00:00.000Z'),
+      entries: [entryRow({ dateAdded: '2024-06-01', dueDate: '2024-07-01' })],
+    });
+    const store = {
+      activeGenerationId: g1Id,
+      generations: new Map([
+        [g1Id, g1],
+        [g2Id, g2],
+      ]),
+    };
+    let releaseNested!: () => void;
+    const nestedGate = new Promise<void>((resolve) => {
+      releaseNested = resolve;
+    });
+    const fake = createFakePrisma();
+    fake.intelligenceSource.findUnique.mockImplementation(async () => {
+      const observedGenerationId = store.activeGenerationId;
+      await nestedGate;
+      const generation = store.generations.get(observedGenerationId);
+      return sourceRow({
+        activeGenerationId: observedGenerationId,
+        activeGeneration: generation ?? null,
+      });
+    });
+    const pending = persistenceFor(fake).loadActiveKevMembershipSnapshot(requireCve());
+    store.activeGenerationId = g2Id;
+    releaseNested();
+    const result = await pending;
+    expect(result.ok && result.value.kind).toBe('present');
+    if (result.ok && result.value.kind === 'present') {
+      expect(result.value.catalogVersion).toBe('2099.10.01');
+      expect(result.value.dateAdded).toBe('2024-01-15');
+      expect(result.value.dueDate).toBe('2024-02-15');
+      expect(result.value.catalogVersion).not.toBe('2099.10.02');
+    }
+    expect(fake.intelligenceSource.findUnique).toHaveBeenCalledTimes(1);
   });
 });

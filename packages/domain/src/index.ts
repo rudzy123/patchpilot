@@ -908,7 +908,6 @@ export {
   ACTIVE_KEV_MEMBERSHIP_UNAVAILABLE,
   ACTIVE_KEV_UNAVAILABLE_REASON,
   activeKevCatalogFreshnessValues,
-  boundCveIdentityListLimit,
   createAbsentActiveKevMembership,
   createCveIdentityRecord,
   createListedInActiveKevMembership,

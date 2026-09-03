@@ -165,6 +165,7 @@ async function seedCatalog(
   input: {
     state: 'staging' | 'complete' | 'active';
     catalogVersion?: string;
+    catalogReleasedAt?: Date;
     cves: readonly string[];
     lastSuccessfulSyncAt?: Date;
   },
@@ -184,10 +185,21 @@ async function seedCatalog(
     });
   }
   if (input.state !== 'staging') {
-    await completeGeneration(prisma, generation.id, {
-      catalogVersion: input.catalogVersion ?? CATALOG_VERSION,
-      expectedEntryCount: input.cves.length,
-    });
+    const catalogReleasedAt = input.catalogReleasedAt;
+    await completeGeneration(
+      prisma,
+      generation.id,
+      catalogReleasedAt === undefined
+        ? {
+            catalogVersion: input.catalogVersion ?? CATALOG_VERSION,
+            expectedEntryCount: input.cves.length,
+          }
+        : {
+            catalogVersion: input.catalogVersion ?? CATALOG_VERSION,
+            expectedEntryCount: input.cves.length,
+            catalogReleasedAt,
+          },
+    );
   }
   if (input.state === 'active') {
     await activateGeneration(prisma, generation.id);
@@ -250,6 +262,7 @@ async function captureCounts(prisma: PrismaClient): Promise<CountSnapshot> {
 
 describe('active KEV membership persistence', { timeout: 120_000 }, () => {
   let databaseName: string;
+  let databaseUrl: string;
   let admin: PrismaClient;
   let prisma: PrismaClient;
   let port: ActiveKevMembershipReadPort;
@@ -262,6 +275,7 @@ describe('active KEV membership persistence', { timeout: 120_000 }, () => {
   beforeAll(async () => {
     const ephemeral = await createEphemeralDatabase('it');
     databaseName = ephemeral.databaseName;
+    databaseUrl = ephemeral.databaseUrl;
     admin = ephemeral.admin;
     await deployMigrations(ephemeral.databaseUrl);
     prisma = new PrismaClient({
@@ -611,4 +625,205 @@ describe('active KEV membership persistence', { timeout: 120_000 }, () => {
     }
     await expectZeroFinding(before);
   });
+
+  it('asserts exact public membership output keys', async () => {
+    const useCase = createQueryActiveKevMembershipUseCase({
+      membership: port,
+      kevEnabled: true,
+      staleThresholdSeconds: THRESHOLD,
+      now: () => NOW,
+    });
+    const unavailable = requireOk(
+      await useCase.queryActiveKevMembership({ cve: CVE_A }),
+      'unavailable keys',
+    );
+    expect(unavailable.status).toBe('unavailable');
+    expect(Object.keys(unavailable).sort()).toEqual(['reason', 'status']);
+
+    await seedCatalog(prisma, { state: 'active', cves: [CVE_B] });
+    const absent = requireOk(await useCase.queryActiveKevMembership({ cve: CVE_A }), 'absent keys');
+    expect(absent.status).toBe('absent');
+    expect(Object.keys(absent).sort()).toEqual([
+      'catalogReleasedAt',
+      'catalogVersion',
+      'cve',
+      'freshness',
+      'status',
+    ]);
+    for (const field of FORBIDDEN_PUBLIC_FIELDS) {
+      expect(absent).not.toHaveProperty(field);
+    }
+
+    await clearActivePointer(prisma);
+    await prisma.kevGeneration.updateMany({
+      where: { state: 'active' },
+      data: { state: 'superseded', supersededAt: NOW },
+    });
+    await seedCatalog(prisma, { state: 'active', cves: [CVE_A] });
+    const listed = requireOk(await useCase.queryActiveKevMembership({ cve: CVE_A }), 'listed keys');
+    expect(listed.status).toBe('listedInActiveKev');
+    expect(Object.keys(listed).sort()).toEqual([
+      'catalogReleasedAt',
+      'catalogVersion',
+      'cve',
+      'dateAdded',
+      'freshness',
+      'kevDueDate',
+      'knownRansomwareCampaignUse',
+      'status',
+    ]);
+    for (const field of FORBIDDEN_PUBLIC_FIELDS) {
+      expect(listed).not.toHaveProperty(field);
+    }
+  });
+
+  it('rejects schema-illegal entry dates and fails closed on a constructible generation corruption', async () => {
+    const generation = await seedCatalog(prisma, { state: 'active', cves: [CVE_A] });
+    const entry = await prisma.kevEntry.findFirstOrThrow({
+      where: { generationId: generation.id, normalizedCve: CVE_A },
+    });
+    await expect(
+      prisma.$executeRaw`
+        INSERT INTO kev_entry (
+          generation_id, ordinal, normalized_cve, vendor_project, product, vulnerability_name,
+          date_added, short_description, required_action, due_date, known_ransomware_campaign_use
+        ) VALUES (
+          ${generation.id}::uuid, 99, ${CVE_C}, 'Synthetic Vendor', 'Synthetic Product', 'Synthetic',
+          ${'2024-13-01'}, 'Synthetic short description', 'Apply the vendor patch',
+          ${'2024-02-15'}, 'known'::"known_ransomware_campaign_use"
+        )
+      `,
+    ).rejects.toThrow();
+    const unchanged = await prisma.kevEntry.findUniqueOrThrow({ where: { id: entry.id } });
+    expect(unchanged.dateAdded).toBe('2024-01-15');
+
+    await prisma.$executeRaw`
+      UPDATE kev_generation
+      SET catalog_version = ${''}
+      WHERE id = ${generation.id}::uuid
+    `;
+    const before = await captureCounts(prisma);
+    const result = await port.loadActiveKevMembershipSnapshot(requireCve(CVE_A));
+    expect(result).toEqual({
+      ok: true,
+      value: { kind: 'inconsistent_active_generation' },
+    });
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain(generation.id);
+    expect(serialized).not.toContain('Synthetic Vendor');
+    expect(serialized).not.toContain(entry.id);
+    await expectZeroFinding(before);
+  });
+
+  it('does not mix generation metadata and entries when activation races an in-flight read', async () => {
+    const schema = readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), '../prisma/schema.prisma'),
+      'utf8',
+    );
+    expect(schema).not.toContain('relationJoins');
+    expect(schema).not.toMatch(/previewFeatures/);
+
+    const g1Released = new Date('2026-01-01T00:00:00.000Z');
+    const g2Released = new Date('2026-06-01T00:00:00.000Z');
+    const first = await seedCatalog(prisma, {
+      state: 'active',
+      cves: [CVE_A],
+      catalogVersion: '2099.10.01',
+      catalogReleasedAt: g1Released,
+    });
+    const second = await seedCatalog(prisma, {
+      state: 'complete',
+      cves: [CVE_B],
+      catalogVersion: '2099.10.02',
+      catalogReleasedAt: g2Released,
+    });
+
+    const locker = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+    let reader: PrismaClient | undefined;
+    let pending:
+      ReturnType<ActiveKevMembershipReadPort['loadActiveKevMembershipSnapshot']> | undefined;
+    try {
+      await prisma.$executeRaw`
+        CREATE OR REPLACE FUNCTION patchpilot_test_kev_entry_lock_barrier() RETURNS boolean
+        LANGUAGE plpgsql
+        AS $$
+        BEGIN
+          PERFORM pg_advisory_xact_lock(942001);
+          RETURN true;
+        END;
+        $$;
+      `;
+      await prisma.$executeRaw`ALTER TABLE kev_entry RENAME TO kev_entry_physical;`;
+      await prisma.$executeRaw`
+        CREATE VIEW kev_entry AS
+        SELECT * FROM kev_entry_physical
+        WHERE patchpilot_test_kev_entry_lock_barrier();
+      `;
+      reader = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+      const readerPort = createActiveKevMembershipPersistence(reader);
+      await locker.$executeRaw`SELECT pg_advisory_lock(942001)`;
+      pending = readerPort.loadActiveKevMembershipSnapshot(requireCve(CVE_A));
+      await waitUntilAdvisoryLockWait(prisma);
+      await clearActivePointer(prisma);
+      await supersedeGeneration(prisma, first.id);
+      await activateGeneration(prisma, second.id);
+      await pointAtGeneration(prisma, second.id, NOW);
+      await locker.$executeRaw`SELECT pg_advisory_unlock(942001)`;
+      const snapshot = requireOk(await pending, 'raced membership');
+      if (snapshot.kind === 'present') {
+        expect(snapshot.catalogVersion).toBe('2099.10.01');
+        expect(snapshot.catalogReleasedAt).toEqual(g1Released);
+        expect(snapshot.dateAdded).toBe('2024-01-15');
+        expect(snapshot.dueDate).toBe('2024-02-15');
+      } else if (snapshot.kind === 'absent') {
+        expect(snapshot.catalogVersion).toBe('2099.10.02');
+        expect(snapshot.catalogReleasedAt).toEqual(g2Released);
+      } else {
+        expect(snapshot.kind).toBe('inconsistent_active_generation');
+      }
+      expect(snapshot.kind).not.toBe('no_active_generation');
+      if (snapshot.kind === 'present') {
+        expect(snapshot.catalogVersion).not.toBe('2099.10.02');
+      }
+      if (snapshot.kind === 'absent') {
+        expect(snapshot.catalogVersion).not.toBe('2099.10.01');
+      }
+    } finally {
+      await locker.$executeRaw`SELECT pg_advisory_unlock_all()`;
+      if (pending !== undefined) {
+        await pending.catch(() => undefined);
+      }
+      await locker.$disconnect();
+      if (reader !== undefined) {
+        await reader.$disconnect();
+      }
+      await prisma.$executeRaw`DROP VIEW IF EXISTS kev_entry;`;
+      await prisma.$executeRaw`ALTER TABLE IF EXISTS kev_entry_physical RENAME TO kev_entry;`;
+      await prisma.$executeRaw`DROP FUNCTION IF EXISTS patchpilot_test_kev_entry_lock_barrier();`;
+      await prisma.$disconnect();
+      prisma = new PrismaClient({
+        datasources: { db: { url: databaseUrl } },
+      });
+      port = createActiveKevMembershipPersistence(prisma);
+    }
+  });
 });
+
+async function waitUntilAdvisoryLockWait(observer: PrismaClient): Promise<void> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const rows = await observer.$queryRaw<Array<{ waiting: bigint }>>`
+      SELECT count(*)::bigint AS waiting
+      FROM pg_locks
+      WHERE locktype = 'advisory'
+        AND granted = false
+        AND objid = 942001
+    `;
+    if ((rows[0]?.waiting ?? 0n) > 0n) {
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
+  }
+  throw new Error('timed out waiting for the membership read to block on the advisory lock');
+}
