@@ -225,10 +225,13 @@ Observation only. It is not part of versionless package identity.
 
 #### Qualifiers
 
-Excluded from the initial identity unless the ecosystem policy explicitly promotes a specific
-qualifier. Unknown or unreviewed qualifiers cause `indeterminate` or `unsupported` behavior when
-they can change package identity. Do **not** silently drop security-relevant qualifiers during
-matching.
+Excluded from the initial identity unless the ecosystem registry entry explicitly promotes a
+specific qualifier as identity.
+
+Unknown or unreviewed qualifiers that can change package identity return `unsupported`. Do **not**
+map them to `indeterminate` (reserved for unknown or unparsable tenant versions) or `not_affected`.
+Do **not** silently drop security-relevant qualifiers during matching. A qualifier may be ignored
+only when that registry entry explicitly classifies it as non-identity.
 
 Current SBOM inventory persistence strips qualifiers from the versionless Component PURL. That
 inventory behavior must not be reused as silent matching authorization.
@@ -530,8 +533,9 @@ Requirements:
 - versions preserved exactly within bounded input limits
 - ecosystem parser validates each version before evaluation
 - membership uses comparator-defined equality or canonical ecosystem-specific equality
-- malformed explicit versions make the affected entry invalid or indeterminate according to a
-  defined provider-data policy
+- malformed explicit versions make the affected entry invalid provider data: they must not be
+  activated as valid evaluator input, must not return `not_affected`, and must not be mapped to
+  `indeterminate` (reserved for unknown or unparsable tenant versions)
 - duplicate versions are normalized deterministically
 - no string trimming or coercion unless the ecosystem policy explicitly requires and records it
 - explicit versions do not override withdrawn status
@@ -684,21 +688,15 @@ Meaning:
 
 ### 16. Positive-proof contract
 
-Minimum future structured proof for `affected` must eventually bind:
+Minimum future structured proof for `affected` is assembled in two layers. This is a future
+match-evaluation output, not a Batch 1C implementation.
+
+Pure evaluator proof binds only:
 
 - evaluator version
-- evaluation timestamp
 - input fingerprint
-- tenant Organization ID
-- Asset ID
-- SBOM ingestion ID
-- Component ID
-- ComponentOccurrence ID
 - observed component version
 - normalized package identity
-- Vulnerability ID
-- VulnerabilitySourceRecord or future normalized provider revision ID
-- OSV advisory ID
 - provider revision/content identity
 - affected-package record ID
 - matched rule kind
@@ -706,7 +704,18 @@ Minimum future structured proof for `affected` must eventually bind:
 - matched event or explicit-version identity
 - normalization versions
 
-This is a future match-evaluation output, not a Batch 1C implementation.
+Orchestration-wrapped persisted evidence, under future ADR 0026, may additionally bind trusted
+tenant locators and catalog pointers that the pure evaluator must not accept or emit:
+
+- evaluation timestamp
+- tenant Organization ID
+- Asset ID
+- SBOM ingestion ID
+- Component ID
+- ComponentOccurrence ID
+- Vulnerability ID
+- VulnerabilitySourceRecord or future normalized provider revision ID
+- OSV advisory ID
 
 Do **not** include:
 

@@ -100,7 +100,7 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | ID | Topic | Status after Batch 1C |
 | --- | --- | --- |
 | Package identity | How a tenant component and an OSV affected package are compared | **Closed as architecture.** [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) selects an ecosystem-aware identity: closed ecosystem, normalized name, namespace when required, optional derived versionless PURL, and a normalization version. A free-form display name or unparsed PURL is not the authoritative key. |
-| PURL as sole identity | Versionless PURL as the only matching key | **Rejected** as sole identity. PURL remains a derived identifier and registry input. Conversion does not exist. |
+| PURL as sole identity | Versionless PURL as the only matching key | **Rejected** as sole identity. PURL remains a derived identifier and registry input. Conversion does not exist. Qualifiers are not automatic identity. Unknown or unreviewed identity-changing qualifiers return `unsupported`, not `indeterminate` or `not_affected`. |
 | Generic matchers | Package-name-only, lexical version, or one-semver-for-all comparison | **Rejected.** Unsupported ecosystems fail closed. |
 | Evaluator result model | Future affected-version evaluation statuses | **Closed as architecture.** Normal statuses are `affected`, `not_affected`, `indeterminate`, `unsupported`, and `withdrawn`. Invalid input and operational failures use `Result`/`AppError`. Evaluation remains zero-Finding in Session 11 and Session 12. |
 | Implemented ecosystems | Runtime registry contents | **Empty.** npm, PyPI, Maven, Go, NuGet, and crates.io are candidates to evaluate, not supported ecosystems. |

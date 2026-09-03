@@ -621,7 +621,7 @@ Not Batch 1B work:
 13. Prove zero-Finding behavior.
 14. Perform adversarial review.
 15. Enable OSV runtime only after all gates pass.
-16. Build ecosystem comparators later under ADR 0025.
+16. Build ecosystem comparators later in Session 12 under the accepted [ADR 0025](0025-ecosystem-aware-package-identity-and-version-evaluation.md) architecture. ADR 0025 does not itself implement a comparator.
 17. Build authoritative matching later.
 18. Build Finding writes still later under ADR 0026.
 
