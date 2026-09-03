@@ -2,7 +2,7 @@
 
 This document traces the v0.1 [MVP journey](../product/mvp-scope.md) through the modular monolith. It is a control-flow and evidence-flow description, not a network packet capture.
 
-Authorization context is established as in [tenant isolation](tenant-isolation.md). Limits and poison handling are in [SBOM ingestion](sbom-ingestion.md). Session 8 upload, parse, and graph persist follow [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md): stages `validate`, `parse`, and `persist_graph` only. Session 9 catalog import follows [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Batch 8B schedules KEV work and processes `intelligence.sync` on the shared worker queue. Batch 9B adds sanitized authenticated provider-status GETs ([ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)). Those GETs do not call CISA, Redis, BullMQ, MinIO, the parser, or the scheduler. Session 11 Batch 1B records OSV acquisition direction ([ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md)); no OSV runtime, ZIP, matching, or Finding write exists. Correlation, enrichment, scoring, findings, remediation, dashboards, and manual synchronization remain later additive workflows. Session 9 and Session 11 must not enqueue `finding.recalculate`. Session 8 has no web upload UI.
+Authorization context is established as in [tenant isolation](tenant-isolation.md). Limits and poison handling are in [SBOM ingestion](sbom-ingestion.md). Session 8 upload, parse, and graph persist follow [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md): stages `validate`, `parse`, and `persist_graph` only. Session 9 catalog import follows [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md). Batch 8B schedules KEV work and processes `intelligence.sync` on the shared worker queue. Batch 9B adds sanitized authenticated provider-status GETs ([ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)). Those GETs do not call CISA, Redis, BullMQ, MinIO, the parser, or the scheduler. Session 11 Batch 1B records OSV acquisition direction ([ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md)); Session 11 Batch 1C records fail-closed evaluation architecture ([ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md)); no OSV runtime, ZIP, comparator, evaluator, matching, or Finding write exists. Correlation, enrichment, scoring, findings, remediation, dashboards, and manual synchronization remain later additive workflows. Session 9 and Session 11 must not enqueue `finding.recalculate`. Session 8 has no web upload UI.
 
 ## End-to-end journey
 
@@ -98,12 +98,12 @@ PostgreSQL uniqueness and retry state remain authority. BullMQ delayed jobs are 
 
 ## 6. Correlate (future additive workflow, not Session 9 or Session 11)
 
-[ADR 0010](../adr/0010-osv-correlation.md) remains the future correlation ADR, not the Session 9 import mechanism and not the Session 11 acquisition mechanism. [ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md) rejects tenant package query APIs for the approved foundation.
+[ADR 0010](../adr/0010-osv-correlation.md) remains the future correlation ADR, not the Session 9 import mechanism and not the Session 11 acquisition mechanism. [ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md) rejects tenant package query APIs for the approved foundation. [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) defines ecosystem-aware identity and fail-closed evaluation. No evaluator exists.
 
-1. For each occurrence, build ecosystem + name + version or PURL.
-2. Match against the accepted **local** OSV catalog using recorded **method**. Current `VulnerabilityNormalizedJson.affectedPackages` is not matching authority.
+1. For each occurrence, map a resolved tenant observation to a closed-registry package identity. Unknown versions are `indeterminate`. Unsupported ecosystems are `unsupported`.
+2. Evaluate against the accepted **local** OSV catalog using a pinned provider revision. Current `VulnerabilityNormalizedJson.affectedPackages` is not matching authority. Do not return `not_affected` for unsupported, unknown, or malformed data.
 3. Do **not** query OSV with tenant packages on cache miss or otherwise. Tenant PURLs, package names, and versions must not leave the instance.
-4. Create or reuse **Finding** by stable identity only in a later Finding-lifecycle session. Add **FindingObservation** `present` in a transaction **without** HTTP I/O. Session 11 remains zero-Finding.
+4. Create or reuse **Finding** by stable identity only in a later Finding-lifecycle session. Add **FindingObservation** `present` in a transaction **without** HTTP I/O. Session 11 and Session 12 remain zero-Finding.
 5. Do not send original SBOM documents to OSV.
 
 ## 7. Enrich with CISA KEV (future, not Session 9)

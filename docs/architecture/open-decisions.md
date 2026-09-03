@@ -86,14 +86,27 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | Provider object export | Allowlisted HTTPS objects from a closed OSV-controlled host | **Preferred direction to investigate** for the first implementation. Not implemented. Arbitrary public bucket listing is not automatically safe. |
 | Per-advisory OSV API | Fetch by known instance-owned advisory ID | **Deferred** as a possible later reconciliation mechanism. Not a complete catalog. Must not accept tenant package identifiers. |
 | `all.zip` | OSV full-database ZIP export | **Not approved** for initial implementation. [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) completeness-baseline research remains historical context. |
-| Ecosystem archives | Per-ecosystem ZIP subsets | **Deferred.** Still require ZIP. Completeness and global deletion/withdrawal authority are unproven. Closed ecosystems belong to future ADR 0025. |
+| Ecosystem archives | Per-ecosystem ZIP subsets | **Deferred.** Still require ZIP. Completeness and global deletion/withdrawal authority are unproven. Closed ecosystems belong to [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md). |
 | Hybrid acquisition | Object export plus optional per-ID reconciliation, archive only after measured approval | **Permitted later refinement.** Must not include tenant package queries. |
 | ZIP / archive support | Archive extraction, ZIP dependency, compressed/expanded limits | **Deferred and not authorized.** No ZIP dependency. Not closed as implemented. |
 | OSV runtime | `INTELLIGENCE_OSV_ENABLED=true` | **Remains rejected** until transport, licensing, limits, parser, persistence, frozen migration, zero-Finding tests, runbooks, and adversarial review all pass. Batch 1B does not enable OSV. |
-| Matching completeness | Advisory-to-component version evaluation | **Not complete.** Session 11 remains zero-Finding. Matching is Session 12 or later. Package identity and comparators remain future ADR 0025. |
+| Matching completeness | Advisory-to-component version evaluation | **Not complete.** Session 11 remains zero-Finding. Matching is Session 12 or later. Package identity and fail-closed evaluation architecture are accepted by [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md). No comparator or evaluator exists. The implemented ecosystem set is empty. |
 | Provider ingestion completeness | OSV transport, parser, snapshots, generations, scheduler, worker | **Not complete.** No OSV runtime exists. |
 | Finding evidence and lifecycle | Match evidence, Finding writes, observations | **Remain for future ADR 0026.** Finding writes are Session 13 or later, subject to all gates. |
 | Full provider-neutral Vulnerability advisory identity | Replacing required unique `Vulnerability.osvId` | **Remains open** ([OD-19](#still-open)). This ADR does not make `osvId` nullable. |
+
+## Closed in Session 11 Batch 1C (ADR 0025)
+
+| ID | Topic | Status after Batch 1C |
+| --- | --- | --- |
+| Package identity | How a tenant component and an OSV affected package are compared | **Closed as architecture.** [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) selects an ecosystem-aware identity: closed ecosystem, normalized name, namespace when required, optional derived versionless PURL, and a normalization version. A free-form display name or unparsed PURL is not the authoritative key. |
+| PURL as sole identity | Versionless PURL as the only matching key | **Rejected** as sole identity. PURL remains a derived identifier and registry input. Conversion does not exist. |
+| Generic matchers | Package-name-only, lexical version, or one-semver-for-all comparison | **Rejected.** Unsupported ecosystems fail closed. |
+| Evaluator result model | Future affected-version evaluation statuses | **Closed as architecture.** Normal statuses are `affected`, `not_affected`, `indeterminate`, `unsupported`, and `withdrawn`. Invalid input and operational failures use `Result`/`AppError`. Evaluation remains zero-Finding in Session 11 and Session 12. |
+| Implemented ecosystems | Runtime registry contents | **Empty.** npm, PyPI, Maven, Go, NuGet, and crates.io are candidates to evaluate, not supported ecosystems. |
+| First ecosystem | Session 12 starting ecosystem | **Not selected.** OSV catalog measurements and affected-range inventory are absent. npm is the preferred candidate to evaluate first after those measurements. Session 12 should still implement one ecosystem first, with no generic fallback. |
+| GIT ranges | Commit ancestry matching | **Deferred / unsupported** in the initial matcher. Do not fetch repositories. Return `unsupported`. |
+| Finding writes from evaluation | Evaluator creating Findings | **Rejected.** Only a later deterministic `affected` result may eventually contribute, and only after ADR 0026 and explicit authorization. |
 
 ## Still open
 
@@ -110,7 +123,7 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | OD-12 | RepositoryConnection provider | GitHub is not MVP. | Persist the entity with status `not_configured`. No webhooks, no tokens, no repo API calls. |
 | OD-13 | Backup encryption and off-site copies | Operator responsibility for a self-hosted system. | Document duties in [deployment-model.md](deployment-model.md) and [retention-and-deletion.md](retention-and-deletion.md). Do not ship a hosted backup service. |
 | OD-14 | CycloneDX minor versions beyond 1.6 | Spec will evolve. | Allowlist 1.4, 1.5, and 1.6. New versions need an ADR and parser tests. |
-| OD-15 | Matching algorithm details beyond OSV ranges | PURL aliases, CPE, comparators, and fuzzy name match are high-risk. Package identity belongs to future ADR 0025. | Do not run matching in Session 9 or Session 11. Tenant package query APIs are rejected ([ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md)). No fuzzy name match. Do not match against current `affectedPackages` JSON. |
+| OD-15 | Matching algorithm details beyond OSV ranges | Identity and fail-closed results are accepted by [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md). Remaining: first ecosystem selection after OSV measurements, comparator implementation, exact event-edge proof, and numeric limits. | Do not run matching in Session 9 or Session 11. The implemented ecosystem set is empty. Tenant package query APIs are rejected ([ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md)). No fuzzy name match, generic semver, or lexical fallback. Do not match against current `affectedPackages` JSON. |
 | OD-16 | Reserved organization slugs | Product URL routing is not implemented. A unique slug is not enough to keep `api`, `health`, `login`, and similar names off tenant routes. | Document the gap; do not invent a reserved-slug list in the database until routing exists. |
 | OD-17 | MFA and account lockout | [ADR 0019](../adr/0019-local-password-sessions.md) specifies Argon2id and fail-closed login rate limits, not MFA or durable lockout. | Dual-key Redis login limits. No MFA. No lockout table. Revisit before treating the product as resistant to credential stuffing beyond those controls. |
 | OD-18 | Reverse-proxy trust hops | `trustProxy` remains false in Session 6. Production TLS topology is operator-specific. | Direct socket peer IP for login rate limits. Do not trust `X-Forwarded-For`. Document hops in a later ADR before enabling `trustProxy`. |

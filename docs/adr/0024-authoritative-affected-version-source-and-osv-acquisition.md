@@ -55,7 +55,7 @@ Session 11 Batch 1A established, and this ADR preserves:
 8. OSV catalog ingestion must exist before authoritative matching.
 9. Session 11 remains zero-Finding.
 10. Finding writes are deferred beyond Session 11.
-11. Package identity and comparator decisions belong to a future ADR 0025.
+11. Package identity and comparator decisions belong to ADR 0025.
 12. Finding evidence and lifecycle decisions belong to a future ADR 0026.
 
 Session 9 imports a global CISA KEV catalog. Session 10 persists canonical CVE identity and
@@ -202,7 +202,7 @@ guarantees, and not download authorization. This ADR does not repeat them as sel
 
 Reasons: still require ZIP handling; ecosystem subsets may not establish global deletion or
 withdrawal authority; completeness and removal semantics must be proven; closed ecosystem support
-belongs to future ADR 0025.
+belongs to [ADR 0025](0025-ecosystem-aware-package-identity-and-version-evaluation.md).
 
 #### Alternative 5: Provider object export over allowlisted HTTPS — **preferred direction to investigate**
 
@@ -386,8 +386,9 @@ evaluation. At minimum:
 
 Do **not** collapse ranges into one free-form `versionRange` string. Do **not** authorize matching
 directly against the current `VulnerabilityNormalizedJson.affectedPackages` shape. Do **not** rely
-on free-form JSON without strict versioned validation. Package identity and comparators remain
-deferred to ADR 0025. This ADR does not implement that schema.
+on free-form JSON without strict versioned validation. Package identity and comparators are
+specified by [ADR 0025](0025-ecosystem-aware-package-identity-and-version-evaluation.md). This ADR
+does not implement that schema.
 
 ### 11. Parser requirements
 
@@ -699,7 +700,7 @@ Open after Batch 1B:
 - numeric listing, object, parser, and worker limits
 - vendored or reviewed subset schema
 - snapshot and catalog-generation persistence (no SQL in this ADR)
-- ADR 0025: package identity, ecosystems, and comparators
+- [ADR 0025](0025-ecosystem-aware-package-identity-and-version-evaluation.md): package identity, ecosystems, and fail-closed evaluation (accepted in Session 11 Batch 1C; no evaluator exists)
 - ADR 0026: Finding evidence and lifecycle
 - [OD-19](../architecture/open-decisions.md) full provider-neutral `Vulnerability` advisory identity
 - ZIP/archive support, remaining deferred and unauthorized

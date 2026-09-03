@@ -12,7 +12,7 @@ Stable identity:
 
 `organizationId` + `assetId` + **versionless** component identity + vulnerability identity (**OSV id**).
 
-Versionless component identity is CycloneDX/PURL **type + namespace + name**, or ecosystem + namespace + name when no versionless PURL can be parsed. **Strip `@version`, qualifiers, and subpath** from a PURL before using it as identity. A versioned PURL (`pkg:npm/foo@1.2.3`) must not be the finding key — that would mint a new finding on every upgrade and break rescan.
+Versionless component identity is CycloneDX/PURL **type + namespace + name**, or ecosystem + namespace + name when no versionless PURL can be parsed, for **current inventory and Finding-identity sketches**. **Strip `@version` from a PURL** before using it as Component identity. Qualifiers and subpath are stripped in Session 8 inventory persistence; [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) forbids silently dropping security-relevant qualifiers during **matching**. Future matching identity is ecosystem-aware and registry-controlled. A versioned PURL (`pkg:npm/foo@1.2.3`) must not be the finding key — that would mint a new finding on every upgrade and break rescan. Finding identity remains future ADR 0026.
 
 CVE and GHSA aliases are **not** part of the identity key. If a CVE is published after the finding exists, update the **Vulnerability** aliases; do not open a second finding.
 

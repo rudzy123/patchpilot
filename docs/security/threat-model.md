@@ -52,6 +52,13 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 - ZIP remains absent and unauthorized. `all.zip` is not the first-implementation assumption. No archive dependency is authorized.
 - `INTELLIGENCE_OSV_ENABLED=true` remains rejected. No OSV runtime, matching, fan-out, or Finding write exists. Session 11 remains zero-Finding.
 
+[ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) records fail-closed package identity and evaluation architecture. No comparator or evaluator exists.
+
+- There is no generic name matcher, lexical version comparator, or universal semver implementation.
+- The implemented ecosystem set is empty. Unsupported ecosystems, GIT ranges, unknown versions, and malformed provider data must not become `not_affected`.
+- The future evaluator is tenant-agnostic and must not fetch PURL, advisory, or repository URLs.
+- Evaluation remains zero-Finding in Session 11 and Session 12.
+
 ## Assets to protect
 
 | Asset | Class | Why it matters |

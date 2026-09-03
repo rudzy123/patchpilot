@@ -56,7 +56,7 @@ If the diagram is not rendered, the sections below define each entity and its re
 | Tenant-owned | Row includes `organizationId`. Queries always apply that predicate from trusted context. |
 | Global / shared catalog | Instance-owned vulnerability intelligence, KEV snapshots, and built-in **RiskPolicy** definitions. Not tenant-owned and not publicly accessible. Session 9 import ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) writes this catalog only. Generic **Finding** rows exist but are unused by Session 9. |
 | Reference rule | Tenant **Finding** rows may store the UUID of a global **Vulnerability** or **VulnerabilitySourceRecord**. They must not copy another organization's findings. |
-| Soft identity of a finding | `organizationId` + `assetId` + **versionless** component identity + vulnerability identity (**OSV id**). CVE and other aliases are denormalized; they are **not** part of the identity key. New ingestions add **FindingObservation** rows rather than duplicating the finding when identity matches. Versionless identity means CycloneDX/PURL **type + namespace + name** (or ecosystem + namespace + name). Strip `@version` / `?` / subpath from PURLs before using them as finding or **Component** identity. |
+| Soft identity of a finding | `organizationId` + `assetId` + **versionless** component identity + vulnerability identity (**OSV id**). CVE and other aliases are denormalized; they are **not** part of the identity key. New ingestions add **FindingObservation** rows rather than duplicating the finding when identity matches. Current Component persistence uses a versionless PURL or ecosystem + namespace + name as **tenant inventory** identity. Future matching identity is the closed, ecosystem-aware model in [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md); a free-form display name or unparsed PURL is not the matching key. Finding lifecycle remains future ADR 0026. |
 | No cascade-delete of evidence | Foreign keys must not erase SBOMs, findings, audit events, or remediation records as a convenience. |
 
 **Component** identities derived from tenant SBOMs are **tenant-owned**. Private package names must not land in a global component catalog.
@@ -360,7 +360,7 @@ Tenant-owned package identity extracted from SBOMs.
 | `name` | Untrusted text |
 | `namespace` | Optional |
 
-Uniqueness is organization-scoped on a normalized **versionless** identity key (versionless PURL, or ecosystem + namespace + name). Version belongs on **ComponentOccurrence**. Names are never executed and are escaped in UI.
+Uniqueness is organization-scoped on a normalized **versionless** identity key (versionless PURL, or ecosystem + namespace + name). Version belongs on **ComponentOccurrence**. Names are never executed and are escaped in UI. This inventory identity is **not** the future matching identity in [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md). Matching must map a resolved observation through a closed ecosystem registry and must not silently reuse qualifier-stripped inventory PURLs as complete matching authorization.
 
 ## ComponentOccurrence
 
