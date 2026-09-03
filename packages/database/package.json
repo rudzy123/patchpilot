@@ -41,7 +41,7 @@
     "@patchpilot/test-utils": "workspace:*",
     "@patchpilot/typescript-config": "workspace:*",
     "@types/node": "^24.10.1",
-    "eslint": "^9.39.1",
+    "eslint": "^10.9.1",
     "prisma": "^6.19.0",
     "typescript": "~5.9.3",
     "vitest": "^4.1.11"
