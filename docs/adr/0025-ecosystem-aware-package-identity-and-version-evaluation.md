@@ -26,7 +26,7 @@ affected-version authority and instance-owned acquisition direction.
 It **closes** the package-identity and fail-closed evaluation portion of
 [OD-15](../architecture/open-decisions.md). Exact OSV event-edge behavior, comparator selection,
 numeric complexity limits, and the first implemented ecosystem remain future implementation work.
-Finding evidence and lifecycle remain future ADR 0026. Do not claim that ADR exists.
+Finding evidence and lifecycle are accepted by [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md). That ADR does not implement writes.
 
 ## What this ADR is and is not
 
@@ -60,7 +60,7 @@ preserved:
 9. Session 11 remains zero-Finding.
 10. Finding writes remain deferred beyond Session 11.
 11. This ADR governs package identity and affected-version evaluation.
-12. Future ADR 0026 will govern match evidence and Finding lifecycle.
+12. Match evidence and Finding lifecycle are governed by [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md).
 
 This ADR must not reverse or weaken those decisions.
 
@@ -97,8 +97,8 @@ Package identity and version comparison are **ecosystem-specific**.
 - Malformed provider data does **not** become `not_affected`.
 - Only a deterministic **affected** result may eventually contribute to Finding creation.
 - Evaluation itself remains read-only and zero-Finding in Session 11 and Session 12.
-- Finding creation remains governed by future ADR 0026 and a later explicit implementation
-  authorization.
+- Finding creation remains governed by [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md)
+  and a later explicit implementation authorization.
 
 This ADR does **not** claim that an evaluator exists.
 
@@ -568,7 +568,7 @@ Withdrawal does not:
 - automatically close Findings
 - remove historical provider snapshots
 
-Finding lifecycle remains future ADR 0026.
+Finding lifecycle is accepted by [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md). That ADR does not implement writes.
 
 ### 14. Unknown and malformed behavior
 
@@ -704,7 +704,7 @@ Pure evaluator proof binds only:
 - matched event or explicit-version identity
 - normalization versions
 
-Orchestration-wrapped persisted evidence, under future ADR 0026, may additionally bind trusted
+Orchestration-wrapped persisted evidence, under [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md), may additionally bind trusted
 tenant locators and catalog pointers that the pure evaluator must not accept or emit:
 
 - evaluation timestamp
@@ -739,7 +739,7 @@ Separation:
 - persisted match evidence includes tenant IDs
 
 Tenant IDs do **not** belong in the pure evaluator result. They belong in orchestration-wrapped
-persisted evidence under future ADR 0026.
+persisted evidence under [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md).
 
 ### 17. Purity and source boundaries
 

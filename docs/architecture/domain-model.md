@@ -56,7 +56,7 @@ If the diagram is not rendered, the sections below define each entity and its re
 | Tenant-owned | Row includes `organizationId`. Queries always apply that predicate from trusted context. |
 | Global / shared catalog | Instance-owned vulnerability intelligence, KEV snapshots, and built-in **RiskPolicy** definitions. Not tenant-owned and not publicly accessible. Session 9 import ([ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)) writes this catalog only. Generic **Finding** rows exist but are unused by Session 9. |
 | Reference rule | Tenant **Finding** rows may store the UUID of a global **Vulnerability** or **VulnerabilitySourceRecord**. They must not copy another organization's findings. |
-| Soft identity of a finding | `organizationId` + `assetId` + **versionless** component identity + vulnerability identity (**OSV id**). CVE and other aliases are denormalized; they are **not** part of the identity key. New ingestions add **FindingObservation** rows rather than duplicating the finding when identity matches. Current Component persistence uses a versionless PURL or ecosystem + namespace + name as **tenant inventory** identity. Future matching identity is the closed, ecosystem-aware model in [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md); a free-form display name or unparsed PURL is not the matching key. Finding lifecycle remains future ADR 0026. |
+| Soft identity of a finding | `organizationId` + `assetId` + `componentId` + `vulnerabilityId` ([ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md)). CVE, CveIdentity, ComponentOccurrence, SBOM, ingestion, OSV source revision, KEV membership, and package version are **not** part of the identity key. Existing uniqueness `finding_identity_key` already matches. New ingestions add **FindingObservation** rows rather than duplicating the finding when identity matches. Current Component persistence uses a versionless PURL or ecosystem + namespace + name as **tenant inventory** identity. Future matching identity is the closed, ecosystem-aware model in [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md); a free-form display name or unparsed PURL is not the matching key. Match-evaluation persistence and Finding writes remain unimplemented. |
 | No cascade-delete of evidence | Foreign keys must not erase SBOMs, findings, audit events, or remediation records as a convenience. |
 
 **Component** identities derived from tenant SBOMs are **tenant-owned**. Private package names must not land in a global component catalog.
@@ -106,13 +106,18 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 
 | Pair | Distinction |
 | --- | --- |
+| **Finding** vs **FindingObservation** | Stable identity vs per-ingestion presence/absence/inconclusive (a **calculated** compare result). Observations are append-only. |
+| **VulnerabilityMatchEvaluation** vs **Finding** | Future tenant-owned append-only evaluation of one occurrence against one pinned provider revision vs the stable tenant Finding. The evaluation model is **not** implemented. Only `affected` may eventually contribute to Finding creation. |
+| **VulnerabilityMatchEvaluation** vs **FindingObservation** | Per-occurrence evaluation proof vs one summarized Finding-level observation per ingestion |
+| **Vulnerability** vs **provider revision** | Advisory identity vs one immutable or generation-visible affected-data revision used for matching. Evaluations pin a revision; they never match "latest" without identity. |
 | **Component** vs **ComponentOccurrence** | Versionless package identity vs this package **version** listed in **this ingestion** |
 | **Vulnerability** vs **CveIdentity** | OSV-keyed advisory row vs one canonical CVE string. Sharing a CVE does not merge advisories. |
 | **CveIdentity** vs KEV membership | Identity is the CVE string. Session 10 Batch 5B derives **active-catalog membership** by exact read-time equality of that string against active `KevEntry.normalizedCve`. Membership is not tenant exposure, not a Finding, and does not require an identity row. |
-| **Vulnerability** vs **Finding** | Shared intel vs tenant+asset observation of it. Session 9 import must not create Findings. Session 10 remains zero-Finding. |
+| **Vulnerability** vs **Finding** | Shared intel vs tenant+asset observation of it. Session 9 import must not create Findings. Session 10, Session 11, and Session 12 remain zero-Finding. |
 | **VulnerabilitySourceRecord** vs **Vulnerability** | Immutable normalized source revision vs mutable current projection activated only after a complete source unit succeeds. Repeated retrieval of unchanged bytes is not a new revision; a newer `normalizationVersion` may create one. Withdrawal and missing-from-authoritative-snapshot are separate facts. |
 | Vulnerability **severity** vs **priority** | Source fact vs calculated ranking |
-| **Finding** vs **FindingObservation** | Stable identity vs per-ingestion presence/absence/inconclusive (a **calculated** compare result) |
+| **Finding** vs **RiskCalculation** | Tenant issue identity vs a later versioned score. Match evaluation does not create a RiskCalculation. |
+| **Finding** vs KEV membership | Proven affected-version issue vs a global exploitation signal that may be derived only after the Finding exists |
 | **SBOM** vs **SBOMIngestion** | Immutable original document vs one processing attempt (parser version, graph, observations) |
 | **RemediationTask** vs **RiskAcceptance** | Work tracking vs time-boxed acceptance of residual risk |
 | **Asset** vs **SBOM** | Inventoried system vs one evidence document |
@@ -448,15 +453,17 @@ Conflicting sources: retain both. A versioned policy may choose display preceden
 
 ## Finding
 
-Tenant-owned link between an asset's observed component identity and a **Vulnerability**, plus later enrichment pointers and the current workflow state. Generic persistence already exists. Session 9 must not create, update, close, or reopen Findings or FindingObservations, and must not enqueue `finding.recalculate`.
+Tenant-owned link between an asset's observed component identity and a **Vulnerability**, plus later enrichment pointers and the current workflow state. Generic persistence already exists. Session 9 must not create, update, close, or reopen Findings or FindingObservations, and must not enqueue `finding.recalculate`. Session 11 and Session 12 remain zero-Finding ([ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md)).
+
+Natural key: `organizationId` + `assetId` + `componentId` + `vulnerabilityId`. A Finding is one advisory affecting one versionless component on one tenant asset. Creation, when later authorized, requires a deterministic `affected` evaluation, append-only match evidence, and a `present` observation. KEV membership, CVE identity, unknown versions, and unsupported evaluation do not create Findings.
 
 Lifecycle: [finding-lifecycle.md](finding-lifecycle.md).
 
-Does not store a mutable "score" in place. Current priority comes from the latest **RiskCalculation** referenced by `currentRiskCalculationId`. Each calculation must store `policyVersion`, `policyDefinitionSha256`, `inputFingerprint`, full **contributingFactors**, intel source record ids used, **priorityBand**, due-date recommendation, and escalation recommendation.
+Does not store a mutable "score" in place. Current priority comes from the latest **RiskCalculation** referenced by `currentRiskCalculationId`. Each calculation must store `policyVersion`, `policyDefinitionSha256`, `inputFingerprint`, full **contributingFactors**, intel source record ids used, **priorityBand**, due-date recommendation, and escalation recommendation. Match evaluation does not create a RiskCalculation. `currentRiskCalculationId` may remain null. Provider catalog dates must not populate `Finding.dueAt`.
 
 ## FindingObservation
 
-Per-**SBOMIngestion** compare result for whether the finding's **versionless** component identity was present. The `result` is a **calculated conclusion**, not a raw SBOM field.
+Per-**SBOMIngestion** compare result for whether the finding's **versionless** component identity was present. The `result` is a **calculated conclusion**, not a raw SBOM field. Architecture: [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md). Rows are append-only. Ordinary application behavior never updates or deletes them. Ensure-by-natural-key is future work; no matching observation port exists today.
 
 | Field (logical) | Notes |
 | --- | --- |
@@ -465,12 +472,18 @@ Per-**SBOMIngestion** compare result for whether the finding's **versionless** c
 | `findingId` | |
 | `sbomId` | Denormalized |
 | `sbomIngestionId` | Required. Uniqueness: `(organizationId, findingId, sbomIngestionId)` |
-| `occurrenceId` | Optional if present (one representative occurrence; mixed versions use method `version_out_of_affected_range` / remain `present`) |
+| `occurrenceId` | Optional representative occurrence; the observation is Finding-level, not one row per occurrence |
 | `result` | `present`, `absent`, `inconclusive` — **calculated** from compare rules, stored with method |
-| `method` | For example `exact_purl`, `ecosystem_name_version`, `version_out_of_affected_range`, `missing_identity`, `incomplete_sbom_coverage` |
+| `method` | Closed, versioned catalog at implementation. Architectural examples: `affected_version_match`, `explicit_version_match`, `version_out_of_affected_range`, `component_not_observed`, `unsupported_ecosystem`, `unknown_version`, `insufficient_coverage`, `withdrawn_advisory` |
 | `observedAt` | UTC |
 
-`resolved` on the finding is a conclusion over the **current** ingestion's observation (latest SBOM `receivedAt` among `completed` ingestions), not a ticket field and not whichever ingestion finished last.
+`resolved` on the finding is a conclusion over the **current** ingestion's observation (`Asset.lastSuccessfulSbomIngestionId`: latest SBOM `receivedAt` among `completed` ingestions), not a ticket field and not whichever ingestion finished last.
+
+## VulnerabilityMatchEvaluation (future)
+
+Conceptual tenant-owned append-only evaluation of one **ComponentOccurrence** against one global **Vulnerability** under one pinned provider revision and one evaluator version ([ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md)). Statuses follow [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md): `affected`, `not_affected`, `indeterminate`, `unsupported`, `withdrawn`. Only `affected` may contribute to Finding creation. This model does **not** exist in schema, domain contracts, or repositories.
+
+Do not confuse it with **Finding**, **FindingObservation**, **RiskCalculation**, KEV membership, or an audit event.
 
 ## RiskPolicy
 

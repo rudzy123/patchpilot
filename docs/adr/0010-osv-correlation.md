@@ -12,7 +12,9 @@ Correlation needs ecosystem-aware version ranges and an open dataset. Extra prov
 
 ## Decision
 
-Use **OSV** as the initial **correlation** source. Worker adapters query allowlisted HTTPS APIs. Persist **Vulnerability** and **VulnerabilitySourceRecord** with provenance (`retrievedAt`, payload hash, source identity). Matching uses a **versioned** occurrence (versioned PURL or ecosystem+name+version) against OSV ranges; **Finding** identity stays **versionless** package identity + OSV id. No fuzzy name match. Do not upload original SBOMs to OSV. Updates are additive. Withdrawn advisories do not delete findings. Targeted package queries are org-scoped jobs and must not persist tenant names on the shared catalog.
+Use **OSV** as the initial **correlation** source. Worker adapters query allowlisted HTTPS APIs. Persist **Vulnerability** and **VulnerabilitySourceRecord** with provenance (`retrievedAt`, payload hash, source identity). Matching uses a **versioned** occurrence (versioned PURL or ecosystem+name+version) against OSV ranges. No fuzzy name match. Do not upload original SBOMs to OSV. Updates are additive. Withdrawn advisories do not delete findings. Targeted package queries are org-scoped jobs and must not persist tenant names on the shared catalog.
+
+This ADR remains the future correlation ADR and is **not** superseded. Later ADRs refine transport and identity without replacing that role: [ADR 0024](0024-authoritative-affected-version-source-and-osv-acquisition.md) rejects tenant package query APIs for the approved foundation; [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md) sets Finding natural key to `organizationId` + `assetId` + `componentId` + `vulnerabilityId` (advisory UUID, not an OSV id string column).
 
 ## Alternatives considered
 

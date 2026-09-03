@@ -92,7 +92,7 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | OSV runtime | `INTELLIGENCE_OSV_ENABLED=true` | **Remains rejected** until transport, licensing, limits, parser, persistence, frozen migration, zero-Finding tests, runbooks, and adversarial review all pass. Batch 1B does not enable OSV. |
 | Matching completeness | Advisory-to-component version evaluation | **Not complete.** Session 11 remains zero-Finding. Matching is Session 12 or later. Package identity and fail-closed evaluation architecture are accepted by [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md). No comparator or evaluator exists. The implemented ecosystem set is empty. |
 | Provider ingestion completeness | OSV transport, parser, snapshots, generations, scheduler, worker | **Not complete.** No OSV runtime exists. |
-| Finding evidence and lifecycle | Match evidence, Finding writes, observations | **Remain for future ADR 0026.** Finding writes are Session 13 or later, subject to all gates. |
+| Finding evidence and lifecycle | Match evidence, Finding writes, observations | **Architecture accepted** by [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md). Schema, persistence, ensure repositories, and lifecycle automation remain unimplemented. Finding writes are Session 13 or later, subject to all gates. ADR acceptance does not authorize writes. |
 | Full provider-neutral Vulnerability advisory identity | Replacing required unique `Vulnerability.osvId` | **Remains open** ([OD-19](#still-open)). This ADR does not make `osvId` nullable. |
 
 ## Closed in Session 11 Batch 1C (ADR 0025)
@@ -106,7 +106,22 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | Implemented ecosystems | Runtime registry contents | **Empty.** npm, PyPI, Maven, Go, NuGet, and crates.io are candidates to evaluate, not supported ecosystems. |
 | First ecosystem | Session 12 starting ecosystem | **Not selected.** OSV catalog measurements and affected-range inventory are absent. npm is the preferred candidate to evaluate first after those measurements. Session 12 should still implement one ecosystem first, with no generic fallback. |
 | GIT ranges | Commit ancestry matching | **Deferred / unsupported** in the initial matcher. Do not fetch repositories. Return `unsupported`. |
-| Finding writes from evaluation | Evaluator creating Findings | **Rejected.** Only a later deterministic `affected` result may eventually contribute, and only after ADR 0026 and explicit authorization. |
+| Finding writes from evaluation | Evaluator creating Findings | **Rejected.** Only a later deterministic `affected` result may eventually contribute, and only after ADR 0026 gates and explicit authorization. |
+
+## Closed in Session 11 Batch 1D (ADR 0026)
+
+| ID | Topic | Status after Batch 1D |
+| --- | --- | --- |
+| Finding natural key | Logical identity across rescans and upgrades | **Closed as architecture.** [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) selects `organizationId` + `assetId` + `componentId` + `vulnerabilityId`. Existing `finding_identity_key` already matches. ComponentOccurrence, SBOM, ingestion, CVE, CveIdentity, OSV revision, KEV, and package version are not part of the key. |
+| Match-evaluation evidence | Dedicated positive-match proof | **Closed conceptually.** Future tenant-owned append-only `VulnerabilityMatchEvaluation`. Not implemented. No schema, repository, or domain contract in Batch 1D. |
+| Match-evaluation persistence | Table, fingerprint, ensure | **Not implemented.** Bounded candidate comparisons only; no Cartesian product. |
+| FindingObservation semantics | One summarized observation per Finding per ingestion | **Closed as architecture.** Natural key `organizationId` + `findingId` + `sbomIngestionId` already exists. Results are `present`, `absent`, and `inconclusive`. Ensure repository remains absent. |
+| Current-ingestion authority | Which ingestion may update current Finding projection | **Specified, not consumed.** Use existing `Asset.lastSuccessfulSbomIngestionId` (greatest SBOM `receivedAt` among `completed` ingestions; tie-break ingestion `createdAt`, then id). Session 13 must apply this rule before Finding writes. Do not invent timestamp-only authority. |
+| Finding ensure and observation repositories | Idempotent create/reload | **Remain absent.** Generic `FindingRepository.create` is insufficient. |
+| Finding lifecycle automation | Create, observe, resolve, reopen | **Architecture accepted, runtime absent.** Session 11 and Session 12 remain zero-Finding. |
+| KEV-after-Finding projection | Membership on a proven Finding | **Deferred.** KEV may be derived only after an `affected` Finding exists. KEV still creates no Finding. |
+| Risk integration | Scoring from matching | **Deferred.** No `finding.recalculate`. No RiskCalculation from match evaluation. |
+| Finding writes | Production Finding creation | **Blocked.** Session 13 is the earliest candidate. All ADR 0026 gates remain required. ADR acceptance does not authorize writes. |
 
 ## Still open
 
@@ -123,7 +138,7 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | OD-12 | RepositoryConnection provider | GitHub is not MVP. | Persist the entity with status `not_configured`. No webhooks, no tokens, no repo API calls. |
 | OD-13 | Backup encryption and off-site copies | Operator responsibility for a self-hosted system. | Document duties in [deployment-model.md](deployment-model.md) and [retention-and-deletion.md](retention-and-deletion.md). Do not ship a hosted backup service. |
 | OD-14 | CycloneDX minor versions beyond 1.6 | Spec will evolve. | Allowlist 1.4, 1.5, and 1.6. New versions need an ADR and parser tests. |
-| OD-15 | Matching algorithm details beyond OSV ranges | Identity and fail-closed results are accepted by [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md). Remaining: first ecosystem selection after OSV measurements, comparator implementation, exact event-edge proof, and numeric limits. | Do not run matching in Session 9 or Session 11. The implemented ecosystem set is empty. Tenant package query APIs are rejected ([ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md)). No fuzzy name match, generic semver, or lexical fallback. Do not match against current `affectedPackages` JSON. |
+| OD-15 | Matching algorithm details beyond OSV ranges | Identity and fail-closed results are accepted by [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md). Finding identity and lifecycle architecture are accepted by [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md). Remaining: first ecosystem selection after OSV measurements, comparator implementation, exact event-edge proof, numeric limits, match-evaluation persistence, and Finding-write authorization. | Do not run matching in Session 9 or Session 11. Session 12 may implement evaluation only and must remain zero-Finding (no Finding writes). The implemented ecosystem set is empty. Tenant package query APIs are rejected ([ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md)). No fuzzy name match, generic semver, or lexical fallback. Do not match against current `affectedPackages` JSON. |
 | OD-16 | Reserved organization slugs | Product URL routing is not implemented. A unique slug is not enough to keep `api`, `health`, `login`, and similar names off tenant routes. | Document the gap; do not invent a reserved-slug list in the database until routing exists. |
 | OD-17 | MFA and account lockout | [ADR 0019](../adr/0019-local-password-sessions.md) specifies Argon2id and fail-closed login rate limits, not MFA or durable lockout. | Dual-key Redis login limits. No MFA. No lockout table. Revisit before treating the product as resistant to credential stuffing beyond those controls. |
 | OD-18 | Reverse-proxy trust hops | `trustProxy` remains false in Session 6. Production TLS topology is operator-specific. | Direct socket peer IP for login rate limits. Do not trust `X-Forwarded-For`. Document hops in a later ADR before enabling `trustProxy`. |

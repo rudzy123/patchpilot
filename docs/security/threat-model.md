@@ -370,7 +370,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Premature closure or duplicate findings that never resolve.
 
-**Mitigation:** Finding `resolved` only with stored evidence (adequate `absent` or out-of-range) on the **current** ingestion (max `receivedAt` among `completed`); UI separates workflow from rescan; incomplete coverage → `inconclusive`; workflow states `risk_accepted`/`mitigated`/`false_positive` are not overwritten by inconclusive compare; identity is versionless + OSV id.
+**Mitigation:** Finding `resolved` only with stored evidence (adequate `absent` or out-of-range) on the **current** ingestion (max `receivedAt` among `completed`); UI separates workflow from rescan; incomplete coverage → `inconclusive`; workflow states `risk_accepted`/`mitigated`/`false_positive` are not overwritten by inconclusive compare; identity is `organizationId` + `assetId` + `componentId` + `vulnerabilityId` ([ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md)).
 
 ### AI data leakage (if optional AI is introduced later)
 

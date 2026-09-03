@@ -104,7 +104,7 @@ Tenant uniqueness always includes `organizationId`.
 | SBOM upload HTTP | `Idempotency-Key` + org |
 | SBOM document | org + asset + sha256 |
 | Outbox | org + `dedupeKey` |
-| Finding create | org + asset + **versionless** component identity + **OSV id** |
+| Finding create | org + asset + versionless `componentId` + `vulnerabilityId` ([ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md)); not occurrence, ingestion, CVE, or OSV id string |
 | RiskCalculation | org + finding + `inputFingerprint` (canonical hash of reason, `policyDefinitionSha256`, sorted intel source record ids, `sbomIngestionId` or null, asset context version or null, override id or null). Intel refresh and ingest docs must use this same key — not a shorter `(finding, sourceRecordId, policyVersion)` tuple. |
 | RiskAcceptance create | `Idempotency-Key` + org; at most one `active` acceptance per finding |
 | Export create | `Idempotency-Key` + org |

@@ -56,7 +56,7 @@ Session 11 Batch 1A established, and this ADR preserves:
 9. Session 11 remains zero-Finding.
 10. Finding writes are deferred beyond Session 11.
 11. Package identity and comparator decisions belong to ADR 0025.
-12. Finding evidence and lifecycle decisions belong to a future ADR 0026.
+12. Finding evidence and lifecycle decisions belong to [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md).
 
 Session 9 imports a global CISA KEV catalog. Session 10 persists canonical CVE identity and
 read-only active-catalog KEV membership. Generic Finding tables exist and remain unused by
@@ -343,7 +343,7 @@ Withdrawn advisories:
 - do not delete historical provider records
 - do not delete Findings or evidence
 - do not automatically close Findings
-- require later Finding-lifecycle policy (future ADR 0026)
+- require later Finding-lifecycle policy ([ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md))
 
 Modified advisories:
 
