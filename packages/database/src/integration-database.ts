@@ -70,6 +70,10 @@ export const FROZEN_MIGRATIONS = [
     directory: '20260904120000_osv_acquisition_persistence_foundation',
     sha256: 'ac99d96d97074b9ad38064ccbbcd9670321bed0872c20a71c0a679d837704349',
   },
+  {
+    directory: '20260904180000_osv_parsed_revision_id_check_correction',
+    sha256: '43f758f559abc1c936197f6d5944f85cb14ef1cbed2a99bd0f555759ebdc1570',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
@@ -86,6 +90,9 @@ export const SESSION_10_CANONICAL_CVE_IDENTITY = '20260902120000_canonical_cve_i
 export const SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION =
   '20260904120000_osv_acquisition_persistence_foundation' as const;
 
+export const SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION =
+  '20260904180000_osv_parsed_revision_id_check_correction' as const;
+
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
   '20260827120000_tenant_model',
@@ -99,6 +106,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
   SESSION_10_CANONICAL_CVE_IDENTITY,
   SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
+  SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {

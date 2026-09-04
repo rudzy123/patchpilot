@@ -15,14 +15,15 @@ PatchPilot uses **forward-only** Prisma migrations against PostgreSQL.
 9. Session 9 KEV intelligence persistence is `20260901120000_kev_intelligence_persistence`. It is frozen. Do not edit it. Any SQL correction requires another forward-only migration.
 10. Session 10 canonical CVE identity is `20260902120000_canonical_cve_identity`. Batch 3B applied it to the persistent development database (eleven finished migrations at that time) and froze it. Frozen SHA-256: `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`. Do not edit it. Any SQL correction requires another forward-only migration. Batch 4B adds persistence adapters only; it does not change this migration. The header comments inside that frozen `migration.sql` refer to the historical Batch 3A stage before independent review, persistent application, and freeze. Those comments must not be edited because their bytes are covered by the frozen SHA-256.
 11. Session 11 OSV acquisition persistence foundation is `20260904120000_osv_acquisition_persistence_foundation`. Batch 5C creates Prisma models and this migration only. Frozen SHA-256: `ac99d96d97074b9ad38064ccbbcd9670321bed0872c20a71c0a679d837704349`. Do not edit it. Any SQL correction requires another forward-only migration. No repository adapter is included. No active OSV catalog is seeded.
-12. Do not edit Session 3, Session 5, Session 6, Session 7, Session 8, Session 9, Session 10, Session 11, or the committed correction migration files. Those SQL files are the authoritative extras (checks, partial unique indexes, triggers). There is no separately applied `prisma/sql/*.sql` extras source.
-13. There is no down migration. Rollback is restore-from-backup or a **forward-fix** migration.
+12. Session 11 Batch 5C-R is `20260904180000_osv_parsed_revision_id_check_correction`. It drops and recreates only `osv_parsed_advisory_revision_osv_id_chk` so PostgreSQL POSIX regex no longer uses `{0,511}`. Frozen SHA-256: `43f758f559abc1c936197f6d5944f85cb14ef1cbed2a99bd0f555759ebdc1570`. The 512-character identifier grammar is preserved with `char_length` plus `^[A-Z0-9][A-Z0-9._+-]*$`. No Prisma schema change. No seed data.
+13. Do not edit Session 3, Session 5, Session 6, Session 7, Session 8, Session 9, Session 10, Session 11, or the committed correction migration files. Those SQL files are the authoritative extras (checks, partial unique indexes, triggers). There is no separately applied `prisma/sql/*.sql` extras source.
+14. There is no down migration. Rollback is restore-from-backup or a **forward-fix** migration.
 
 ## Paths
 
 ### Clean database
 
-`pnpm db:migrate:deploy` on an empty database applies Session 3, Session 5, the Session 5 corrective migrations, Session 6 authentication persistence, Session 7 asset inventory constraints, Session 8 graph persistence, Session 9 KEV intelligence persistence, Session 10 canonical CVE identity, then Session 11 OSV acquisition persistence. Isolated migration tests use that twelve-migration sequence. The persistent development database has those twelve frozen migrations, including `20260904120000_osv_acquisition_persistence_foundation`. The placeholder table exists only between Session 3 and Session 5.
+`pnpm db:migrate:deploy` on an empty database applies Session 3, Session 5, the Session 5 corrective migrations, Session 6 authentication persistence, Session 7 asset inventory constraints, Session 8 graph persistence, Session 9 KEV intelligence persistence, Session 10 canonical CVE identity, Session 11 OSV acquisition persistence, then the Session 11 parsed-revision ID CHECK correction. Isolated migration tests use that thirteen-migration sequence. The persistent development database has those thirteen frozen migrations, including `20260904180000_osv_parsed_revision_id_check_correction`. The placeholder table exists only between Session 3 and Session 5.
 
 ### Upgrade from Session 3
 
@@ -50,11 +51,15 @@ A database that already has `20260830120000_sbom_ingestion_graph_persistence` ap
 
 ### Upgrade from Session 9
 
-A database that already has `20260901120000_kev_intelligence_persistence` applies `20260902120000_canonical_cve_identity` then `20260904120000_osv_acquisition_persistence_foundation`. The Session 10 migration creates two global append-only identity tables. The Session 11 migration adds OSV acquisition tables only. Neither rewrites Vulnerability or Finding rows. No active OSV catalog is seeded. Isolated tests cover this path. Do not reset the database or delete Docker volumes.
+A database that already has `20260901120000_kev_intelligence_persistence` applies `20260902120000_canonical_cve_identity`, `20260904120000_osv_acquisition_persistence_foundation`, then `20260904180000_osv_parsed_revision_id_check_correction`. The Session 10 migration creates two global append-only identity tables. The Session 11 Batch 5C migration adds OSV acquisition tables only. Batch 5C-R replaces only the parsed OSV ID CHECK. None rewrite Vulnerability or Finding rows. No active OSV catalog is seeded. Isolated tests cover this path. Do not reset the database or delete Docker volumes.
 
 ### Upgrade from Session 10
 
-A database that already has `20260902120000_canonical_cve_identity` applies only `20260904120000_osv_acquisition_persistence_foundation`. The migration adds global OSV acquisition tables and does not rewrite tenant, Finding, KEV, or canonical CVE identity rows. No active OSV catalog is seeded. Isolated tests cover this path. Do not reset the database or delete Docker volumes.
+A database that already has `20260902120000_canonical_cve_identity` applies `20260904120000_osv_acquisition_persistence_foundation` then `20260904180000_osv_parsed_revision_id_check_correction`. The Batch 5C migration adds global OSV acquisition tables and does not rewrite tenant, Finding, KEV, or canonical CVE identity rows. Batch 5C-R changes no data. No active OSV catalog is seeded. Isolated tests cover this path. Do not reset the database or delete Docker volumes.
+
+### Upgrade from Session 11 Batch 5C
+
+A database that already has `20260904120000_osv_acquisition_persistence_foundation` applies only `20260904180000_osv_parsed_revision_id_check_correction`. That migration drops and recreates `osv_parsed_advisory_revision_osv_id_chk`. It does not rewrite rows. Isolated tests cover this path. Do not reset the database or delete Docker volumes.
 
 ## Locks and transactions
 

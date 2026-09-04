@@ -69,7 +69,7 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 
 | ID | Topic | Status after Batch 1B |
 | --- | --- | --- |
-| OD-19 canonical CVE identity | Global `CveIdentity` plus append-only `VulnerabilityCveIdentityLink` | **Partially resolved.** [ADR 0023](../adr/0023-provider-neutral-cve-identity.md) accepts the identity model. Batch 3B applied and froze `20260902120000_canonical_cve_identity` (SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). Batch 4B implements insert-once persistence adapters (`identities` and `links`). Batch 5B implements read-only active-catalog membership for one exact canonical CVE. Full advisory-identity replacement of `osvId` remains open. Finding enrichment remains blocked. The persistent development database has twelve finished migrations after Session 11 Batch 5C. |
+| OD-19 canonical CVE identity | Global `CveIdentity` plus append-only `VulnerabilityCveIdentityLink` | **Partially resolved.** [ADR 0023](../adr/0023-provider-neutral-cve-identity.md) accepts the identity model. Batch 3B applied and froze `20260902120000_canonical_cve_identity` (SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). Batch 4B implements insert-once persistence adapters (`identities` and `links`). Batch 5B implements read-only active-catalog membership for one exact canonical CVE. Full advisory-identity replacement of `osvId` remains open. Finding enrichment remains blocked. The persistent development database has thirteen finished migrations after Session 11 Batch 5C-R. |
 | Full provider-neutral Vulnerability advisory identity | Replacing required unique `Vulnerability.osvId` | **Remains open.** `osvId` stays required and unique. |
 | OSV runtime | Session 9/10 import of OSV dumps | **Remains deferred.** `INTELLIGENCE_OSV_ENABLED=true` stays rejected. |
 | Finding correlation | Advisory-to-component matching and Finding writes | **Remains blocked** by the ADR 0023 four-condition gate and [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) zero-Finding. |
@@ -160,9 +160,15 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 
 | ID | Topic | Status after Batch 5C |
 | --- | --- | --- |
-| OSV acquisition persistence foundation | Prisma models plus `20260904120000_osv_acquisition_persistence_foundation` | **Schema only.** Frozen SHA-256 `ac99d96d97074b9ad38064ccbbcd9670321bed0872c20a71c0a679d837704349`. Twelve finished migrations. No adapter, object storage, provider retrieval, synchronization, or catalog-activation execution. No active OSV generation is seeded. |
+| OSV acquisition persistence foundation | Prisma models plus `20260904120000_osv_acquisition_persistence_foundation` | **Schema only.** Frozen SHA-256 `ac99d96d97074b9ad38064ccbbcd9670321bed0872c20a71c0a679d837704349`. Batch 5C-R adds `20260904180000_osv_parsed_revision_id_check_correction` (SHA-256 `43f758f559abc1c936197f6d5944f85cb14ef1cbed2a99bd0f555759ebdc1570`) replacing only the unsatisfiable parsed OSV ID CHECK. Thirteen finished migrations. No adapter, object storage, provider retrieval, synchronization, or catalog-activation execution. No active OSV generation is seeded. |
 | Immutable provider identities | Provider object and generation natural keys | **Closed in schema.** Unique `(provider, key)`, `(provider, digest)`, and `(object, generation)`. Provider generation is a checked decimal string. |
 | Separate active pointer | One pointer per catalog scope | **Closed in schema.** `osv_active_catalog_pointer` is the mutable projection; `osv_activation_record` is append-only history. Activation execution remains Batch 5D. |
+
+## Closed in Session 11 Batch 5C-R (parsed OSV ID CHECK)
+
+| ID | Topic | Status after Batch 5C-R |
+| --- | --- | --- |
+| Parsed OSV ID CHECK | `osv_parsed_advisory_revision_osv_id_chk` | **Corrected.** Batch 5C SQL remains frozen with `{0,511}`. Live CHECK uses `char_length` 1–512 plus `^[A-Z0-9][A-Z0-9._+-]*$`. Parsed-revision inserts succeed. No Prisma schema change. |
 
 ## Still open
 
