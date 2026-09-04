@@ -281,6 +281,17 @@ Session 11 Batch 4G adversarially hardens the committed Batch 4F/4F-R isolated O
 - No provider retrieval, HTTP, snapshots, persistence, Prisma, migrations, schedulers, durable queues, APIs, matching, Findings, or OSV enablement (`INTELLIGENCE_OSV_ENABLED=true` remains rejected).
 - Worker lifecycle hardening is complete. Pending-queue size approval and runtime composition remain blocked. Session 11 remains zero-Finding. Session 12 remains zero-Finding.
 
+### Session 11 Batch 5B
+
+These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
+
+- Framework-independent OSV persistence contracts exist in `@patchpilot/vulnerability-intelligence` (`src/osv/persistence/`). Identities, inventory, snapshots, parser attempts, parsed revisions, candidate generations, completeness, reconciliation, quarantine, presence, idempotency, activation, and repository ports are contracts only.
+- Provider-generation identity is immutable and content-addressed. Body snapshots remain outside PostgreSQL. Object attachment is staged then attached; locators never contain a provider key.
+- Parser attempts are immutable. Parser success does not activate a catalog. Matching completeness remains `not_in_scope`. MAL matching remains prohibited.
+- Completeness dimensions stay separate. Reconciliation equations are exact integers with no waiver. Quarantine is append-only and blocks activation.
+- The active catalog pointer is a contract for later atomic old-to-new replacement. No Prisma, migration, adapter, object storage, provider retrieval, synchronization, Outbox, BackgroundJob, API, permission, matching, or Finding path is included.
+- [ADR 0027](docs/adr/0027-osv-acquisition-persistence-and-catalog-activation.md) is Proposed, not Accepted. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 11 remains zero-Finding. Session 12 remains zero-Finding.
+
 ## Target repository layout
 
 ```text

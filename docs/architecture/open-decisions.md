@@ -147,6 +147,15 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | --- | --- | --- |
 | OD-8 parser isolation subset | Production isolation architecture for the bounded OSV advisory parser | Session 11 Batch 4E selects `worker_threads`, closes worker timeouts (5 s init, 5 s parse, 250 ms cancel grace, 1 s forced terminate), schema loading inside the isolate, one-request-at-a-time Ajv ownership, pool size 1, sequential reuse, transfer/recycle/failure mapping, and duplicate-key disposition. The worker is **not** implemented. Pending-queue size stays `unavailable`, so runtime composition remains blocked. Provider-object body retrieval limits, continuation-token bounds, and ZIP remain open in OD-8. |
 
+## Closed in Session 11 Batch 5B (persistence contracts)
+
+| ID | Topic | Status after Batch 5B |
+| --- | --- | --- |
+| OSV persistence contracts | Identities, inventory, snapshots, parser attempts, revisions, generations, completeness, reconciliation, quarantine, activation, ports | **Contracts only.** Framework-independent types live in `@patchpilot/vulnerability-intelligence`. No Prisma, no migration, no adapter, no object storage, no provider retrieval, no synchronization, and no catalog activation runtime. [ADR 0027](../adr/0027-osv-acquisition-persistence-and-catalog-activation.md) is Proposed. |
+| Active catalog pointer | Separate pointer plus CAS, not a flag on generation rows and not `IntelligenceSource.activeGenerationId` | **Closed as contract.** Implementation remains Batch 5D. Activation does not trigger matching. |
+| Completeness dimensions | Inventory, eligible-body, parser, parsed-catalog, matching | **Closed as contract.** Matching remains `not_in_scope`. Equations are exact integers with no waiver. |
+| OSV object-key prefixes | Advisory-body and parsed-document locators | **Proposed**, not closed. Prefixes are `intelligence/osv/advisory_body/{tmp\|sha256}/{uuid\|sha256}` and `intelligence/osv/parsed_advisory/{tmp\|sha256}/{uuid\|sha256}`. Close in Batch 5E after adapter tests. |
+
 ## Still open
 
 | ID | Topic | Why it is open | Interim default for design and first implementation |
