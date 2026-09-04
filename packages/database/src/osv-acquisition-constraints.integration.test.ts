@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -534,16 +534,33 @@ describe('session 11 OSV acquisition SQL constraints', { timeout: 90_000 }, () =
     expect(osvBlock).not.toContain('@db.Json');
   });
 
-  it('does not add an OSV repository adapter', () => {
+  it('does not seed an active catalog and keeps adapter files Prisma-schema-free', () => {
     const srcDir = path.dirname(fileURLToPath(import.meta.url));
-    expect(existsSync(path.join(srcDir, 'osv-acquisition-persistence.ts'))).toBe(false);
-    const productionFiles = readdirSync(srcDir).filter(
-      (name) => name.endsWith('.ts') && !name.endsWith('.test.ts'),
+    expect(existsSync(path.join(srcDir, 'osv-acquisition-persistence.ts'))).toBe(true);
+    const schemaPath = path.join(srcDir, '../prisma/schema.prisma');
+    const schema = readFileSync(schemaPath, 'utf8');
+    expect(schema).not.toContain('createOsvAcquisitionPersistence');
+  });
+
+  it('records that frozen Batch 5C SQL still contains the unsatisfiable POSIX quantifier', async () => {
+    const sql = readFileSync(
+      path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        '../prisma/migrations/20260904120000_osv_acquisition_persistence_foundation/migration.sql',
+      ),
+      'utf8',
     );
-    for (const fileName of productionFiles) {
-      const source = readFileSync(path.join(srcDir, fileName), 'utf8');
-      expect(source, fileName).not.toContain('createOsvAcquisitionPersistence');
-      expect(source, fileName).not.toContain('osvCatalogGeneration.create');
-    }
+    expect(sql).toContain('osv_parsed_advisory_revision_osv_id_chk');
+    expect(sql).toContain('[A-Z0-9._+-]{0,511}');
+    await expect(
+      prisma.$queryRawUnsafe(`SELECT 'SYNTH0' ~ '^[A-Z0-9][A-Z0-9._+-]{0,511}$'`),
+    ).rejects.toThrow(/invalid regular expression|2201B|repetition count/i);
+    const live = await prisma.$queryRaw<Array<{ definition: string }>>`
+      SELECT pg_get_constraintdef(oid) AS definition
+      FROM pg_constraint
+      WHERE conname = 'osv_parsed_advisory_revision_osv_id_chk'
+    `;
+    expect(live[0]?.definition).toContain('char_length');
+    expect(live[0]?.definition).not.toContain('{0,511}');
   });
 });

@@ -151,8 +151,8 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 
 | ID | Topic | Status after Batch 5B |
 | --- | --- | --- |
-| OSV persistence contracts | Identities, inventory, snapshots, parser attempts, revisions, generations, completeness, reconciliation, quarantine, activation, ports | **Contracts only.** Framework-independent types live in `@patchpilot/vulnerability-intelligence`. No Prisma, no migration, no adapter, no object storage, no provider retrieval, no synchronization, and no catalog activation runtime. [ADR 0027](../adr/0027-osv-acquisition-persistence-and-catalog-activation.md) is Proposed. |
-| Active catalog pointer | Separate pointer plus CAS, not a flag on generation rows and not `IntelligenceSource.activeGenerationId` | **Closed as contract.** Implementation remains Batch 5D. Activation does not trigger matching. |
+| OSV persistence contracts | Identities, inventory, snapshots, parser attempts, revisions, generations, completeness, reconciliation, quarantine, activation, ports | **Contracts closed in Batch 5B.** Framework-independent types live in `@patchpilot/vulnerability-intelligence`. |
+| Active catalog pointer | Separate pointer plus CAS, not a flag on generation rows and not `IntelligenceSource.activeGenerationId` | **Closed as contract in Batch 5B.** Batch 5D implements PostgreSQL CAS. Activation does not trigger matching. |
 | Completeness dimensions | Inventory, eligible-body, parser, parsed-catalog, matching | **Closed as contract.** Matching remains `not_in_scope`. Equations are exact integers with no waiver. |
 | OSV object-key prefixes | Advisory-body and parsed-document locators | **Proposed**, not closed. Prefixes are `intelligence/osv/advisory_body/{tmp\|sha256}/{uuid\|sha256}` and `intelligence/osv/parsed_advisory/{tmp\|sha256}/{uuid\|sha256}`. Close in Batch 5E after adapter tests. |
 
@@ -160,9 +160,16 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 
 | ID | Topic | Status after Batch 5C |
 | --- | --- | --- |
-| OSV acquisition persistence foundation | Prisma models plus `20260904120000_osv_acquisition_persistence_foundation` | **Schema only.** Frozen SHA-256 `ac99d96d97074b9ad38064ccbbcd9670321bed0872c20a71c0a679d837704349`. Batch 5C-R adds `20260904180000_osv_parsed_revision_id_check_correction` (SHA-256 `43f758f559abc1c936197f6d5944f85cb14ef1cbed2a99bd0f555759ebdc1570`) replacing only the unsatisfiable parsed OSV ID CHECK. Thirteen finished migrations. No adapter, object storage, provider retrieval, synchronization, or catalog-activation execution. No active OSV generation is seeded. |
+| OSV acquisition persistence foundation | Prisma models plus `20260904120000_osv_acquisition_persistence_foundation` | **Schema only.** Frozen SHA-256 `ac99d96d97074b9ad38064ccbbcd9670321bed0872c20a71c0a679d837704349`. Batch 5C-R adds `20260904180000_osv_parsed_revision_id_check_correction` (SHA-256 `43f758f559abc1c936197f6d5944f85cb14ef1cbed2a99bd0f555759ebdc1570`) replacing only the unsatisfiable parsed OSV ID CHECK. Thirteen finished migrations. No object storage, provider retrieval, or synchronization. No active OSV generation is seeded. |
 | Immutable provider identities | Provider object and generation natural keys | **Closed in schema.** Unique `(provider, key)`, `(provider, digest)`, and `(object, generation)`. Provider generation is a checked decimal string. |
-| Separate active pointer | One pointer per catalog scope | **Closed in schema.** `osv_active_catalog_pointer` is the mutable projection; `osv_activation_record` is append-only history. Activation execution remains Batch 5D. |
+| Separate active pointer | One pointer per catalog scope | **Closed in schema.** `osv_active_catalog_pointer` is the mutable projection; `osv_activation_record` is append-only history. |
+
+## Closed in Session 11 Batch 5D (PostgreSQL adapters)
+
+| ID | Topic | Status after Batch 5D |
+| --- | --- | --- |
+| OSV acquisition adapters | `createOsvAcquisitionPersistence` | **Adapters exist** in `@patchpilot/database`. Immutable conflict detection, generation/attachment graphs, deterministic reconciliation, append-only quarantine and presence, and pointer CAS are implemented. Parser-attempt/revision writes are transactional. Batch 5C-R makes successful parsed-revision inserts possible. No production catalog is activated. Object storage, provider retrieval, and synchronization remain absent. |
+| Cross-scope previous generation | ID-only previous-generation FK | **Closed in adapter.** Activation loads the previous generation and rejects a scope mismatch without writing history or mutating the pointer. |
 
 ## Closed in Session 11 Batch 5C-R (parsed OSV ID CHECK)
 
