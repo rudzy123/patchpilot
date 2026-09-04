@@ -28,8 +28,9 @@ export function createEmptyJobRegistry(): JobRegistry {
 /**
  * Tenant object-key conventions (org/{organizationId}/assets/{assetId}/sboms/sha256/{sha256})
  * are implemented by S3SbomObjectStorage. Intelligence snapshots use
- * intelligence/cisa_kev/cisa_kev_json_catalog/{tmp|sha256}/... in the same
- * private bucket. The older buffered ObjectStoragePort remains unused.
+ * intelligence/cisa_kev/cisa_kev_json_catalog/{tmp|sha256}/... and OSV
+ * advisory artifacts use intelligence/osv/{advisory_body|parsed_advisory}/{tmp|sha256}/...
+ * in the same private bucket. The older buffered ObjectStoragePort remains unused.
  *
  * Both adapters use @aws-sdk/client-s3@3.1120.0 with static credentials,
  * forcePathStyle, and no public ACLs. Compose MinIO healthchecks are not an SDK
@@ -38,6 +39,7 @@ export function createEmptyJobRegistry(): JobRegistry {
 export const deferredIntegrationNotes = {
   objectKeyConvention: 'org-asset-sha256',
   intelligenceObjectKeyConvention: 'intelligence-cisa-kev-sha256',
+  osvObjectKeyConvention: 'intelligence-osv-sha256',
   minioAdapter: 's3-compatible-streaming-adapter',
   s3Client: 'wired-static-credentials',
 } as const;
@@ -55,6 +57,12 @@ export {
   type S3IntelligenceSnapshotStorageConfig,
   type S3IntelligenceSnapshotStorageOptions,
 } from './s3-intelligence-snapshot-storage.js';
+export {
+  createS3OsvAdvisoryObjectStorage,
+  isCompiledOsvS3ObjectKey,
+  S3OsvAdvisoryObjectStorage,
+  type S3OsvAdvisoryObjectStorageConfig,
+} from './s3-osv-advisory-object-storage.js';
 export { createCisaKevHttpsClient, createCisaKevHttpsTransport } from './cisa-kev-https.js';
 export { createS3Client, S3ClientConstructionError } from './s3-client.js';
 export { encodeS3CopySource } from './s3-copy-source.js';

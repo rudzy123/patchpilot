@@ -154,7 +154,7 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | OSV persistence contracts | Identities, inventory, snapshots, parser attempts, revisions, generations, completeness, reconciliation, quarantine, activation, ports | **Contracts closed in Batch 5B.** Framework-independent types live in `@patchpilot/vulnerability-intelligence`. |
 | Active catalog pointer | Separate pointer plus CAS, not a flag on generation rows and not `IntelligenceSource.activeGenerationId` | **Closed as contract in Batch 5B.** Batch 5D implements PostgreSQL CAS. Activation does not trigger matching. |
 | Completeness dimensions | Inventory, eligible-body, parser, parsed-catalog, matching | **Closed as contract.** Matching remains `not_in_scope`. Equations are exact integers with no waiver. |
-| OSV object-key prefixes | Advisory-body and parsed-document locators | **Proposed**, not closed. Prefixes are `intelligence/osv/advisory_body/{tmp\|sha256}/{uuid\|sha256}` and `intelligence/osv/parsed_advisory/{tmp\|sha256}/{uuid\|sha256}`. Close in Batch 5E after adapter tests. |
+| OSV object-key prefixes | Advisory-body and parsed-document locators | **Closed in Batch 5E.** Prefixes are `intelligence/osv/advisory_body/{tmp\|sha256}/{uuid\|sha256}` and `intelligence/osv/parsed_advisory/{tmp\|sha256}/{uuid\|sha256}`. Provider keys are never storage paths. |
 
 ## Closed in Session 11 Batch 5C (acquisition schema)
 
@@ -170,6 +170,13 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | --- | --- | --- |
 | OSV acquisition adapters | `createOsvAcquisitionPersistence` | **Adapters exist** in `@patchpilot/database`. Immutable conflict detection, generation/attachment graphs, deterministic reconciliation, append-only quarantine and presence, and pointer CAS are implemented. Parser-attempt/revision writes are transactional. Batch 5C-R makes successful parsed-revision inserts possible. No production catalog is activated. Object storage, provider retrieval, and synchronization remain absent. |
 | Cross-scope previous generation | ID-only previous-generation FK | **Closed in adapter.** Activation loads the previous generation and rejects a scope mismatch without writing history or mutating the pointer. |
+
+## Closed in Session 11 Batch 5E (immutable object storage)
+
+| ID | Topic | Status after Batch 5E |
+| --- | --- | --- |
+| OSV object-key prefixes | Advisory-body and parsed-document locators | **Closed.** Adapter tests confirm `intelligence/osv/{advisory_body\|parsed_advisory}/{tmp\|sha256}/…` in the existing private bucket. |
+| OSV snapshot object storage | Immutable write-once adapter | **Adapter exists** for synthetic locally supplied bytes. Staged write, SHA-256 read-back, conflict detection, and cleanup eligibility exist. No provider retrieval, no destructive cleanup job, and no PostgreSQL+storage atomic commit. |
 
 ## Closed in Session 11 Batch 5C-R (parsed OSV ID CHECK)
 

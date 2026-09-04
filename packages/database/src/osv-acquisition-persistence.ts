@@ -64,6 +64,7 @@ import {
   type OsvPersistenceRejectionCode,
   type OsvPersistenceResult,
   type OsvPresenceObservationRepository,
+  type OsvObjectAttachmentRepository,
   type OsvProviderBodySnapshot,
   type OsvProviderBodySnapshotRepository,
   type OsvProviderGenerationIdentity,
@@ -117,6 +118,7 @@ export type OsvAcquisitionPersistenceAdapters = {
   readonly inventory: OsvInventoryPersistence;
   readonly providerObjects: OsvProviderObjectRepository;
   readonly bodySnapshots: OsvProviderBodySnapshotRepository;
+  readonly attachments: OsvObjectAttachmentRepository;
   readonly parserAttempts: OsvParserAttemptRepository;
   readonly parsedRevisions: OsvParsedAdvisoryRevisionRepository;
   readonly memberships: OsvCatalogMembershipRepository;
@@ -145,6 +147,7 @@ export function createOsvAcquisitionPersistenceForClient(
     inventory: new PrismaOsvInventoryPersistence(client),
     providerObjects: new PrismaOsvProviderObjectRepository(client),
     bodySnapshots: new PrismaOsvProviderBodySnapshotRepository(client),
+    attachments: new PrismaOsvObjectAttachmentRepository(client),
     parserAttempts: new PrismaOsvParserAttemptRepository(client),
     parsedRevisions: new PrismaOsvParsedAdvisoryRevisionRepository(client),
     memberships: new PrismaOsvCatalogMembershipRepository(client),
@@ -1169,6 +1172,114 @@ class PrismaOsvProviderBodySnapshotRepository implements OsvProviderBodySnapshot
       return fail('invalid_state');
     }
     return idem('created', 'body_attachment');
+  }
+
+  public async loadByGeneration(
+    generation: OsvProviderGenerationIdentity,
+  ): Promise<OsvPersistenceResult<OsvProviderBodySnapshot | null>> {
+    const parsed = isOsvProviderGenerationIdentity(generation)
+      ? okResult(generation)
+      : fail('invalid_field');
+    if (!parsed.ok) {
+      return parsed;
+    }
+    try {
+      const row = await this.client.osvProviderGeneration.findUnique({
+        where: {
+          providerObjectId_providerGeneration: {
+            providerObjectId: parsed.value.providerObjectId,
+            providerGeneration: parsed.value.providerGeneration,
+          },
+        },
+        include: { bodySnapshot: { include: { attachment: true } } },
+      });
+      if (row === null || row.bodySnapshot === null) {
+        return okResult(null);
+      }
+      if (row.providerObjectKeyDigest !== parsed.value.providerObjectKeyDigest) {
+        return fail('immutable_conflict');
+      }
+      return okResult(
+        mapSnapshot({
+          ...row.bodySnapshot,
+          providerObjectId: row.providerObjectId,
+          providerObjectKeyDigest: row.providerObjectKeyDigest,
+          providerGeneration: row.providerGeneration,
+          classificationStatus: 'eligible',
+          attachment: row.bodySnapshot.attachment,
+        }),
+      );
+    } catch (error) {
+      return mapCaught(error);
+    }
+  }
+}
+
+class PrismaOsvObjectAttachmentRepository implements OsvObjectAttachmentRepository {
+  public constructor(private readonly client: PrismaClientLike) {}
+
+  public async inspect(
+    id: string,
+  ): Promise<OsvPersistenceResult<ReturnType<typeof mapAttachment> | null>> {
+    if (!UUID_PATTERN.test(id)) {
+      return fail('invalid_uuid');
+    }
+    try {
+      const row = await this.client.osvObjectAttachment.findUnique({ where: { id } });
+      if (row === null) {
+        return okResult(null);
+      }
+      return okResult(mapAttachment(row));
+    } catch (error) {
+      return mapCaught(error);
+    }
+  }
+
+  public async markOrphaned(id: string): Promise<OsvPersistenceResult<OsvIdempotencyResult>> {
+    return this.transitionTerminal(id, 'orphaned');
+  }
+
+  public async markRejected(id: string): Promise<OsvPersistenceResult<OsvIdempotencyResult>> {
+    return this.transitionTerminal(id, 'rejected');
+  }
+
+  private async transitionTerminal(
+    id: string,
+    nextState: 'orphaned' | 'rejected',
+  ): Promise<OsvPersistenceResult<OsvIdempotencyResult>> {
+    if (!UUID_PATTERN.test(id)) {
+      return fail('invalid_uuid');
+    }
+    try {
+      const row = await this.client.osvObjectAttachment.findUnique({ where: { id } });
+      if (row === null) {
+        return fail('invalid_state');
+      }
+      const current = mapAttachment(row);
+      if (current.state === nextState) {
+        return idem('already_applied', 'object_attachment');
+      }
+      if (!attachmentTransitionAllowed(current.state, nextState)) {
+        return fail('invalid_transition');
+      }
+      const next = transitionOsvAttachmentState(current, nextState);
+      if (!next.ok) {
+        return next;
+      }
+      const updated = await this.client.osvObjectAttachment.updateMany({
+        where: { id, state: 'staged' },
+        data: {
+          state: nextState,
+          cleanupEligible: true,
+        },
+      });
+      if (updated.count === 0) {
+        return fail('invalid_state');
+      }
+      return idem('created', 'object_attachment');
+    } catch (error) {
+      return mapCaught(error);
+    }
   }
 }
 

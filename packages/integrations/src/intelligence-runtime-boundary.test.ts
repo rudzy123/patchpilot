@@ -34,6 +34,7 @@ const INTELLIGENCE_FILES = [
   'intelligence-http-retry.ts',
   'intelligence-http-stream.ts',
   's3-intelligence-snapshot-storage.ts',
+  's3-osv-advisory-object-storage.ts',
 ];
 
 describe('intelligence runtime boundary', () => {
