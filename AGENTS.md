@@ -267,8 +267,19 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - Occupancy is exactly one in-flight parse. Pending-queue size remains `unavailable`, so a second concurrent parse is rejected with `invalid_request`. Sequential reuse of a healthy worker is authorized.
 - Host failures use the closed parser failure catalog (`cancelled`, `timeout`, `worker_terminated`, `worker_start_failed`, `malformed_worker_output`, and related kinds). Shutdown is idempotent. Late messages are discarded. Raw advisory bytes never enter errors or events.
 - `worker_threads` is not an OS-level sandbox, container isolation, or filesystem/network denial. Compensating controls remain as in Batch 4E.
-- No HTTP adapter, provider-object retrieval, snapshots, persistence, Prisma, migrations, schedulers, durable queues, APIs, matching, Findings, or OSV enablement (`INTELLIGENCE_OSV_ENABLED=true` remains rejected). Batch 4G remains blocked until a pending-queue size is approved and remaining lifecycle tests (timeout/crash/malformed-output fakes) are authorized.
+- No HTTP adapter, provider-object retrieval, snapshots, persistence, Prisma, migrations, schedulers, durable queues, APIs, matching, Findings, or OSV enablement (`INTELLIGENCE_OSV_ENABLED=true` remains rejected).
 - Session 11 remains zero-Finding. Session 12 remains zero-Finding.
+
+### Session 11 Batch 4G
+
+Session 11 Batch 4G adversarially hardens the committed Batch 4F/4F-R isolated OSV parser worker and parent adapter. These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
+
+- Comprehensive adversarial worker lifecycle tests cover initialization attacks, correlation attacks, timeout races, cancellation races, malformed messages, worker crashes, Ajv state isolation, input ownership attacks, backpressure attacks, worker recycle attacks, shutdown attacks, observability confidentiality, worker-construction security, and sandbox-claim review.
+- Hardening corrections applied: timer cleanup in `terminateWorker` (forced-termination timeout cleared in finally block), explicit listener removal (`removeAllListeners()` for message/error/exit before termination), array index safety (undefined checks for `noUncheckedIndexedAccess`).
+- Lifecycle verification: exactly one terminal response per request, stale/duplicate messages safely ignored, no second promise resolution, wrong-worker messages cannot complete request, no recycled worker messages accepted, timers cleared after resolution, no dangling promises or workers, every accepted request settles exactly once, no request runs twice, bounded queue maintained, capacity deterministic, shutdown idempotent, no active worker after successful shutdown.
+- Duplicate JSON object keys remain undetected. Adversarial tests prove last-key-wins cannot bypass security gates. Detection without new dependency remains parser-hardening follow-up before OSV enablement.
+- No provider retrieval, HTTP, snapshots, persistence, Prisma, migrations, schedulers, durable queues, APIs, matching, Findings, or OSV enablement (`INTELLIGENCE_OSV_ENABLED=true` remains rejected).
+- Worker lifecycle hardening is complete. Pending-queue size approval and runtime composition remain blocked. Session 11 remains zero-Finding. Session 12 remains zero-Finding.
 
 ## Target repository layout
 
