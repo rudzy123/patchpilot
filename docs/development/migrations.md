@@ -13,15 +13,16 @@ PatchPilot uses **forward-only** Prisma migrations against PostgreSQL.
 7. Session 7 asset inventory constraints are `20260828120000_asset_inventory_constraints`: the default Asset list keyset index (`asset_org_status_name_id_idx`), drop of redundant `asset_org_status_idx`, and `AssetExternalIdentifier` namespace/value CHECKs.
 8. Session 8 graph persistence is `20260830120000_sbom_ingestion_graph_persistence`. It is frozen. Do not edit it. Any SQL correction requires another forward-only migration.
 9. Session 9 KEV intelligence persistence is `20260901120000_kev_intelligence_persistence`. It is frozen. Do not edit it. Any SQL correction requires another forward-only migration.
-10. Session 10 canonical CVE identity is `20260902120000_canonical_cve_identity`. Batch 3B applied it to the persistent development database (eleven finished migrations) and froze it. Frozen SHA-256: `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`. Do not edit it. Any SQL correction requires another forward-only migration. Batch 4B adds persistence adapters only; it does not change this migration. The header comments inside that frozen `migration.sql` refer to the historical Batch 3A stage before independent review, persistent application, and freeze. Those comments must not be edited because their bytes are covered by the frozen SHA-256.
-11. Do not edit Session 3, Session 5, Session 6, Session 7, Session 8, Session 9, Session 10, or the committed correction migration files. Those SQL files are the authoritative extras (checks, partial unique indexes, triggers). There is no separately applied `prisma/sql/*.sql` extras source.
-12. There is no down migration. Rollback is restore-from-backup or a **forward-fix** migration.
+10. Session 10 canonical CVE identity is `20260902120000_canonical_cve_identity`. Batch 3B applied it to the persistent development database (eleven finished migrations at that time) and froze it. Frozen SHA-256: `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`. Do not edit it. Any SQL correction requires another forward-only migration. Batch 4B adds persistence adapters only; it does not change this migration. The header comments inside that frozen `migration.sql` refer to the historical Batch 3A stage before independent review, persistent application, and freeze. Those comments must not be edited because their bytes are covered by the frozen SHA-256.
+11. Session 11 OSV acquisition persistence foundation is `20260904120000_osv_acquisition_persistence_foundation`. Batch 5C creates Prisma models and this migration only. Frozen SHA-256: `ac99d96d97074b9ad38064ccbbcd9670321bed0872c20a71c0a679d837704349`. Do not edit it. Any SQL correction requires another forward-only migration. No repository adapter is included. No active OSV catalog is seeded.
+12. Do not edit Session 3, Session 5, Session 6, Session 7, Session 8, Session 9, Session 10, Session 11, or the committed correction migration files. Those SQL files are the authoritative extras (checks, partial unique indexes, triggers). There is no separately applied `prisma/sql/*.sql` extras source.
+13. There is no down migration. Rollback is restore-from-backup or a **forward-fix** migration.
 
 ## Paths
 
 ### Clean database
 
-`pnpm db:migrate:deploy` on an empty database applies Session 3, Session 5, the Session 5 corrective migrations, Session 6 authentication persistence, Session 7 asset inventory constraints, Session 8 graph persistence, Session 9 KEV intelligence persistence, then Session 10 canonical CVE identity. Isolated migration tests use that eleven-migration sequence. The persistent development database has those eleven frozen migrations, including `20260902120000_canonical_cve_identity`. The placeholder table exists only between Session 3 and Session 5.
+`pnpm db:migrate:deploy` on an empty database applies Session 3, Session 5, the Session 5 corrective migrations, Session 6 authentication persistence, Session 7 asset inventory constraints, Session 8 graph persistence, Session 9 KEV intelligence persistence, Session 10 canonical CVE identity, then Session 11 OSV acquisition persistence. Isolated migration tests use that twelve-migration sequence. The persistent development database has those twelve frozen migrations, including `20260904120000_osv_acquisition_persistence_foundation`. The placeholder table exists only between Session 3 and Session 5.
 
 ### Upgrade from Session 3
 
@@ -49,7 +50,11 @@ A database that already has `20260830120000_sbom_ingestion_graph_persistence` ap
 
 ### Upgrade from Session 9
 
-A database that already has `20260901120000_kev_intelligence_persistence` applies only `20260902120000_canonical_cve_identity`. The migration creates two global append-only tables, a canonical CVE CHECK, and backfills only exact canonical values already stored in `vulnerability.cve_id`. Malformed legacy `cve_id` values remain unlinked and unchanged. Vulnerability rows are not merged. `osv_id` and `cve_id` are not rewritten. KEV and Finding tables are unchanged. Isolated tests cover this path. Batch 3B applied and froze this migration on the persistent development database. Do not reset the database or delete Docker volumes.
+A database that already has `20260901120000_kev_intelligence_persistence` applies `20260902120000_canonical_cve_identity` then `20260904120000_osv_acquisition_persistence_foundation`. The Session 10 migration creates two global append-only identity tables. The Session 11 migration adds OSV acquisition tables only. Neither rewrites Vulnerability or Finding rows. No active OSV catalog is seeded. Isolated tests cover this path. Do not reset the database or delete Docker volumes.
+
+### Upgrade from Session 10
+
+A database that already has `20260902120000_canonical_cve_identity` applies only `20260904120000_osv_acquisition_persistence_foundation`. The migration adds global OSV acquisition tables and does not rewrite tenant, Finding, KEV, or canonical CVE identity rows. No active OSV catalog is seeded. Isolated tests cover this path. Do not reset the database or delete Docker volumes.
 
 ## Locks and transactions
 

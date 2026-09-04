@@ -372,6 +372,258 @@ enum IntelligenceNotModifiedReason {
   @@map("intelligence_not_modified_reason")
 }
 
+enum OsvCatalogLifecycleState {
+  planned
+  acquiring
+  ready_for_activation
+  active
+  superseded
+  failed
+  quarantined
+  cancelled
+
+  @@map("osv_catalog_lifecycle_state")
+}
+
+enum OsvAcquisitionRunState {
+  requested
+  running
+  retry_wait
+  completed
+  failed
+  quarantined
+  cancelled
+
+  @@map("osv_acquisition_run_state")
+}
+
+enum OsvInventoryRunState {
+  running
+  complete
+  failed
+  cancelled
+
+  @@map("osv_inventory_run_state")
+}
+
+enum OsvInventoryPassCompletenessStatus {
+  incomplete
+  complete
+  failed
+
+  @@map("osv_inventory_pass_completeness_status")
+}
+
+enum OsvInventoryConvergenceStatus {
+  converged
+  divergent
+  not_comparable
+
+  @@map("osv_inventory_convergence_status")
+}
+
+enum OsvClassificationStatus {
+  eligible
+  ineligible
+  legal_review_required
+  unknown
+  ambiguous
+
+  @@map("osv_classification_status")
+}
+
+enum OsvParserAttemptResultState {
+  succeeded
+  failed
+
+  @@map("osv_parser_attempt_result_state")
+}
+
+enum OsvWorkerLifecycleOutcome {
+  reused
+  recycled
+  terminated
+  not_started
+
+  @@map("osv_worker_lifecycle_outcome")
+}
+
+enum OsvAttachmentState {
+  staged
+  attached
+  orphaned
+  rejected
+
+  @@map("osv_attachment_state")
+}
+
+enum OsvPresenceKind {
+  provider_absent_observed
+  provider_generation_superseded
+  source_license_eligibility_revoked
+  generation_not_found
+  parser_failure
+  catalog_exclusion
+
+  @@map("osv_presence_kind")
+}
+
+enum OsvQuarantineReasonCode {
+  generation_content_conflict
+  byte_count_mismatch
+  content_hash_mismatch
+  source_identity_mismatch
+  registry_mismatch
+  parser_protocol_mismatch
+  schema_validation_failed
+  structural_bound_failure
+  timeout_exhausted
+  malformed_worker_output
+  unsupported_source
+  legal_review_required
+  duplicate_provider_identity_conflict
+  oversize_body
+  listing_rejected_key
+
+  @@map("osv_quarantine_reason_code")
+}
+
+enum OsvQuarantinePhase {
+  inventory
+  retrieval
+  parse
+  revision
+  reconciliation
+  activation
+
+  @@map("osv_quarantine_phase")
+}
+
+enum OsvActivationOutcome {
+  activated
+  already_active
+  stale_pointer
+  generation_not_ready
+  completeness_failed
+  version_mismatch
+  quarantine_blocked
+  immutable_conflict
+
+  @@map("osv_activation_outcome")
+}
+
+enum OsvCompletenessDimension {
+  inventory
+  eligible_body
+  parser
+  parsed_catalog
+  matching
+
+  @@map("osv_completeness_dimension")
+}
+
+enum OsvCompletenessStatus {
+  not_started
+  incomplete
+  complete
+  failed
+  not_in_scope
+
+  @@map("osv_completeness_status")
+}
+
+enum OsvObjectStorageKind {
+  advisory_body
+  parsed_advisory
+
+  @@map("osv_object_storage_kind")
+}
+
+enum OsvObjectStorageRole {
+  temporary
+  final
+
+  @@map("osv_object_storage_role")
+}
+
+enum OsvFamilyCandidateKind {
+  known
+  unknown_uppercase
+  unclassifiable
+
+  @@map("osv_family_candidate_kind")
+}
+
+enum OsvInventoryFailureCode {
+  incomplete_pass
+  divergent_passes
+  listing_rejected
+  classification_mismatch
+  cancelled
+
+  @@map("osv_inventory_failure_code")
+}
+
+enum OsvReconciliationDiscrepancyCode {
+  listing_rejected_nonzero
+  classification_mismatch
+  missing_eligible_snapshot
+  non_eligible_snapshot_present
+  parser_result_mismatch
+  revision_mismatch
+  membership_mismatch
+  blocking_quarantine
+  immutable_conflict_present
+  fail_closed_body_present
+  pin_mismatch
+  matching_not_not_in_scope
+
+  @@map("osv_reconciliation_discrepancy_code")
+}
+
+enum OsvSourceIdentifier {
+  ossf_malicious_packages
+  github_advisory_database
+  pypa_advisory_database
+  go_vulnerability_database
+  rustsec_advisory_database
+  global_security_database
+  erlang_ecosystem_foundation_cna
+  osv_ambiguous_origin
+  echo_advisory_database
+
+  @@map("osv_source_identifier")
+}
+
+enum OsvAdvisoryParserWarningCode {
+  self_reference_omitted
+  database_specific_fields_omitted
+  ecosystem_specific_fields_omitted
+
+  @@map("osv_advisory_parser_warning_code")
+}
+
+enum OsvAdvisoryParserRetryability {
+  non_retryable
+  orchestration_retryable
+
+  @@map("osv_advisory_parser_retryability")
+}
+
+enum OsvAdvisoryParserFailurePhase {
+  request_validation
+  policy
+  input_identity
+  execution
+  decode
+  schema
+  structure
+  source_confirmation
+  output_validation
+
+  @@map("osv_advisory_parser_failure_phase")
+}
+
 enum ExternalCredentialStatus {
   pending
   active
@@ -1391,6 +1643,446 @@ model KevEntryCwe {
   @@unique([entryId, ordinal], map: "kev_entry_cwe_ordinal_uidx")
   @@unique([entryId, normalizedCwe], map: "kev_entry_cwe_value_uidx")
   @@map("kev_entry_cwe")
+}
+
+/// Session 11 Batch 5C OSV acquisition foundation. Global, instance-owned.
+/// Body bytes remain outside PostgreSQL. No tenant or Finding foreign keys.
+/// Mapping notes: validated provider keys are stored on OsvProviderObject for
+/// generation-bound retrieval in addition to the public digest/prefix/family
+/// identity; completeness is one row per dimension; activation request and
+/// result share OsvActivationRecord. Parser attempt/revision insert order is
+/// attempt (null revision), then revision, then attempt.parsedRevisionId.
+model OsvCatalogGeneration {
+  id                    String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scopeFingerprint      String                   @map("scope_fingerprint") @db.Char(64)
+  providerIdentifier    String                   @map("provider_identifier") @db.VarChar(32)
+  inventoryScope        String                   @map("inventory_scope") @db.VarChar(128)
+  eligibleBodyScope     String                   @map("eligible_body_scope") @db.VarChar(128)
+  sourceLicenseRegistry String                   @map("source_license_registry") @db.VarChar(128)
+  listingProtocol       String                   @map("listing_protocol") @db.VarChar(128)
+  transportPolicy       String                   @map("transport_policy") @db.VarChar(128)
+  parserProtocol        String                   @map("parser_protocol") @db.VarChar(128)
+  parserResourcePolicy  String                   @map("parser_resource_policy") @db.VarChar(128)
+  schemaRevision        String                   @map("schema_revision") @db.VarChar(32)
+  schemaCommit          String                   @map("schema_commit") @db.Char(40)
+  metadataPolicy        String                   @map("metadata_policy") @db.VarChar(128)
+  syncAlgorithm         String                   @map("sync_algorithm") @db.VarChar(128)
+  lifecycleState        OsvCatalogLifecycleState @default(planned) @map("lifecycle_state")
+  version               Int                      @default(1)
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  readyAt               DateTime?                @map("ready_at") @db.Timestamptz(6)
+  activatedAt           DateTime?                @map("activated_at") @db.Timestamptz(6)
+  supersededAt          DateTime?                @map("superseded_at") @db.Timestamptz(6)
+  failedAt              DateTime?                @map("failed_at") @db.Timestamptz(6)
+  cancelledAt           DateTime?                @map("cancelled_at") @db.Timestamptz(6)
+  quarantinedAt         DateTime?                @map("quarantined_at") @db.Timestamptz(6)
+  updatedAt             DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  acquisitionRuns        OsvAcquisitionRun[]
+  inventoryRuns          OsvInventoryRun[]
+  completenessRows       OsvAcquisitionCompleteness[]
+  reconciliation         OsvReconciliation?
+  memberships            OsvCatalogMembership[]
+  quarantineRecords      OsvQuarantineRecord[]
+  presenceObservations   OsvProviderPresenceObservation[]
+  activePointers         OsvActiveCatalogPointer[]
+  activationsAsCandidate OsvActivationRecord[]            @relation("OsvActivationCandidate")
+  activationsAsPrevious  OsvActivationRecord[]            @relation("OsvActivationPrevious")
+
+  @@unique([id, scopeFingerprint], map: "osv_catalog_generation_id_scope_key")
+  @@index([scopeFingerprint, lifecycleState], map: "osv_catalog_generation_scope_state_idx")
+  @@map("osv_catalog_generation")
+}
+
+model OsvAcquisitionRun {
+  id                  String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  catalogGenerationId String                 @map("catalog_generation_id") @db.Uuid
+  scopeFingerprint    String                 @map("scope_fingerprint") @db.Char(64)
+  state               OsvAcquisitionRunState
+  attemptNumber       Int                    @map("attempt_number")
+  correlationId       String                 @map("correlation_id") @db.Uuid
+  requestedAt         DateTime               @map("requested_at") @db.Timestamptz(6)
+  updatedAt           DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  catalogGeneration OsvCatalogGeneration @relation(fields: [catalogGenerationId, scopeFingerprint], references: [id, scopeFingerprint], onDelete: Restrict)
+
+  @@index([scopeFingerprint, state], map: "osv_acquisition_run_scope_state_idx")
+  @@map("osv_acquisition_run")
+}
+
+model OsvInventoryRun {
+  id                    String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  catalogGenerationId   String                        @map("catalog_generation_id") @db.Uuid
+  state                 OsvInventoryRunState
+  inventoryScope        String                        @map("inventory_scope") @db.VarChar(128)
+  listingProtocol       String                        @map("listing_protocol") @db.VarChar(128)
+  transportPolicy       String                        @map("transport_policy") @db.VarChar(128)
+  sourceLicenseRegistry String                        @map("source_license_registry") @db.VarChar(128)
+  passCount             Int                           @map("pass_count")
+  startedAt             DateTime                      @map("started_at") @db.Timestamptz(6)
+  completedAt           DateTime?                     @map("completed_at") @db.Timestamptz(6)
+  acceptedListedCount   Int                           @map("accepted_listed_count")
+  listingRejectedCount  Int                           @map("listing_rejected_count")
+  eligibleCount         Int                           @map("eligible_count")
+  ineligibleCount       Int                           @map("ineligible_count")
+  legalReviewCount      Int                           @map("legal_review_count")
+  unknownCount          Int                           @map("unknown_count")
+  ambiguousCount        Int                           @map("ambiguous_count")
+  convergence           OsvInventoryConvergenceStatus
+  failureCode           OsvInventoryFailureCode?      @map("failure_code")
+  updatedAt             DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  catalogGeneration OsvCatalogGeneration            @relation(fields: [catalogGenerationId], references: [id], onDelete: Restrict)
+  prefixPasses      OsvInventoryPrefixPass[]
+  observations      OsvInventoryObjectObservation[]
+
+  @@index([catalogGenerationId, state], map: "osv_inventory_run_generation_state_idx")
+  @@map("osv_inventory_run")
+}
+
+model OsvInventoryPrefixPass {
+  id                    String                             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  inventoryRunId        String                             @map("inventory_run_id") @db.Uuid
+  providerPrefix        String                             @map("provider_prefix") @db.VarChar(32)
+  passNumber            Int                                @map("pass_number")
+  listingProtocol       String                             @map("listing_protocol") @db.VarChar(128)
+  transportPolicy       String                             @map("transport_policy") @db.VarChar(128)
+  sourceLicenseRegistry String                             @map("source_license_registry") @db.VarChar(128)
+  inventoryScope        String                             @map("inventory_scope") @db.VarChar(128)
+  pageCount             Int                                @map("page_count")
+  responseByteCount     Int                                @map("response_byte_count")
+  acceptedItemCount     Int                                @map("accepted_item_count")
+  listingRejectedCount  Int                                @map("listing_rejected_count")
+  terminalPageObserved  Boolean                            @map("terminal_page_observed")
+  completeness          OsvInventoryPassCompletenessStatus
+  createdAt             DateTime                           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  inventoryRun OsvInventoryRun @relation(fields: [inventoryRunId], references: [id], onDelete: Restrict)
+
+  @@unique([inventoryRunId, providerPrefix, passNumber], map: "osv_inventory_prefix_pass_natural_key")
+  @@map("osv_inventory_prefix_pass")
+}
+
+model OsvInventoryObjectObservation {
+  id                      String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  inventoryRunId          String                  @map("inventory_run_id") @db.Uuid
+  providerObjectKeyDigest String                  @map("provider_object_key_digest") @db.Char(64)
+  providerGeneration      String                  @map("provider_generation") @db.VarChar(20)
+  providerPrefix          String                  @map("provider_prefix") @db.VarChar(32)
+  declaredByteCount       Int                     @map("declared_byte_count")
+  classificationStatus    OsvClassificationStatus @map("classification_status")
+  sourceIdentifier        OsvSourceIdentifier?    @map("source_identifier")
+  etagMetadata            String?                 @map("etag_metadata") @db.VarChar(128)
+  md5HashMetadata         String?                 @map("md5_hash_metadata") @db.VarChar(128)
+  createdAt               DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  inventoryRun OsvInventoryRun @relation(fields: [inventoryRunId], references: [id], onDelete: Restrict)
+
+  @@unique([inventoryRunId, providerObjectKeyDigest, providerGeneration], map: "osv_inventory_object_observation_natural_key")
+  @@map("osv_inventory_object_observation")
+}
+
+model OsvProviderObject {
+  id                      String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerIdentifier      String                 @map("provider_identifier") @db.VarChar(32)
+  /// Validated provider object key. Never an object-storage path.
+  providerObjectKey       String                 @map("provider_object_key") @db.VarChar(512)
+  providerObjectKeyDigest String                 @map("provider_object_key_digest") @db.Char(64)
+  providerPrefix          String                 @map("provider_prefix") @db.VarChar(32)
+  familyKind              OsvFamilyCandidateKind @map("family_kind")
+  familyValue             String?                @map("family_value") @db.VarChar(64)
+  createdAt               DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  generations          OsvProviderGeneration[]
+  presenceObservations OsvProviderPresenceObservation[]
+
+  @@unique([providerIdentifier, providerObjectKeyDigest], map: "osv_provider_object_digest_uidx")
+  @@unique([providerIdentifier, providerObjectKey], map: "osv_provider_object_key_uidx")
+  @@map("osv_provider_object")
+}
+
+model OsvProviderGeneration {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerObjectId        String   @map("provider_object_id") @db.Uuid
+  providerObjectKeyDigest String   @map("provider_object_key_digest") @db.Char(64)
+  providerGeneration      String   @map("provider_generation") @db.VarChar(20)
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  providerObject OsvProviderObject           @relation(fields: [providerObjectId], references: [id], onDelete: Restrict)
+  bodySnapshot   OsvProviderBodySnapshot?
+  revisions      OsvParsedAdvisoryRevision[]
+
+  @@unique([providerObjectId, providerGeneration], map: "osv_provider_generation_natural_key")
+  @@index([providerObjectKeyDigest, providerGeneration], map: "osv_provider_generation_digest_idx")
+  @@map("osv_provider_generation")
+}
+
+model OsvObjectAttachment {
+  id                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storageKind          OsvObjectStorageKind @map("storage_kind")
+  role                 OsvObjectStorageRole
+  objectKey            String               @map("object_key") @db.VarChar(512)
+  locatorContentSha256 String?              @map("locator_content_sha256") @db.Char(64)
+  uploadId             String?              @map("upload_id") @db.Uuid
+  contentSha256        String               @map("content_sha256") @db.Char(64)
+  byteCount            Int                  @map("byte_count")
+  contentType          String               @map("content_type") @db.VarChar(128)
+  contentEncoding      String               @map("content_encoding") @db.VarChar(32)
+  state                OsvAttachmentState
+  cleanupEligible      Boolean              @map("cleanup_eligible")
+  createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  bodySnapshot   OsvProviderBodySnapshot?
+  parsedRevision OsvParsedAdvisoryRevision?
+
+  @@index([state, createdAt], map: "osv_object_attachment_cleanup_idx")
+  @@map("osv_object_attachment")
+}
+
+model OsvProviderBodySnapshot {
+  id                   String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerGenerationId String                  @unique(map: "osv_provider_body_snapshot_generation_uidx") @map("provider_generation_id") @db.Uuid
+  attachmentId         String                  @unique(map: "osv_provider_body_snapshot_attachment_uidx") @map("attachment_id") @db.Uuid
+  contentSha256        String                  @map("content_sha256") @db.Char(64)
+  receivedByteCount    Int                     @map("received_byte_count")
+  declaredByteCount    Int                     @map("declared_byte_count")
+  contentType          String                  @map("content_type") @db.VarChar(128)
+  contentEncoding      String                  @map("content_encoding") @db.VarChar(32)
+  sourceIdentifier     OsvSourceIdentifier     @map("source_identifier")
+  registryIdentifier   String                  @map("registry_identifier") @db.VarChar(128)
+  eligibleBodyScope    String                  @map("eligible_body_scope") @db.VarChar(128)
+  transportPolicy      String                  @map("transport_policy") @db.VarChar(128)
+  retrievedAt          DateTime                @map("retrieved_at") @db.Timestamptz(6)
+  classificationStatus OsvClassificationStatus @map("classification_status")
+  createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  providerGeneration OsvProviderGeneration            @relation(fields: [providerGenerationId], references: [id], onDelete: Restrict)
+  attachment         OsvObjectAttachment              @relation(fields: [attachmentId], references: [id], onDelete: Restrict)
+  parserAttempts     OsvParserAttempt[]
+  revisions          OsvParsedAdvisoryRevision[]
+  quarantineRecords  OsvQuarantineRecord[]
+  historicalPresence OsvProviderPresenceObservation[]
+
+  @@map("osv_provider_body_snapshot")
+}
+
+model OsvParserAttempt {
+  id                     String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  snapshotId             String                         @map("snapshot_id") @db.Uuid
+  protocolIdentifier     String                         @map("protocol_identifier") @db.VarChar(128)
+  schemaRevision         String                         @map("schema_revision") @db.VarChar(32)
+  schemaCommit           String                         @map("schema_commit") @db.Char(40)
+  resourcePolicy         String                         @map("resource_policy") @db.VarChar(128)
+  registryIdentifier     String                         @map("registry_identifier") @db.VarChar(128)
+  sourceIdentifier       OsvSourceIdentifier            @map("source_identifier")
+  inputSha256            String                         @map("input_sha256") @db.Char(64)
+  inputByteCount         Int                            @map("input_byte_count")
+  attemptNumber          Int                            @map("attempt_number")
+  resultState            OsvParserAttemptResultState    @map("result_state")
+  failureKind            String?                        @map("failure_kind") @db.VarChar(64)
+  retryability           OsvAdvisoryParserRetryability?
+  phase                  OsvAdvisoryParserFailurePhase?
+  terminationRequired    Boolean                        @map("termination_required")
+  warningCodes           OsvAdvisoryParserWarningCode[] @default([]) @map("warning_codes")
+  workerLifecycleOutcome OsvWorkerLifecycleOutcome      @map("worker_lifecycle_outcome")
+  parsedRevisionId       String?                        @unique(map: "osv_parser_attempt_revision_uidx") @map("parsed_revision_id") @db.Uuid
+  correlationId          String                         @map("correlation_id") @db.Uuid
+  startedAt              DateTime                       @map("started_at") @db.Timestamptz(6)
+  completedAt            DateTime                       @map("completed_at") @db.Timestamptz(6)
+  createdAt              DateTime                       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  snapshot          OsvProviderBodySnapshot    @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  parsedRevision    OsvParsedAdvisoryRevision? @relation("OsvAttemptParsedRevision", fields: [parsedRevisionId], references: [id], onDelete: Restrict)
+  producedRevision  OsvParsedAdvisoryRevision? @relation("OsvRevisionParserAttempt")
+  quarantineRecords OsvQuarantineRecord[]
+
+  @@unique([snapshotId, attemptNumber], map: "osv_parser_attempt_snapshot_ordinal_uidx")
+  @@map("osv_parser_attempt")
+}
+
+model OsvParsedAdvisoryRevision {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  snapshotId           String              @map("snapshot_id") @db.Uuid
+  parserAttemptId      String              @unique(map: "osv_parsed_advisory_revision_attempt_uidx") @map("parser_attempt_id") @db.Uuid
+  providerGenerationId String              @map("provider_generation_id") @db.Uuid
+  documentAttachmentId String              @unique(map: "osv_parsed_advisory_revision_attachment_uidx") @map("document_attachment_id") @db.Uuid
+  documentIdentifier   String              @map("document_identifier") @db.VarChar(128)
+  protocolIdentifier   String              @map("protocol_identifier") @db.VarChar(128)
+  schemaRevision       String              @map("schema_revision") @db.VarChar(32)
+  schemaCommit         String              @map("schema_commit") @db.Char(40)
+  resourcePolicy       String              @map("resource_policy") @db.VarChar(128)
+  registryIdentifier   String              @map("registry_identifier") @db.VarChar(128)
+  sourceIdentifier     OsvSourceIdentifier @map("source_identifier")
+  contentSha256        String              @map("content_sha256") @db.Char(64)
+  parsedOutputSha256   String              @map("parsed_output_sha256") @db.Char(64)
+  parsedTopLevelOsvId  String              @map("parsed_top_level_osv_id") @db.VarChar(512)
+  publishedAt          DateTime?           @map("published_at") @db.Timestamptz(6)
+  modifiedAt           DateTime?           @map("modified_at") @db.Timestamptz(6)
+  withdrawnAt          DateTime?           @map("withdrawn_at") @db.Timestamptz(6)
+  withdrawn            Boolean
+  aliasCount           Int                 @map("alias_count")
+  relatedCount         Int                 @map("related_count")
+  affectedPackageCount Int                 @map("affected_package_count")
+  rangeCount           Int                 @map("range_count")
+  eventCount           Int                 @map("event_count")
+  explicitVersionCount Int                 @map("explicit_version_count")
+  referenceCount       Int                 @map("reference_count")
+  creditCount          Int                 @map("credit_count")
+  severityCount        Int                 @map("severity_count")
+  normalizationState   String              @map("normalization_state") @db.VarChar(64)
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  snapshot            OsvProviderBodySnapshot          @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  parserAttempt       OsvParserAttempt                 @relation("OsvRevisionParserAttempt", fields: [parserAttemptId], references: [id], onDelete: Restrict)
+  referencedByAttempt OsvParserAttempt?                @relation("OsvAttemptParsedRevision")
+  providerGeneration  OsvProviderGeneration            @relation(fields: [providerGenerationId], references: [id], onDelete: Restrict)
+  documentAttachment  OsvObjectAttachment              @relation(fields: [documentAttachmentId], references: [id], onDelete: Restrict)
+  memberships         OsvCatalogMembership[]
+  quarantineRecords   OsvQuarantineRecord[]
+  historicalPresence  OsvProviderPresenceObservation[]
+
+  @@unique([snapshotId, protocolIdentifier, schemaRevision, schemaCommit, resourcePolicy, registryIdentifier], map: "osv_parsed_advisory_revision_pin_uidx")
+  @@index([providerGenerationId], map: "osv_parsed_advisory_revision_generation_idx")
+  @@map("osv_parsed_advisory_revision")
+}
+
+model OsvCatalogMembership {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  catalogGenerationId String   @map("catalog_generation_id") @db.Uuid
+  revisionId          String   @map("revision_id") @db.Uuid
+  attachedAt          DateTime @default(now()) @map("attached_at") @db.Timestamptz(6)
+
+  catalogGeneration OsvCatalogGeneration      @relation(fields: [catalogGenerationId], references: [id], onDelete: Restrict)
+  revision          OsvParsedAdvisoryRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+
+  @@unique([catalogGenerationId, revisionId], map: "osv_catalog_membership_natural_key")
+  @@map("osv_catalog_membership")
+}
+
+model OsvAcquisitionCompleteness {
+  id                    String                             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  catalogGenerationId   String                             @map("catalog_generation_id") @db.Uuid
+  dimension             OsvCompletenessDimension
+  status                OsvCompletenessStatus
+  requiredCount         Int                                @map("required_count")
+  observedCount         Int                                @map("observed_count")
+  discrepancyCodes      OsvReconciliationDiscrepancyCode[] @default([]) @map("discrepancy_codes")
+  blocksActivation      Boolean                            @map("blocks_activation")
+  malMatchingProhibited Boolean                            @map("mal_matching_prohibited")
+  updatedAt             DateTime                           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  catalogGeneration OsvCatalogGeneration @relation(fields: [catalogGenerationId], references: [id], onDelete: Restrict)
+
+  @@unique([catalogGenerationId, dimension], map: "osv_acquisition_completeness_natural_key")
+  @@map("osv_acquisition_completeness")
+}
+
+model OsvReconciliation {
+  catalogGenerationId           String                             @id @map("catalog_generation_id") @db.Uuid
+  acceptedListedCount           Int                                @map("accepted_listed_count")
+  eligibleCount                 Int                                @map("eligible_count")
+  ineligibleCount               Int                                @map("ineligible_count")
+  legalReviewCount              Int                                @map("legal_review_count")
+  unknownCount                  Int                                @map("unknown_count")
+  ambiguousCount                Int                                @map("ambiguous_count")
+  listingRejectedCount          Int                                @map("listing_rejected_count")
+  attachedEligibleSnapshotCount Int                                @map("attached_eligible_snapshot_count")
+  missingEligibleSnapshotCount  Int                                @map("missing_eligible_snapshot_count")
+  nonEligibleSnapshotCount      Int                                @map("non_eligible_snapshot_count")
+  parserSuccessCount            Int                                @map("parser_success_count")
+  parserFailureCount            Int                                @map("parser_failure_count")
+  quarantinedSnapshotCount      Int                                @map("quarantined_snapshot_count")
+  acceptedRevisionCount         Int                                @map("accepted_revision_count")
+  withdrawnRevisionCount        Int                                @map("withdrawn_revision_count")
+  membershipCount               Int                                @map("membership_count")
+  providerAbsentCount           Int                                @map("provider_absent_count")
+  immutableConflictCount        Int                                @map("immutable_conflict_count")
+  blockingQuarantineCount       Int                                @map("blocking_quarantine_count")
+  failClosedRetrievedBodyCount  Int                                @map("fail_closed_retrieved_body_count")
+  pinMismatchCount              Int                                @map("pin_mismatch_count")
+  passed                        Boolean
+  discrepancyCodes              OsvReconciliationDiscrepancyCode[] @default([]) @map("discrepancy_codes")
+  blocksActivation              Boolean                            @map("blocks_activation")
+  matchingCompleteness          String                             @map("matching_completeness") @db.VarChar(32)
+  frozenAt                      DateTime                           @default(now()) @map("frozen_at") @db.Timestamptz(6)
+
+  catalogGeneration OsvCatalogGeneration @relation(fields: [catalogGenerationId], references: [id], onDelete: Restrict)
+
+  @@map("osv_reconciliation")
+}
+
+model OsvQuarantineRecord {
+  id                      String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  catalogGenerationId     String                  @map("catalog_generation_id") @db.Uuid
+  providerObjectKeyDigest String?                 @map("provider_object_key_digest") @db.Char(64)
+  snapshotId              String?                 @map("snapshot_id") @db.Uuid
+  parserAttemptId         String?                 @map("parser_attempt_id") @db.Uuid
+  revisionId              String?                 @map("revision_id") @db.Uuid
+  reasonCode              OsvQuarantineReasonCode @map("reason_code")
+  originatingPhase        OsvQuarantinePhase      @map("originating_phase")
+  diagnosticCode          OsvQuarantineReasonCode @map("diagnostic_code")
+  recordedAt              DateTime                @map("recorded_at") @db.Timestamptz(6)
+  blocksActivation        Boolean                 @map("blocks_activation")
+  createdAt               DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  catalogGeneration OsvCatalogGeneration       @relation(fields: [catalogGenerationId], references: [id], onDelete: Restrict)
+  snapshot          OsvProviderBodySnapshot?   @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  parserAttempt     OsvParserAttempt?          @relation(fields: [parserAttemptId], references: [id], onDelete: Restrict)
+  revision          OsvParsedAdvisoryRevision? @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+
+  @@index([catalogGenerationId, blocksActivation], map: "osv_quarantine_record_generation_blocking_idx")
+  @@map("osv_quarantine_record")
+}
+
+model OsvProviderPresenceObservation {
+  id                      String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  catalogGenerationId     String          @map("catalog_generation_id") @db.Uuid
+  providerObjectId        String          @map("provider_object_id") @db.Uuid
+  providerObjectKeyDigest String          @map("provider_object_key_digest") @db.Char(64)
+  kind                    OsvPresenceKind
+  recordedAt              DateTime        @map("recorded_at") @db.Timestamptz(6)
+  historicalSnapshotId    String?         @map("historical_snapshot_id") @db.Uuid
+  historicalRevisionId    String?         @map("historical_revision_id") @db.Uuid
+  createdAt               DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  catalogGeneration  OsvCatalogGeneration       @relation(fields: [catalogGenerationId], references: [id], onDelete: Restrict)
+  providerObject     OsvProviderObject          @relation(fields: [providerObjectId], references: [id], onDelete: Restrict)
+  historicalSnapshot OsvProviderBodySnapshot?   @relation(fields: [historicalSnapshotId], references: [id], onDelete: Restrict)
+  historicalRevision OsvParsedAdvisoryRevision? @relation(fields: [historicalRevisionId], references: [id], onDelete: Restrict)
+
+  @@unique([catalogGenerationId, providerObjectId, kind], map: "osv_provider_presence_observation_natural_key")
+  @@map("osv_provider_presence_observation")
+}
+
+model OsvActiveCatalogPointer {
+  scopeFingerprint String   @id @map("scope_fingerprint") @db.Char(64)
+  generationId     String?  @map("generation_id") @db.Uuid
+  version          Int
+  updatedAt        DateTime @map("updated_at") @db.Timestamptz(6)
+
+  generation OsvCatalogGeneration? @relation(fields: [generationId, scopeFingerprint], references: [id, scopeFingerprint], onDelete: Restrict)
+
+  @@map("osv_active_catalog_pointer")
+}
+
+model OsvActivationRecord {
+  id                      String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scopeFingerprint        String               @map("scope_fingerprint") @db.Char(64)
+  candidateGenerationId   String               @map("candidate_generation_id") @db.Uuid
+  previousGenerationId    String?              @map("previous_generation_id") @db.Uuid
+  expectedPointerVersion  Int                  @map("expected_pointer_version")
+  resultingPointerVersion Int?                 @map("resulting_pointer_version")
+  activatedAt             DateTime             @map("activated_at") @db.Timestamptz(6)
+  reasonCode              String               @map("reason_code") @db.VarChar(64)
+  outcome                 OsvActivationOutcome
+  createdAt               DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  candidateGeneration OsvCatalogGeneration  @relation("OsvActivationCandidate", fields: [candidateGenerationId, scopeFingerprint], references: [id, scopeFingerprint], onDelete: Restrict)
+  previousGeneration  OsvCatalogGeneration? @relation("OsvActivationPrevious", fields: [previousGenerationId], references: [id], onDelete: Restrict)
+
+  @@index([scopeFingerprint, activatedAt], map: "osv_activation_record_scope_time_idx")
+  @@map("osv_activation_record")
 }
 
 model Integration {

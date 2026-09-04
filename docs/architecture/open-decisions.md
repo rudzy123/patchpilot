@@ -37,7 +37,7 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 | --- | --- | --- |
 | OD-8 KEV numeric limits | KEV response, count, parser, HTTP, lease, and staging-chunk bounds | Provisionally resolved for **initial KEV implementation** in `@patchpilot/config`. Values are PatchPilot safety margins from one 2026-08-31 snapshot, not CISA guarantees. |
 | OD-8 OSV archive runtime limits | Compressed/expanded `all.zip` operator download authorization | **Deferred and not authorized.** [ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md) does not approve `all.zip` as the first implementation. ZIP remains absent. Dated Session 9 size observations in [vulnerability-intelligence.md](vulnerability-intelligence.md) are non-contractual and are not download authorization. OSV runtime remains disabled. Session 11 Batch 3C compiles listing page-size and listing-page byte-cap constants only; those are not archive or object-body limits. |
-| OD-19 | Provider-neutral Vulnerability identity | **Partially resolved** for canonical CVE identity by [ADR 0023](../adr/0023-provider-neutral-cve-identity.md). Migration `20260902120000_canonical_cve_identity` is applied and frozen on the persistent development database (eleven migrations; SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). Batch 4B ships `createCveIdentityPersistence`. Batch 5B adds read-only active-catalog membership derivation. Full advisory-identity replacement of `osvId` remains open. |
+| OD-19 | Provider-neutral Vulnerability identity | **Partially resolved** for canonical CVE identity by [ADR 0023](../adr/0023-provider-neutral-cve-identity.md). Migration `20260902120000_canonical_cve_identity` is applied and frozen (SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). Session 11 Batch 5C adds the OSV acquisition foundation migration (twelve migrations). Batch 4B ships `createCveIdentityPersistence`. Batch 5B adds read-only active-catalog membership derivation. Full advisory-identity replacement of `osvId` remains open. |
 
 ## Closed in Session 9 Batch 4C (KEV persistence)
 
@@ -69,7 +69,7 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 
 | ID | Topic | Status after Batch 1B |
 | --- | --- | --- |
-| OD-19 canonical CVE identity | Global `CveIdentity` plus append-only `VulnerabilityCveIdentityLink` | **Partially resolved.** [ADR 0023](../adr/0023-provider-neutral-cve-identity.md) accepts the identity model. Batch 3B applied and froze `20260902120000_canonical_cve_identity` (SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). Batch 4B implements insert-once persistence adapters (`identities` and `links`). Batch 5B implements read-only active-catalog membership for one exact canonical CVE. Full advisory-identity replacement of `osvId` remains open. Finding enrichment remains blocked. The persistent development database has eleven finished migrations. |
+| OD-19 canonical CVE identity | Global `CveIdentity` plus append-only `VulnerabilityCveIdentityLink` | **Partially resolved.** [ADR 0023](../adr/0023-provider-neutral-cve-identity.md) accepts the identity model. Batch 3B applied and froze `20260902120000_canonical_cve_identity` (SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). Batch 4B implements insert-once persistence adapters (`identities` and `links`). Batch 5B implements read-only active-catalog membership for one exact canonical CVE. Full advisory-identity replacement of `osvId` remains open. Finding enrichment remains blocked. The persistent development database has twelve finished migrations after Session 11 Batch 5C. |
 | Full provider-neutral Vulnerability advisory identity | Replacing required unique `Vulnerability.osvId` | **Remains open.** `osvId` stays required and unique. |
 | OSV runtime | Session 9/10 import of OSV dumps | **Remains deferred.** `INTELLIGENCE_OSV_ENABLED=true` stays rejected. |
 | Finding correlation | Advisory-to-component matching and Finding writes | **Remains blocked** by the ADR 0023 four-condition gate and [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) zero-Finding. |
@@ -155,6 +155,14 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | Active catalog pointer | Separate pointer plus CAS, not a flag on generation rows and not `IntelligenceSource.activeGenerationId` | **Closed as contract.** Implementation remains Batch 5D. Activation does not trigger matching. |
 | Completeness dimensions | Inventory, eligible-body, parser, parsed-catalog, matching | **Closed as contract.** Matching remains `not_in_scope`. Equations are exact integers with no waiver. |
 | OSV object-key prefixes | Advisory-body and parsed-document locators | **Proposed**, not closed. Prefixes are `intelligence/osv/advisory_body/{tmp\|sha256}/{uuid\|sha256}` and `intelligence/osv/parsed_advisory/{tmp\|sha256}/{uuid\|sha256}`. Close in Batch 5E after adapter tests. |
+
+## Closed in Session 11 Batch 5C (acquisition schema)
+
+| ID | Topic | Status after Batch 5C |
+| --- | --- | --- |
+| OSV acquisition persistence foundation | Prisma models plus `20260904120000_osv_acquisition_persistence_foundation` | **Schema only.** Frozen SHA-256 `ac99d96d97074b9ad38064ccbbcd9670321bed0872c20a71c0a679d837704349`. Twelve finished migrations. No adapter, object storage, provider retrieval, synchronization, or catalog-activation execution. No active OSV generation is seeded. |
+| Immutable provider identities | Provider object and generation natural keys | **Closed in schema.** Unique `(provider, key)`, `(provider, digest)`, and `(object, generation)`. Provider generation is a checked decimal string. |
+| Separate active pointer | One pointer per catalog scope | **Closed in schema.** `osv_active_catalog_pointer` is the mutable projection; `osv_activation_record` is append-only history. Activation execution remains Batch 5D. |
 
 ## Still open
 

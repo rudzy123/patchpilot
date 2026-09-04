@@ -17,6 +17,7 @@ import {
   SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
   SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
   SESSION_10_CANONICAL_CVE_IDENTITY,
+  SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
   applyMigrationSqlAndResolve,
   applySession3Schema,
   applyThroughAuditActorAnonymous,
@@ -27,6 +28,7 @@ import {
   applyThroughSession7,
   applyThroughSession8,
   applyThroughSession9,
+  applyThroughSession10,
   createEphemeralDatabase,
   deployMigrations,
   dropEphemeralDatabase,
@@ -78,6 +80,24 @@ const PRISMA_TABLES = [
   'kev_generation',
   'kev_entry',
   'kev_entry_cwe',
+  'osv_catalog_generation',
+  'osv_acquisition_run',
+  'osv_inventory_run',
+  'osv_inventory_prefix_pass',
+  'osv_inventory_object_observation',
+  'osv_provider_object',
+  'osv_provider_generation',
+  'osv_object_attachment',
+  'osv_provider_body_snapshot',
+  'osv_parser_attempt',
+  'osv_parsed_advisory_revision',
+  'osv_catalog_membership',
+  'osv_acquisition_completeness',
+  'osv_reconciliation',
+  'osv_quarantine_record',
+  'osv_provider_presence_observation',
+  'osv_active_catalog_pointer',
+  'osv_activation_record',
 ] as const;
 
 const PRISMA_FOREIGN_KEYS = [
@@ -99,6 +119,13 @@ const PRISMA_FOREIGN_KEYS = [
   'vulnerability_sync_run_generation_owned_fkey',
   'vulnerability_cve_identity_vulnerability_id_fkey',
   'vulnerability_cve_identity_cve_identity_id_fkey',
+  'osv_acquisition_run_catalog_generation_id_scope_fingerprin_fkey',
+  'osv_provider_generation_provider_object_id_fkey',
+  'osv_provider_body_snapshot_provider_generation_id_fkey',
+  'osv_parser_attempt_snapshot_id_fkey',
+  'osv_parsed_advisory_revision_parser_attempt_id_fkey',
+  'osv_active_catalog_pointer_generation_id_scope_fingerprint_fkey',
+  'osv_activation_record_candidate_generation_id_scope_finger_fkey',
 ] as const;
 
 const SQL_ONLY_CHECKS = [
@@ -160,6 +187,70 @@ const SQL_ONLY_CHECKS = [
   'kev_entry_cwe_value_chk',
   'intelligence_source_active_provider_chk',
   'cve_identity_cve_chk',
+  'osv_catalog_generation_scope_fingerprint_chk',
+  'osv_catalog_generation_provider_chk',
+  'osv_catalog_generation_schema_commit_chk',
+  'osv_catalog_generation_pin_shape_chk',
+  'osv_catalog_generation_version_chk',
+  'osv_catalog_generation_lifecycle_timestamps_chk',
+  'osv_acquisition_run_scope_fingerprint_chk',
+  'osv_acquisition_run_attempt_chk',
+  'osv_inventory_run_counts_nonnegative_chk',
+  'osv_inventory_run_classification_sum_chk',
+  'osv_inventory_run_completed_after_started_chk',
+  'osv_inventory_run_running_chk',
+  'osv_inventory_run_complete_chk',
+  'osv_inventory_run_failed_chk',
+  'osv_inventory_run_cancelled_chk',
+  'osv_inventory_prefix_pass_prefix_chk',
+  'osv_inventory_prefix_pass_number_chk',
+  'osv_inventory_prefix_pass_counts_nonnegative_chk',
+  'osv_inventory_prefix_pass_complete_chk',
+  'osv_inventory_object_observation_digest_chk',
+  'osv_inventory_object_observation_generation_chk',
+  'osv_inventory_object_observation_prefix_chk',
+  'osv_inventory_object_observation_byte_count_chk',
+  'osv_inventory_object_observation_source_chk',
+  'osv_inventory_object_observation_metadata_chk',
+  'osv_provider_object_provider_chk',
+  'osv_provider_object_digest_chk',
+  'osv_provider_object_key_chk',
+  'osv_provider_object_prefix_chk',
+  'osv_provider_object_family_chk',
+  'osv_provider_generation_digest_chk',
+  'osv_provider_generation_value_chk',
+  'osv_object_attachment_sha256_chk',
+  'osv_object_attachment_byte_count_chk',
+  'osv_object_attachment_type_chk',
+  'osv_object_attachment_locator_chk',
+  'osv_provider_body_snapshot_sha256_chk',
+  'osv_provider_body_snapshot_bytes_chk',
+  'osv_provider_body_snapshot_type_chk',
+  'osv_provider_body_snapshot_source_chk',
+  'osv_parser_attempt_sha256_chk',
+  'osv_parser_attempt_counts_chk',
+  'osv_parser_attempt_completed_after_started_chk',
+  'osv_parser_attempt_outcome_chk',
+  'osv_parsed_advisory_revision_sha256_chk',
+  'osv_parsed_advisory_revision_osv_id_chk',
+  'osv_parsed_advisory_revision_withdrawn_chk',
+  'osv_parsed_advisory_revision_counts_nonnegative_chk',
+  'osv_parsed_advisory_revision_normalization_chk',
+  'osv_acquisition_completeness_counts_nonnegative_chk',
+  'osv_acquisition_completeness_dimension_chk',
+  'osv_reconciliation_counts_nonnegative_chk',
+  'osv_reconciliation_matching_chk',
+  'osv_reconciliation_result_chk',
+  'osv_quarantine_record_digest_chk',
+  'osv_quarantine_record_blocks_chk',
+  'osv_quarantine_record_diagnostic_chk',
+  'osv_provider_presence_observation_digest_chk',
+  'osv_active_catalog_pointer_scope_chk',
+  'osv_active_catalog_pointer_version_chk',
+  'osv_activation_record_scope_chk',
+  'osv_activation_record_version_chk',
+  'osv_activation_record_reason_chk',
+  'osv_activation_record_outcome_chk',
 ] as const;
 
 const SQL_ONLY_INDEXES = [
@@ -195,6 +286,9 @@ const SQL_ONLY_INDEXES = [
   'kev_entry_generation_ordinal_id_idx',
   'cve_identity_cve_uidx',
   'vulnerability_cve_identity_natural_key',
+  'osv_acquisition_run_inflight_uidx',
+  'osv_catalog_generation_one_active_uidx',
+  'osv_object_attachment_cleanup_eligible_idx',
 ] as const;
 
 const SQL_ONLY_TRIGGERS = [
@@ -528,6 +622,7 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
   expect(findingColumns).not.toContain('generation_id');
 
   await assertCanonicalCveIdentityCatalog(client);
+  await assertOsvAcquisitionCatalog(client);
 }
 
 async function assertCanonicalCveIdentityCatalog(client: PrismaClient): Promise<void> {
@@ -768,10 +863,140 @@ async function assertCanonicalCveIdentityCatalog(client: PrismaClient): Promise<
   expect(Number(linkCount[0]?.count)).toBe(0);
 }
 
+const OSV_ACQUISITION_TABLES = [
+  'osv_catalog_generation',
+  'osv_acquisition_run',
+  'osv_inventory_run',
+  'osv_inventory_prefix_pass',
+  'osv_inventory_object_observation',
+  'osv_provider_object',
+  'osv_provider_generation',
+  'osv_object_attachment',
+  'osv_provider_body_snapshot',
+  'osv_parser_attempt',
+  'osv_parsed_advisory_revision',
+  'osv_catalog_membership',
+  'osv_acquisition_completeness',
+  'osv_reconciliation',
+  'osv_quarantine_record',
+  'osv_provider_presence_observation',
+  'osv_active_catalog_pointer',
+  'osv_activation_record',
+] as const;
+
+async function assertOsvAcquisitionCatalog(client: PrismaClient): Promise<void> {
+  const tables = await names(
+    client,
+    `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'`,
+  );
+  for (const table of OSV_ACQUISITION_TABLES) {
+    expect(tables).toContain(table);
+  }
+
+  const forbiddenColumns = await client.$queryRaw<
+    Array<{ table_name: string; column_name: string }>
+  >`
+    SELECT table_name, column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name LIKE 'osv_%'
+      AND column_name IN (
+        'organization_id',
+        'tenant_id',
+        'user_id',
+        'membership_id',
+        'asset_id',
+        'component_id',
+        'component_occurrence_id',
+        'finding_id',
+        'finding_observation_id',
+        'risk_calculation_id',
+        'evidence_id',
+        'page_token',
+        'raw_body',
+        'body',
+        'advisory_json',
+        'provider_body'
+      )
+  `;
+  expect(forbiddenColumns).toEqual([]);
+
+  const jsonColumns = await client.$queryRaw<Array<{ table_name: string; column_name: string }>>`
+    SELECT table_name, column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name LIKE 'osv_%'
+      AND data_type IN ('json', 'jsonb')
+  `;
+  expect(jsonColumns).toEqual([]);
+
+  const generationType = await client.$queryRaw<
+    Array<{ data_type: string; character_maximum_length: number | null }>
+  >`
+    SELECT data_type, character_maximum_length
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'osv_provider_generation'
+      AND column_name = 'provider_generation'
+  `;
+  expect(generationType[0]?.data_type).toBe('character varying');
+  expect(generationType[0]?.character_maximum_length).toBe(20);
+
+  const forbiddenFks = await client.$queryRaw<Array<{ conname: string }>>`
+    SELECT c.conname
+    FROM pg_constraint c
+    JOIN pg_class rel ON rel.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = rel.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.contype = 'f'
+      AND rel.relname LIKE 'osv_%'
+      AND (
+        c.confrelid = 'organization'::regclass
+        OR c.confrelid = 'finding'::regclass
+        OR c.confrelid = 'finding_observation'::regclass
+        OR c.confrelid = 'component'::regclass
+        OR c.confrelid = 'component_occurrence'::regclass
+        OR c.confrelid = 'asset'::regclass
+        OR c.confrelid = 'sbom'::regclass
+        OR c.confrelid = 'evidence'::regclass
+        OR c.confrelid = 'kev_entry'::regclass
+        OR c.confrelid = 'kev_generation'::regclass
+        OR c.confrelid = 'outbox_event'::regclass
+        OR c.confrelid = 'background_job'::regclass
+        OR c.confrelid = 'cve_identity'::regclass
+        OR c.confrelid = 'vulnerability'::regclass
+      )
+  `;
+  expect(forbiddenFks).toEqual([]);
+
+  const cascadeDeletes = await client.$queryRaw<Array<{ conname: string }>>`
+    SELECT c.conname
+    FROM pg_constraint c
+    JOIN pg_class rel ON rel.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = rel.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.contype = 'f'
+      AND rel.relname LIKE 'osv_%'
+      AND c.confdeltype = 'c'
+  `;
+  expect(cascadeDeletes).toEqual([]);
+
+  const pointerCount = await client.$queryRaw<Array<{ count: bigint | number | string }>>`
+    SELECT COUNT(*)::bigint AS count FROM "osv_active_catalog_pointer"
+  `;
+  const activeGenerationCount = await client.$queryRaw<Array<{ count: bigint | number | string }>>`
+    SELECT COUNT(*)::bigint AS count
+    FROM "osv_catalog_generation"
+    WHERE "lifecycle_state" = 'active'
+  `;
+  expect(Number(pointerCount[0]?.count)).toBe(0);
+  expect(Number(activeGenerationCount[0]?.count)).toBe(0);
+}
+
 describe('frozen migrations', () => {
-  it('keeps Session 3 through Session 10 canonical CVE identity SQL byte-stable', async () => {
-    expect(FROZEN_MIGRATIONS).toHaveLength(11);
-    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(11);
+  it('keeps Session 3 through Session 11 OSV acquisition SQL byte-stable', async () => {
+    expect(FROZEN_MIGRATIONS).toHaveLength(12);
+    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(12);
     expect(FROZEN_MIGRATIONS.map((item) => item.directory)).toEqual([
       ...EXPECTED_APPLIED_MIGRATIONS,
     ]);
@@ -787,12 +1012,26 @@ describe('frozen migrations', () => {
     expect(existsSync(path.join(sqlDir, 'review-corrections-extras.sql'))).toBe(false);
   });
 
-  it('lists the Session 10 canonical CVE identity migration once, last, and frozen', () => {
+  it('lists the Session 11 OSV acquisition migration once, last, and frozen', async () => {
     expect(
-      EXPECTED_APPLIED_MIGRATIONS.filter((name) => name === SESSION_10_CANONICAL_CVE_IDENTITY),
-    ).toEqual([SESSION_10_CANONICAL_CVE_IDENTITY]);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-1)).toBe(SESSION_10_CANONICAL_CVE_IDENTITY);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-2)).toBe(SESSION_9_KEV_INTELLIGENCE_PERSISTENCE);
+      EXPECTED_APPLIED_MIGRATIONS.filter(
+        (name) => name === SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
+      ),
+    ).toEqual([SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION]);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-1)).toBe(
+      SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
+    );
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-2)).toBe(SESSION_10_CANONICAL_CVE_IDENTITY);
+    expect(
+      FROZEN_MIGRATIONS.filter(
+        (item) => item.directory === SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
+      ),
+    ).toEqual([
+      {
+        directory: SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
+        sha256: 'ac99d96d97074b9ad38064ccbbcd9670321bed0872c20a71c0a679d837704349',
+      },
+    ]);
     expect(
       FROZEN_MIGRATIONS.filter((item) => item.directory === SESSION_10_CANONICAL_CVE_IDENTITY),
     ).toEqual([
@@ -801,7 +1040,9 @@ describe('frozen migrations', () => {
         sha256: '2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba',
       },
     ]);
-    expect(existsSync(frozenMigrationFile(SESSION_10_CANONICAL_CVE_IDENTITY))).toBe(true);
+    expect(existsSync(frozenMigrationFile(SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION))).toBe(
+      true,
+    );
   });
 });
 
@@ -1036,6 +1277,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
         SESSION_10_CANONICAL_CVE_IDENTITY,
+        SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
       ]);
       expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
 
@@ -1110,6 +1352,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
         SESSION_10_CANONICAL_CVE_IDENTITY,
+        SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1241,6 +1484,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
         SESSION_10_CANONICAL_CVE_IDENTITY,
+        SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -1295,6 +1539,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
         SESSION_10_CANONICAL_CVE_IDENTITY,
+        SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1338,6 +1583,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
         SESSION_10_CANONICAL_CVE_IDENTITY,
+        SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1379,6 +1625,7 @@ describe('migrations', { timeout: 90_000 }, () => {
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
         SESSION_10_CANONICAL_CVE_IDENTITY,
+        SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1387,7 +1634,7 @@ describe('migrations', { timeout: 90_000 }, () => {
     }
   });
 
-  it('upgrades a Session 9 database by applying only canonical CVE identity', async () => {
+  it('upgrades a Session 9 database by applying canonical CVE identity then OSV acquisition', async () => {
     const ephemeral = await createEphemeralDatabase('migrate');
     const client = new PrismaClient({
       datasources: { db: { url: ephemeral.databaseUrl } },
@@ -1413,6 +1660,7 @@ describe('migrations', { timeout: 90_000 }, () => {
       expect(tablesBefore).toContain('kev_generation');
       expect(tablesBefore).not.toContain('cve_identity');
       expect(tablesBefore).not.toContain('vulnerability_cve_identity');
+      expect(tablesBefore).not.toContain('osv_catalog_generation');
 
       await deployMigrations(ephemeral.databaseUrl);
       const appliedAfter = await names(
@@ -1421,6 +1669,50 @@ describe('migrations', { timeout: 90_000 }, () => {
       );
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_10_CANONICAL_CVE_IDENTITY,
+        SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
+      ]);
+      await assertFinalMigratedSchema(client);
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades a Session 10 database by applying only OSV acquisition persistence', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughSession10(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore).toEqual([
+        ...SESSION_6_COMPLETE_MIGRATIONS,
+        SESSION_7_ASSET_INVENTORY_CONSTRAINTS,
+        SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
+        SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
+        SESSION_10_CANONICAL_CVE_IDENTITY,
+      ]);
+      expect(appliedBefore).not.toContain(SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION);
+      const tablesBefore = await names(
+        client,
+        `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'`,
+      );
+      expect(tablesBefore).toContain('cve_identity');
+      expect(tablesBefore).not.toContain('osv_catalog_generation');
+      expect(tablesBefore).not.toContain('osv_active_catalog_pointer');
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1458,6 +1750,10 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
       );
       await applyMigrationSqlAndResolve(ephemeral.databaseUrl, SESSION_10_CANONICAL_CVE_IDENTITY);
+      await applyMigrationSqlAndResolve(
+        ephemeral.databaseUrl,
+        SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
+      );
       await assertFinalMigratedSchema(client);
 
       const checkDef = await names(
@@ -1545,6 +1841,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
         SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
         SESSION_10_CANONICAL_CVE_IDENTITY,
+        SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
       ]);
       await assertFinalMigratedSchema(client);
 

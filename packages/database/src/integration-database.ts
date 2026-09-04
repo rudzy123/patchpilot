@@ -66,6 +66,10 @@ export const FROZEN_MIGRATIONS = [
     directory: '20260902120000_canonical_cve_identity',
     sha256: '2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba',
   },
+  {
+    directory: '20260904120000_osv_acquisition_persistence_foundation',
+    sha256: 'ac99d96d97074b9ad38064ccbbcd9670321bed0872c20a71c0a679d837704349',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
@@ -79,6 +83,9 @@ export const SESSION_9_KEV_INTELLIGENCE_PERSISTENCE =
 
 export const SESSION_10_CANONICAL_CVE_IDENTITY = '20260902120000_canonical_cve_identity' as const;
 
+export const SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION =
+  '20260904120000_osv_acquisition_persistence_foundation' as const;
+
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
   '20260827120000_tenant_model',
@@ -91,6 +98,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   SESSION_8_SBOM_INGESTION_GRAPH_PERSISTENCE,
   SESSION_9_KEV_INTELLIGENCE_PERSISTENCE,
   SESSION_10_CANONICAL_CVE_IDENTITY,
+  SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
@@ -271,4 +279,14 @@ export async function applyThroughSession8(databaseUrl: string): Promise<void> {
 export async function applyThroughSession9(databaseUrl: string): Promise<void> {
   await applyThroughSession8(databaseUrl);
   await applyMigrationSqlAndResolve(databaseUrl, SESSION_9_KEV_INTELLIGENCE_PERSISTENCE);
+}
+
+export async function applyThroughSession10(databaseUrl: string): Promise<void> {
+  await applyThroughSession9(databaseUrl);
+  await applyMigrationSqlAndResolve(databaseUrl, SESSION_10_CANONICAL_CVE_IDENTITY);
+}
+
+export async function applyThroughSession11(databaseUrl: string): Promise<void> {
+  await applyThroughSession10(databaseUrl);
+  await applyMigrationSqlAndResolve(databaseUrl, SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION);
 }

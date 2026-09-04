@@ -155,3 +155,13 @@ describe('Session 10 Batch 5B public exports', () => {
     expect('SOURCE_SELECT' in databasePublic).toBe(false);
   });
 });
+
+describe('Session 11 Batch 5C public exports', () => {
+  const srcDir = path.dirname(fileURLToPath(import.meta.url));
+
+  it('does not export an OSV acquisition adapter', () => {
+    expect(existsSync(path.join(srcDir, 'osv-acquisition-persistence.ts'))).toBe(false);
+    expect('createOsvAcquisitionPersistence' in databasePublic).toBe(false);
+    expect('createOsvCatalogActivation' in databasePublic).toBe(false);
+  });
+});
