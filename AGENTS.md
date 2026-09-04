@@ -179,6 +179,26 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - No HTTP client, provider-object retrieval, advisory parsing, snapshots, object storage, persistence, Prisma, migrations, workers, schedulers, Outbox, BackgroundJob, API, permissions, or OSV enablement is included.
 - `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 11 remains zero-Finding. Session 12 remains zero-Finding.
 
+### Session 11 Batch 4A
+
+These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
+
+- Session 11 Batch 4A vendors the official OSV advisory JSON Schema (v1.9.0) with immutable provenance and integrity verification. The schema is self-contained with local-only reference closure.
+- **Upstream repository**: `https://github.com/ossf/osv-schema` (OpenSSF)
+- **Version tag**: `v1.9.0`
+- **Exact commit SHA**: `f3f826310aeca8e324baabd195632f2229952abe`
+- **Byte length**: 16,816 bytes
+- **SHA-256**: `cdb8292f72945cfdf06d3e044280d7c0867105a3a1ae6d4547c983eba20810a2`
+- **Local path**: `packages/vulnerability-intelligence/vendor/osv-schema/schema.json`
+- **Schema license**: Apache-2.0 (schema/software license, distinct from advisory content licenses)
+- All `$ref` references are local fragments (`#/$defs/...`). No remote HTTP/HTTPS references. No external schema dependencies.
+- Vendored artifacts include: `schema.json`, `PROVENANCE.json`, `SHA256SUMS`, `LICENSE`, `NOTICE`.
+- Deterministic integrity tests verify: file existence, byte counts, SHA-256 checksums, valid JSON structure, local reference closure, no remote $ref, provenance immutability, no path traversal, no runtime network capability, zero-Finding enforcement.
+- `@patchpilot/vulnerability-intelligence` exports immutable schema provenance constants and deterministic path helpers. No tenant input, no network I/O, no Findings.
+- **Critical distinction**: Vendoring the OSV schema (Apache-2.0) does NOT license all OSV advisory bodies, change Batch 3A-P source-license registry decisions, make OSV or ECHO retrieval eligible, authorize provider-body retrieval, normalization, matching, external exposure, or Finding creation. The schema is a validation tool. Advisory content licensing remains per-source. OSV and ECHO remain fail-closed.
+- No advisory parser, validation runtime, HTTP transport, object-storage snapshots, persistence, Prisma, migrations, worker, scheduler, Outbox, BackgroundJob, API, permissions, package normalization, version comparison, matching, Finding creation, or OSV enablement (`INTELLIGENCE_OSV_ENABLED=true` remains rejected).
+- Session 11 remains zero-Finding. Session 12 remains zero-Finding.
+
 ## Target repository layout
 
 ```text
