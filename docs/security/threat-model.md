@@ -51,7 +51,7 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 - CISA KEV remains an independent exploitation signal. Tenant SBOMs remain inventory. OSV data alone does not prove tenant exposure and does not create a Finding.
 - ZIP remains absent and unauthorized. `all.zip` is not the first-implementation assumption. No archive dependency is authorized.
 - `INTELLIGENCE_OSV_ENABLED=true` remains rejected. No OSV runtime, matching, fan-out, or Finding write exists. Session 11 remains zero-Finding.
-- Session 11 Batch 4B defines an isolated advisory parser protocol (metadata-only envelopes, fail-closed failure taxonomy, untrusted worker-output validation). It does not parse advisories, spawn workers, retrieve provider bodies, or invent parser byte/timeout limits while those remain `unavailable` (OD-8).
+- Session 11 Batch 4B defines an isolated advisory parser protocol (metadata-only envelopes, fail-closed failure taxonomy, untrusted worker-output validation). Batch 4B-P closes parser resource-policy v1 as PatchPilot security ceilings (not provider guarantees) and authorizes synthetic bounded reference-parser requests only. It does not parse advisories, spawn workers, retrieve provider bodies, or enable OSV. Provider-object body retrieval limits remain `unavailable` (OD-8). Production worker isolation remains unauthorized.
 
 [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) records fail-closed package identity and evaluation architecture. No comparator or evaluator exists.
 
