@@ -35,6 +35,7 @@ const INTELLIGENCE_FILES = [
   'intelligence-http-stream.ts',
   's3-intelligence-snapshot-storage.ts',
   's3-osv-advisory-object-storage.ts',
+  'osv-generation-bound-retrieval-https.ts',
 ];
 
 describe('intelligence runtime boundary', () => {
@@ -46,6 +47,33 @@ describe('intelligence runtime boundary', () => {
       expect(source, fileName).not.toMatch(banned);
       expect(source, fileName).not.toContain('globalThis.fetch');
     }
+  });
+
+  it('keeps OSV retrieval free of storage, parser, database, tenant, and Finding coupling', () => {
+    const source = readFileSync(join(srcRoot, 'osv-generation-bound-retrieval-https.ts'), 'utf8');
+    expect(source).toContain('https.request');
+    expect(source).not.toContain('globalThis.fetch');
+    expect(source).not.toContain('@aws-sdk');
+    expect(source).not.toContain('S3Client');
+    expect(source).not.toContain('createOsvArtifactAttachmentService');
+    expect(source).not.toContain('parseOsvAdvisory');
+    expect(source).not.toContain('advisory-parser-worker');
+    expect(source).not.toContain('INTELLIGENCE_OSV_ENABLED');
+    expect(source).not.toContain('organizationId');
+    expect(source).not.toContain('createFinding');
+    expect(source).not.toContain('finding.recalculate');
+    expect(source).not.toContain('maxRetries');
+    expect(source).not.toContain('backoff');
+  });
+
+  it('does not contact GCS merely by importing the OSV retrieval module', async () => {
+    const production = productionTypeScriptFiles(srcRoot).filter((filePath) =>
+      filePath.endsWith('osv-generation-bound-retrieval-https.ts'),
+    );
+    expect(production).toHaveLength(1);
+    const loaded = await import('./osv-generation-bound-retrieval-https.js');
+    expect(typeof loaded.createOsvGenerationBoundRetrievalHttpsAdapter).toBe('function');
+    expect(typeof loaded.createOsvGenerationBoundRetrievalHttpsClient).toBe('function');
   });
 
   it('does not contact CISA merely by importing the transport module', async () => {
