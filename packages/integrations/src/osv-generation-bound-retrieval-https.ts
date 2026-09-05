@@ -121,8 +121,17 @@ function mapHttpStatus(status: number | undefined): OsvGenerationBoundRetrievalF
   if (status === 429) {
     return 'http_429';
   }
+  if (status === 500) {
+    return 'http_500';
+  }
+  if (status === 502) {
+    return 'http_502';
+  }
   if (status === 503) {
     return 'service_unavailable';
+  }
+  if (status === 504) {
+    return 'http_504';
   }
   if (status !== undefined && status >= 300 && status < 400) {
     return 'redirect_rejected';

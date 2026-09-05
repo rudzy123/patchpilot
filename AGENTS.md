@@ -356,12 +356,29 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 
 These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
 
-- Session 11 Batch 6A implements one generation-bound OSV provider-object HTTPS retrieval adapter in `@patchpilot/integrations` (`createOsvGenerationBoundRetrievalHttpsClient`). It enforces committed `osv_generation_bound_retrieval_policy_v1`. The injectable `https.request` test seam is not part of the package public export.
+- Session 11 Batch 6A implements one generation-bound OSV provider-object HTTPS retrieval adapter in `@patchpilot/integrations` (`createOsvGenerationBoundRetrievalHttpsAdapter`). It enforces committed `osv_generation_bound_retrieval_policy_v1`. The injectable `https.request` test seam is not part of the package public export.
 - Authorization, GCS get-media request compilation, and the validated result contract live in `@patchpilot/vulnerability-intelligence`. The adapter performs at most one HTTP attempt. Redirects are rejected. There is no retry, backoff, HEAD preflight, Range continuation, listing execution, storage attachment, parser invocation, catalog activation, scheduler, Outbox, BackgroundJob type, API, or permission change.
 - Declared-size preflight, source eligibility, and private retention are enforced before HTTP. Generation is an ASCII decimal string bound with `ifGenerationMatch`. Response `x-goog-generation` must equal the requested generation. Received bytes must equal the declared listing size and cannot exceed 1,048,576.
 - Streaming SHA-256 is computed over exact received bytes. Identity encoding only. Successful HTTP status is exactly 200. Failures omit body, raw key, URL, headers, Location, provider prose, stack, tenant, package, and Finding data.
 - Tests use synthetic local byte streams and injected `node:https.request` / DNS seams only. They do not contact `storage.googleapis.com`. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 11 remains zero-Finding. Session 12 remains zero-Finding.
 - [ADR 0027](docs/adr/0027-osv-acquisition-persistence-and-catalog-activation.md) remains Proposed. Synchronization orchestration is Batch 6B.
+
+### Session 11 Batch 6A-R
+
+Session 11 Batch 6A-R adversarially reviews and hardens the committed Batch 6A generation-bound retrieval adapter, resolving the HTTP 500/502/504 retryability inconsistency. These are deliberate:
+
+- Batch 6A-R adds three dedicated orchestration-retryable failure kinds to `osv_generation_bound_retrieval_policy_v1`: `http_500`, `http_502`, and `http_504`. These statuses were declared `orchestration_retryable` in the policy but mapped to non-retryable `unexpected_http_status` at runtime. Now each has an exact dedicated kind with `orchestration_retryable` classification.
+- The `mapHttpStatus` function in the HTTPS adapter now maps HTTP 500 to `http_500`, HTTP 502 to `http_502`, and HTTP 504 to `http_504`. HTTP 503 remains `service_unavailable`. HTTP 408 and 429 remain distinct with their own kinds. Unmapped statuses remain `unexpected_http_status` with `non_retryable` classification.
+- Comprehensive retryability taxonomy tests verify: (1) HTTP 500/502/504 have dedicated kinds, (2) all three are `orchestration_retryable`, (3) HTTP 503 remains `service_unavailable`, (4) HTTP 408 and 429 remain distinct, (5) `unexpected_http_status` is `non_retryable`, (6) internal consistency between policy and catalog.
+- The retrieval adapter performs exactly one HTTP attempt regardless of status (retryable or non-retryable). No internal retry loop exists. Future Batch 6B orchestration owns retry execution and backoff.
+- Endpoint compilation remains fixed to `storage.googleapis.com`, HTTPS port 443, exact path prefix `/storage/v1/b/osv-vulnerabilities/o/`, and query parameters `alt=media` and `ifGenerationMatch`. Object names are URI-encoded exactly once. Generation is an ASCII decimal string with no Number conversion.
+- Redirects (301, 302, 303, 307, 308) remain rejected with dedicated `redirect_rejected` kind. No redirect target is followed. Response generation must exactly equal requested generation (string equality).
+- Compressed responses (gzip, br, deflate) remain rejected. Request sends `Accept-Encoding: identity`. Response must be `identity` or absent.
+- Received body bytes are bounded to exactly 1,048,576 (1 MiB). First byte above policy terminates consumption immediately with `response_too_large`. Declared listing size, Content-Length, and received size must reconcile exactly. Partial bodies never succeed.
+- Streaming incremental SHA-256 is computed over exact received bytes. ETag and md5Hash are informational only and cannot become PatchPilot content identity.
+- Confidential failure taxonomy: body bytes, raw provider object key, complete URL, response headers, provider prose, stack traces, tenant data, package data, and Finding data remain omitted from all failures and events.
+- Quality gates pass: 168 integrations tests pass (including 33 retryability tests and 72 retrieval tests with the fix), 753 vulnerability-intelligence tests pass, formatting passes, linting passes, typecheck passes.
+- Batch 6A-R does not implement retry execution, backoff, storage attachment, parser invocation, synchronization orchestration, pending-work queue, scheduler, Outbox, BackgroundJob types, APIs, permissions, matching, Findings, or OSV enablement. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 11 remains zero-Finding. Session 12 remains zero-Finding.
 
 ## Target repository layout
 

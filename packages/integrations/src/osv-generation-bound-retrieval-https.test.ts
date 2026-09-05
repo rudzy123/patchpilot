@@ -292,10 +292,10 @@ describe('OSV generation-bound retrieval HTTPS adapter', () => {
       { status: 408, kind: 'http_408' },
       { status: 412, kind: 'generation_not_found' },
       { status: 429, kind: 'http_429' },
-      { status: 500, kind: 'unexpected_http_status' },
-      { status: 502, kind: 'unexpected_http_status' },
+      { status: 500, kind: 'http_500' },
+      { status: 502, kind: 'http_502' },
       { status: 503, kind: 'service_unavailable' },
-      { status: 504, kind: 'unexpected_http_status' },
+      { status: 504, kind: 'http_504' },
       { status: 418, kind: 'unexpected_http_status' },
     ];
 
