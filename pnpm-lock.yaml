@@ -424,6 +424,9 @@ importers:
       '@patchpilot/domain':
         specifier: workspace:*
         version: link:../domain
+      '@patchpilot/vulnerability-intelligence':
+        specifier: workspace:*
+        version: link:../vulnerability-intelligence
       '@smithy/node-http-handler':
         specifier: 4.11.3
         version: 4.11.3
