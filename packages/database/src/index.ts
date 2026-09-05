@@ -23,6 +23,7 @@ export {
   createOsvAcquisitionPersistence,
   type OsvAcquisitionPersistenceAdapters,
 } from './osv-acquisition-persistence.js';
+export { createOsvAcquisitionResumeInspection } from './osv-acquisition-inspection.js';
 export { developmentSeedIds, seedDevelopmentData } from './seed/development.js';
 export { boundPageSize } from './paging.js';
 export {

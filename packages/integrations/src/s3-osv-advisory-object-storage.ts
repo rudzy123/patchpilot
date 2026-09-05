@@ -146,6 +146,20 @@ function copyBody(bytes: Uint8Array): Uint8Array {
   return copy;
 }
 
+function concatChunks(chunks: readonly Uint8Array[]): Uint8Array {
+  let total = 0;
+  for (const chunk of chunks) {
+    total += chunk.byteLength;
+  }
+  const copy = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    copy.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return copy;
+}
+
 export function isCompiledOsvS3ObjectKey(objectKey: string): boolean {
   if (typeof objectKey !== 'string' || containsForbiddenFragment(objectKey)) {
     return false;
@@ -490,6 +504,73 @@ export class S3OsvAdvisoryObjectStorage {
       contentEncoding: string;
     }>
   > {
+    const result = await this.verifiedGet(input, false);
+    if (!result.ok) {
+      return result;
+    }
+    return ok({
+      byteCount: result.value.byteCount,
+      sha256: result.value.sha256,
+      contentType: result.value.contentType,
+      contentEncoding: result.value.contentEncoding,
+    });
+  }
+
+  /**
+   * Batch 6B resume read-back. Returns SHA-256-verified bytes for an already
+   * attached advisory body. Does not change write-once getVerified metadata.
+   */
+  public async readVerifiedBody(input: {
+    readonly locator: OsvS3Locator;
+    readonly expectedSha256: string;
+    readonly expectedByteCount: number;
+    readonly expectedContentType: string;
+    readonly expectedContentEncoding: string;
+    readonly maxBytes: number;
+  }): Promise<
+    OsvS3Result<{
+      byteCount: number;
+      sha256: string;
+      contentType: string;
+      contentEncoding: string;
+      bytes: Uint8Array;
+    }>
+  > {
+    const result = await this.verifiedGet(input, true);
+    if (!result.ok) {
+      return result;
+    }
+    if (result.value.bytes === undefined) {
+      return fail('integrity_mismatch');
+    }
+    return ok({
+      byteCount: result.value.byteCount,
+      sha256: result.value.sha256,
+      contentType: result.value.contentType,
+      contentEncoding: result.value.contentEncoding,
+      bytes: result.value.bytes,
+    });
+  }
+
+  private async verifiedGet(
+    input: {
+      readonly locator: OsvS3Locator;
+      readonly expectedSha256: string;
+      readonly expectedByteCount: number;
+      readonly expectedContentType: string;
+      readonly expectedContentEncoding: string;
+      readonly maxBytes: number;
+    },
+    collectBytes: boolean,
+  ): Promise<
+    OsvS3Result<{
+      byteCount: number;
+      sha256: string;
+      contentType: string;
+      contentEncoding: string;
+      bytes?: Uint8Array;
+    }>
+  > {
     const started = Date.now();
     if (!locatorMatchesKey(input.locator) || !SHA256_HEX_PATTERN.test(input.expectedSha256)) {
       return fail('invalid_storage_identity');
@@ -539,8 +620,13 @@ export class S3OsvAdvisoryObjectStorage {
         expectedByteLength: input.expectedByteCount,
         expectedSha256: input.expectedSha256,
       });
+      const chunks: Buffer[] = [];
       sdkStream.pipe(inspect);
-      inspect.on('data', () => undefined);
+      inspect.on('data', (chunk: Buffer) => {
+        if (collectBytes) {
+          chunks.push(chunk);
+        }
+      });
       try {
         await finished(inspect);
       } catch (error) {
@@ -562,11 +648,13 @@ export class S3OsvAdvisoryObjectStorage {
         return fail('content_encoding_mismatch');
       }
       this.logOk('get_verified', started);
+      const bytes = collectBytes ? concatChunks(chunks) : undefined;
       return ok({
         byteCount: inspect.observedByteLength(),
         sha256,
         contentType: CONTENT_TYPE,
         contentEncoding: CONTENT_ENCODING,
+        ...(bytes === undefined ? {} : { bytes }),
       });
     } catch (error) {
       this.logFailure('get_verified', started);

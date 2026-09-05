@@ -347,7 +347,7 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - Write-once idempotency hashes stored bytes. HEAD metadata, storage ETag, and spoofed checksums are not content identity. 409 and 412 compare rather than overwrite.
 - Recovery stays inside `OSV_STORAGE_CALL_BUDGETS`. Transient storage failures leave staged metadata. Integrity conflicts may reject. Orphaned and rejected rows cannot become attached. False attached state is not accepted when the deterministic object is missing or corrupt.
 - Cleanup remains classification-only except the committed best-effort delete of a known temporary identity after successful attachment. In-flight staged objects, attached evidence, referenced objects, and conflicting objects are not executable cleanup targets.
-- Layer tests cover the in-memory orchestrator, disposable MinIO, and disposable PostgreSQL attachment adapters. A composed MinIO-plus-PostgreSQL orchestration test is a Batch 6B prerequisite because adding it here would invert package dependencies.
+- Layer tests cover the in-memory orchestrator, disposable MinIO, and disposable PostgreSQL attachment adapters. Session 11 Batch 6B adds the composed MinIO-plus-PostgreSQL disabled-acquisition rehearsal in `apps/worker` integration tests.
 - The 1 MiB snapshot ceiling is an object-storage admission limit. Session 11 Batch 6A-P closed OD-8 retrieval bytes at 1 MiB. Session 11 Batch 6A implements one-attempt generation-bound HTTPS retrieval. Do not treat Batch 5F as synchronization readiness.
 - No provider retrieval, synchronization, matching, Findings, or OSV enablement existed in Batch 5F. Synthetic bytes only. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 11 remains zero-Finding. Session 12 remains zero-Finding.
 - [ADR 0027](docs/adr/0027-osv-acquisition-persistence-and-catalog-activation.md) remains Proposed.
@@ -361,7 +361,7 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - Declared-size preflight, source eligibility, and private retention are enforced before HTTP. Generation is an ASCII decimal string bound with `ifGenerationMatch`. Response `x-goog-generation` must equal the requested generation. Received bytes must equal the declared listing size and cannot exceed 1,048,576.
 - Streaming SHA-256 is computed over exact received bytes. Identity encoding only. Successful HTTP status is exactly 200. Failures omit body, raw key, URL, headers, Location, provider prose, stack, tenant, package, and Finding data.
 - Tests use synthetic local byte streams and injected `node:https.request` / DNS seams only. They do not contact `storage.googleapis.com`. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 11 remains zero-Finding. Session 12 remains zero-Finding.
-- [ADR 0027](docs/adr/0027-osv-acquisition-persistence-and-catalog-activation.md) remains Proposed. Synchronization orchestration is Batch 6B.
+- [ADR 0027](docs/adr/0027-osv-acquisition-persistence-and-catalog-activation.md) remains Proposed. Disabled acquisition orchestration is Batch 6B. Listing execution, scheduling, and OSV enablement remain absent.
 
 ### Session 11 Batch 6A-R
 
@@ -370,7 +370,7 @@ Session 11 Batch 6A-R adversarially reviews and hardens the committed Batch 6A g
 - Batch 6A-R adds three dedicated orchestration-retryable failure kinds to `osv_generation_bound_retrieval_policy_v1`: `http_500`, `http_502`, and `http_504`. These statuses were declared `orchestration_retryable` in the policy but mapped to non-retryable `unexpected_http_status` at runtime. Now each has an exact dedicated kind with `orchestration_retryable` classification.
 - The `mapHttpStatus` function in the HTTPS adapter now maps HTTP 500 to `http_500`, HTTP 502 to `http_502`, and HTTP 504 to `http_504`. HTTP 503 remains `service_unavailable`. HTTP 408 and 429 remain distinct with their own kinds. Unmapped statuses remain `unexpected_http_status` with `non_retryable` classification.
 - Comprehensive retryability taxonomy tests verify: (1) HTTP 500/502/504 have dedicated kinds, (2) all three are `orchestration_retryable`, (3) HTTP 503 remains `service_unavailable`, (4) HTTP 408 and 429 remain distinct, (5) `unexpected_http_status` is `non_retryable`, (6) internal consistency between policy and catalog.
-- The retrieval adapter performs exactly one HTTP attempt regardless of status (retryable or non-retryable). No internal retry loop exists. Future Batch 6B orchestration owns retry execution and backoff.
+- The retrieval adapter performs exactly one HTTP attempt regardless of status (retryable or non-retryable). No internal retry loop exists. Session 11 Batch 6B records retry disposition only and does not execute retries, backoff, or automatic redispatch.
 - Endpoint compilation remains fixed to `storage.googleapis.com`, HTTPS port 443, exact path prefix `/storage/v1/b/osv-vulnerabilities/o/`, and query parameters `alt=media` and `ifGenerationMatch`. Object names are URI-encoded exactly once. Generation is an ASCII decimal string with no Number conversion.
 - Redirects (301, 302, 303, 307, 308) remain rejected with dedicated `redirect_rejected` kind. No redirect target is followed. Response generation must exactly equal requested generation (string equality).
 - Compressed responses (gzip, br, deflate) remain rejected. Request sends `Accept-Encoding: identity`. Response must be `identity` or absent.
@@ -379,6 +379,19 @@ Session 11 Batch 6A-R adversarially reviews and hardens the committed Batch 6A g
 - Confidential failure taxonomy: body bytes, raw provider object key, complete URL, response headers, provider prose, stack traces, tenant data, package data, and Finding data remain omitted from all failures and events.
 - Quality gates pass: 168 integrations tests pass (including 33 retryability tests and 72 retrieval tests with the fix), 753 vulnerability-intelligence tests pass, formatting passes, linting passes, typecheck passes.
 - Batch 6A-R does not implement retry execution, backoff, storage attachment, parser invocation, synchronization orchestration, pending-work queue, scheduler, Outbox, BackgroundJob types, APIs, permissions, matching, Findings, or OSV enablement. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 11 remains zero-Finding. Session 12 remains zero-Finding.
+
+### Session 11 Batch 6B
+
+These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
+
+- Session 11 Batch 6B implements a **disabled, bounded OSV acquisition orchestrator** in `@patchpilot/vulnerability-intelligence` (`createOsvDisabledAcquisitionOrchestrator`, policy `osv_disabled_acquisition_orchestration_policy_v1`). It is explicitly invoked. It does not start at worker boot, does not schedule work, and does not enable OSV.
+- Input is a bounded batch of already-validated listed-object observations (maximum 32). Raw listing pages, continuation tokens, live endpoints, tenant fields, and policy overrides are rejected. GCS listing is not executed.
+- Conservative capacity: active concurrency 1, pending work 32 metadata-only items, one retrieval attempt per item per invocation. Only the active item may hold retrieved body bytes (at most 1 MiB). Pending items do not retain body bytes, streams, or client objects.
+- The orchestrator composes committed classification, one-attempt generation-bound retrieval, immutable attachment, isolated parsing, parser-attempt and revision persistence, catalog membership, append-only quarantine, deterministic reconciliation, and candidate readiness. Parser success and candidate readiness never activate a catalog.
+- Retry disposition is recorded only (`no_retry`, `future_explicit_retry_permitted`, `permanent_failure`, `quarantine_required`). There is no retry loop, backoff, Retry-After execution, delayed task, or durable retry job.
+- HTTP retrieval remains in `@patchpilot/integrations`. Object storage remains in `@patchpilot/integrations`. Prisma adapters remain in `@patchpilot/database`, including read-only `createOsvAcquisitionResumeInspection`. Attached-body resume read-back is required (`createOsvAttachedBodyReadPort` over SHA-256-verified storage bytes). The orchestrator depends on injected ports only.
+- One authorized MinIO-plus-PostgreSQL composition rehearsal lives in `apps/worker` as an integration test. It uses synthetic GHSA bytes and a fake retrieval port. It does not add worker production OSV startup, Outbox events, BackgroundJob types, or BullMQ jobs.
+- Matching completeness remains `not_in_scope`. MAL may be retrieved and parsed where committed permission allows and never acquires matching authorization. OSV and ECHO remain fail-closed. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 11 remains zero-Finding. Session 12 remains zero-Finding.
 
 ## Target repository layout
 

@@ -13,6 +13,7 @@ const PRODUCTION = [
   'osv-acquisition-mappers.ts',
   'osv-acquisition-errors.ts',
   'osv-acquisition-graphs.ts',
+  'osv-acquisition-inspection.ts',
 ] as const;
 
 const BANNED =
@@ -48,6 +49,7 @@ describe('OSV acquisition adapter source boundary', () => {
   it('does not perform import-time database or network work', () => {
     expect(existsSync(path.join(srcDir, 'osv-acquisition-persistence.ts'))).toBe(true);
     expect('createOsvAcquisitionPersistence' in databasePublic).toBe(true);
+    expect('createOsvAcquisitionResumeInspection' in databasePublic).toBe(true);
     expect('createOsvAcquisitionPersistenceForClient' in databasePublic).toBe(false);
     expect('PrismaOsvInventoryPersistence' in databasePublic).toBe(false);
     expect('mapCatalogGeneration' in databasePublic).toBe(false);

@@ -63,6 +63,7 @@ export {
   S3OsvAdvisoryObjectStorage,
   type S3OsvAdvisoryObjectStorageConfig,
 } from './s3-osv-advisory-object-storage.js';
+export { createOsvAttachedBodyReadPort } from './osv-attached-body-read.js';
 export { createCisaKevHttpsClient, createCisaKevHttpsTransport } from './cisa-kev-https.js';
 export { createOsvGenerationBoundRetrievalHttpsClient } from './osv-generation-bound-retrieval-https.js';
 export { createS3Client, S3ClientConstructionError } from './s3-client.js';
