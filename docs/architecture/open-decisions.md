@@ -212,6 +212,12 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | Disabled acquisition pending-work capacity | Active concurrency 1, pending maximum 32, observations per invocation 32 | **Closed for `osv_disabled_acquisition_orchestration_policy_v1`.** Pending items are metadata-only. Parser-worker pending-queue size remains unselected. No listing execution, scheduler, automatic retry, or catalog activation. |
 | OSV composed MinIO and PostgreSQL rehearsal | Disabled acquisition composition | **Closed in `apps/worker` integration tests.** Synthetic GHSA bytes, fake retrieval, disposable MinIO, disposable PostgreSQL, isolated parser worker. No provider contact and no catalog activation. |
 
+## Closed in Session 11 Batch 6C (disabled end-to-end rehearsal)
+
+| ID | Topic | Closed by |
+| --- | --- | --- |
+| Disabled synthetic acquisition rehearsal | Bounded end-to-end pipeline under synthetic inventory | **Closed as a disabled rehearsal.** `apps/worker` integration tests compose synthetic complete-inventory evidence, authorized scripted retrieval, disposable MinIO, disposable PostgreSQL, and the isolated parser worker. Ineligible items terminate at `retrieval_skipped`. The orchestrator never activates a catalog. No provider contact. Parser-worker pending-queue size remains unselected and is not conflated with orchestration pending capacity. |
+
 ## Closed in Session 11 Batch 5C-R (parsed OSV ID CHECK)
 
 | ID | Topic | Status after Batch 5C-R |

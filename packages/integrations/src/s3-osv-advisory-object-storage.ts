@@ -810,6 +810,38 @@ export class S3OsvAdvisoryObjectStorage {
     }
   }
 
+  /**
+   * Test-infrastructure deletion of rehearsal-owned OSV objects. Disabled in
+   * production. Not a catalog cleanup job and not a broad bucket purge.
+   */
+  public async deleteDevelopmentOwnedObject(input: {
+    explicitlyAllowed: true;
+    objectKey: string;
+  }): Promise<OsvS3Result<void>> {
+    if (
+      this.deploymentEnvironment === 'production' ||
+      this.allowDevelopmentAdapters !== true ||
+      input.explicitlyAllowed !== true ||
+      !isCompiledOsvS3ObjectKey(input.objectKey)
+    ) {
+      return fail('access_denied');
+    }
+    const abort = combineAbortSignals(undefined, this.operationTimeoutMs);
+    try {
+      await this.client.send(
+        new DeleteObjectCommand({ Bucket: this.bucket, Key: input.objectKey }),
+        { abortSignal: abort.signal },
+      );
+      return ok(undefined);
+    } catch (error) {
+      const code = mapCategory(error, 'delete_object', abort);
+      if (code === 'object_not_found') {
+        return ok(undefined);
+      }
+      return fail(code);
+    }
+  }
+
   private existingMatches(
     existing: {
       sha256: string;

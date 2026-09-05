@@ -355,4 +355,32 @@ describe('S3OsvAdvisoryObjectStorage write-once', () => {
     }
     storage.destroy();
   });
+
+  it('refuses development-owned deletion in production and for non-OSV keys', async () => {
+    const production = createS3OsvAdvisoryObjectStorage(
+      testConfig({
+        deploymentEnvironment: 'production',
+        allowDevelopmentAdapters: false,
+      }),
+    );
+    const denied = await production.deleteDevelopmentOwnedObject({
+      explicitlyAllowed: true,
+      objectKey: `intelligence/osv/advisory_body/sha256/${DIGEST}`,
+    });
+    expect(denied.ok).toBe(false);
+    production.destroy();
+
+    const development = createS3OsvAdvisoryObjectStorage(testConfig());
+    const wrongPrefix = await development.deleteDevelopmentOwnedObject({
+      explicitlyAllowed: true,
+      objectKey: 'org/other/object',
+    });
+    expect(wrongPrefix.ok).toBe(false);
+    const uncompiled = await development.deleteDevelopmentOwnedObject({
+      explicitlyAllowed: true,
+      objectKey: 'intelligence/osv/not-a-compiled-key',
+    });
+    expect(uncompiled.ok).toBe(false);
+    development.destroy();
+  });
 });

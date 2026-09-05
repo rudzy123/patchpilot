@@ -45,8 +45,6 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const TS = '2026-09-05T18:00:00.000Z';
-const SYNTHETIC_ID = 'GHSA-AAAA-BBBB-CCCC';
-const SYNTHETIC_KEY = `npm/${SYNTHETIC_ID}.json`;
 const SYNTHETIC_GENERATION = '1234567890123456789';
 
 describe('disabled OSV acquisition MinIO and PostgreSQL composition', () => {
@@ -54,11 +52,14 @@ describe('disabled OSV acquisition MinIO and PostgreSQL composition', () => {
   const prisma = getPrismaClient({ databaseUrl: config.databaseUrl });
   const generationId = randomUUID();
   const inventoryRunId = randomUUID();
+  const runToken = randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase();
+  const SYNTHETIC_ID = `GHSA-T6C0-${runToken.slice(0, 4)}-${runToken.slice(4, 8)}`;
+  const SYNTHETIC_KEY = `npm/${SYNTHETIC_ID}.json`;
   const syntheticBody = new TextEncoder().encode(
     JSON.stringify({
       id: SYNTHETIC_ID,
       modified: '2026-01-01T00:00:00Z',
-      summary: `Synthetic composition advisory ${generationId}`,
+      summary: `Synthetic composition advisory ${runToken}`,
       affected: [],
     }),
   );
@@ -89,6 +90,120 @@ describe('disabled OSV acquisition MinIO and PostgreSQL composition', () => {
     if (host !== undefined) {
       await host.shutdown();
     }
+    const objectStore = createS3OsvAdvisoryObjectStorage({
+      endpoint: config.objectStorage.endpoint,
+      region: config.objectStorage.region,
+      accessKey: config.objectStorage.accessKey,
+      secretKey: config.objectStorage.secretKey,
+      bucket: config.objectStorage.bucket,
+      useSsl: config.objectStorage.useSsl,
+      connectionTimeoutMs: config.objectStorage.connectionTimeoutMs,
+      operationTimeoutMs: config.intelligence.objectStorageTimeoutMs,
+      deploymentEnvironment: config.deploymentEnvironment,
+      allowDevelopmentAdapters: config.allowDevelopmentAdapters,
+    });
+    const digest = digestOsvProviderObjectKey(SYNTHETIC_KEY);
+    await prisma.osvProviderPresenceObservation.deleteMany({
+      where: { catalogGenerationId: generationId },
+    });
+    await prisma.osvQuarantineRecord.deleteMany({
+      where: { catalogGenerationId: generationId },
+    });
+    await prisma.osvCatalogMembership.deleteMany({
+      where: { catalogGenerationId: generationId },
+    });
+    const attempts = await prisma.osvParserAttempt.findMany({
+      where: { snapshot: { contentSha256: syntheticSha } },
+      select: { id: true },
+    });
+    await prisma.osvParserAttempt.updateMany({
+      where: { id: { in: attempts.map((row) => row.id) } },
+      data: { parsedRevisionId: null },
+    });
+    await prisma.osvParsedAdvisoryRevision.deleteMany({
+      where: { snapshot: { contentSha256: syntheticSha } },
+    });
+    await prisma.osvParserAttempt.deleteMany({
+      where: { id: { in: attempts.map((row) => row.id) } },
+    });
+    const parsedAttachments = await prisma.osvObjectAttachment.findMany({
+      where: {
+        storageKind: 'parsed_advisory',
+        parsedRevision: null,
+      },
+    });
+    for (const row of parsedAttachments) {
+      const deleted = await objectStore.deleteDevelopmentOwnedObject({
+        explicitlyAllowed: true,
+        objectKey: row.objectKey,
+      });
+      expect(deleted.ok).toBe(true);
+    }
+    await prisma.osvObjectAttachment.deleteMany({
+      where: { id: { in: parsedAttachments.map((row) => row.id) } },
+    });
+    const snapshots = await prisma.osvProviderBodySnapshot.findMany({
+      where: { contentSha256: syntheticSha },
+      select: { attachmentId: true },
+    });
+    await prisma.osvProviderBodySnapshot.deleteMany({
+      where: { contentSha256: syntheticSha },
+    });
+    const attachments = await prisma.osvObjectAttachment.findMany({
+      where: {
+        OR: [
+          { id: { in: snapshots.map((row) => row.attachmentId) } },
+          { objectKey: { startsWith: 'intelligence/osv/' }, contentSha256: syntheticSha },
+        ],
+      },
+    });
+    for (const row of attachments) {
+      const deleted = await objectStore.deleteDevelopmentOwnedObject({
+        explicitlyAllowed: true,
+        objectKey: row.objectKey,
+      });
+      expect(deleted.ok).toBe(true);
+    }
+    await prisma.osvObjectAttachment.deleteMany({
+      where: { id: { in: attachments.map((row) => row.id) } },
+    });
+    await prisma.osvProviderGeneration.deleteMany({
+      where: { providerObjectKeyDigest: digest },
+    });
+    const inventoryRuns = await prisma.osvInventoryRun.findMany({
+      where: { catalogGenerationId: generationId },
+      select: { id: true },
+    });
+    await prisma.osvInventoryObjectObservation.deleteMany({
+      where: { inventoryRunId: { in: inventoryRuns.map((row) => row.id) } },
+    });
+    await prisma.osvInventoryPrefixPass.deleteMany({
+      where: { inventoryRunId: { in: inventoryRuns.map((row) => row.id) } },
+    });
+    await prisma.osvInventoryRun.deleteMany({
+      where: { catalogGenerationId: generationId },
+    });
+    await prisma.osvReconciliation.deleteMany({
+      where: { catalogGenerationId: generationId },
+    });
+    await prisma.osvAcquisitionCompleteness.deleteMany({
+      where: { catalogGenerationId: generationId },
+    });
+    await prisma.osvActivationRecord.deleteMany({
+      where: { candidateGenerationId: generationId },
+    });
+    await prisma.osvCatalogGeneration.deleteMany({
+      where: { id: generationId },
+    });
+    await prisma.osvProviderObject.deleteMany({
+      where: { providerObjectKeyDigest: digest },
+    });
+    const bodyDeleted = await objectStore.deleteDevelopmentOwnedObject({
+      explicitlyAllowed: true,
+      objectKey: `intelligence/osv/advisory_body/sha256/${syntheticSha}`,
+    });
+    expect(bodyDeleted.ok).toBe(true);
+    objectStore.destroy();
   });
 
   it('attaches, parses, persists membership, and reconciles without activating or contacting GCS', async () => {
