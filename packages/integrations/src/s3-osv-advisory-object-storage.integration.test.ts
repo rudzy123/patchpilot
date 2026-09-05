@@ -264,4 +264,68 @@ describe('S3OsvAdvisoryObjectStorage MinIO compatibility', () => {
     });
     expect(verified.ok).toBe(true);
   });
+
+  it('handles MinIO conditional create, 409 comparison, and category isolation for the same digest', async () => {
+    const object = bodyLocator('minio-conditional');
+    const first = await storage.putExclusive({
+      locator: object.final,
+      body: object.body,
+      contentSha256: object.digest,
+      byteCount: object.body.byteLength,
+      contentType: CONTENT_TYPE,
+      contentEncoding: CONTENT_ENCODING,
+      artifactCategory: 'advisory_body',
+    });
+    expect(first.ok).toBe(true);
+    const [left, right] = await Promise.all([
+      storage.putExclusive({
+        locator: object.final,
+        body: object.body,
+        contentSha256: object.digest,
+        byteCount: object.body.byteLength,
+        contentType: CONTENT_TYPE,
+        contentEncoding: CONTENT_ENCODING,
+        artifactCategory: 'advisory_body',
+      }),
+      storage.putExclusive({
+        locator: object.final,
+        body: object.body,
+        contentSha256: object.digest,
+        byteCount: object.body.byteLength,
+        contentType: CONTENT_TYPE,
+        contentEncoding: CONTENT_ENCODING,
+        artifactCategory: 'advisory_body',
+      }),
+    ]);
+    expect(left.ok && right.ok).toBe(true);
+    if (left.ok) {
+      expect(left.value.status).toBe('already_applied');
+    }
+    const parsedFinalKey = `intelligence/osv/parsed_advisory/sha256/${object.digest}`;
+    trackedFinal.push(parsedFinalKey);
+    const parsedPut = await storage.putExclusive({
+      locator: {
+        kind: 'osv_object_storage_locator',
+        storageKind: 'parsed_advisory',
+        role: 'final',
+        objectKey: parsedFinalKey,
+        contentSha256: object.digest,
+        uploadId: null,
+      },
+      body: object.body,
+      contentSha256: object.digest,
+      byteCount: object.body.byteLength,
+      contentType: CONTENT_TYPE,
+      contentEncoding: CONTENT_ENCODING,
+      artifactCategory: 'parsed_advisory',
+    });
+    expect(parsedPut.ok).toBe(true);
+    const deletedFinal = await storage.deleteTemporary({ locator: object.final });
+    expect(deletedFinal.ok).toBe(false);
+    const stillThere = await storage.head({ locator: object.final });
+    expect(stillThere.ok).toBe(true);
+    if (stillThere.ok) {
+      expect(stillThere.value.exists).toBe(true);
+    }
+  });
 });

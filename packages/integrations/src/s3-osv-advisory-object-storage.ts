@@ -45,6 +45,8 @@ const PARSED_FINAL = 'intelligence/osv/parsed_advisory/sha256/';
 const LAYOUT_VERSION = 'osv_object_storage_layout_v1';
 const CONTENT_TYPE = 'application/json';
 const CONTENT_ENCODING = 'identity';
+const MIN_BYTES = 1;
+const MAX_BYTES = 1_048_576;
 
 const META_SHA256 = 'content-sha256';
 const META_BYTES = 'byte-length';
@@ -114,6 +116,16 @@ function fail(code: OsvS3StorageFailure['code']): OsvS3StorageFailure {
   return Object.freeze({ ok: false, code, retryability });
 }
 
+function containsControlOrLineSeparator(objectKey: string): boolean {
+  for (let index = 0; index < objectKey.length; index += 1) {
+    const code = objectKey.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f || code === 0x2028 || code === 0x2029) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function containsForbiddenFragment(objectKey: string): boolean {
   return (
     objectKey.includes('..') ||
@@ -122,8 +134,16 @@ function containsForbiddenFragment(objectKey: string): boolean {
     objectKey.includes('://') ||
     objectKey.includes('org/') ||
     objectKey.includes('.json') ||
-    objectKey.includes('npm/')
+    objectKey.includes('npm/') ||
+    objectKey.includes('%') ||
+    containsControlOrLineSeparator(objectKey)
   );
+}
+
+function copyBody(bytes: Uint8Array): Uint8Array {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy;
 }
 
 export function isCompiledOsvS3ObjectKey(objectKey: string): boolean {
@@ -331,13 +351,18 @@ export class S3OsvAdvisoryObjectStorage {
     if (input.contentEncoding !== CONTENT_ENCODING) {
       return fail('content_encoding_mismatch');
     }
-    if (input.body.byteLength !== input.byteCount || input.byteCount < 1) {
-      return fail('byte_count_mismatch');
+    if (
+      input.body.byteLength !== input.byteCount ||
+      input.byteCount < MIN_BYTES ||
+      input.byteCount > MAX_BYTES
+    ) {
+      return fail(input.byteCount > MAX_BYTES ? 'response_too_large' : 'byte_count_mismatch');
     }
     if (!SHA256_HEX_PATTERN.test(input.contentSha256)) {
       return fail('integrity_mismatch');
     }
-    const actualSha256 = createHash('sha256').update(input.body).digest('hex');
+    const body = copyBody(input.body);
+    const actualSha256 = createHash('sha256').update(body).digest('hex');
     if (actualSha256 !== input.contentSha256) {
       return fail('integrity_mismatch');
     }
@@ -346,9 +371,11 @@ export class S3OsvAdvisoryObjectStorage {
       return existing;
     }
     if (existing.value.exists) {
-      return this.existingMatches(existing.value, input)
-        ? ok({ status: 'already_applied' })
-        : fail('immutable_conflict');
+      if (!this.existingMatches(existing.value, input)) {
+        this.logFailure('put_exclusive', started);
+        return fail('immutable_conflict');
+      }
+      return this.compareVerifiedBytes(input.locator, input, started, 'put_exclusive');
     }
     const abort = combineAbortSignals(undefined, this.operationTimeoutMs);
     try {
@@ -356,7 +383,7 @@ export class S3OsvAdvisoryObjectStorage {
         new PutObjectCommand({
           Bucket: this.bucket,
           Key: input.locator.objectKey,
-          Body: input.body,
+          Body: body,
           ContentLength: input.byteCount,
           ContentType: CONTENT_TYPE,
           IfNoneMatch: '*',
@@ -374,11 +401,7 @@ export class S3OsvAdvisoryObjectStorage {
       return ok({ status: 'created' });
     } catch (error) {
       if (isWriteOncePrecondition(error)) {
-        const raced = await this.head({ locator: input.locator });
-        if (raced.ok && raced.value.exists && this.existingMatches(raced.value, input)) {
-          return ok({ status: 'already_applied' });
-        }
-        return fail('immutable_conflict');
+        return this.compareVerifiedBytes(input.locator, input, started, 'put_exclusive');
       }
       this.logFailure('put_exclusive', started);
       return fail(mapCategory(error, 'put_object', abort));
@@ -411,15 +434,23 @@ export class S3OsvAdvisoryObjectStorage {
       );
       const byteCount = head.ContentLength;
       const sha256 = metadataValue(head.Metadata, META_SHA256);
+      const declaredBytes = metadataValue(head.Metadata, META_BYTES);
       const category = metadataValue(head.Metadata, META_CATEGORY);
-      const encoding = metadataValue(head.Metadata, META_ENCODING) ?? CONTENT_ENCODING;
+      const encoding = metadataValue(head.Metadata, META_ENCODING);
       const layout = metadataValue(head.Metadata, META_LAYOUT);
+      const contentType = head.ContentType;
       if (
         byteCount === undefined ||
         sha256 === undefined ||
+        declaredBytes === undefined ||
+        encoding === undefined ||
+        contentType === undefined ||
         !SHA256_HEX_PATTERN.test(sha256) ||
+        Number.parseInt(declaredBytes, 10) !== byteCount ||
         (category !== 'advisory_body' && category !== 'parsed_advisory') ||
-        layout !== LAYOUT_VERSION
+        layout !== LAYOUT_VERSION ||
+        contentType !== CONTENT_TYPE ||
+        encoding !== CONTENT_ENCODING
       ) {
         this.logFailure('head', started);
         return fail('integrity_mismatch');
@@ -429,7 +460,7 @@ export class S3OsvAdvisoryObjectStorage {
         exists: true,
         byteCount,
         sha256,
-        contentType: head.ContentType ?? CONTENT_TYPE,
+        contentType,
         contentEncoding: encoding,
         artifactCategory: category,
         layoutVersion: layout,
@@ -463,8 +494,21 @@ export class S3OsvAdvisoryObjectStorage {
     if (!locatorMatchesKey(input.locator) || !SHA256_HEX_PATTERN.test(input.expectedSha256)) {
       return fail('invalid_storage_identity');
     }
-    if (!Number.isInteger(input.maxBytes) || input.maxBytes < 1) {
+    if (
+      !Number.isInteger(input.maxBytes) ||
+      input.maxBytes < MIN_BYTES ||
+      input.maxBytes > MAX_BYTES
+    ) {
       return fail('response_too_large');
+    }
+    if (input.expectedByteCount > input.maxBytes || input.expectedByteCount > MAX_BYTES) {
+      return fail('response_too_large');
+    }
+    if (input.expectedContentType !== CONTENT_TYPE) {
+      return fail('content_type_mismatch');
+    }
+    if (input.expectedContentEncoding !== CONTENT_ENCODING) {
+      return fail('content_encoding_mismatch');
     }
     const abort = combineAbortSignals(undefined, this.operationTimeoutMs);
     try {
@@ -482,10 +526,7 @@ export class S3OsvAdvisoryObjectStorage {
         destroyStream(response.Body);
         return fail('byte_count_mismatch');
       }
-      if (
-        response.ContentType !== undefined &&
-        response.ContentType !== input.expectedContentType
-      ) {
+      if (response.ContentType !== input.expectedContentType) {
         destroyStream(response.Body);
         return fail('content_type_mismatch');
       }
@@ -516,17 +557,16 @@ export class S3OsvAdvisoryObjectStorage {
         return fail(mapCategory(error, 'get_object', abort));
       }
       const sha256 = inspect.sha256Hex();
-      const encoding =
-        metadataValue(response.Metadata, META_ENCODING) ?? input.expectedContentEncoding;
-      if (encoding !== input.expectedContentEncoding) {
+      const encoding = metadataValue(response.Metadata, META_ENCODING);
+      if (encoding !== CONTENT_ENCODING) {
         return fail('content_encoding_mismatch');
       }
       this.logOk('get_verified', started);
       return ok({
         byteCount: inspect.observedByteLength(),
         sha256,
-        contentType: input.expectedContentType,
-        contentEncoding: encoding,
+        contentType: CONTENT_TYPE,
+        contentEncoding: CONTENT_ENCODING,
       });
     } catch (error) {
       this.logFailure('get_verified', started);
@@ -557,19 +597,48 @@ export class S3OsvAdvisoryObjectStorage {
     if (input.destination.contentSha256 !== input.expectedSha256) {
       return fail('integrity_mismatch');
     }
+    if (input.contentType !== CONTENT_TYPE) {
+      return fail('content_type_mismatch');
+    }
+    if (input.contentEncoding !== CONTENT_ENCODING) {
+      return fail('content_encoding_mismatch');
+    }
+    if (
+      input.expectedByteCount < MIN_BYTES ||
+      input.expectedByteCount > MAX_BYTES ||
+      input.source.storageKind !== input.artifactCategory
+    ) {
+      return fail(
+        input.expectedByteCount > MAX_BYTES ? 'response_too_large' : 'invalid_storage_identity',
+      );
+    }
     const existing = await this.head({ locator: input.destination });
     if (!existing.ok) {
       return existing;
     }
     if (existing.value.exists) {
-      return this.existingMatches(existing.value, {
-        contentSha256: input.expectedSha256,
-        byteCount: input.expectedByteCount,
-        contentType: input.contentType,
-        artifactCategory: input.artifactCategory,
-      })
-        ? ok({ status: 'already_applied' })
-        : fail('immutable_conflict');
+      if (
+        !this.existingMatches(existing.value, {
+          contentSha256: input.expectedSha256,
+          byteCount: input.expectedByteCount,
+          contentType: input.contentType,
+          contentEncoding: input.contentEncoding,
+          artifactCategory: input.artifactCategory,
+        })
+      ) {
+        return fail('immutable_conflict');
+      }
+      return this.compareVerifiedBytes(
+        input.destination,
+        {
+          contentSha256: input.expectedSha256,
+          byteCount: input.expectedByteCount,
+          contentType: input.contentType,
+          contentEncoding: input.contentEncoding,
+        },
+        started,
+        'copy_exclusive',
+      );
     }
     const abort = combineAbortSignals(undefined, this.operationTimeoutMs);
     try {
@@ -593,20 +662,17 @@ export class S3OsvAdvisoryObjectStorage {
       );
     } catch (error) {
       if (isWriteOncePrecondition(error)) {
-        const raced = await this.head({ locator: input.destination });
-        if (
-          raced.ok &&
-          raced.value.exists &&
-          this.existingMatches(raced.value, {
+        return this.compareVerifiedBytes(
+          input.destination,
+          {
             contentSha256: input.expectedSha256,
             byteCount: input.expectedByteCount,
             contentType: input.contentType,
-            artifactCategory: input.artifactCategory,
-          })
-        ) {
-          return ok({ status: 'already_applied' });
-        }
-        return fail('immutable_conflict');
+            contentEncoding: input.contentEncoding,
+          },
+          started,
+          'copy_exclusive',
+        );
       }
       this.logFailure('copy_exclusive', started);
       return fail(mapCategory(error, 'copy_object', abort));
@@ -621,6 +687,7 @@ export class S3OsvAdvisoryObjectStorage {
         contentSha256: input.expectedSha256,
         byteCount: input.expectedByteCount,
         contentType: input.contentType,
+        contentEncoding: input.contentEncoding,
         artifactCategory: input.artifactCategory,
       })
     ) {
@@ -660,20 +727,63 @@ export class S3OsvAdvisoryObjectStorage {
       sha256: string;
       byteCount: number;
       contentType: string;
+      contentEncoding: string;
       artifactCategory: 'advisory_body' | 'parsed_advisory';
+      layoutVersion: string;
     },
     input: {
       contentSha256: string;
       byteCount: number;
       contentType: string;
+      contentEncoding: string;
       artifactCategory: 'advisory_body' | 'parsed_advisory';
     },
   ): boolean {
     return (
       existing.sha256 === input.contentSha256 &&
       existing.byteCount === input.byteCount &&
-      existing.artifactCategory === input.artifactCategory
+      existing.contentType === input.contentType &&
+      existing.contentEncoding === input.contentEncoding &&
+      existing.artifactCategory === input.artifactCategory &&
+      existing.layoutVersion === LAYOUT_VERSION
     );
+  }
+
+  private async compareVerifiedBytes(
+    locator: OsvS3Locator,
+    input: {
+      contentSha256: string;
+      byteCount: number;
+      contentType: string;
+      contentEncoding: string;
+    },
+    started: number,
+    operation: string,
+  ): Promise<OsvS3Result<{ status: 'already_applied' }>> {
+    const verified = await this.getVerified({
+      locator,
+      expectedSha256: input.contentSha256,
+      expectedByteCount: input.byteCount,
+      expectedContentType: input.contentType,
+      expectedContentEncoding: input.contentEncoding,
+      maxBytes: MAX_BYTES,
+    });
+    if (!verified.ok) {
+      this.logFailure(operation, started);
+      if (
+        verified.code === 'integrity_mismatch' ||
+        verified.code === 'byte_count_mismatch' ||
+        verified.code === 'content_type_mismatch' ||
+        verified.code === 'content_encoding_mismatch' ||
+        verified.code === 'partial_read_rejected' ||
+        verified.code === 'response_too_large'
+      ) {
+        return fail('immutable_conflict');
+      }
+      return verified;
+    }
+    this.logOk(operation, started);
+    return ok({ status: 'already_applied' });
   }
 
   private logOk(operation: string, started: number): void {

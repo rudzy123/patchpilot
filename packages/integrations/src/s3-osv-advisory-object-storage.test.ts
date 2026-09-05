@@ -161,6 +161,14 @@ describe('S3OsvAdvisoryObjectStorage write-once', () => {
 
   it('returns already_applied for identical bytes and immutable_conflict for different bytes', async () => {
     send.mockImplementation(async (command) => {
+      if (command instanceof GetObjectCommand) {
+        return {
+          ContentLength: PAYLOAD.byteLength,
+          ContentType: 'application/json',
+          Body: Readable.from([PAYLOAD]),
+          Metadata: metadata(),
+        };
+      }
       expect(command).toBeInstanceOf(HeadObjectCommand);
       return {
         ContentLength: PAYLOAD.byteLength,
