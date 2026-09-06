@@ -239,7 +239,7 @@ Session 11 Batch 6D verifies existing closures. It does **not** introduce OD-8 r
 
 | ID | Topic | Closed by |
 | --- | --- | --- |
-| OSV production GCS listing execution | HTTPS listing adapter ownership, one-request executor, compiled Batch 3C surface | ADR 0028 §1. Future path `packages/integrations/src/osv-gcs-listing-https-adapter.ts`. Not implemented. |
+| OSV production GCS listing execution | HTTPS listing adapter ownership, one-request executor, compiled Batch 3C surface | ADR 0028 §1. Session 12 Batch 1 implements `packages/integrations/src/osv-gcs-listing-https-adapter.ts` (`createOsvGcsListingHttpsAdapter`). Uncomposed and runtime-unreachable. No provider contact in production. |
 | OSV listing pagination and token-cycle protection | Page, byte, observation, and token ceilings; in-memory digest cycle detection | ADR 0028 §§2–3. Canary vs production fail-closed split. Token never durable. |
 | OSV parser-host pending capacity | Exact pending size | ADR 0028 §10 selects **0**. Committed host constant remains `unavailable` until R4/R5. |
 | OSV retry and backoff policy | Owner, attempts, backoff, jitter, Retry-After, exhaustion | ADR 0028 §9. Durable job layer only. Not implemented. |

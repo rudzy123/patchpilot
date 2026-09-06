@@ -1166,3 +1166,18 @@ Machine-checkable pins for invariant tests:
 - not OSV runtime enablement
 - R2 may implement exactly one production GCS listing-page HTTPS adapter
 - ADR 0027 remains Proposed; R2 does not require ADR 0027 acceptance
+
+## Implementation note (Session 12 Batch 1)
+
+Session 12 Batch 1 implemented the R2 listing-page HTTPS adapter at
+`packages/integrations/src/osv-gcs-listing-https-adapter.ts`
+(`createOsvGcsListingHttpsAdapter`). This note does not change the accepted
+decision. The adapter remains uncomposed and runtime-unreachable. It performs
+one request per invocation, rejects redirects, requires identity encoding,
+bounds the page to 1,048,576 bytes, decodes UTF-8 fatally, and reuses the
+committed listing-page parser. Listing-specific timeout milliseconds were not
+committed in Batch 3B; the adapter reuses `OSV_TIMEOUT_POLICY_V1` because that
+policy is the approved GCS HTTPS one-attempt, 1 MiB, four-phase bound. Tests
+are synthetic and local only. Pagination, token-cycle detection, retries,
+schedulers, catalog activation, matching, Findings, and OSV enablement remain
+out of scope. ADR 0027 remains Proposed.

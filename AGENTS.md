@@ -125,19 +125,30 @@ Session 11 acquisition foundation is **CLOSED** and synthetically verified. Verd
 - Canary policy is defined and not executed (Phase C / R6).
 - Package normalization and version evaluation remain out of scope (Phase E).
 
-Next checkpoint: R2 production GCS listing executor under Accepted [ADR 0028](docs/adr/0028-osv-runtime-enablement-architecture-and-safety.md). That ADR does not enable OSV, authorize canary or catalog activation, or add schedulers or jobs. R2 implements one listing-page HTTPS adapter only. Session 12 remains zero-Finding. Matching is Phase M (earliest). Finding writes are Phase F (earliest), subject to ADR 0026 gates.
+Session 12 Batch 1 (R2) implements the uncomposed GCS listing-page HTTPS executor. Pagination, schedulers, jobs, and OSV enablement remain later gates. Session 12 remains zero-Finding. Matching is Phase M (earliest). Finding writes are Phase F (earliest), subject to ADR 0026 gates.
 
 ### Runtime Enablement Phase R1 (ADR 0028, Accepted)
 
 These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
 
 - [ADR 0028](docs/adr/0028-osv-runtime-enablement-architecture-and-safety.md) is **Accepted**. Architecture identifier `osv_runtime_enablement_architecture_v1`. Acceptance authorizes only the staged roadmap and the R2 listing-adapter boundary. It is not canary, activation, matching, Finding-write, or OSV enablement authorization.
-- Production listing executor, scheduler, `intelligence.osv.sync`, lease table, retry executor, cleanup executor, kill-switch variable, and observability emitters are **not implemented**.
+- R1 did not implement a listing executor, scheduler, `intelligence.osv.sync`, lease table, retry executor, cleanup executor, kill-switch variable, or observability emitters. Session 12 Batch 1 later added the uncomposed listing adapter; it remains runtime-unreachable. Scheduler, jobs, leases, retries, cleanup, kill-switch, and observability emitters are **not implemented**.
 - Parser-host pending capacity is selected at **0**. The committed isolation constant remains `unavailable` until R4/R5.
 - First-provider canary is `crates.io/` / `rustsec_advisory_database` with exact caps. It is not authorized to execute. Legal revalidation is required before R6.
 - Duplicate JSON-key disposition is Option B: residual risk for a disabled canary; detection or explicit exception before catalog activation.
 - [ADR 0027](docs/adr/0027-osv-acquisition-persistence-and-catalog-activation.md) remains Proposed.
 - `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 11 remains zero-Finding. Session 12 remains zero-Finding.
+
+### Session 12 Batch 1 (R2 listing-page HTTPS executor)
+
+These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
+
+- Session 12 Batch 1 implements `createOsvGcsListingHttpsAdapter` at `packages/integrations/src/osv-gcs-listing-https-adapter.ts`. It performs **one** GCS JSON Objects listing-page HTTPS request per invocation via `OsvTransportPort.listPage`.
+- The compiled Batch 3C surface is fixed: `GET` `https://storage.googleapis.com/storage/v1/b/osv-vulnerabilities/o`, unauthenticated, redirects rejected, `Accept-Encoding: identity`, `application/json`, 1,048,576-byte page ceiling, fatal UTF-8, committed listing-page parser.
+- Timeouts reuse committed `OSV_TIMEOUT_POLICY_V1` (listing-specific milliseconds were not committed; semantics match the approved GCS HTTPS one-attempt 1 MiB policy). Continuation-token UTF-8 bytes are rejected above 8192 at request construction. ADR 0028 pagination ceilings, token-cycle detection, and A/B convergence are **not** implemented.
+- The adapter is exported from `@patchpilot/integrations` and is **not** imported by worker, API, scheduler, queue, health, seed, or migration composition. Tests use synthetic local HTTPS/DNS doubles only and do not contact `storage.googleapis.com` or `osv.dev`.
+- No retry, body retrieval, persistence, storage, parser-worker, catalog activation, matching, Finding write, API, permission, Prisma, or dependency change is included.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint is R3 listing pagination and convergence.
 
 ### Session 11 Batch 1A (Historical)
 
