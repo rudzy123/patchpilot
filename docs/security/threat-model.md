@@ -23,18 +23,18 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 
 [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md) records an import-only shared catalog. Session 9 is not complete. [ADR 0010](../adr/0010-osv-correlation.md) remains future correlation, not the import path.
 
-- Approved sources are OSV GCS bulk export (`all.zip` completeness baseline) and the CISA KEV JSON snapshot. Package-query APIs are not the catalog importer. OSV runtime remains disabled.
+- Session 9 recorded OSV GCS bulk export (`all.zip` completeness baseline) and the CISA KEV JSON snapshot. [ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md) does **not** approve `all.zip` for the first implementation. Tenant package-query APIs are rejected. OSV runtime remains disabled.
 - Provider responses are untrusted. Raw bodies belong in private object storage. PostgreSQL stores metadata, hashes, normalized revisions, and current projections. No public or signed snapshot URLs.
 - Partial normalization must never become the current catalog. Content SHA-256 is import idempotency. HTTP 304 is not product not-modified.
 - Session 9 must not match components, write Findings or FindingObservations, enrich findings, score, remediate, enqueue `finding.recalculate`, or query tenant inventories.
-- Parser isolation follows Session 8: parse outside transactions; `worker.terminate()` if termination is required; `Promise.race` is not a kill switch. Archive extraction limits are required; no archive dependency is selected yet.
+- Parser isolation follows Session 8: parse outside transactions; `worker.terminate()` if termination is required; `Promise.race` is not a kill switch. ZIP remains deferred and unauthorized; no archive dependency is selected or authorized.
 - Provider HTTP is allowlisted HTTPS (`node:https.request`) with redirects disabled, proxy environment ignored, and rejection of private, loopback, link-local, metadata-service, and other non-public destinations. Advisory reference URLs are never fetched.
 - DNS lookup pinning plus post-connect verification is implemented for CISA KEV. It is not DNSSEC.
 - The Batch 7B synchronization service exists. Batch 8B starts the worker scheduler, Outbox mapping, and BullMQ intelligence processor. Batch 9B adds authenticated sanitized provider-status GETs (`intelligence:read`; [ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)). Still absent: web dashboard, manual sync/retry, detailed SyncRun APIs, matching, and any Finding workflow. OD-10 remains open. Status GETs do not call CISA and do not write AuditEvent rows.
 
 ## Session 10 status notes
 
-[ADR 0023](../adr/0023-provider-neutral-cve-identity.md) records provider-neutral canonical CVE identity. Batch 3B applied and froze migration `20260902120000_canonical_cve_identity` (SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). The persistent development database has eleven finished migrations.
+[ADR 0023](../adr/0023-provider-neutral-cve-identity.md) records provider-neutral canonical CVE identity. Batch 3B applied and froze migration `20260902120000_canonical_cve_identity` (SHA-256 `2190b5a0d22cf008fa01a180bc9233a68ba56159447bc599a4a2a1dba684b0ba`). Session 11 Batch 5C adds `20260904120000_osv_acquisition_persistence_foundation` (SHA-256 `ac99d96d97074b9ad38064ccbbcd9670321bed0872c20a71c0a679d837704349`). Session 11 Batch 5C-R adds `20260904180000_osv_parsed_revision_id_check_correction` (SHA-256 `43f758f559abc1c936197f6d5944f85cb14ef1cbed2a99bd0f555759ebdc1570`) so parsed-revision inserts no longer fail on PostgreSQL POSIX `{0,511}`. The persistent development database has thirteen finished migrations.
 
 - Canonical identity is global and append-only. It is not tenant-owned and has no `organization_id`.
 - The advisory-to-CVE link is source-free. Provenance stays on `VulnerabilitySourceRecord` and KEV generations.
@@ -42,6 +42,49 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 - Unicode lookalikes, lowercase, and whitespace variants do not match the POSIX CHECK. They cannot collide with a canonical identity string.
 - KEV membership is read-time exact equality against the accepted active generation (Session 10 Batch 5B). Listing in KEV is active-catalog membership, not tenant exposure, and is not a Finding.
 - Session 10 remains zero-Finding. The identity migration must not write Findings, FindingObservations, Evidence, RiskCalculations, or `finding.recalculate`.
+
+## Session 11 status notes
+
+[ADR 0024](../adr/0024-authoritative-affected-version-source-and-osv-acquisition.md) selects OSV as the future affected-version authority and instance-owned catalog acquisition as the approved direction. The acquisition foundation is implemented and synthetically verified. Production OSV acquisition remains disabled. Provider listing execution, scheduler, durable OSV jobs, and automatic retries remain absent.
+
+- Tenant package query APIs are rejected. Tenant PURLs, package names, and versions must not be sent to a provider.
+- CISA KEV remains an independent exploitation signal. Tenant SBOMs remain inventory. OSV data alone does not prove tenant exposure and does not create a Finding.
+- ZIP remains absent and unauthorized. `all.zip` is not the first-implementation assumption. No archive dependency is authorized.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. No OSV runtime, matching, fan-out, or Finding write exists. Session 11 remains zero-Finding.
+- Session 11 Batch 4B defines an isolated advisory parser protocol (metadata-only envelopes, fail-closed failure taxonomy, untrusted worker-output validation). Batch 4B-P closes parser resource-policy v1 as PatchPilot security ceilings (not provider guarantees) and authorizes synthetic bounded reference-parser requests. Batch 4C implements an in-process reference parser for one bounded synthetic advisory (byte-count and SHA-256 verification, fatal UTF-8, secure JSON, pinned local schema, structural bounds, top-level id confirmation). Batch 4D adversarially reviews that parser with synthetic hostile inputs and hardens identity whitespace/control rejection, abort checks, and unexpected-exception mapping. Batch 4E closes the production isolation design (`worker_threads`, exact timeouts, schema load inside the isolate, one-request-at-a-time Ajv, pool size 1, sequential reuse, recycle on protocol failure). Batch 4F implements the isolated worker and parent host. Batch 4F-R verified that path under Node.js 24 with synthetic fixtures. `worker_threads` is not an OS sandbox. Duplicate JSON object keys are not detected (last-key-wins; not a source or identity bypass; must be resolved or explicitly accepted before OSV enablement). Provider-object body retrieval is closed at 1,048,576 bytes by Batch 6A-P. Pending-queue size remains unapproved, so runtime composition stays blocked. The worker does not retrieve provider bodies, persist catalogs, or enable OSV.
+- Session 11 Batch 5B adds framework-independent OSV persistence **contracts** only (identities, completeness, reconciliation, quarantine, active-pointer CAS intent, repository ports). Activation contracts do not trigger matching.
+- Session 11 Batch 5C adds Prisma models and frozen migration `20260904120000_osv_acquisition_persistence_foundation` (SHA-256 `ac99d96d97074b9ad38064ccbbcd9670321bed0872c20a71c0a679d837704349`). Batch 5C-R adds `20260904180000_osv_parsed_revision_id_check_correction` (thirteen migrations; SHA-256 `43f758f559abc1c936197f6d5944f85cb14ef1cbed2a99bd0f555759ebdc1570`) replacing only the unsatisfiable parsed OSV ID CHECK. Body bytes remain outside PostgreSQL. No active OSV generation is seeded.
+- Session 11 Batch 5D adds PostgreSQL adapters (`createOsvAcquisitionPersistence`) with immutable-conflict reload, generation and attachment graphs, transactional parser-attempt/revision writes, deterministic reconciliation, append-only quarantine and presence, and active-pointer compare-and-swap. Cross-scope previous generations fail closed. Parsed-revision persistence succeeds after Batch 5C-R. Object storage, provider retrieval, synchronization, matching, and Findings remain absent. OSV remains disabled. Session 11 remains zero-Finding.
+- Session 11 Batch 5E adds an immutable S3-compatible adapter for OSV provider-body snapshots and parsed structural documents (`S3OsvAdvisoryObjectStorage`) plus staged-attachment orchestration. Provider keys are never storage paths. PostgreSQL and object storage are not one transaction. Write-once SHA-256 identities, read-back hashing, conflict detection, recovery without false attached state, and cleanup eligibility exist. Tests use synthetic local bytes only. No provider retrieval, synchronization, matching, Findings, or OSV enablement. There is no destructive cleanup service.
+- Session 11 Batch 5F adversarially reviews that storage path. Write-once idempotency hashes stored bytes; HEAD metadata, ETags, and spoofed checksums are not content identity. Recovery is bounded and cannot mint false attached state. In-flight staged objects are not cleanup-eligible. Package boundaries keep MinIO and PostgreSQL layer tests on separate packages. Session 11 Batch 6B adds a composed MinIO-plus-PostgreSQL disabled-acquisition rehearsal in `apps/worker` integration tests using synthetic bytes and a fake retrieval port. The storage ceiling is not a provider retrieval authorization. No live provider data was used.
+- Session 11 Batch 6A-P closes OD-8 provider-object retrieval at 1,048,576 bytes and defines `osv_generation_bound_retrieval_policy_v1`.
+- Session 11 Batch 6A implements one-attempt generation-bound HTTPS retrieval. Source and retention preflight run before HTTP. Redirects are rejected. Identity encoding only. Exact generation binding. Bounded streaming SHA-256. The adapter returns a validated retrieval result only and does not attach storage, parse advisories, retry, list GCS, synchronize, or enable OSV. Tests use synthetic streams and an injected HTTP seam. They do not contact `storage.googleapis.com`.
+- Session 11 Batch 6B adds a disabled, bounded acquisition orchestrator. It is explicitly invoked. It does not execute provider listing, schedule work, retry automatically, or activate a catalog. Parser success and candidate readiness never activate a catalog. Session 11 remains zero-Finding. OSV remains disabled.
+- Session 11 Batch 6C executes a disabled end-to-end rehearsal with synthetic complete-inventory evidence, authorized scripted retrieval, disposable MinIO, disposable PostgreSQL, and the isolated parser worker. Ineligible items terminate at `retrieval_skipped`. Test teardown removes rehearsal-owned MinIO objects and PostgreSQL rows. No external provider contact. The orchestrator never calls activation. Session 11 remains zero-Finding. OSV remains disabled.
+- Session 11 Batch 6D closes the acquisition foundation as implemented and synthetically verified. Production OSV acquisition remains disabled. Listing execution, scheduler, durable OSV jobs, and automatic retries remain absent. Catalog activation is not invoked. Matching and Finding writes remain unauthorized. Runtime Enablement Phase R1 is Proposed [ADR 0028](../adr/0028-osv-runtime-enablement-architecture-and-safety.md). That ADR does not enable OSV, implement listing, or authorize activation.
+
+## Remaining pre-runtime OSV threats
+
+[ADR 0028](../adr/0028-osv-runtime-enablement-architecture-and-safety.md) mitigates these in architecture. Implementation, canary, and activation remain later gates. Synthetic verification does not close them.
+
+| Threat | Existing control | Remaining gate |
+| --- | --- | --- |
+| Accidental production reachability | `INTELLIGENCE_OSV_ENABLED=true` rejected; worker and API startup do not register the disabled orchestrator; ADR 0028 forbids boot wiring; future halt defaults halted | Awaiting implementation (R5A). No enablement path in R1-R |
+| Listing-token cycles | Listing executor does not exist; tokens are in-memory opaque values; ADR 0028 selects in-memory digest cycle detection and 8192-byte token ceiling | Awaiting implementation (R3) |
+| Retry storms | One-attempt retrieval; orchestrator records retry disposition only; ADR 0028 caps 3 attempts with bounded backoff | Awaiting implementation (R4) |
+| Incomplete-catalog activation | Integer reconciliation, blocking quarantine, `ready_for_activation` gate; disabled orchestration never activates; ADR 0028 requires explicit activation | Activation blocking (R7 after canary) |
+| Duplicate JSON keys | Last-key-wins documented; Option B: residual risk for disabled canary; detection or explicit exception before activation | Activation blocking |
+| Cleanup of referenced evidence | Eligibility classification only; ADR 0028 forbids deleting referenced evidence; no production cleanup executor | Awaiting implementation; executor stays disabled until reviewed |
+| Operational data leakage | Confidential failure taxonomy omits bodies, keys, URLs, and tenant data; ADR 0028 observability prohibition list | Awaiting implementation (R5) |
+| Source-license revalidation | Immutable `osv_source_license_registry_v1` with Batch 3A-P evidence; ADR 0028 pins revalidation points | Awaiting canary (legal revalidation before R6) |
+| Rollback and kill switch | ADR 0028 defines halt independent from enablement and rollback as a new activation record. Variable not added in R1 | Awaiting implementation (R5 halt, R7 rollback) |
+
+[ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) records fail-closed package identity and evaluation architecture. No comparator or evaluator exists.
+
+- There is no generic name matcher, lexical version comparator, or universal semver implementation.
+- The implemented ecosystem set is empty. Unsupported ecosystems, GIT ranges, unknown versions, and malformed provider data must not become `not_affected`.
+- The future evaluator is tenant-agnostic and must not fetch PURL, advisory, or repository URLs.
+- Evaluation remains zero-Finding in Session 11 and Session 12.
 
 ## Assets to protect
 
@@ -354,7 +397,7 @@ Each subsection states the threat, impact, and the **designed mitigation**. Resi
 
 **Impact:** Premature closure or duplicate findings that never resolve.
 
-**Mitigation:** Finding `resolved` only with stored evidence (adequate `absent` or out-of-range) on the **current** ingestion (max `receivedAt` among `completed`); UI separates workflow from rescan; incomplete coverage → `inconclusive`; workflow states `risk_accepted`/`mitigated`/`false_positive` are not overwritten by inconclusive compare; identity is versionless + OSV id.
+**Mitigation:** Finding `resolved` only with stored evidence (adequate `absent` or out-of-range) on the **current** ingestion (max `receivedAt` among `completed`); UI separates workflow from rescan; incomplete coverage → `inconclusive`; workflow states `risk_accepted`/`mitigated`/`false_positive` are not overwritten by inconclusive compare; identity is `organizationId` + `assetId` + `componentId` + `vulnerabilityId` ([ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md)).
 
 ### AI data leakage (if optional AI is introduced later)
 

@@ -19,6 +19,11 @@ export { createIntelligenceStatusReader } from './intelligence-status.js';
 export { createActiveKevMembershipPersistence } from './active-kev-membership.js';
 export { createSbomUploadUnitOfWork } from './sbom-upload-unit-of-work.js';
 export { createSbomIngestionProcessorUnitOfWork } from './sbom-ingestion-processor-unit-of-work.js';
+export {
+  createOsvAcquisitionPersistence,
+  type OsvAcquisitionPersistenceAdapters,
+} from './osv-acquisition-persistence.js';
+export { createOsvAcquisitionResumeInspection } from './osv-acquisition-inspection.js';
 export { developmentSeedIds, seedDevelopmentData } from './seed/development.js';
 export { boundPageSize } from './paging.js';
 export {

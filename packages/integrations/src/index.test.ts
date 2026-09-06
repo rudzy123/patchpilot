@@ -14,5 +14,6 @@ describe('integration ports', () => {
     expect(deferredIntegrationNotes.intelligenceObjectKeyConvention).toBe(
       'intelligence-cisa-kev-sha256',
     );
+    expect(deferredIntegrationNotes.osvObjectKeyConvention).toBe('intelligence-osv-sha256');
   });
 });

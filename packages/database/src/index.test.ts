@@ -155,3 +155,16 @@ describe('Session 10 Batch 5B public exports', () => {
     expect('SOURCE_SELECT' in databasePublic).toBe(false);
   });
 });
+
+describe('Session 11 Batch 5D public exports', () => {
+  const srcDir = path.dirname(fileURLToPath(import.meta.url));
+
+  it('exports the OSV acquisition adapter factory and not internals', () => {
+    expect(existsSync(path.join(srcDir, 'osv-acquisition-persistence.ts'))).toBe(true);
+    expect('createOsvAcquisitionPersistence' in databasePublic).toBe(true);
+    expect('createOsvAcquisitionResumeInspection' in databasePublic).toBe(true);
+    expect('createOsvAcquisitionPersistenceForClient' in databasePublic).toBe(false);
+    expect('createOsvCatalogActivation' in databasePublic).toBe(false);
+    expect('PrismaOsvActiveCatalogPointerRepository' in databasePublic).toBe(false);
+  });
+});

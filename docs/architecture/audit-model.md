@@ -137,6 +137,18 @@ Replay uniqueness for these system events: non-null `correlationId` and unique `
 
 Routine `GET /intelligence/providers` and `GET /intelligence/providers/:provider/status` ([ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)) do **not** create `AuditEvent` rows. Do not add `intelligence.status_read`. Session `lastSeenAt` bookkeeping from session resolution is allowed. Synchronization still emits the `intelligence.sync_*` actions above.
 
+### Future matching and Finding lifecycle events
+
+[ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) records future bounded audit principles. **None of these actions are implemented** in Session 11. Do not add audit constants now.
+
+Per-positive Finding lifecycle actions may later include `finding.created`, `finding.observed`, `finding.resolved`, and `finding.reopened`. The existing catalog already names `finding.state_changed`, `finding.false_positive`, and `finding.mitigated`. A later write session must reconcile specific names with that catalog and must not emit duplicate generic and specific events for the same transition.
+
+A per-job aggregate `vulnerability.match_evaluated` may later record bounded IDs, counts, versions, and statuses. Do not create one **AuditEvent** per negative comparison. Positive match evidence is not replaced by an audit event.
+
+Payloads must not contain provider prose, package inventories, affected-version arrays, raw provider records, SBOM bodies, CVE lists, KEV bodies, raw comparator errors, credentials, or URLs. Full PURLs appear only if internal policy explicitly permits them.
+
+Replay uniqueness remains tenant `(organizationId, action, subjectId, correlationId)`. Session 11 and Session 12 must not emit Finding lifecycle audits.
+
 ## Integrity properties
 
 - Insert audit in the **same transaction** as the state change it describes, when both are PostgreSQL rows.

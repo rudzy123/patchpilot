@@ -66,7 +66,7 @@ Even if a glob did not attach:
 14. **Worker I/O:** tests or architecture-boundary checks that feed/storage adapters are not invoked inside a mocked DB transaction.
 15. **Export isolation:** org A cannot download org B export snapshots.
 16. **Policy replay:** stored factors + `policyDefinitionSha256` reproduce the same priority.
-17. **Versionless identity:** upgrading `foo@1.0.0` → `foo@2.0.0` updates observation, does not create a second finding for the same OSV id; a versioned PURL must not be used as the finding key.
+17. **Versionless identity:** upgrading `foo@1.0.0` → `foo@2.0.0` adds an observation, does not create a second finding for the same `organizationId` + `assetId` + `componentId` + `vulnerabilityId`; a versioned PURL must not be used as the finding key ([ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md)).
 18. **Current ingestion race:** older SBOM completing after a newer `completed` upload does not change finding state or `lastSuccessfulSbomIngestionId`.
 19. **Workflow occupancy:** inconclusive observation does not move `risk_accepted` / `mitigated` / `false_positive` to `inconclusive`; task completion does not move those states to `verification_pending`.
 20. **Ingestion complete:** persist_graph alone does not mark `completed`.
