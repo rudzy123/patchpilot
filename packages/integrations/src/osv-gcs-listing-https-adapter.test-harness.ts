@@ -37,6 +37,7 @@ export type ScriptedListingResponse = {
   omitSecureConnect?: boolean;
   omitSocket?: boolean;
   remoteAddress?: string;
+  omitRemoteAddress?: boolean;
   remoteFamily?: string;
   closeEarly?: boolean;
   neverEnd?: boolean;
@@ -47,6 +48,7 @@ export type ScriptedListingResponse = {
   closeAfterData?: boolean;
   duplicateEnd?: boolean;
   dataAfterEnd?: Buffer;
+  objectModeChunk?: unknown;
 };
 
 export function listingJson(overrides: Record<string, unknown> = {}): Buffer {
@@ -110,6 +112,7 @@ export function continuationRequest(raw: string = SECRET_TOKEN): OsvListingReque
 export function createListingTestContext(): {
   recordedOptions: unknown[];
   lookupHosts: string[];
+  lookupCalls: number;
   remainingResponses: ScriptedListingResponse[];
   lastDestroyed: { request: boolean; response: boolean };
   setLookup: (impl: OsvGcsListingDnsLookup) => void;
@@ -126,12 +129,14 @@ export function createListingTestContext(): {
   const lookupHosts: string[] = [];
   const remainingResponses: ScriptedListingResponse[] = [];
   const lastDestroyed = { request: false, response: false };
+  let lookupCalls = 0;
   let lookupImpl: OsvGcsListingDnsLookup = (_hostname, _options, callback) => {
     callback(null, [{ address: PUBLIC_V4, family: 4 }]);
   };
 
   const lookup: OsvGcsListingDnsLookup = (hostname, options, callback) => {
     lookupHosts.push(hostname);
+    lookupCalls += 1;
     lookupImpl(hostname, options, callback);
   };
 
@@ -156,7 +161,8 @@ export function createListingTestContext(): {
         }
         const socket = new EventEmitter();
         Object.defineProperty(socket, 'remoteAddress', {
-          value: script.remoteAddress ?? PUBLIC_V4,
+          value:
+            script.omitRemoteAddress === true ? undefined : (script.remoteAddress ?? PUBLIC_V4),
         });
         Object.defineProperty(socket, 'remoteFamily', {
           value: script.remoteFamily ?? 'IPv4',
@@ -177,7 +183,16 @@ export function createListingTestContext(): {
         }
         const payload = script.body ?? MINIMAL_PAGE;
         let response: Readable;
-        if (payload instanceof Readable) {
+        if (script.objectModeChunk !== undefined) {
+          const value = script.objectModeChunk;
+          response = new Readable({
+            objectMode: true,
+            read() {
+              this.push(value);
+              this.push(null);
+            },
+          });
+        } else if (payload instanceof Readable) {
           response = payload;
         } else if (Array.isArray(payload)) {
           response = new Readable({
@@ -272,6 +287,9 @@ export function createListingTestContext(): {
   return {
     recordedOptions,
     lookupHosts,
+    get lookupCalls() {
+      return lookupCalls;
+    },
     remainingResponses,
     lastDestroyed,
     setLookup: (impl) => {
@@ -292,6 +310,7 @@ export function createListingTestContext(): {
     reset: () => {
       recordedOptions.length = 0;
       lookupHosts.length = 0;
+      lookupCalls = 0;
       remainingResponses.length = 0;
       lastDestroyed.request = false;
       lastDestroyed.response = false;

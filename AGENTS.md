@@ -19,12 +19,12 @@ Do not treat product, styling, or convenience guidance as permission to bypass d
 
 ## Authoritative current project status
 
-Last verified checkpoint: Session 12 Batch 1.
+Last verified checkpoint: Session 12 Batch 2.
 Current session: Session 12.
-Current checkpoint: Session 12 Batch 2 — GCS Listing-Page Executor Adversarial Review.
+Current checkpoint: Session 12 Batch 3 — listing pagination and convergence contracts (not yet implemented).
 Current branch: `feat/osv-runtime-enablement`.
 
-PatchPilot currently provides authentication, organization selection, asset inventory, SBOM upload and ingestion, local graph persistence, local CISA KEV synchronization, sanitized provider status, canonical CVE identity, a disabled synthetically verified OSV acquisition foundation, and an uncomposed Session 12 Batch 1 GCS listing-page HTTPS executor.
+PatchPilot currently provides authentication, organization selection, asset inventory, SBOM upload and ingestion, local graph persistence, local CISA KEV synchronization, sanitized provider status, canonical CVE identity, a disabled synthetically verified OSV acquisition foundation, and an uncomposed, adversarially reviewed Session 12 Batch 1 GCS listing-page HTTPS executor.
 
 PatchPilot does not yet provide the primary end-user vulnerability workflow: authoritative package normalization, affected-version evaluation, component-to-advisory matching, OSV-derived Findings, explainable production risk scores, remediation workflows, dashboards, or reports.
 
@@ -38,7 +38,7 @@ Implemented:
 - CISA KEV synchronization and authenticated sanitized provider-status GETs.
 - Canonical CVE identity persistence and read-only active-catalog KEV membership derivation.
 - Disabled, synthetically verified OSV acquisition foundation (classification, one-attempt retrieval adapter, immutable storage, isolated parser worker, persistence, disabled orchestrator).
-- Session 12 Batch 1 uncomposed GCS listing-page HTTPS executor (`createOsvGcsListingHttpsAdapter` in `@patchpilot/integrations`).
+- Session 12 Batch 1 uncomposed GCS listing-page HTTPS executor (`createOsvGcsListingHttpsAdapter` in `@patchpilot/integrations`), adversarially reviewed and hardened in Session 12 Batch 2.
 
 Disabled:
 
@@ -65,8 +65,8 @@ Repository integrity:
 
 - Session 12 implements Accepted ADR 0028 incrementally while OSV remains disabled. ADR phase labels (R1–R7) are historical ADR references; contributor checkpoints use Session 12 batch names.
 - Session 12 Batch 1 implemented one listing-page HTTPS request per `OsvTransportPort.listPage` invocation. It is uncomposed and runtime-unreachable.
-- Session 12 Batch 2 is the current checkpoint: adversarial review of that executor. It must not implement pagination, token-cycle detection, convergence, scheduling, retries, runtime enablement, activation, matching, or Findings.
-- Pagination, convergence, durable jobs, retries, scheduler wiring, canary execution, and activation remain outside Batch 2.
+- Session 12 Batch 2 adversarially reviewed and hardened the Batch 1 listing executor. Pagination, token-cycle detection, convergence, scheduling, retries, runtime enablement, activation, matching, and Findings remain out of scope.
+- Pagination, convergence, durable jobs, retries, scheduler wiring, canary execution, and activation remain outside Batch 2. Session 12 Batch 3 is the next checkpoint.
 - Parser pending capacity: ADR 0028 selects runtime parser pending capacity **0**. The current parser host already has occupancy 1 and rejects a second concurrent parse (`invalid_request`). The historical isolation-policy status constant still reports pending-capacity policy as `unavailable`. A later Session 12 runtime batch must reconcile that machine-readable status before production composition. No body-bearing parser queue is authorized. The disabled orchestrator's metadata pending capacity 32 is a separate policy.
 - Finding writes are not authorized in Session 12. They remain blocked until an active authoritative catalog, package normalization, a reviewed ecosystem evaluator, a deterministic `affected` result, persisted immutable match evidence, [ADR 0026](docs/adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) gates, tenant-isolation proof, and explicit Finding-write authorization are complete. Architectural gates are authoritative, not the assigned session number. The current roadmap places that work no earlier than Session 16.
 
@@ -98,9 +98,18 @@ Session 12 Batch 1 implements `createOsvGcsListingHttpsAdapter` at `packages/int
 - Tests use synthetic local HTTPS and DNS doubles only. They do not contact `storage.googleapis.com` or `osv.dev`.
 - `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding.
 
-### Current checkpoint: Session 12 Batch 2
+### Session 12 Batch 2 (committed)
 
-Session 12 Batch 2 adversarially reviews the Batch 1 listing executor. It has not started. It must not implement pagination, token-cycle detection, A/B convergence, scheduling, retries, leases, observability emitters, cleanup, runtime enablement, catalog activation, matching, or Findings.
+Session 12 Batch 2 adversarially reviewed the Batch 1 listing executor with synthetic request and response doubles only. Tests do not contact `storage.googleapis.com` or `osv.dev`. Concrete transport corrections:
+
+- Duplicate or empty `Location` on HTTP 200 fails closed (arrays are not ignored).
+- `Transfer-Encoding` other than absent/`chunked`, compressed transfer encodings, and `Content-Length` plus `Transfer-Encoding` fail closed.
+- Shared Content-Length parsing rejects leading zeros and multi-value arrays instead of coalescing duplicates.
+- Shared Content-Encoding parsing accepts only absent or `identity` (empty and whitespace-only values are rejected).
+- DNS answers are copied before pin selection. Socket listeners are one-shot and removed on terminal cleanup. Non-byte body chunks are rejected.
+- Continuation tokens remain opaque. One invocation remains zero or one HTTPS request. Pagination, token-cycle detection, and A/B convergence remain absent.
+
+The adapter remains uncomposed. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint is Session 12 Batch 3 pagination and convergence contracts.
 
 ## Current repository state
 
@@ -237,7 +246,17 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - Timeouts reuse committed `OSV_TIMEOUT_POLICY_V1` (listing-specific milliseconds were not committed; semantics match the approved GCS HTTPS one-attempt 1 MiB policy). Continuation-token UTF-8 bytes are rejected above 8192 at request construction. ADR 0028 pagination ceilings, token-cycle detection, and A/B convergence are **not** implemented.
 - The adapter is exported from `@patchpilot/integrations` and is **not** imported by worker, API, scheduler, queue, health, seed, or migration composition. Tests use synthetic local HTTPS/DNS doubles only and do not contact `storage.googleapis.com` or `osv.dev`.
 - No retry, body retrieval, persistence, storage, parser-worker, catalog activation, matching, Finding write, API, permission, Prisma, or dependency change is included.
-- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Current checkpoint is Session 12 Batch 2: adversarial review of this executor. Batch 2 does not implement pagination or convergence.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 2 later adversarially reviewed this executor. Batch 1 and Batch 2 do not implement pagination or convergence.
+
+### Session 12 Batch 2 (listing-executor adversarial review)
+
+These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
+
+- Session 12 Batch 2 adversarially reviewed the Batch 1 listing executor with synthetic doubles only. It did not contact `storage.googleapis.com` or `osv.dev`.
+- Transport hardening: HTTP 200 `Location` presence including arrays fails closed; `Transfer-Encoding` ambiguity and compressed transfer encodings fail closed; shared Content-Length rejects leading zeros and multi-value arrays; shared Content-Encoding accepts only absent or `identity`; DNS answers are copied before pin selection; socket listeners are one-shot with cleanup; non-byte body chunks are rejected.
+- Continuation tokens remain confidential and are encoded once in `pageToken`. One invocation remains zero or one HTTPS request.
+- Pagination, token-cycle detection, A/B convergence, retries, schedulers, durable jobs, catalog activation, matching, Findings, and production composition remain absent.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint is Session 12 Batch 3 pagination and convergence contracts.
 
 ## Historical checkpoint record
 

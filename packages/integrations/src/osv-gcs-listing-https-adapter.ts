@@ -1,8 +1,11 @@
 /**
  * Session 12 Batch 1 / ADR 0028 R2 GCS JSON Objects listing-page HTTPS adapter.
- * Exactly one HTTPS request per invocation. No pagination, retry, redirect
- * follow, body retrieval, persistence, storage, parser-worker, activation,
- * matching, or Finding path.
+ * Session 12 Batch 2 adversarially hardens single-page transport: Location and
+ * Transfer-Encoding fail closed, DNS answers are copied before pin selection,
+ * non-byte body chunks are rejected, and socket listeners are one-shot with
+ * cleanup. Exactly one HTTPS request per invocation. No pagination, retry,
+ * redirect follow, body retrieval, persistence, storage, parser-worker,
+ * activation, matching, or Finding path.
  *
  * Request grammar comes from the committed Batch 3C builder. Response pages
  * are handed to the committed Batch 3C parser. Transport failures use the
@@ -59,7 +62,7 @@ const HTTPS_PORT = 443 as const;
 
 /**
  * ADR 0028 listing-page request-construction ceiling for continuation-token
- * UTF-8 bytes. This is not pagination, cycle tracking, or a change to
+ * UTF-8 bytes. This is not pagination or a change to
  * Batch 3B token constructors.
  */
 const LISTING_CONTINUATION_TOKEN_MAX_UTF8_BYTES = 8192 as const;
@@ -115,17 +118,41 @@ function failure(kind: OsvTransportFailureKind): ListingFailure {
   return { ok: false, failure: created.value };
 }
 
-function headerAsString(value: string | string[] | undefined): string | undefined {
-  if (value === undefined) {
-    return undefined;
+function responseLocationIsPresent(value: string | string[] | undefined): boolean {
+  return value !== undefined;
+}
+
+function classifyListingTransferFraming(
+  headers: IncomingMessage['headers'],
+): OsvTransportFailureKind | 'ok' {
+  const transfer = headers['transfer-encoding'];
+  if (transfer === undefined) {
+    return 'ok';
   }
-  if (Array.isArray(value)) {
-    if (value.length !== 1) {
-      return undefined;
-    }
-    return value[0];
+  const values = Array.isArray(transfer) ? transfer : [transfer];
+  if (values.length !== 1) {
+    return 'malformed_response';
   }
-  return value;
+  const raw = values[0];
+  if (raw === undefined) {
+    return 'malformed_response';
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (
+    normalized.includes('gzip') ||
+    normalized.includes('br') ||
+    normalized.includes('deflate') ||
+    normalized.includes('compress')
+  ) {
+    return 'invalid_content_encoding';
+  }
+  if (normalized !== 'chunked') {
+    return 'malformed_response';
+  }
+  if (headers['content-length'] !== undefined) {
+    return 'malformed_response';
+  }
+  return 'ok';
 }
 
 function mapHttpStatus(status: number | undefined): OsvTransportFailureKind | 'ok' {
@@ -361,7 +388,14 @@ function lookupPinned(
         finish(failure('temporary_dns_failure'));
         return;
       }
-      const resolved = addresses.flatMap((entry) => {
+      const snapshot = addresses.map((entry) => ({
+        address: entry.address,
+        family: entry.family,
+      }));
+      const resolved = snapshot.flatMap((entry) => {
+        if (typeof entry.address !== 'string') {
+          return [];
+        }
         if (entry.family === 4 || entry.family === 6) {
           return [{ address: entry.address, family: entry.family as 4 | 6 }];
         }
@@ -446,27 +480,30 @@ function consumeListingBody(input: {
         finish({ ok: false, kind: 'cancelled' });
         return;
       }
-      const bytes = chunk instanceof Uint8Array ? chunk : Buffer.from(chunk);
-      if (bytes.byteLength === 0) {
+      if (!(chunk instanceof Uint8Array)) {
+        finish({ ok: false, kind: 'malformed_response' });
+        return;
+      }
+      if (chunk.byteLength === 0) {
         armInactivity();
         return;
       }
-      if (received > input.maxBytes - bytes.byteLength) {
+      if (received > input.maxBytes - chunk.byteLength) {
         finish({ ok: false, kind: 'response_too_large' });
         return;
       }
-      if (input.declaredBytes !== undefined && received + bytes.byteLength > input.declaredBytes) {
+      if (input.declaredBytes !== undefined && received + chunk.byteLength > input.declaredBytes) {
         finish({
           ok: false,
           kind:
-            received + bytes.byteLength > input.maxBytes
+            received + chunk.byteLength > input.maxBytes
               ? 'response_too_large'
               : 'malformed_response',
         });
         return;
       }
-      buffer.set(bytes, received);
-      received += bytes.byteLength;
+      buffer.set(chunk, received);
+      received += chunk.byteLength;
       armInactivity();
     };
 
@@ -647,6 +684,7 @@ async function executeListPage(args: {
     let headerTimer: ReturnType<typeof setTimeout> | undefined;
     let totalTimer: ReturnType<typeof setTimeout> | undefined;
     let req: ReturnType<typeof https.request> | undefined;
+    let attachedSocket: { removeAllListeners: () => void } | undefined;
     let abortHandler: (() => void) | undefined;
     const agent = createDirectHttpsAgent();
 
@@ -667,6 +705,10 @@ async function executeListPage(args: {
 
     const destroyRequest = (): void => {
       ignoreRequestErrors = true;
+      if (attachedSocket !== undefined) {
+        attachedSocket.removeAllListeners();
+        attachedSocket = undefined;
+      }
       req?.destroy();
       agent.destroy();
     };
@@ -786,10 +828,18 @@ async function executeListPage(args: {
           return;
         }
 
-        if (headerAsString(response.headers.location) !== undefined) {
+        if (responseLocationIsPresent(response.headers.location)) {
           ignoreRequestErrors = true;
           response.destroy();
           finish(failure('malformed_response'));
+          return;
+        }
+
+        const framing = classifyListingTransferFraming(response.headers);
+        if (framing !== 'ok') {
+          ignoreRequestErrors = true;
+          response.destroy();
+          finish(failure(framing));
           return;
         }
 
@@ -888,8 +938,12 @@ async function executeListPage(args: {
       return;
     }
 
-    req.on('socket', (socket) => {
-      socket.on('error', () => {
+    req.once('socket', (socket) => {
+      if (settled) {
+        return;
+      }
+      attachedSocket = socket;
+      socket.once('error', () => {
         if (ignoreRequestErrors || settled) {
           return;
         }
@@ -904,6 +958,9 @@ async function executeListPage(args: {
         );
       });
       socket.once('secureConnect', () => {
+        if (settled) {
+          return;
+        }
         if (!pinnedAddressMatchesSocket(pinned, socket.remoteAddress, socket.remoteFamily)) {
           finish(failure('policy_violation'));
           return;
