@@ -1181,3 +1181,24 @@ policy is the approved GCS HTTPS one-attempt, 1 MiB, four-phase bound. Tests
 are synthetic and local only. Pagination, token-cycle detection, retries,
 schedulers, catalog activation, matching, Findings, and OSV enablement remain
 out of scope. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 3)
+
+Session 12 Batch 3 records framework-independent pagination and two-pass
+inventory convergence contracts in
+`packages/vulnerability-intelligence/src/osv/listing-pagination/`. This note
+does not change the accepted decision, ceilings, or ADR status.
+
+The ADR defined A/B convergence without a named policy identifier. Batch 3
+pins that closed policy as `osv_listing_inventory_convergence_policy_v1`.
+Pagination policy identifiers remain `osv_listing_pagination_policy_v1` and
+`osv_disabled_first_provider_canary_policy_v1`. Exact ADR 0028 ceilings are
+preserved, including production 524,288,000 listing bytes per prefix per pass
+and 6,291,456,000 listing bytes per run.
+
+Raw continuation tokens remain in memory only. Token digests are in-memory
+cycle controls only and are never durable identities. Crash restart begins at
+page one. One A/B pair is permitted per synchronization attempt. Incomplete
+inventory cannot authorize body retrieval. Pagination is not executed. The
+listing HTTPS adapter remains uncomposed. Production OSV runtime remains
+disabled. ADR 0027 remains Proposed.

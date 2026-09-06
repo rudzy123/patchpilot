@@ -19,12 +19,12 @@ Do not treat product, styling, or convenience guidance as permission to bypass d
 
 ## Authoritative current project status
 
-Last verified checkpoint: Session 12 Batch 2.
+Last verified checkpoint: Session 12 Batch 3 (implemented, awaiting commit).
 Current session: Session 12.
-Current checkpoint: Session 12 Batch 3 — listing pagination and convergence contracts (not yet implemented).
+Current checkpoint: Session 12 Batch 3 pagination and convergence contracts implemented and awaiting commit. Session 12 Batch 4 pagination and convergence implementation is next. Pagination execution remains absent.
 Current branch: `feat/osv-runtime-enablement`.
 
-PatchPilot currently provides authentication, organization selection, asset inventory, SBOM upload and ingestion, local graph persistence, local CISA KEV synchronization, sanitized provider status, canonical CVE identity, a disabled synthetically verified OSV acquisition foundation, and an uncomposed, adversarially reviewed Session 12 Batch 1 GCS listing-page HTTPS executor.
+PatchPilot currently provides authentication, organization selection, asset inventory, SBOM upload and ingestion, local graph persistence, local CISA KEV synchronization, sanitized provider status, canonical CVE identity, a disabled synthetically verified OSV acquisition foundation, an uncomposed, adversarially reviewed Session 12 Batch 1 GCS listing-page HTTPS executor, and Session 12 Batch 3 framework-independent listing pagination and two-pass inventory convergence contracts. Pagination is not executed.
 
 PatchPilot does not yet provide the primary end-user vulnerability workflow: authoritative package normalization, affected-version evaluation, component-to-advisory matching, OSV-derived Findings, explainable production risk scores, remediation workflows, dashboards, or reports.
 
@@ -39,12 +39,14 @@ Implemented:
 - Canonical CVE identity persistence and read-only active-catalog KEV membership derivation.
 - Disabled, synthetically verified OSV acquisition foundation (classification, one-attempt retrieval adapter, immutable storage, isolated parser worker, persistence, disabled orchestrator).
 - Session 12 Batch 1 uncomposed GCS listing-page HTTPS executor (`createOsvGcsListingHttpsAdapter` in `@patchpilot/integrations`), adversarially reviewed and hardened in Session 12 Batch 2.
+- Session 12 Batch 3 framework-independent OSV listing pagination and two-pass inventory convergence contracts in `@patchpilot/vulnerability-intelligence` (`src/osv/listing-pagination/`). No pagination loop, no provider contact, and no production composition.
 
 Disabled:
 
 - Production OSV runtime. `INTELLIGENCE_OSV_ENABLED=true` remains rejected.
 - Catalog activation is not invoked. No production OSV catalog is active.
 - The listing executor is exported and is not imported by worker, API, scheduler, queue, health, seed, or migration composition.
+- Session 12 Batch 3 pagination and convergence contracts are exported from `@patchpilot/vulnerability-intelligence` and are not imported by worker, API, scheduler, queue, health, seed, or migration composition.
 
 Not yet implemented:
 
@@ -52,7 +54,7 @@ Not yet implemented:
 - Package normalization and affected-version evaluation. The implemented ecosystem registry is empty.
 - Component-to-advisory matching, match-evaluation persistence, and OSV-derived Finding writes.
 - Explainable production risk scoring and complete remediation workflows.
-- Listing pagination, token-cycle detection, A/B convergence, durable OSV jobs, retries, scheduler wiring, canary execution, and activation.
+- Listing pagination execution, two-pass I/O orchestration, durable OSV jobs, retries, scheduler wiring, canary execution, and activation. Token-cycle detection and A/B convergence exist as pure contracts only.
 
 Repository integrity:
 
@@ -65,14 +67,14 @@ Repository integrity:
 
 - Session 12 implements Accepted ADR 0028 incrementally while OSV remains disabled. ADR phase labels (R1–R7) are historical ADR references; contributor checkpoints use Session 12 batch names.
 - Session 12 Batch 1 implemented one listing-page HTTPS request per `OsvTransportPort.listPage` invocation. It is uncomposed and runtime-unreachable.
-- Session 12 Batch 2 adversarially reviewed and hardened the Batch 1 listing executor. Pagination, token-cycle detection, convergence, scheduling, retries, runtime enablement, activation, matching, and Findings remain out of scope.
-- Pagination, convergence, durable jobs, retries, scheduler wiring, canary execution, and activation remain outside Batch 2. Session 12 Batch 3 is the next checkpoint.
+- Session 12 Batch 2 adversarially reviewed and hardened the Batch 1 listing executor. Scheduling, retries, runtime enablement, activation, matching, and Findings remain out of scope.
+- Session 12 Batch 3 defines pure pagination and two-pass inventory convergence contracts. It does not execute pagination, call the listing HTTPS executor, persist raw tokens, retrieve advisory bodies, or enable OSV. Session 12 Batch 4 is the next checkpoint for pagination and convergence implementation. Durable jobs, retries, scheduler wiring, canary execution, and activation remain later gates.
 - Parser pending capacity: ADR 0028 selects runtime parser pending capacity **0**. The current parser host already has occupancy 1 and rejects a second concurrent parse (`invalid_request`). The historical isolation-policy status constant still reports pending-capacity policy as `unavailable`. A later Session 12 runtime batch must reconcile that machine-readable status before production composition. No body-bearing parser queue is authorized. The disabled orchestrator's metadata pending capacity 32 is a separate policy.
 - Finding writes are not authorized in Session 12. They remain blocked until an active authoritative catalog, package normalization, a reviewed ecosystem evaluator, a deterministic `affected` result, persisted immutable match evidence, [ADR 0026](docs/adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) gates, tenant-isolation proof, and explicit Finding-write authorization are complete. Architectural gates are authoritative, not the assigned session number. The current roadmap places that work no earlier than Session 16.
 
 ### Current roadmap (gates remain authoritative)
 
-- Session 12: runtime-enablement foundation (listing executor, later pagination, jobs, and disabled composition).
+- Session 12: runtime-enablement foundation (listing executor and pagination contracts implemented; pagination execution, jobs, and disabled composition remain gated).
 - Session 13: disabled provider canary and catalog-activation work.
 - Session 14: package normalization and matching architecture.
 - Session 15: first ecosystem evaluator and match evidence.
@@ -109,7 +111,21 @@ Session 12 Batch 2 adversarially reviewed the Batch 1 listing executor with synt
 - DNS answers are copied before pin selection. Socket listeners are one-shot and removed on terminal cleanup. Non-byte body chunks are rejected.
 - Continuation tokens remain opaque. One invocation remains zero or one HTTPS request. Pagination, token-cycle detection, and A/B convergence remain absent.
 
-The adapter remains uncomposed. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint is Session 12 Batch 3 pagination and convergence contracts.
+The adapter remains uncomposed. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding.
+
+### Session 12 Batch 3 (implemented, awaiting commit)
+
+Session 12 Batch 3 adds framework-independent listing pagination and two-pass inventory convergence contracts in `@patchpilot/vulnerability-intelligence` at `packages/vulnerability-intelligence/src/osv/listing-pagination/`. Verified from the uncommitted Batch 3 tree:
+
+- Closed policy profiles `disabled_canary` and `production_fail_closed` pin Accepted ADR 0028 identifiers and ceilings. Callers cannot supply numeric limits.
+- Per-page limits remain 1000 observations, 1,048,576 response bytes, and 8192 continuation-token UTF-8 bytes.
+- Canary ceilings: 8 pages / 2000 observations / 8,388,608 bytes per prefix per pass; 16 pages / 4000 observations / 16,777,216 bytes per run.
+- Production fail-closed ceilings: 500 pages / 500,000 observations / 524,288,000 bytes per prefix per pass; 6000 pages / 6,000,000 observations / 6,291,456,000 bytes per run.
+- Raw continuation tokens remain in-memory opaque handles. Token-digest cycle detection is in-memory only, bounded by max pages per pass, and treats digest collision as `listing_token_cycle`.
+- Canonical pass-set identity is SHA-256 over length-prefixed observation fields. Pass A and pass B comparison uses digest plus exact ordered equality.
+- Incomplete inventory, canary completeness, and even recorded production-scope completeness still block body retrieval, candidate readiness, and catalog activation from these contracts.
+- One A/B pair per synchronization attempt. Crash restart begins at page one with a new pass-attempt identity. Retry disposition is recorded and never executed.
+- No pagination loop, no HTTPS, no provider contact, no Prisma or migration change, and no production composition. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding.
 
 ## Current repository state
 
@@ -256,7 +272,18 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - Transport hardening: HTTP 200 `Location` presence including arrays fails closed; `Transfer-Encoding` ambiguity and compressed transfer encodings fail closed; shared Content-Length rejects leading zeros and multi-value arrays; shared Content-Encoding accepts only absent or `identity`; DNS answers are copied before pin selection; socket listeners are one-shot with cleanup; non-byte body chunks are rejected.
 - Continuation tokens remain confidential and are encoded once in `pageToken`. One invocation remains zero or one HTTPS request.
 - Pagination, token-cycle detection, A/B convergence, retries, schedulers, durable jobs, catalog activation, matching, Findings, and production composition remain absent.
-- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint is Session 12 Batch 3 pagination and convergence contracts.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint relative to this Batch 2 checkpoint was Session 12 Batch 3 pagination and convergence contracts.
+
+### Session 12 Batch 3 (listing pagination and convergence contracts)
+
+These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
+
+- Session 12 Batch 3 implements pure pagination and two-pass inventory convergence contracts in `@patchpilot/vulnerability-intelligence`. It does not execute a pagination loop, call `createOsvGcsListingHttpsAdapter`, contact `storage.googleapis.com` or `osv.dev`, persist raw tokens or token digests, retrieve advisory bodies, compose production runtime, enable OSV, or write Findings.
+- Policy profiles are closed: `disabled_canary` (`osv_disabled_first_provider_canary_policy_v1`) and `production_fail_closed` (`osv_listing_pagination_policy_v1`). Convergence policy identifier is `osv_listing_inventory_convergence_policy_v1`. Callers cannot supply numeric limits.
+- Raw continuation tokens remain in memory only. In-memory SHA-256 token-digest cycle detection is bounded by max pages per pass. Crash restart begins at page one with a new pass-attempt identity.
+- Canary completeness cannot satisfy production completeness. Incomplete inventory cannot authorize body retrieval. These contracts never authorize candidate readiness or catalog activation.
+- Pagination execution, two-pass I/O orchestration, durable jobs, retries, schedulers, catalog activation, matching, and Findings remain absent.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint is Session 12 Batch 4 pagination and convergence implementation.
 
 ## Historical checkpoint record
 
