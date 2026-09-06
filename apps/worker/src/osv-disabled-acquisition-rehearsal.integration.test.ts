@@ -89,13 +89,6 @@ describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
   const objectStore = storage(false);
   const trackedStores: ReturnType<typeof createS3OsvAdvisoryObjectStorage>[] = [];
   let host: ReturnType<typeof createOsvAdvisoryParserHost> | undefined;
-  const tenantBaseline = {
-    organizations: 0,
-    findings: 0,
-    vulnerabilities: 0,
-    components: 0,
-    evidence: 0,
-  };
 
   function storage(track = true) {
     const created = createS3OsvAdvisoryObjectStorage({
@@ -383,11 +376,6 @@ describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
       bucket: config.objectStorage.bucket,
     });
     expect(initialized.ok).toBe(true);
-    tenantBaseline.organizations = await prisma.organization.count();
-    tenantBaseline.findings = await prisma.finding.count();
-    tenantBaseline.vulnerabilities = await prisma.vulnerability.count();
-    tenantBaseline.components = await prisma.component.count();
-    tenantBaseline.evidence = await prisma.evidence.count();
   });
 
   afterEach(async () => {
@@ -461,8 +449,9 @@ describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
       }),
     ).toBe(1);
     // Scope assertions to this candidate only. CI runs package integration suites in
-    // parallel against one Postgres; global activation/pointer counts race with
-    // @patchpilot/database activateReadyGeneration tests.
+    // parallel against one Postgres; global activation/pointer and tenant-table counts
+    // race with @patchpilot/database and @patchpilot/api tests. Zero-Finding / no
+    // activation are covered by result flags above plus these generation-scoped rows.
     expect(
       await prisma.osvActivationRecord.count({
         where: { candidateGenerationId: input.catalogGenerationId },
@@ -473,11 +462,6 @@ describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
         where: { generationId: input.catalogGenerationId },
       }),
     ).toBe(0);
-    expect(await prisma.finding.count()).toBe(tenantBaseline.findings);
-    expect(await prisma.vulnerability.count()).toBe(tenantBaseline.vulnerabilities);
-    expect(await prisma.organization.count()).toBe(tenantBaseline.organizations);
-    expect(await prisma.component.count()).toBe(tenantBaseline.components);
-    expect(await prisma.evidence.count()).toBe(tenantBaseline.evidence);
 
     const haystack = leakHaystack(result);
     expect(haystack).not.toContain(objectKey);
