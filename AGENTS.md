@@ -108,7 +108,27 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - No API or worker wiring exists.
 - Zero-Finding remains enforced.
 
-### Session 11 Batch 1A
+### Session 11 Closure State (after Batch 6D)
+
+Session 11 is **CLOSED**. The acquisition foundation is implemented and synthetically verified. The following capabilities deliberately remain unimplemented and are deferred to future phases:
+
+- No production listing executor (Phase A).
+- No production OSV scheduler (Phase A).
+- No OSV BackgroundJob types or Outbox events (Phase A).
+- No automatic retry or backoff implementation (Phase A/B).
+- No production orchestrator composition (Phase B).
+- No cleanup executor or retention deletion (Phase A/B).
+- No package normalization or version evaluation (Phase E).
+- No matching execution (Phase E).
+- No Finding writes (Phase F).
+- Parser-host pending-queue size unselected (Phase A decision).
+- Duplicate JSON-key detection not implemented (Phase A decision).
+- Operational runbooks not drafted (Phase A).
+- Canary policy not executed (Phase C).
+
+OSV remains disabled. `INTELLIGENCE_OSV_ENABLED=true` is rejected. Session 12 remains zero-Finding. Matching is Phase E (earliest). Finding writes are Phase F (earliest), subject to ADR 0026 gates.
+
+### Session 11 Batch 1A (Historical)
 
 Session 11 Batch 1A found the repository unable to authoritatively match versions. Current `VulnerabilitySourceRecord` normalized JSON is insufficient for affected-version evaluation. OSV is the recommended affected-package and affected-version source. CISA KEV remains an independent exploitation signal. Tenant SBOMs remain inventory, not advisory authority. Tenant package inventory must not be sent to an external provider without an explicit ADR. Current OSV query APIs must not be used with tenant package identities. OSV catalog ingestion must exist before authoritative matching. Session 11 remains zero-Finding. Finding writes are deferred beyond Session 11. Package identity and fail-closed evaluation belong to [ADR 0025](docs/adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md). Finding evidence and lifecycle belong to [ADR 0026](docs/adr/0026-authoritative-match-evidence-and-finding-lifecycle.md).
 
@@ -405,6 +425,10 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - Identical replay is idempotent. Conflicting replay fails closed. Resume after interruption reuses attached SHA-256 bodies and persisted parser success without a second revision.
 - Rehearsal-owned MinIO objects and PostgreSQL rows are inventoried and removed by test teardown. Storage deletion is a development-gated, compiled-key helper (`deleteDevelopmentOwnedObject`) denied in production. It is not a catalog cleanup job and not a broad bucket purge.
 - Parser-worker pending-queue size remains unselected and is not the orchestrator's 32-item metadata queue. Occupancy remains 1. Matching completeness remains `not_in_scope`. MAL may parse and never authorizes matching. OSV and ECHO remain fail-closed. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 11 remains zero-Finding.
+
+### Session 11 Batch 6D
+
+Session 11 Batch 6D completes the acquisition-foundation closure review. The committed system contains synthetically verified OSV acquisition capabilities that remain deliberately disabled in production runtime. All tests pass (1,118 total: vulnerability-intelligence 798, integrations 177, database 99, worker 44). Thirteen frozen migrations retain integrity. OSV schema provenance is intact (v1.9.0, commit `f3f826310aeca8e324baabd195632f2229952abe`). Production runtime composition is proven OSV-free. Zero-tenant and zero-Finding boundaries are proven. No external provider contact occurs. The orchestrator exists as an explicitly invoked, disabled, bounded, test-only composition. No listing execution, scheduler, durable jobs, automatic retry, or catalog activation exists. Session 11 remains zero-Finding. The system is architecturally ready for Phase A runtime-enablement design. No OSV runtime, matching, or Finding writes exist. Session 11 acquisition foundation is **CLOSED**.
 
 ## Target repository layout
 
