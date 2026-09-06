@@ -437,8 +437,6 @@ describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
       bodySha,
     });
     const composed = await compose(new Map([[objectKey, body]]));
-    const pointerBefore = await prisma.osvActiveCatalogPointer.count();
-    const activationBefore = await prisma.osvActivationRecord.count();
     const result = await composed.orchestrator.processBoundedCandidateGeneration(input);
 
     expect(result.listingExecuted).toBe(false);
@@ -456,16 +454,23 @@ describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
       where: { id: input.catalogGenerationId },
     });
     expect(generation.lifecycleState).toBe('ready_for_activation');
+    expect(generation.activatedAt).toBeNull();
     expect(
       await prisma.osvCatalogMembership.count({
         where: { catalogGenerationId: input.catalogGenerationId },
       }),
     ).toBe(1);
-    expect(await prisma.osvActivationRecord.count()).toBe(activationBefore);
-    expect(await prisma.osvActiveCatalogPointer.count()).toBe(pointerBefore);
+    // Scope assertions to this candidate only. CI runs package integration suites in
+    // parallel against one Postgres; global activation/pointer counts race with
+    // @patchpilot/database activateReadyGeneration tests.
     expect(
       await prisma.osvActivationRecord.count({
         where: { candidateGenerationId: input.catalogGenerationId },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.osvActiveCatalogPointer.count({
+        where: { generationId: input.catalogGenerationId },
       }),
     ).toBe(0);
     expect(await prisma.finding.count()).toBe(tenantBaseline.findings);
