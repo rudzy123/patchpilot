@@ -1199,6 +1199,28 @@ and 6,291,456,000 listing bytes per run.
 Raw continuation tokens remain in memory only. Token digests are in-memory
 cycle controls only and are never durable identities. Crash restart begins at
 page one. One A/B pair is permitted per synchronization attempt. Incomplete
-inventory cannot authorize body retrieval. Pagination is not executed. The
-listing HTTPS adapter remains uncomposed. Production OSV runtime remains
-disabled. ADR 0027 remains Proposed.
+inventory cannot authorize body retrieval. Pagination is not executed in
+Batch 3. The listing HTTPS adapter remains uncomposed. Production OSV runtime
+remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 4)
+
+Session 12 Batch 4 implements the bounded in-memory pagination and two-pass
+inventory-convergence runtime defined by Batch 3, in
+`packages/vulnerability-intelligence/src/osv/listing-pagination/`. This note
+does not change the accepted decision, ceilings, or ADR status.
+
+The listing HTTPS adapter now exposes exact `responseByteCount` on the
+successful one-page transport result: received bytes before UTF-8 decoding,
+positive, at most 1,048,576, and not caller-supplied. Pagination passes that
+count to `acceptOsvListingPage`. The adapter still performs one request per
+invocation and does not paginate.
+
+`createOsvListingPaginationService` is explicitly invoked and is not composed
+into worker, API, scheduler, queue, health, seed, or migration runtime. Raw
+continuation tokens and token digests remain in memory only. Token cycles fail
+closed. Page admission is atomic. Pass A and pass B execute once per prefix
+attempt. Canary completeness cannot satisfy production completeness. Incomplete
+inventory cannot authorize body retrieval. Retry disposition is recorded and
+not executed. Tests do not contact `storage.googleapis.com` or `osv.dev`.
+Production OSV runtime remains disabled. ADR 0027 remains Proposed.

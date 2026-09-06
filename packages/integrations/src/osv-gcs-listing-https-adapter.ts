@@ -3,9 +3,11 @@
  * Session 12 Batch 2 adversarially hardens single-page transport: Location and
  * Transfer-Encoding fail closed, DNS answers are copied before pin selection,
  * non-byte body chunks are rejected, and socket listeners are one-shot with
- * cleanup. Exactly one HTTPS request per invocation. No pagination, retry,
- * redirect follow, body retrieval, persistence, storage, parser-worker,
- * activation, matching, or Finding path.
+ * cleanup. Session 12 Batch 4 threads exact `responseByteCount` (received
+ * bytes before UTF-8 decoding) on the successful one-page transport result.
+ * Exactly one HTTPS request per invocation. No pagination, retry, redirect
+ * follow, body retrieval, persistence, storage, parser-worker, activation,
+ * matching, or Finding path.
  *
  * Request grammar comes from the committed Batch 3C builder. Response pages
  * are handed to the committed Batch 3C parser. Transport failures use the
@@ -31,13 +33,14 @@ import {
   OSV_TIMEOUT_POLICY_V1,
   OSV_TRANSPORT_POLICY_VERSION,
   createOsvGcsListingRequest,
+  createOsvListingPageTransportSuccess,
   createOsvListingRequest,
   createOsvTransportFailure,
   isOsvListingRequest,
   osvGcsListingRequestHref,
   parseOsvGcsListingPage,
   readOsvListingContinuationTokenForTransport,
-  type OsvListingPage,
+  type OsvListingPageTransportOutcome,
   type OsvListingRequest,
   type OsvTransportFailure,
   type OsvTransportFailureKind,
@@ -67,9 +70,7 @@ const HTTPS_PORT = 443 as const;
  */
 const LISTING_CONTINUATION_TOKEN_MAX_UTF8_BYTES = 8192 as const;
 
-export type OsvGcsListingHttpsOutcome =
-  | { readonly ok: true; readonly page: OsvListingPage }
-  | { readonly ok: false; readonly failure: OsvTransportFailure };
+export type OsvGcsListingHttpsOutcome = OsvListingPageTransportOutcome;
 
 type ListingFailure = Extract<OsvGcsListingHttpsOutcome, { readonly ok: false }>;
 
@@ -913,6 +914,7 @@ async function executeListPage(args: {
             finish(failure(body.kind));
             return;
           }
+          const responseByteCount = body.bytes.byteLength;
           if (listingRequest.signal?.aborted === true) {
             finish(failure('cancelled'));
             return;
@@ -930,7 +932,15 @@ async function executeListPage(args: {
             finish({ ok: false, failure: parsed.failure });
             return;
           }
-          finish({ ok: true, page: parsed.value.page });
+          const success = createOsvListingPageTransportSuccess({
+            page: parsed.value.page,
+            responseByteCount,
+          });
+          if (!success.ok) {
+            finish(failure('malformed_response'));
+            return;
+          }
+          finish(success.value);
         });
       });
     } catch {
