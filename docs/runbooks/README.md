@@ -4,6 +4,8 @@ These runbooks are the v0.1 **operational failure plans** for security-sensitive
 
 The SBOM ingestion pipeline, the outbox relay, `sbom.ingest`, and scheduled CISA KEV import are implemented, so [SBOM ingestion failure](sbom-ingestion-failure.md), [outbox backlog](outbox-backlog.md), [background job failure](background-job-failure.md), and [vulnerability sync failure](vulnerability-sync-failure.md) describe live behavior. Authenticated provider-status GET routes exist; they are not anonymous. Correlation, scoring, a dashboard, manual sync/retry, and a detailed operator SyncRun API are not implemented.
 
+OSV runtime remains disabled. Accepted [ADR 0028](../adr/0028-osv-runtime-enablement-architecture-and-safety.md) contains operational **outlines** for a future OSV runtime. Those outlines are not live procedures. Do not contact `storage.googleapis.com` or `osv.dev` from these runbooks.
+
 Three recoveries currently require direct database or bucket work by an instance operator, because no API covers them: requeueing a `failed` ingestion, releasing a `quarantined` one, and cleaning up orphan objects.
 
 They do not include exploit payloads. They do not claim compliance.

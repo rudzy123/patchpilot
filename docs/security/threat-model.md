@@ -61,23 +61,23 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 - Session 11 Batch 6A implements one-attempt generation-bound HTTPS retrieval. Source and retention preflight run before HTTP. Redirects are rejected. Identity encoding only. Exact generation binding. Bounded streaming SHA-256. The adapter returns a validated retrieval result only and does not attach storage, parse advisories, retry, list GCS, synchronize, or enable OSV. Tests use synthetic streams and an injected HTTP seam. They do not contact `storage.googleapis.com`.
 - Session 11 Batch 6B adds a disabled, bounded acquisition orchestrator. It is explicitly invoked. It does not execute provider listing, schedule work, retry automatically, or activate a catalog. Parser success and candidate readiness never activate a catalog. Session 11 remains zero-Finding. OSV remains disabled.
 - Session 11 Batch 6C executes a disabled end-to-end rehearsal with synthetic complete-inventory evidence, authorized scripted retrieval, disposable MinIO, disposable PostgreSQL, and the isolated parser worker. Ineligible items terminate at `retrieval_skipped`. Test teardown removes rehearsal-owned MinIO objects and PostgreSQL rows. No external provider contact. The orchestrator never calls activation. Session 11 remains zero-Finding. OSV remains disabled.
-- Session 11 Batch 6D closes the acquisition foundation as implemented and synthetically verified. Production OSV acquisition remains disabled. Listing execution, scheduler, durable OSV jobs, and automatic retries remain absent. Catalog activation is not invoked. Matching and Finding writes remain unauthorized. Next checkpoint is runtime-enablement architecture.
+- Session 11 Batch 6D closes the acquisition foundation as implemented and synthetically verified. Production OSV acquisition remains disabled. Listing execution, scheduler, durable OSV jobs, and automatic retries remain absent. Catalog activation is not invoked. Matching and Finding writes remain unauthorized. Runtime Enablement Phase R1 is Proposed [ADR 0028](../adr/0028-osv-runtime-enablement-architecture-and-safety.md). That ADR does not enable OSV, implement listing, or authorize activation.
 
 ## Remaining pre-runtime OSV threats
 
-These threats remain open for runtime-enablement architecture. Synthetic verification does not close them.
+[ADR 0028](../adr/0028-osv-runtime-enablement-architecture-and-safety.md) mitigates these in architecture. Implementation, canary, and activation remain later gates. Synthetic verification does not close them.
 
 | Threat | Existing control | Remaining gate |
 | --- | --- | --- |
-| Accidental production reachability | `INTELLIGENCE_OSV_ENABLED=true` rejected; worker and API startup do not register the disabled orchestrator | Phase R1/B must not wire provider contact into boot |
-| Listing-token cycles | Listing executor does not exist; tokens are in-memory opaque values in contracts | Phase R1 must specify cycle and repetition detection before listing execution |
-| Retry storms | One-attempt retrieval; orchestrator records retry disposition only | Phase R1 must close backoff, attempt caps, and exhaustion before retry execution |
-| Incomplete-catalog activation | Integer reconciliation, blocking quarantine, `ready_for_activation` gate; disabled orchestration never activates | Phase D explicit activation authorization after canary |
-| Duplicate JSON keys | Last-key-wins documented; adversarial tests show no identity or eligibility bypass | Resolve, explicitly accept, or keep enablement blocked |
-| Cleanup of referenced evidence | Eligibility classification only; no production cleanup executor | Phase R1/B must keep attached and referenced objects out of deletion |
-| Operational data leakage | Confidential failure taxonomy omits bodies, keys, URLs, and tenant data | Phase R1 production observability must preserve those omissions |
-| Source-license revalidation | Immutable `osv_source_license_registry_v1` with Batch 3A-P evidence | Revalidate before live-provider contact |
-| Rollback and kill switch | Configuration reject is the only disablement | Phase R1 must define runtime kill switch and active-pointer rollback |
+| Accidental production reachability | `INTELLIGENCE_OSV_ENABLED=true` rejected; worker and API startup do not register the disabled orchestrator; ADR 0028 forbids boot wiring; future halt defaults halted | Awaiting implementation (R5A). No enablement path in R1-R |
+| Listing-token cycles | Listing executor does not exist; tokens are in-memory opaque values; ADR 0028 selects in-memory digest cycle detection and 8192-byte token ceiling | Awaiting implementation (R3) |
+| Retry storms | One-attempt retrieval; orchestrator records retry disposition only; ADR 0028 caps 3 attempts with bounded backoff | Awaiting implementation (R4) |
+| Incomplete-catalog activation | Integer reconciliation, blocking quarantine, `ready_for_activation` gate; disabled orchestration never activates; ADR 0028 requires explicit activation | Activation blocking (R7 after canary) |
+| Duplicate JSON keys | Last-key-wins documented; Option B: residual risk for disabled canary; detection or explicit exception before activation | Activation blocking |
+| Cleanup of referenced evidence | Eligibility classification only; ADR 0028 forbids deleting referenced evidence; no production cleanup executor | Awaiting implementation; executor stays disabled until reviewed |
+| Operational data leakage | Confidential failure taxonomy omits bodies, keys, URLs, and tenant data; ADR 0028 observability prohibition list | Awaiting implementation (R5) |
+| Source-license revalidation | Immutable `osv_source_license_registry_v1` with Batch 3A-P evidence; ADR 0028 pins revalidation points | Awaiting canary (legal revalidation before R6) |
+| Rollback and kill switch | ADR 0028 defines halt independent from enablement and rollback as a new activation record. Variable not added in R1 | Awaiting implementation (R5 halt, R7 rollback) |
 
 [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) records fail-closed package identity and evaluation architecture. No comparator or evaluator exists.
 
