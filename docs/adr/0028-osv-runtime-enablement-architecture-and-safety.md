@@ -1337,3 +1337,39 @@ No schema, migration, scheduler, BackgroundJob routing, Outbox routing,
 kill-switch variable, catalog activation, or OSV enablement is included.
 Tests do not contact `storage.googleapis.com` or `osv.dev`. Production OSV
 runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 8)
+
+Session 12 Batch 8 implements `createOsvDisabledRuntimeSynchronization`, an
+explicitly constructed disabled composition of committed listing pagination,
+inventory convergence, lease/fencing adapters, stage attempts, disabled
+acquisition orchestration, and candidate readiness. Construction performs no
+I/O. Production startup does not import the factory. Retry disposition is
+recorded and not executed. There is no periodic heartbeat loop. Candidate
+readiness does not activate a catalog. This note does not change the accepted
+decision, numeric policy, or ADR status.
+
+No schema, migration, scheduler, BackgroundJob routing, Outbox routing,
+kill-switch variable, catalog activation, or OSV enablement is included.
+Tests do not contact `storage.googleapis.com` or `osv.dev`. Production OSV
+runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 8-R)
+
+Session 12 Batch 8-R independently reviewed and hardened the uncommitted
+Batch 8 disabled composition. Concrete corrections: the public factory never
+honors a caller-supplied execution flag and the verification factory is not a
+public package export; late listing, retrieval, parser, and attachment success
+after ownership loss is discarded; attempt reservation or start failure prevents
+the protected stage; stale owners do not transition the authoritative run to
+failed or cancelled and do not release a later holder's lease; post-lease
+cancellation terminalizes the run before release; the inventory bridge requires
+the exact canary or production prefix plan plus complete pass A and pass B;
+membership, quarantine, catalog-lifecycle, body-read, and related acquisition
+writes recheck current ownership. This note does not change the accepted
+decision, numeric policy, or ADR status.
+
+No schema, migration, scheduler, BackgroundJob routing, Outbox routing,
+kill-switch variable, catalog activation, or OSV enablement is included.
+Tests do not contact `storage.googleapis.com` or `osv.dev`. Production OSV
+runtime remains disabled. ADR 0027 remains Proposed.
