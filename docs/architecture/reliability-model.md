@@ -176,7 +176,7 @@ One reconciliation path is implemented: the relay's per-batch sweep that creates
 
 Object-storage orphan cleanup is **not** implemented. `SBOM_ORPHAN_GRACE_SECONDS` (default 7 days, validated to exceed the idempotency TTL) is the policy floor a future job must honor; nothing reads it today. Orphans arise when a temporary-object delete fails, or when a promote succeeded and the database transaction then failed. The final object is intentionally retained in the second case because it may be the only copy of the evidence. See [SBOM ingestion](sbom-ingestion.md#orphan-reconciliation).
 
-Session 9 KEV scheduler, bounded provider retry, PostgreSQL retry reconciliation, staging, and atomic activation are implemented. Still unimplemented: object-storage orphan cleanup (including intelligence final-snapshot orphans), stale `running` job sweeps, OSV runtime, expired **RiskAcceptance**, and expired **manual_override** calculations. Delivery remains at-least-once; PatchPilot does not claim exactly-once. Runbooks: [docs/runbooks/](../runbooks/README.md).
+Session 9 KEV scheduler, bounded provider retry, PostgreSQL retry reconciliation, staging, and atomic activation are implemented. Still unimplemented: object-storage orphan cleanup (including intelligence final-snapshot orphans), stale `running` job sweeps, production OSV runtime (the Session 12 runtime-enablement foundation exists and remains uncomposed), expired **RiskAcceptance**, and expired **manual_override** calculations. Delivery remains at-least-once; PatchPilot does not claim exactly-once. Runbooks: [docs/runbooks/](../runbooks/README.md).
 
 ## Backup, RPO, RTO (proposals)
 

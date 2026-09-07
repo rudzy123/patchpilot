@@ -96,7 +96,7 @@ Required. Session 9 is **KEV-first**. Loading these variables does **not** resol
 
 The KEV feed URL is a **compiled constant** (`https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json`). There is no provider URL environment variable. Redirects are fixed at zero. Approved providers require no credentials.
 
-`INTELLIGENCE_OSV_ENABLED` must be `false` in development, test, and production. `true` fails typed configuration validation. No OSV archive is downloaded. No ZIP dependency is installed. Observed 2026-08-31 OSV `all.zip` size (approximately 1.43 GiB compressed, 8.74 GiB declared expanded, 890,787 entries) is **not** encoded as runtime configuration.
+`INTELLIGENCE_OSV_ENABLED` must be `false` in development, test, and production. `true` fails typed configuration validation. `INTELLIGENCE_OSV_ACQUISITION_HALT` defaults halted and is independent from enablement. No OSV archive is downloaded. No ZIP dependency is installed. Observed 2026-08-31 OSV `all.zip` size (approximately 1.43 GiB compressed, 8.74 GiB declared expanded, 890,787 entries) is **not** encoded as runtime configuration.
 
 KEV response and count limits are PatchPilot safety margins from one complete snapshot measured on 2026-08-31 (1,621,705 bytes observed versus 4 MiB default; 1,687 entries versus 4,096 default). They are **not** CISA maxima or service-level guarantees. CISA conditional `ETag` / `If-None-Match` behavior is **not** relied upon; content SHA-256 is the not-modified signal.
 
@@ -105,7 +105,8 @@ Values must be canonical integers (no `NaN`, `Infinity`, scientific notation, de
 | Variable | Purpose |
 | --- | --- |
 | `INTELLIGENCE_KEV_ENABLED` | Operator enablement for KEV scheduling. Default `true`. `false` stops new scheduler ticks and retry reconciliation; already queued pre-snapshot work fails `provider_disabled`. Configuration load does not contact CISA. |
-| `INTELLIGENCE_OSV_ENABLED` | OSV runtime synchronization. Default `false`. `false` is the only valid Session 9 value. |
+| `INTELLIGENCE_OSV_ENABLED` | OSV runtime synchronization. Default `false`. `false` is the only valid value. `true` is rejected. Halt false does not make `true` valid. |
+| `INTELLIGENCE_OSV_ACQUISITION_HALT` | OSV acquisition emergency halt. Default `true` (halted). Missing, empty, and whitespace-only values are halted. Own properties only; prototype values cannot supply the setting. Exact `true`/`false` after trim. Malformed values fail validation. Explicit `false` releases halt only and does not enable OSV, start a scheduler, or contact a provider. Refresh is a process snapshot; restart is required. |
 | `INTELLIGENCE_KEV_SYNC_INTERVAL_SECONDS` | UTC schedule-window length used by the worker scheduler. Default `86400`. Floor `3600`, ceiling `604800`. PatchPilot operational default, not a CISA SLA. Distinct from the scheduler poll interval. |
 | `INTELLIGENCE_KEV_STALE_THRESHOLD_SECONDS` | Planned freshness alarm. Default `259200`. Floor `7200`, ceiling `1209600`. Must be strictly greater than the sync interval. |
 | `INTELLIGENCE_HTTP_CONNECT_TIMEOUT_MS` | TCP/TLS connect timeout for the restricted CISA adapter. Default `5000`. Floor `250`, ceiling `15000`. Must be strictly less than the total timeout. |

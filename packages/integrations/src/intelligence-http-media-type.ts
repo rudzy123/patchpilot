@@ -94,17 +94,18 @@ export function isIdentityContentEncoding(header: string | string[] | undefined)
     return true;
   }
 
-  const values = Array.isArray(header) ? header : [header];
-  if (values.length === 0) {
-    return true;
+  if (Array.isArray(header)) {
+    if (header.length !== 1) {
+      return false;
+    }
+    const only = header[0];
+    if (only === undefined) {
+      return false;
+    }
+    return only.trim().toLowerCase() === 'identity';
   }
 
-  if (values.length > 1) {
-    return false;
-  }
-
-  const value = values[0]?.trim().toLowerCase();
-  return value === undefined || value.length === 0 || value === 'identity';
+  return header.trim().toLowerCase() === 'identity';
 }
 
 export function parseDeclaredContentLength(
@@ -114,18 +115,19 @@ export function parseDeclaredContentLength(
     return { kind: 'absent' };
   }
 
-  const values = Array.isArray(header) ? header : [header];
-  if (values.length === 0) {
-    return { kind: 'absent' };
+  if (Array.isArray(header)) {
+    if (header.length !== 1) {
+      return { kind: 'invalid' };
+    }
+    const only = header[0];
+    if (typeof only !== 'string') {
+      return { kind: 'invalid' };
+    }
+    return parseDeclaredContentLength(only);
   }
 
-  const unique = new Set(values.map((value) => value.trim()));
-  if (unique.size !== 1) {
-    return { kind: 'invalid' };
-  }
-
-  const [raw] = unique;
-  if (raw === undefined || raw.length === 0 || !/^[0-9]+$/.test(raw)) {
+  const raw = header.trim();
+  if (raw.length === 0 || !/^(0|[1-9][0-9]*)$/.test(raw)) {
     return { kind: 'invalid' };
   }
 

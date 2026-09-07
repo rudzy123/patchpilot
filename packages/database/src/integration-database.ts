@@ -74,6 +74,10 @@ export const FROZEN_MIGRATIONS = [
     directory: '20260904180000_osv_parsed_revision_id_check_correction',
     sha256: '43f758f559abc1c936197f6d5944f85cb14ef1cbed2a99bd0f555759ebdc1570',
   },
+  {
+    directory: '20260907120000_osv_runtime_coordination_persistence',
+    sha256: '7017b1c4b1d4bcae8bed4bdd0eb43559c0c89fce5b3636e0e889b276013cc3a6',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
@@ -93,6 +97,9 @@ export const SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION =
 export const SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION =
   '20260904180000_osv_parsed_revision_id_check_correction' as const;
 
+export const SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE =
+  '20260907120000_osv_runtime_coordination_persistence' as const;
+
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
   '20260827120000_tenant_model',
@@ -107,6 +114,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   SESSION_10_CANONICAL_CVE_IDENTITY,
   SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
   SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+  SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
@@ -297,4 +305,19 @@ export async function applyThroughSession10(databaseUrl: string): Promise<void> 
 export async function applyThroughSession11(databaseUrl: string): Promise<void> {
   await applyThroughSession10(databaseUrl);
   await applyMigrationSqlAndResolve(databaseUrl, SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION);
+}
+
+export async function applyThroughSession11ParsedRevisionCorrection(
+  databaseUrl: string,
+): Promise<void> {
+  await applyThroughSession11(databaseUrl);
+  await applyMigrationSqlAndResolve(
+    databaseUrl,
+    SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+  );
+}
+
+export async function applyThroughSession12Batch6(databaseUrl: string): Promise<void> {
+  await applyThroughSession11ParsedRevisionCorrection(databaseUrl);
+  await applyMigrationSqlAndResolve(databaseUrl, SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE);
 }

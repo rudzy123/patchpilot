@@ -92,6 +92,9 @@ import {
   INTELLIGENCE_ORPHAN_GRACE_SECONDS_MIN,
   INTELLIGENCE_OSV_ENABLED_DEFAULT,
   INTELLIGENCE_OSV_ENABLED_SESSION9_ERROR,
+  INTELLIGENCE_OSV_ACQUISITION_HALT_DEFAULT,
+  INTELLIGENCE_OSV_ACQUISITION_HALT_NAME,
+  INTELLIGENCE_OSV_ACQUISITION_HALT_REFRESH,
   INTELLIGENCE_OSV_RUNTIME_STATUS,
   INTELLIGENCE_PARSER_VERSION_DEFAULT,
   INTELLIGENCE_SNAPSHOT_RETENTION_COUNT_DEFAULT,
@@ -253,6 +256,8 @@ type IntelligenceNumericKey = keyof Omit<
   IntelligenceConfig,
   | 'kevEnabled'
   | 'osvEnabled'
+  | 'osvAcquisitionHalt'
+  | 'osvAcquisitionHaltSource'
   | 'kevSource'
   | 'osvRuntime'
   | 'httpRedirectMax'
@@ -464,6 +469,8 @@ describe('vulnerability intelligence configuration', () => {
     expect(config.intelligence).toEqual({
       kevEnabled: INTELLIGENCE_KEV_ENABLED_DEFAULT,
       osvEnabled: INTELLIGENCE_OSV_ENABLED_DEFAULT,
+      osvAcquisitionHalt: 'halted',
+      osvAcquisitionHaltSource: 'explicit',
       kevSource: source,
       osvRuntime: INTELLIGENCE_OSV_RUNTIME_STATUS,
       httpRedirectMax: INTELLIGENCE_HTTP_REDIRECT_MAX,
@@ -501,6 +508,10 @@ describe('vulnerability intelligence configuration', () => {
     });
     expect(config.intelligence.kevEnabled).toBe(true);
     expect(config.intelligence.osvEnabled).toBe(false);
+    expect(config.intelligence.osvAcquisitionHalt).toBe('halted');
+    expect(INTELLIGENCE_OSV_ACQUISITION_HALT_DEFAULT).toBe(true);
+    expect(INTELLIGENCE_OSV_ACQUISITION_HALT_NAME).toBe('INTELLIGENCE_OSV_ACQUISITION_HALT');
+    expect(INTELLIGENCE_OSV_ACQUISITION_HALT_REFRESH).toBe('process_snapshot_restart_required');
   });
 
   it('allows KEV to be disabled without enabling OSV', () => {
@@ -978,5 +989,169 @@ describe('vulnerability intelligence configuration', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     loadServerConfigFrom(validDevelopmentEnv());
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('defaults missing and empty acquisition halt to halted without timers', () => {
+    for (const raw of [undefined, '', '   ']) {
+      const env = validDevelopmentEnv();
+      if (raw === undefined) {
+        delete env['INTELLIGENCE_OSV_ACQUISITION_HALT'];
+      } else {
+        env['INTELLIGENCE_OSV_ACQUISITION_HALT'] = raw;
+      }
+      const config = loadServerConfigFrom(env);
+      expect(config.intelligence.osvAcquisitionHalt).toBe('halted');
+      expect(config.intelligence.osvAcquisitionHaltSource).toBe('defaulted');
+      expect(config.intelligence.osvEnabled).toBe(false);
+    }
+  });
+
+  it('treats explicit true as halted and explicit false as halt released only', () => {
+    const haltedEnv = validDevelopmentEnv();
+    haltedEnv['INTELLIGENCE_OSV_ACQUISITION_HALT'] = 'true';
+    const halted = loadServerConfigFrom(haltedEnv).intelligence;
+    expect(halted.osvAcquisitionHalt).toBe('halted');
+    expect(halted.osvAcquisitionHaltSource).toBe('explicit');
+    expect(halted.osvEnabled).toBe(false);
+
+    const releasedEnv = validDevelopmentEnv();
+    releasedEnv['INTELLIGENCE_OSV_ACQUISITION_HALT'] = 'false';
+    const released = loadServerConfigFrom(releasedEnv).intelligence;
+    expect(released.osvAcquisitionHalt).toBe('permitted_by_halt_control');
+    expect(released.osvAcquisitionHaltSource).toBe('explicit');
+    expect(released.osvEnabled).toBe(false);
+    expect(released.osvRuntime).toBe('deferred');
+  });
+
+  it('rejects mixed-case, numeric, and alternate halt forms without logging the raw value', () => {
+    for (const raw of [
+      'TRUE',
+      'FALSE',
+      'True',
+      'False',
+      '1',
+      '0',
+      'yes',
+      'no',
+      'on',
+      'off',
+      'maybe',
+    ]) {
+      const env = validDevelopmentEnv();
+      env['INTELLIGENCE_OSV_ACQUISITION_HALT'] = raw;
+      expect(() => loadServerConfigFrom(env)).toThrow(ConfigValidationError);
+      expect(() => loadServerConfigFrom(env)).toThrow(/must be "true" or "false"/);
+      try {
+        loadServerConfigFrom(env);
+      } catch (error) {
+        const message = String(error);
+        expect(message).not.toContain(`INTELLIGENCE_OSV_ACQUISITION_HALT=${raw}`);
+        if (raw.length > 2) {
+          expect(message).not.toContain(raw);
+        }
+      }
+    }
+  });
+
+  it('accepts whitespace-padded halt booleans using the shared trim-then-parse contract', () => {
+    const env = validDevelopmentEnv();
+    env['INTELLIGENCE_OSV_ACQUISITION_HALT'] = ' false ';
+    const config = loadServerConfigFrom(env);
+    expect(config.intelligence.osvAcquisitionHalt).toBe('permitted_by_halt_control');
+    expect(config.intelligence.osvAcquisitionHaltSource).toBe('explicit');
+  });
+
+  it('keeps OSV enablement rejected when halt is released', () => {
+    const env = validDevelopmentEnv();
+    env['INTELLIGENCE_OSV_ENABLED'] = 'true';
+    env['INTELLIGENCE_OSV_ACQUISITION_HALT'] = 'false';
+    expectRejection(env, new RegExp(INTELLIGENCE_OSV_ENABLED_SESSION9_ERROR));
+  });
+
+  it('rejects enablement true with halt true, and missing enablement independently of halt', () => {
+    const bothTrue = validDevelopmentEnv();
+    bothTrue['INTELLIGENCE_OSV_ENABLED'] = 'true';
+    bothTrue['INTELLIGENCE_OSV_ACQUISITION_HALT'] = 'true';
+    expectRejection(bothTrue, new RegExp(INTELLIGENCE_OSV_ENABLED_SESSION9_ERROR));
+
+    const missingEnablement = validDevelopmentEnv();
+    delete missingEnablement['INTELLIGENCE_OSV_ENABLED'];
+    missingEnablement['INTELLIGENCE_OSV_ACQUISITION_HALT'] = 'false';
+    expect(() => loadServerConfigFrom(missingEnablement)).toThrow(/INTELLIGENCE_OSV_ENABLED/);
+
+    const malformedEnablement = validDevelopmentEnv();
+    malformedEnablement['INTELLIGENCE_OSV_ENABLED'] = 'yes';
+    malformedEnablement['INTELLIGENCE_OSV_ACQUISITION_HALT'] = 'false';
+    expect(() => loadServerConfigFrom(malformedEnablement)).toThrow(/must be "true" or "false"/);
+  });
+
+  it('loads halt independently in development, test, and production', () => {
+    for (const env of [validDevelopmentEnv(), validTestEnv(), validProductionEnv()]) {
+      env['INTELLIGENCE_OSV_ACQUISITION_HALT'] = 'false';
+      const config = loadServerConfigFrom(env);
+      expect(config.intelligence.osvAcquisitionHalt).toBe('permitted_by_halt_control');
+      expect(config.intelligence.osvEnabled).toBe(false);
+    }
+  });
+
+  it('ignores unknown halt-adjacent keys and does not start work on load', () => {
+    const env = validDevelopmentEnv();
+    env['INTELLIGENCE_OSV_ACQUISITION_HALT_OVERRIDE'] = 'false';
+    env['INTELLIGENCE_OSV_HALT'] = 'false';
+    const config = loadServerConfigFrom(env);
+    expect(config.intelligence.osvAcquisitionHalt).toBe('halted');
+    expect(config.intelligence).not.toHaveProperty('osvAcquisitionHaltOverride');
+    expect(JSON.stringify(config.intelligence)).not.toContain('INTELLIGENCE_OSV_ACQUISITION_HALT');
+  });
+
+  it('defaults tab, newline, and Unicode whitespace halt values without inheriting prototypes', () => {
+    for (const raw of ['\t', '\n', '\r\n', '\u00a0', '\u2003']) {
+      const env = validDevelopmentEnv();
+      env['INTELLIGENCE_OSV_ACQUISITION_HALT'] = raw;
+      const config = loadServerConfigFrom(env);
+      expect(config.intelligence.osvAcquisitionHalt).toBe('halted');
+      expect(config.intelligence.osvAcquisitionHaltSource).toBe('defaulted');
+    }
+
+    const inherited = Object.assign(
+      Object.create({
+        INTELLIGENCE_OSV_ACQUISITION_HALT: 'false',
+      }) as Record<string, string>,
+      validDevelopmentEnv(),
+    );
+    delete inherited['INTELLIGENCE_OSV_ACQUISITION_HALT'];
+    const config = loadServerConfigFrom(inherited);
+    expect(config.intelligence.osvAcquisitionHalt).toBe('halted');
+    expect(config.intelligence.osvAcquisitionHaltSource).toBe('defaulted');
+  });
+
+  it('rejects NUL, control characters, and non-string halt values without echoing them', () => {
+    for (const raw of ['true\0', 'false\ntrue', 'true\u0007']) {
+      const env = validDevelopmentEnv();
+      env['INTELLIGENCE_OSV_ACQUISITION_HALT'] = raw;
+      expect(() => loadServerConfigFrom(env)).toThrow(ConfigValidationError);
+      try {
+        loadServerConfigFrom(env);
+      } catch (error) {
+        const message = String(error);
+        expect(message).not.toContain(raw);
+        expect(message).not.toContain('INTELLIGENCE_OSV_ACQUISITION_HALT=');
+      }
+    }
+
+    const env = {
+      ...validDevelopmentEnv(),
+      INTELLIGENCE_OSV_ACQUISITION_HALT: 0 as unknown as string,
+    };
+    expect(() => loadServerConfigFrom(env)).toThrow(/must be "true" or "false"/);
+  });
+
+  it('keeps parsed halt state as a process snapshot after later environment mutation', () => {
+    const env = validDevelopmentEnv();
+    env['INTELLIGENCE_OSV_ACQUISITION_HALT'] = 'true';
+    const config = loadServerConfigFrom(env);
+    env['INTELLIGENCE_OSV_ACQUISITION_HALT'] = 'false';
+    expect(config.intelligence.osvAcquisitionHalt).toBe('halted');
+    expect(config.intelligence.osvAcquisitionHaltSource).toBe('explicit');
   });
 });

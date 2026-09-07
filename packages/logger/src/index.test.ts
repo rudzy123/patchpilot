@@ -149,6 +149,47 @@ describe('logger redaction', () => {
     expect(output).not.toContain('shouldNotAppearIfSerialized');
   });
 
+  it('redacts OSV listing tokens, holder tokens, and nested token digests', () => {
+    const collected = collectLogs();
+    const logger = createLogger({
+      service: 'test',
+      level: 'info',
+      pretty: false,
+      destination: collected.stream,
+    });
+
+    logger.info(
+      {
+        pageToken: 'raw-osv-page-token-marker',
+        nextPageToken: 'raw-osv-next-page-token-marker',
+        continuationToken: 'raw-osv-continuation-token-marker',
+        tokenDigest: 'osv-token-digest-marker',
+        holderToken: 'raw-osv-holder-token-marker',
+        holderTokenDigest: 'osv-holder-token-digest-marker',
+        holderDigest: 'osv-holder-digest-marker',
+        nested: {
+          pageToken: 'nested-osv-page-token-marker',
+          holderToken: 'nested-osv-holder-token-marker',
+        },
+        requestId: 'osv-safe-request-id',
+      },
+      'osv runtime',
+    );
+
+    const output = collected.lines().join('\n');
+    expect(output).toContain('[Redacted]');
+    expect(output).toContain('osv-safe-request-id');
+    expect(output).not.toContain('raw-osv-page-token-marker');
+    expect(output).not.toContain('raw-osv-next-page-token-marker');
+    expect(output).not.toContain('raw-osv-continuation-token-marker');
+    expect(output).not.toContain('osv-token-digest-marker');
+    expect(output).not.toContain('raw-osv-holder-token-marker');
+    expect(output).not.toContain('osv-holder-token-digest-marker');
+    expect(output).not.toContain('osv-holder-digest-marker');
+    expect(output).not.toContain('nested-osv-page-token-marker');
+    expect(output).not.toContain('nested-osv-holder-token-marker');
+  });
+
   it('does not log complete environment objects', () => {
     const collected = collectLogs();
     const logger = createLogger({

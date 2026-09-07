@@ -12,6 +12,12 @@ models, a migration, adapters, object storage, provider retrieval,
 synchronization, matching, or Finding writes. Accept this ADR before Session 11
 Batch 5C creates the forward-only migration.
 
+Implementation status (not an acceptance): Session 11 later implemented
+persistence, object storage, and retrieval adapters. Session 12 implemented the
+disabled runtime-enablement foundation. Catalog activation remains uninvoked.
+This ADR remains **Proposed** and does not authorize runtime enablement,
+activation, matching, or Finding writes.
+
 ## Context
 
 [ADR 0024](0024-authoritative-affected-version-source-and-osv-acquisition.md)

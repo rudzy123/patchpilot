@@ -1166,3 +1166,263 @@ Machine-checkable pins for invariant tests:
 - not OSV runtime enablement
 - R2 may implement exactly one production GCS listing-page HTTPS adapter
 - ADR 0027 remains Proposed; R2 does not require ADR 0027 acceptance
+
+## Implementation note (Session 12 Batch 1)
+
+Session 12 Batch 1 implemented the R2 listing-page HTTPS adapter at
+`packages/integrations/src/osv-gcs-listing-https-adapter.ts`
+(`createOsvGcsListingHttpsAdapter`). This note does not change the accepted
+decision. The adapter remains uncomposed and runtime-unreachable. It performs
+one request per invocation, rejects redirects, requires identity encoding,
+bounds the page to 1,048,576 bytes, decodes UTF-8 fatally, and reuses the
+committed listing-page parser. Listing-specific timeout milliseconds were not
+committed in Batch 3B; the adapter reuses `OSV_TIMEOUT_POLICY_V1` because that
+policy is the approved GCS HTTPS one-attempt, 1 MiB, four-phase bound. Tests
+are synthetic and local only. Pagination, token-cycle detection, retries,
+schedulers, catalog activation, matching, Findings, and OSV enablement remain
+out of scope. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 3)
+
+Session 12 Batch 3 records framework-independent pagination and two-pass
+inventory convergence contracts in
+`packages/vulnerability-intelligence/src/osv/listing-pagination/`. This note
+does not change the accepted decision, ceilings, or ADR status.
+
+The ADR defined A/B convergence without a named policy identifier. Batch 3
+pins that closed policy as `osv_listing_inventory_convergence_policy_v1`.
+Pagination policy identifiers remain `osv_listing_pagination_policy_v1` and
+`osv_disabled_first_provider_canary_policy_v1`. Exact ADR 0028 ceilings are
+preserved, including production 524,288,000 listing bytes per prefix per pass
+and 6,291,456,000 listing bytes per run.
+
+Raw continuation tokens remain in memory only. Token digests are in-memory
+cycle controls only and are never durable identities. Crash restart begins at
+page one. One A/B pair is permitted per synchronization attempt. Incomplete
+inventory cannot authorize body retrieval. Pagination is not executed in
+Batch 3. The listing HTTPS adapter remains uncomposed. Production OSV runtime
+remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 4)
+
+Session 12 Batch 4 implements the bounded in-memory pagination and two-pass
+inventory-convergence runtime defined by Batch 3, in
+`packages/vulnerability-intelligence/src/osv/listing-pagination/`. This note
+does not change the accepted decision, ceilings, or ADR status.
+
+The listing HTTPS adapter now exposes exact `responseByteCount` on the
+successful one-page transport result: received bytes before UTF-8 decoding,
+positive, at most 1,048,576, and not caller-supplied. Pagination passes that
+count to `acceptOsvListingPage`. The adapter still performs one request per
+invocation and does not paginate.
+
+`createOsvListingPaginationService` is explicitly invoked and is not composed
+into worker, API, scheduler, queue, health, seed, or migration runtime. Raw
+continuation tokens and token digests remain in memory only. Token cycles fail
+closed. Page admission is atomic. Pass A and pass B execute once per prefix
+attempt. Canary completeness cannot satisfy production completeness. Incomplete
+inventory cannot authorize body retrieval. Retry disposition is recorded and
+not executed. Tests do not contact `storage.googleapis.com` or `osv.dev`.
+Production OSV runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 4-R)
+
+Session 12 Batch 4-R adversarially reviewed the Batch 4 pagination service with
+synthetic listing pages and scripted listing-port doubles. This note does not
+change the accepted decision, ceilings, or ADR status.
+
+Concrete corrections: rejected pages do not commit candidate counts; only
+constructed transport success is admitted; hung listing ports lose to
+cancellation; unsafe ceiling arithmetic fails closed; event-sink thenables
+cannot become unhandled rejections; canonical convergence checks the exact
+algorithm identifier. Raw tokens remain in memory only. Retry disposition is
+recorded and not executed. Tests do not contact `storage.googleapis.com` or
+`osv.dev`. Production OSV runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 5)
+
+Session 12 Batch 5 records framework-independent contracts for the future
+`intelligence.osv.sync` job, shared catalog-scope lease, holder token, CAS
+row revision, fencing token, database-time expiry, retry policy
+`osv_runtime_retry_policy_v1`, parser pending capacity 0, future halt default
+halted, and bounded operational events. This note does not change the accepted
+decision, numeric policy, or ADR status.
+
+Clarifications that remain compatible with the accepted decision:
+
+- Canary and production acquisition for the same OSV GCS public export share
+  one lease so they cannot overlap. Work scopes remain distinct.
+- Heartbeat increments lease row revision. Fencing token increments on
+  acquire, stale takeover, and release, not on heartbeat.
+- Parser timeout remains two total attempts, including the initial attempt.
+  Ordinary retryable stages remain three total attempts, including the initial
+  attempt.
+- HTTP 429 Retry-After is capped at 30 seconds. Malformed and non-429 values
+  use bounded full jitter. Full jitter still applies to honored Retry-After
+  values and cannot exceed 30 seconds.
+- Reserved Outbox name `intelligence.osv.sync.requested.v1` is deferred until
+  scheduler and job persistence prove a transaction-bound publication
+  requirement. The name remains reserved and is not registered.
+- `INTELLIGENCE_OSV_ACQUISITION_HALT` is not added. Parser-host pending-queue
+  status remains `unavailable` until a later runtime-composition batch.
+
+No Prisma, migration, lease adapter, retry executor, scheduler, or production
+composition is included. Tests do not contact `storage.googleapis.com` or
+`osv.dev`. Production OSV runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 6 / 6-R)
+
+Session 12 Batch 6 records the schema-only PostgreSQL persistence for the
+committed Batch 5 contracts: immutable synchronization request and run, one
+current lease projection per shared acquisition scope, holder-token digest
+only, separate CAS row revision and fencing token, database timestamps, and
+stage attempts. Session 12 Batch 6-R independently reviewed that uncommitted
+schema and froze migration
+`20260907120000_osv_runtime_coordination_persistence` at SHA-256
+`7017b1c4b1d4bcae8bed4bdd0eb43559c0c89fce5b3636e0e889b276013cc3a6`. This note
+does not change the accepted decision, numeric policy, or ADR status.
+
+Clarifications that remain compatible with the accepted decision:
+
+- Raw holder tokens are not stored. Only a lowercase SHA-256 digest is durable.
+  Digests use TEXT plus an exact 64-character lowercase hex CHECK so
+  CHAR/VARCHAR(64) trailing-space truncation cannot admit a padded value.
+- Expired is derived from database time and `expiresAt`, not stored as a
+  mutable lease state. Stored projection states are `held` and `released`.
+- The current lease projection cannot be deleted in ordinary operation.
+  Fencing tokens are monotonic for the lease scope. Heartbeat does not change
+  the fencing token.
+- Request rows are append-only. Duplicate request delivery cannot create a
+  second run. Attempt identity is immutable. Planned or running attempts may
+  transition once to a terminal state. Attempt ordinal 4 cannot satisfy CHECK
+  constraints.
+- Parser timeout remains two total attempts. Inventory convergence cannot use
+  durable retry rows beyond ordinal 1.
+
+No lease adapter, heartbeat, stale takeover, retry executor, scheduler, or
+production composition is included. Tests do not contact
+`storage.googleapis.com` or `osv.dev`. Production OSV runtime remains
+disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 7)
+
+Session 12 Batch 7 implements `createOsvRuntimeCoordinationPersistence` in
+`@patchpilot/database` against the frozen Batch 6 schema. The adapters
+establish and inspect durable request, run, lease, fencing, attempt, and
+retry-eligibility authority. They do not execute retries, sleep, contact a
+provider, or compose production runtime. Holder tokens remain secret; only
+SHA-256 digests are stored. Lease and retry timestamps use database
+`CURRENT_TIMESTAMP`. Fencing tokens increment on ownership change, release,
+and reacquisition, not on heartbeat. This note does not change the accepted
+decision, numeric policy, or ADR status.
+
+No scheduler, BackgroundJob routing, Outbox routing, kill-switch variable,
+catalog activation, or OSV enablement is included. Tests do not contact
+`storage.googleapis.com` or `osv.dev`. Production OSV runtime remains
+disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 7-R)
+
+Session 12 Batch 7-R independently reviewed the uncommitted Batch 7 adapters.
+Expired holders cannot heartbeat or release. Same-owner acquire after expiry
+is a new fencing generation: the Batch 6-R heartbeat trigger cannot increment
+fencing on held→held same run and digest, so the adapter bumps generation
+through a same-transaction released-then-held pair without a schema change.
+Public release still rejects expired holders. Attempt reservation is
+transactional and ordinal-contiguous. Retry eligibility remains inspection
+only. BIGINT values retain exact precision. This note does not change the
+accepted decision, numeric policy, or ADR status.
+
+No schema, migration, scheduler, BackgroundJob routing, Outbox routing,
+kill-switch variable, catalog activation, or OSV enablement is included.
+Tests do not contact `storage.googleapis.com` or `osv.dev`. Production OSV
+runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 8)
+
+Session 12 Batch 8 implements `createOsvDisabledRuntimeSynchronization`, an
+explicitly constructed disabled composition of committed listing pagination,
+inventory convergence, lease/fencing adapters, stage attempts, disabled
+acquisition orchestration, and candidate readiness. Construction performs no
+I/O. Production startup does not import the factory. Retry disposition is
+recorded and not executed. There is no periodic heartbeat loop. Candidate
+readiness does not activate a catalog. This note does not change the accepted
+decision, numeric policy, or ADR status.
+
+No schema, migration, scheduler, BackgroundJob routing, Outbox routing,
+kill-switch variable, catalog activation, or OSV enablement is included.
+Tests do not contact `storage.googleapis.com` or `osv.dev`. Production OSV
+runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 8-R)
+
+Session 12 Batch 8-R independently reviewed and hardened the uncommitted
+Batch 8 disabled composition. Concrete corrections: the public factory never
+honors a caller-supplied execution flag and the verification factory is not a
+public package export; late listing, retrieval, parser, and attachment success
+after ownership loss is discarded; attempt reservation or start failure prevents
+the protected stage; stale owners do not transition the authoritative run to
+failed or cancelled and do not release a later holder's lease; post-lease
+cancellation terminalizes the run before release; the inventory bridge requires
+the exact canary or production prefix plan plus complete pass A and pass B;
+membership, quarantine, catalog-lifecycle, body-read, and related acquisition
+writes recheck current ownership. This note does not change the accepted
+decision, numeric policy, or ADR status.
+
+No schema, migration, scheduler, BackgroundJob routing, Outbox routing,
+kill-switch variable, catalog activation, or OSV enablement is included.
+Tests do not contact `storage.googleapis.com` or `osv.dev`. Production OSV
+runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 9)
+
+Session 12 Batch 9 records typed `INTELLIGENCE_OSV_ACQUISITION_HALT` in
+`@patchpilot/config` and bounded operational observability for the disabled
+composition. Default, missing, and empty values are halted. Explicit `true` is
+halted. Explicit `false` releases halt only. Malformed values fail configuration
+validation. Enablement and halt remain independent: `INTELLIGENCE_OSV_ENABLED=true`
+is still rejected, and halt false does not enable OSV, register a job, start a
+scheduler, or contact a provider. Halt is re-evaluated synchronously at protected
+checkpoints through a typed port. Production environment refresh is a process
+snapshot; restart is required to pick up a new environment value. There is no
+polling loop. Operational events use catalog identifier
+`osv_runtime_operational_event_catalog_v1`. Logs, metrics, and traces remain
+distinct. Metric labels are closed. Event-sink failure cannot change the domain
+result. This note does not change the accepted decision, numeric policy, or ADR
+status.
+
+No scheduler, BackgroundJob routing, Outbox routing, retry executor, periodic
+heartbeat loop, catalog activation, matching, Finding write, or OSV enablement
+is included. Tests do not contact `storage.googleapis.com` or `osv.dev`.
+Production OSV runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 9-R)
+
+Session 12 Batch 9-R independently reviewed the uncommitted Batch 9 halt and
+observability controls. Prototype-derived and non-string halt values cannot
+release halt. The public halt-state factory observes trusted typed state only and
+does not authorize synthetic or production execution. Pass B and next-prefix
+listing transitions are named halt checkpoints; the first blocking checkpoint is
+preserved. Event-sink failure, thenables, and recursive emission cannot change
+the domain result. Metric labels are closed per metric name. This note does not
+change the accepted decision, numeric policy, or ADR status.
+
+No scheduler, BackgroundJob routing, Outbox routing, retry executor, periodic
+heartbeat loop, catalog activation, matching, Finding write, or OSV enablement
+is included. Tests do not contact `storage.googleapis.com` or `osv.dev`.
+Production OSV runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 10)
+
+Session 12 Batch 10 independently reviewed the committed Session 12
+runtime-enablement foundation. Listing transport, pagination, token
+confidentiality, lease fencing, disabled composition, halt defaults, and
+bounded observability remain consistent with this accepted decision.
+Heartbeat scheduling remains deferred to Session 13 or a dedicated heartbeat
+batch. Production OSV remains disabled. This note does not change the accepted
+decision, numeric policy, or ADR status.
+
+No scheduler, BackgroundJob routing, Outbox routing, retry executor, periodic
+heartbeat loop, catalog activation, matching, Finding write, or OSV enablement
+is included. Tests do not contact `storage.googleapis.com` or `osv.dev`.
+Production OSV runtime remains disabled. ADR 0027 remains Proposed.

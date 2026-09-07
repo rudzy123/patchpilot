@@ -39,17 +39,31 @@ describe('intelligence HTTP media type', () => {
     expect(isIdentityContentEncoding(undefined)).toBe(true);
     expect(isIdentityContentEncoding('identity')).toBe(true);
     expect(isIdentityContentEncoding('IDENTITY')).toBe(true);
+    expect(isIdentityContentEncoding(' identity ')).toBe(true);
+    expect(isIdentityContentEncoding(['identity'])).toBe(true);
     expect(isIdentityContentEncoding('gzip')).toBe(false);
     expect(isIdentityContentEncoding('br')).toBe(false);
     expect(isIdentityContentEncoding('deflate')).toBe(false);
     expect(isIdentityContentEncoding(['identity', 'gzip'])).toBe(false);
+    expect(isIdentityContentEncoding('')).toBe(false);
+    expect(isIdentityContentEncoding('   ')).toBe(false);
+    expect(isIdentityContentEncoding([])).toBe(false);
+    expect(isIdentityContentEncoding(['identity', 'identity'])).toBe(false);
   });
 
-  it('parses Content-Length and rejects invalid or conflicting values', () => {
+  it('parses Content-Length and rejects invalid, leading-zero, and array-ambiguous values', () => {
     expect(parseDeclaredContentLength(undefined)).toEqual({ kind: 'absent' });
     expect(parseDeclaredContentLength('12')).toEqual({ kind: 'value', bytes: 12 });
     expect(parseDeclaredContentLength('0')).toEqual({ kind: 'value', bytes: 0 });
+    expect(parseDeclaredContentLength(' 12 ')).toEqual({ kind: 'value', bytes: 12 });
+    expect(parseDeclaredContentLength(['12'])).toEqual({ kind: 'value', bytes: 12 });
     expect(parseDeclaredContentLength('abc')).toEqual({ kind: 'invalid' });
+    expect(parseDeclaredContentLength('012')).toEqual({ kind: 'invalid' });
+    expect(parseDeclaredContentLength('+12')).toEqual({ kind: 'invalid' });
+    expect(parseDeclaredContentLength('1e3')).toEqual({ kind: 'invalid' });
     expect(parseDeclaredContentLength(['12', '13'])).toEqual({ kind: 'invalid' });
+    expect(parseDeclaredContentLength(['12', '12'])).toEqual({ kind: 'invalid' });
+    expect(parseDeclaredContentLength([])).toEqual({ kind: 'invalid' });
+    expect(parseDeclaredContentLength('12,12')).toEqual({ kind: 'invalid' });
   });
 });

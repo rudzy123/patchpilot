@@ -66,6 +66,7 @@ export {
 export { createOsvAttachedBodyReadPort } from './osv-attached-body-read.js';
 export { createCisaKevHttpsClient, createCisaKevHttpsTransport } from './cisa-kev-https.js';
 export { createOsvGenerationBoundRetrievalHttpsClient } from './osv-generation-bound-retrieval-https.js';
+export { createOsvGcsListingHttpsAdapter } from './osv-gcs-listing-https-adapter.js';
 export { createS3Client, S3ClientConstructionError } from './s3-client.js';
 export { encodeS3CopySource } from './s3-copy-source.js';
 export { classifyS3Failure, classifiedStorageFailure } from './s3-errors.js';
