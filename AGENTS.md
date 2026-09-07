@@ -19,12 +19,12 @@ Do not treat product, styling, or convenience guidance as permission to bypass d
 
 ## Authoritative current project status
 
-Last verified checkpoint: Session 12 Batch 4 (implemented, awaiting commit).
+Last verified checkpoint: Session 12 Batch 4-R (implemented, awaiting commit).
 Current session: Session 12.
-Current checkpoint: Session 12 Batch 4 pagination and convergence implementation exists and is awaiting commit. Session 12 Batch 4-R pagination adversarial review is next. Production runtime composition remains absent.
+Current checkpoint: Session 12 Batch 4-R pagination adversarial review is implemented and awaiting commit. Session 12 Batch 5 runtime job, lease, and retry contracts are next. Production runtime composition remains absent.
 Current branch: `feat/osv-runtime-enablement`.
 
-PatchPilot currently provides authentication, organization selection, asset inventory, SBOM upload and ingestion, local graph persistence, local CISA KEV synchronization, sanitized provider status, canonical CVE identity, a disabled synthetically verified OSV acquisition foundation, an uncomposed, adversarially reviewed Session 12 Batch 1 GCS listing-page HTTPS executor, Session 12 Batch 3 framework-independent listing pagination and two-pass inventory convergence contracts, and an explicitly invoked Session 12 Batch 4 in-memory pagination and convergence service. The pagination service is production-unreachable. Tests do not contact a provider.
+PatchPilot currently provides authentication, organization selection, asset inventory, SBOM upload and ingestion, local graph persistence, local CISA KEV synchronization, sanitized provider status, canonical CVE identity, a disabled synthetically verified OSV acquisition foundation, an uncomposed, adversarially reviewed Session 12 Batch 1 GCS listing-page HTTPS executor, Session 12 Batch 3 framework-independent listing pagination and two-pass inventory convergence contracts, an explicitly invoked Session 12 Batch 4 in-memory pagination and convergence service, and the Session 12 Batch 4-R adversarial review of that service. The pagination service is production-unreachable. Tests do not contact a provider.
 
 PatchPilot does not yet provide the primary end-user vulnerability workflow: authoritative package normalization, affected-version evaluation, component-to-advisory matching, OSV-derived Findings, explainable production risk scores, remediation workflows, dashboards, or reports.
 
@@ -40,14 +40,14 @@ Implemented:
 - Disabled, synthetically verified OSV acquisition foundation (classification, one-attempt retrieval adapter, immutable storage, isolated parser worker, persistence, disabled orchestrator).
 - Session 12 Batch 1 uncomposed GCS listing-page HTTPS executor (`createOsvGcsListingHttpsAdapter` in `@patchpilot/integrations`), adversarially reviewed and hardened in Session 12 Batch 2. Successful one-page results expose exact `responseByteCount`.
 - Session 12 Batch 3 framework-independent OSV listing pagination and two-pass inventory convergence contracts in `@patchpilot/vulnerability-intelligence` (`src/osv/listing-pagination/`).
-- Session 12 Batch 4 explicitly invoked in-memory listing pagination and two-pass inventory-convergence service (`createOsvListingPaginationService`) using an injected one-page listing port. One prefix, one pass, and one page at a time. No production composition and no provider contact in tests.
+- Session 12 Batch 4 explicitly invoked in-memory listing pagination and two-pass inventory-convergence service (`createOsvListingPaginationService`) using an injected one-page listing port. One prefix, one pass, and one page at a time. No production composition and no provider contact in tests. Session 12 Batch 4-R adversarially reviewed and hardened that service with synthetic listing pages and scripted ports only.
 
 Disabled:
 
 - Production OSV runtime. `INTELLIGENCE_OSV_ENABLED=true` remains rejected.
 - Catalog activation is not invoked. No production OSV catalog is active.
 - The listing executor is exported and is not imported by worker, API, scheduler, queue, health, seed, or migration composition.
-- Session 12 Batch 3 pagination contracts and Session 12 Batch 4 `createOsvListingPaginationService` are exported from `@patchpilot/vulnerability-intelligence` and are not imported by worker, API, scheduler, queue, health, seed, or migration composition.
+- Session 12 Batch 3 pagination contracts, Session 12 Batch 4 `createOsvListingPaginationService`, and the Session 12 Batch 4-R hardened pagination service are exported from `@patchpilot/vulnerability-intelligence` and are not imported by worker, API, scheduler, queue, health, seed, or migration composition.
 
 Not yet implemented:
 
@@ -71,12 +71,13 @@ Repository integrity:
 - Session 12 Batch 2 adversarially reviewed and hardened the Batch 1 listing executor. Scheduling, retries, runtime enablement, activation, matching, and Findings remain out of scope.
 - Session 12 Batch 3 defines pure pagination and two-pass inventory convergence contracts. It does not persist raw tokens, retrieve advisory bodies, or enable OSV.
 - Session 12 Batch 4 implements bounded in-memory pagination and two-pass inventory convergence through an injected one-page listing port. It is explicitly invoked and production-unreachable. Raw tokens and token digests remain in memory only. No same-attempt restart, no automatic retry, no body retrieval, no persistence, and no activation. Durable jobs, retries, scheduler wiring, canary execution, and activation remain later gates.
+- Session 12 Batch 4-R adversarially reviewed that pagination service with synthetic pages and scripted ports. Concrete corrections: rejected pages do not commit candidate counts; only constructed transport success is admitted; hung listing ports lose to cancellation; unsafe ceiling arithmetic fails closed; async event-sink rejections cannot become unhandled. Durable jobs remain gated.
 - Parser pending capacity: ADR 0028 selects runtime parser pending capacity **0**. The current parser host already has occupancy 1 and rejects a second concurrent parse (`invalid_request`). The historical isolation-policy status constant still reports pending-capacity policy as `unavailable`. A later Session 12 runtime batch must reconcile that machine-readable status before production composition. No body-bearing parser queue is authorized. The disabled orchestrator's metadata pending capacity 32 is a separate policy.
 - Finding writes are not authorized in Session 12. They remain blocked until an active authoritative catalog, package normalization, a reviewed ecosystem evaluator, a deterministic `affected` result, persisted immutable match evidence, [ADR 0026](docs/adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) gates, tenant-isolation proof, and explicit Finding-write authorization are complete. Architectural gates are authoritative, not the assigned session number. The current roadmap places that work no earlier than Session 16.
 
 ### Current roadmap (gates remain authoritative)
 
-- Session 12: runtime-enablement foundation (listing executor and pagination contracts implemented; Batch 4 in-memory pagination implemented and uncomposed; durable jobs and disabled production composition remain gated).
+- Session 12: runtime-enablement foundation (listing executor and pagination contracts implemented; Batch 4 in-memory pagination implemented and uncomposed; Batch 4-R adversarial review implemented and awaiting commit; durable jobs and disabled production composition remain gated).
 - Session 13: disabled provider canary and catalog-activation work.
 - Session 14: package normalization and matching architecture.
 - Session 15: first ecosystem evaluator and match evidence.
@@ -129,9 +130,9 @@ Session 12 Batch 3 adds framework-independent listing pagination and two-pass in
 - One A/B pair per synchronization attempt. Crash restart begins at page one with a new pass-attempt identity. Retry disposition is recorded and never executed.
 - Batch 3 itself has no pagination loop, no HTTPS, no provider contact, no Prisma or migration change, and no production composition. Session 12 Batch 4 later added in-memory execution of these contracts. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding.
 
-### Session 12 Batch 4 (implemented, awaiting commit)
+### Session 12 Batch 4 (committed)
 
-Session 12 Batch 4 implements bounded in-memory listing pagination and two-pass inventory convergence in `@patchpilot/vulnerability-intelligence` via `createOsvListingPaginationService`. Verified from the uncommitted Batch 4 tree:
+Session 12 Batch 4 implements bounded in-memory listing pagination and two-pass inventory convergence in `@patchpilot/vulnerability-intelligence` via `createOsvListingPaginationService`. Verified from committed code and tests:
 
 - Explicitly invoked. Injected one-page listing port. Does not import or instantiate `createOsvGcsListingHttpsAdapter`.
 - One prefix, one pass, and one page at a time. Pass A then pass B. No parallel requests, no third pass, no same-attempt restart, no automatic retry.
@@ -139,7 +140,20 @@ Session 12 Batch 4 implements bounded in-memory listing pagination and two-pass 
 - Raw tokens and token digests remain in memory only. Token cycles fail closed. Page admission is atomic. Exact policy ceilings are enforced.
 - Canary and production completeness remain separate. No body retrieval, persistence, scheduler, job, activation, matching, Finding, Prisma, or dependency change.
 - Tests use scripted ports and synthetic local HTTPS doubles only. They do not contact `storage.googleapis.com` or `osv.dev`.
-- Production composition does not construct the service. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 4-R is next.
+- Production composition does not construct the service. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding.
+
+### Session 12 Batch 4-R (implemented, awaiting commit)
+
+Session 12 Batch 4-R adversarially reviewed the committed Batch 4 pagination service with synthetic listing pages and scripted listing-port doubles only. Tests do not contact `storage.googleapis.com` or `osv.dev`. Concrete corrections:
+
+- Rejected pages no longer commit candidate page, observation, or byte counts. Duplicate, conflict, cycle, and ceiling failures leave prior accepted totals intact.
+- Pagination admits only constructed `createOsvListingPageTransportSuccess` results and still validates `responseByteCount` defensively. Unconstructed or malformed port output fails closed as `listing_transport_failure`.
+- In-flight listing-port calls race `AbortSignal`. A port that never settles cannot hang the pass. Late success after cancellation is ignored. `listingInFlight` is cleared.
+- Ceiling evaluators reject unsafe integers instead of comparing `NaN` as capacity remaining. Direct `acceptOsvListingPage` rejects non-positive byte counts.
+- Event-sink thenables are forwarded and swallowed so a rejected Promise cannot become an unhandled rejection or alter control flow.
+- Canonical convergence also checks the exact algorithm identifier. Equal digest with different observations, and different digest with equal observations, fail closed as `internal_validation_failure`.
+
+No durable jobs, retries, schedulers, body retrieval, persistence, activation, matching, Findings, Prisma, or dependency change is included. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 5 is next.
 
 ## Current repository state
 
@@ -314,7 +328,19 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - Canary completeness cannot satisfy production completeness. Incomplete inventory cannot authorize body retrieval. These results never authorize candidate readiness or catalog activation.
 - Cancellation is checked at prefix, pass, page, token, convergence, and inventory boundaries. Interruption returns bounded incomplete progress with no durable token. Retry disposition is recorded and never executed.
 - No Prisma, migration, dependency, scheduler, BackgroundJob, Outbox, body retrieval, object storage, parser, matching, Finding, or OSV-enablement change is included.
-- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint is Session 12 Batch 4-R pagination adversarial review.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 4-R later adversarially reviewed this implementation.
+
+### Session 12 Batch 4-R (listing pagination adversarial review)
+
+These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
+
+- Session 12 Batch 4-R adversarially reviewed `createOsvListingPaginationService` with synthetic pages and scripted ports only. It did not contact `storage.googleapis.com` or `osv.dev`.
+- Page admission is atomic: candidate arithmetic is calculated and discarded on rejection. Exact ceilings succeed; one over fails closed. Unsafe integers fail closed.
+- Only constructed transport success is trusted. Malformed port output, extra fields, and unconstructed success objects fail closed. Hung ports lose to cancellation. One listing call remains in flight.
+- Raw tokens remain ephemeral and confidential. Token cycles, digest collisions, and cross-pass token reuse fail closed. Detector state cannot exceed the pass page maximum.
+- Canonical sets remain length-prefixed and order-independent. Convergence requires digest plus exact observation equality plus the committed algorithm identifier. Canary completeness cannot satisfy production completeness.
+- Retry disposition is recorded and never executed. There is no prefetch, third pass, same-attempt restart, body retrieval, scheduler, job, lease, or production composition.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint is Session 12 Batch 5 runtime job, lease, and retry contracts.
 
 ## Historical checkpoint record
 

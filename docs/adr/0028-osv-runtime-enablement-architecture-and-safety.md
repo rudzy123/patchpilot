@@ -1224,3 +1224,17 @@ attempt. Canary completeness cannot satisfy production completeness. Incomplete
 inventory cannot authorize body retrieval. Retry disposition is recorded and
 not executed. Tests do not contact `storage.googleapis.com` or `osv.dev`.
 Production OSV runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 4-R)
+
+Session 12 Batch 4-R adversarially reviewed the Batch 4 pagination service with
+synthetic listing pages and scripted listing-port doubles. This note does not
+change the accepted decision, ceilings, or ADR status.
+
+Concrete corrections: rejected pages do not commit candidate counts; only
+constructed transport success is admitted; hung listing ports lose to
+cancellation; unsafe ceiling arithmetic fails closed; event-sink thenables
+cannot become unhandled rejections; canonical convergence checks the exact
+algorithm identifier. Raw tokens remain in memory only. Retry disposition is
+recorded and not executed. Tests do not contact `storage.googleapis.com` or
+`osv.dev`. Production OSV runtime remains disabled. ADR 0027 remains Proposed.
