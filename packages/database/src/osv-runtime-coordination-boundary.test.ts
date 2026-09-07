@@ -36,32 +36,33 @@ function walkTs(directory: string, files: string[] = []): string[] {
 }
 
 describe('OSV runtime coordination schema source boundary', () => {
-  it('does not export a lease, retry, or acquire adapter', () => {
-    expect(existsSync(path.join(srcDir, 'osv-runtime-coordination-persistence.ts'))).toBe(false);
+  it('exports the Batch 7 coordination factory and does not export retry execution', () => {
+    expect(existsSync(path.join(srcDir, 'osv-runtime-coordination-persistence.ts'))).toBe(true);
     expect(existsSync(path.join(srcDir, 'osv-runtime-lease-persistence.ts'))).toBe(false);
     expect(existsSync(path.join(srcDir, 'osv-runtime-retry-persistence.ts'))).toBe(false);
+    expect('createOsvRuntimeCoordinationPersistence' in databasePublic).toBe(true);
+    expect('createOsvRuntimeCoordinationPersistenceForClient' in databasePublic).toBe(false);
     for (const name of BANNED_ADAPTER_EXPORTS) {
       expect(name in databasePublic, name).toBe(false);
     }
     expect('createOsvAcquisitionPersistence' in databasePublic).toBe(true);
   });
 
-  it('keeps Batch 6 database sources free of runtime, provider, and Finding coupling', () => {
+  it('keeps Batch 7 database sources free of scheduler, provider, and Finding coupling', () => {
     const productionFiles = walkTs(srcDir).filter((filePath) => {
       const name = path.basename(filePath);
       return name.startsWith('osv-runtime-coordination') && !name.includes('.test.');
     });
-    expect(productionFiles).toEqual([]);
+    expect(productionFiles.length).toBeGreaterThan(0);
+    for (const filePath of productionFiles) {
+      const source = readFileSync(filePath, 'utf8');
+      expect(source, filePath).not.toMatch(
+        /from 'ioredis'|from 'bullmq'|from '@aws-sdk|from 'fastify'|from 'next'|from 'node:https'|storage\.googleapis\.com|osv\.dev|setTimeout\(|executeRetry|createFinding/,
+      );
+    }
     expect(
       existsSync(path.join(srcDir, 'osv-runtime-coordination-constraints.integration.test.ts')),
     ).toBe(true);
-    const constraintSource = readFileSync(
-      path.join(srcDir, 'osv-runtime-coordination-constraints.integration.test.ts'),
-      'utf8',
-    );
-    expect(constraintSource).not.toMatch(
-      /from 'ioredis'|from 'bullmq'|from '@aws-sdk|from 'fastify'|from 'next'|from 'node:https'|storage\.googleapis\.com/,
-    );
   });
 
   it('keeps runtime coordination models free of tenant and Finding columns', () => {

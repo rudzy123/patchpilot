@@ -894,14 +894,21 @@ describe('session 12 Batch 6 OSV runtime coordination SQL constraints', { timeou
     expect(await prisma.osvActiveCatalogPointer.count()).toBe(0);
   });
 
-  it('does not add a production adapter, acquire method, or runtime composition file', () => {
-    expect(existsSync(path.join(srcDir, 'osv-runtime-coordination-persistence.ts'))).toBe(false);
+  it('keeps schema free of acquire methods and leaves runtime composition unregistered', () => {
+    expect(existsSync(path.join(srcDir, 'osv-runtime-coordination-persistence.ts'))).toBe(true);
     const schema = readFileSync(path.join(srcDir, '../prisma/schema.prisma'), 'utf8');
     expect(schema).not.toContain('acquire(');
     expect(schema).not.toContain('heartbeat(');
     expect(schema).not.toContain('takeover(');
     expect(schema).not.toContain('executeRetry');
     expect(schema).not.toContain('claimRetry');
+    const adapter = readFileSync(
+      path.join(srcDir, 'osv-runtime-coordination-persistence.ts'),
+      'utf8',
+    );
+    expect(adapter).toContain('createOsvRuntimeCoordinationPersistence');
+    expect(adapter).not.toContain('executeRetry');
+    expect(adapter).not.toContain('setTimeout(');
   });
 
   it('rejects malformed fingerprints, including whitespace, prefix, JSON, and Unicode digits', async () => {

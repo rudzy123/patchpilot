@@ -1303,3 +1303,37 @@ No lease adapter, heartbeat, stale takeover, retry executor, scheduler, or
 production composition is included. Tests do not contact
 `storage.googleapis.com` or `osv.dev`. Production OSV runtime remains
 disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 7)
+
+Session 12 Batch 7 implements `createOsvRuntimeCoordinationPersistence` in
+`@patchpilot/database` against the frozen Batch 6 schema. The adapters
+establish and inspect durable request, run, lease, fencing, attempt, and
+retry-eligibility authority. They do not execute retries, sleep, contact a
+provider, or compose production runtime. Holder tokens remain secret; only
+SHA-256 digests are stored. Lease and retry timestamps use database
+`CURRENT_TIMESTAMP`. Fencing tokens increment on ownership change, release,
+and reacquisition, not on heartbeat. This note does not change the accepted
+decision, numeric policy, or ADR status.
+
+No scheduler, BackgroundJob routing, Outbox routing, kill-switch variable,
+catalog activation, or OSV enablement is included. Tests do not contact
+`storage.googleapis.com` or `osv.dev`. Production OSV runtime remains
+disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 7-R)
+
+Session 12 Batch 7-R independently reviewed the uncommitted Batch 7 adapters.
+Expired holders cannot heartbeat or release. Same-owner acquire after expiry
+is a new fencing generation: the Batch 6-R heartbeat trigger cannot increment
+fencing on held→held same run and digest, so the adapter bumps generation
+through a same-transaction released-then-held pair without a schema change.
+Public release still rejects expired holders. Attempt reservation is
+transactional and ordinal-contiguous. Retry eligibility remains inspection
+only. BIGINT values retain exact precision. This note does not change the
+accepted decision, numeric policy, or ADR status.
+
+No schema, migration, scheduler, BackgroundJob routing, Outbox routing,
+kill-switch variable, catalog activation, or OSV enablement is included.
+Tests do not contact `storage.googleapis.com` or `osv.dev`. Production OSV
+runtime remains disabled. ADR 0027 remains Proposed.

@@ -19,12 +19,12 @@ Do not treat product, styling, or convenience guidance as permission to bypass d
 
 ## Authoritative current project status
 
-Last verified checkpoint: Session 12 Batch 6-R (completed, awaiting commit).
+Last verified checkpoint: Session 12 Batch 7-R (completed, awaiting commit).
 Current session: Session 12.
-Current checkpoint: Session 12 Batch 6-R independently reviewed, adversarially tested, and hardened the uncommitted OSV runtime coordination schema and forward-only migration. Session 12 Batch 7 PostgreSQL lease and retry adapters are next. No lease adapter, retry executor, scheduler, or production runtime composition exists.
+Current checkpoint: Session 12 Batch 7-R independently reviewed and hardened the uncommitted Batch 7 PostgreSQL OSV runtime-coordination adapters. Session 12 Batch 8 disabled runtime composition is next. No retry executor, scheduler, or production runtime composition exists.
 Current branch: `feat/osv-runtime-enablement`.
 
-PatchPilot currently provides authentication, organization selection, asset inventory, SBOM upload and ingestion, local graph persistence, local CISA KEV synchronization, sanitized provider status, canonical CVE identity, a disabled synthetically verified OSV acquisition foundation, an uncomposed, adversarially reviewed Session 12 Batch 1 GCS listing-page HTTPS executor, Session 12 Batch 3 framework-independent listing pagination and two-pass inventory convergence contracts, an explicitly invoked Session 12 Batch 4 in-memory pagination and convergence service, the Session 12 Batch 4-R adversarial review of that service, Session 12 Batch 5 framework-independent durable synchronization job, lease, retry, parser-capacity, halt, cancellation, and operational-event contracts, and Session 12 Batch 6 schema-only OSV runtime coordination persistence. The pagination service, Batch 5 contracts, and Batch 6 tables are production-unreachable. Tests do not contact a provider.
+PatchPilot currently provides authentication, organization selection, asset inventory, SBOM upload and ingestion, local graph persistence, local CISA KEV synchronization, sanitized provider status, canonical CVE identity, a disabled synthetically verified OSV acquisition foundation, an uncomposed, adversarially reviewed Session 12 Batch 1 GCS listing-page HTTPS executor, Session 12 Batch 3 framework-independent listing pagination and two-pass inventory convergence contracts, an explicitly invoked Session 12 Batch 4 in-memory pagination and convergence service, the Session 12 Batch 4-R adversarial review of that service, Session 12 Batch 5 framework-independent durable synchronization job, lease, retry, parser-capacity, halt, cancellation, and operational-event contracts, Session 12 Batch 6 schema-only OSV runtime coordination persistence, and Session 12 Batch 7 uncomposed PostgreSQL runtime-coordination adapters. The pagination service, Batch 5 contracts, Batch 6 tables, and Batch 7 adapters are production-unreachable. Tests do not contact a provider.
 
 PatchPilot does not yet provide the primary end-user vulnerability workflow: authoritative package normalization, affected-version evaluation, component-to-advisory matching, OSV-derived Findings, explainable production risk scores, remediation workflows, dashboards, or reports.
 
@@ -42,14 +42,15 @@ Implemented:
 - Session 12 Batch 3 framework-independent OSV listing pagination and two-pass inventory convergence contracts in `@patchpilot/vulnerability-intelligence` (`src/osv/listing-pagination/`).
 - Session 12 Batch 4 explicitly invoked in-memory listing pagination and two-pass inventory-convergence service (`createOsvListingPaginationService`) using an injected one-page listing port. One prefix, one pass, and one page at a time. No production composition and no provider contact in tests. Session 12 Batch 4-R adversarially reviewed and hardened that service with synthetic listing pages and scripted ports only.
 - Session 12 Batch 5 framework-independent OSV durable synchronization job, lease, fencing, retry, parser-capacity, halt, cancellation, restart, and bounded operational-event contracts in `@patchpilot/vulnerability-intelligence` (`src/osv/runtime-coordination/`). No lease adapter, retry execution, scheduler, or production composition.
-- Session 12 Batch 6 schema-only OSV runtime coordination persistence in `@patchpilot/database`, adversarially reviewed and hardened in Session 12 Batch 6-R: immutable synchronization request, one run per request, current lease projection (holder-token digest only, separate BIGINT row revision and fencing token, DELETE forbidden so fencing cannot reset), and identity-immutable stage attempts that may transition once from planned or running to a terminal state. Migration `20260907120000_osv_runtime_coordination_persistence` (frozen SHA-256 `7017b1c4b1d4bcae8bed4bdd0eb43559c0c89fce5b3636e0e889b276013cc3a6`). No adapter, heartbeat, takeover, retry execution, or production composition.
+- Session 12 Batch 6 schema-only OSV runtime coordination persistence in `@patchpilot/database`, adversarially reviewed and hardened in Session 12 Batch 6-R: immutable synchronization request, one run per request, current lease projection (holder-token digest only, separate BIGINT row revision and fencing token, DELETE forbidden so fencing cannot reset), and identity-immutable stage attempts that may transition once from planned or running to a terminal state. Migration `20260907120000_osv_runtime_coordination_persistence` (frozen SHA-256 `7017b1c4b1d4bcae8bed4bdd0eb43559c0c89fce5b3636e0e889b276013cc3a6`).
+- Session 12 Batch 7 uncomposed PostgreSQL adapters (`createOsvRuntimeCoordinationPersistence` in `@patchpilot/database`) for request/run ensure, database-time lease acquire/heartbeat/release/stale takeover, fencing CAS, immutable stage-attempt reservation and terminal recording, and retry-eligibility inspection. Session 12 Batch 7-R adversarially reviewed those adapters: expired owners cannot heartbeat or release, attempt reservation is transactional and ordered, BIGINT values retain exact precision, and retry inspection is not dispatch authority. No retry execution, scheduler, or production composition.
 
 Disabled:
 
 - Production OSV runtime. `INTELLIGENCE_OSV_ENABLED=true` remains rejected.
 - Catalog activation is not invoked. No production OSV catalog is active.
 - The listing executor is exported and is not imported by worker, API, scheduler, queue, health, seed, or migration composition.
-- Session 12 Batch 3 pagination contracts, Session 12 Batch 4 `createOsvListingPaginationService`, the Session 12 Batch 4-R hardened pagination service, and Session 12 Batch 5 runtime-coordination contracts are exported from `@patchpilot/vulnerability-intelligence` and are not imported by worker, API, scheduler, queue, health, seed, or migration composition. Session 12 Batch 6 tables exist and are unused by production runtime. The future job type `intelligence.osv.sync` is not registered in production worker routing.
+- Session 12 Batch 3 pagination contracts, Session 12 Batch 4 `createOsvListingPaginationService`, the Session 12 Batch 4-R hardened pagination service, Session 12 Batch 5 runtime-coordination contracts, and Session 12 Batch 7 `createOsvRuntimeCoordinationPersistence` are exported and are not imported by worker, API, scheduler, queue, health, seed, or migration composition. Session 12 Batch 6 tables exist and are unused by production runtime. The future job type `intelligence.osv.sync` is not registered in production worker routing.
 
 Not yet implemented:
 
@@ -57,7 +58,7 @@ Not yet implemented:
 - Package normalization and affected-version evaluation. The implemented ecosystem registry is empty.
 - Component-to-advisory matching, match-evaluation persistence, and OSV-derived Finding writes.
 - Explainable production risk scoring and complete remediation workflows.
-- Durable OSV job registration, lease acquisition, retry execution, scheduler wiring, canary execution, catalog activation, matching, and Finding writes. Token-cycle detection and A/B convergence execute only inside the uncomposed Batch 4 in-memory service. Batch 5 defines those coordination contracts. Batch 6 persists the schema only.
+- Durable OSV job registration, retry execution, scheduler wiring, canary execution, catalog activation, matching, and Finding writes. Token-cycle detection and A/B convergence execute only inside the uncomposed Batch 4 in-memory service. Batch 5 defines those coordination contracts. Batch 6 persists the schema. Batch 7 persists authority through uncomposed adapters without executing work. Batch 7-R reviewed those adapters. Batch 8 is disabled runtime composition.
 
 Repository integrity:
 
@@ -75,13 +76,15 @@ Repository integrity:
 - Session 12 Batch 4 implements bounded in-memory pagination and two-pass inventory convergence through an injected one-page listing port. It is explicitly invoked and production-unreachable. Raw tokens and token digests remain in memory only. No same-attempt restart, no automatic retry, no body retrieval, no persistence, and no activation. Durable jobs, retries, scheduler wiring, canary execution, and activation remain later gates.
 - Session 12 Batch 4-R adversarially reviewed that pagination service with synthetic pages and scripted ports. Concrete corrections: rejected pages do not commit candidate counts; only constructed transport success is admitted; hung listing ports lose to cancellation; unsafe ceiling arithmetic fails closed; async event-sink rejections cannot become unhandled.
 - Session 12 Batch 5 defines framework-independent contracts for future job type `intelligence.osv.sync`, one immutable payload and version-set fingerprint, one catalog-scope lease shared by canary and production, holder-token plus row-revision plus fencing-token fencing, database-time expiry, three total attempts including the initial attempt, parser-timeout maximum two attempts, bounded full jitter, HTTP 429 Retry-After capped at 30 seconds, parser pending capacity 0, future halt default halted, cancellation and redelivery, and bounded operational events. No runtime job is registered. No lease is acquired. No retry executes. Reserved Outbox name `intelligence.osv.sync.requested.v1` remains deferred until scheduler and job persistence prove a transaction-bound publication requirement.
-- Session 12 Batch 6 adds the persistence schema for those contracts: one immutable request, one run per request, one current lease projection per shared acquisition scope, holder-token SHA-256 digest only, separate positive BIGINT row revision and fencing token, database timestamps for acquisition/heartbeat/expiry/release, and stage attempts with ordinals 1–3 (parser timeout 1–2). Session 12 Batch 6-R forbids lease-row deletion so fencing tokens cannot reset, keeps fencing monotonic on UPDATE, and allows planned or running attempts to transition once to a terminal state. No lease adapter, heartbeat, takeover, retry executor, scheduler, or production composition.
+- Session 12 Batch 6 adds the persistence schema for those contracts: one immutable request, one run per request, one current lease projection per shared acquisition scope, holder-token SHA-256 digest only, separate positive BIGINT row revision and fencing token, database timestamps for acquisition/heartbeat/expiry/release, and stage attempts with ordinals 1–3 (parser timeout 1–2). Session 12 Batch 6-R forbids lease-row deletion so fencing tokens cannot reset, keeps fencing monotonic on UPDATE, and allows planned or running attempts to transition once to a terminal state.
+- Session 12 Batch 7 implements uncomposed PostgreSQL adapters for those tables: insert-once request and run ensure with immutable replay comparison, database-time lease acquire/heartbeat/release, expired-lease takeover with one CAS winner, holder-digest fencing, immutable stage-attempt reservation and guarded terminal recording, database-time retry-not-before, and retry-eligibility inspection without executing retries. Production composition does not construct the factory.
+- Session 12 Batch 7-R independently reviewed those uncommitted adapters with disposable PostgreSQL. Concrete corrections: expired holders cannot heartbeat or release; same-owner acquire after expiry is a new fencing generation; non-owners do not observe expiry as a distinct heartbeat outcome; attempt reservation is transactional, bounded, and ordinal-contiguous; planned attempts cannot skip to retryable failure; BIGINT mapping rejects unsafe Number conversion; unique-conflict and restrict-violation translation remains bounded. Retry inspection is not dispatch authority.
 - Parser pending capacity: ADR 0028 selects runtime parser pending capacity **0**. Batch 5 represents that selected value. The current parser host already has occupancy 1 and rejects a second concurrent parse (`invalid_request`). The historical isolation-policy status constant still reports pending-capacity policy as `unavailable`. A later Session 12 runtime-composition batch must reconcile that machine-readable status before production composition. No body-bearing parser queue is authorized. The disabled orchestrator's metadata pending capacity 32 is a separate policy.
 - Finding writes are not authorized in Session 12. They remain blocked until an active authoritative catalog, package normalization, a reviewed ecosystem evaluator, a deterministic `affected` result, persisted immutable match evidence, [ADR 0026](docs/adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) gates, tenant-isolation proof, and explicit Finding-write authorization are complete. Architectural gates are authoritative, not the assigned session number. The current roadmap places that work no earlier than Session 16.
 
 ### Current roadmap (gates remain authoritative)
 
-- Session 12: runtime-enablement foundation (listing executor and pagination contracts implemented; Batch 4 in-memory pagination implemented and uncomposed; Batch 4-R adversarial review committed; Batch 5 job/lease/retry contracts committed; Batch 6 lease and retry persistence schema implemented; Batch 6-R persistence and migration review completed and awaiting commit; Batch 7 is next; disabled production composition remains gated).
+- Session 12: runtime-enablement foundation (listing executor and pagination contracts implemented; Batch 4 in-memory pagination implemented and uncomposed; Batch 4-R adversarial review committed; Batch 5 job/lease/retry contracts committed; Batch 6 lease and retry persistence schema implemented; Batch 6-R persistence and migration review committed; Batch 7 PostgreSQL adapters implemented and uncomposed; Batch 7-R adversarial review completed and awaiting commit; Session 12 Batch 8 disabled runtime composition is next; production composition remains gated).
 - Session 13: disabled provider canary and catalog-activation work.
 - Session 14: package normalization and matching architecture.
 - Session 15: first ecosystem evaluator and match evidence.
@@ -175,7 +178,7 @@ Session 12 Batch 5 adds framework-independent OSV durable synchronization job, l
 
 `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding.
 
-### Session 12 Batch 6 (implemented, awaiting Batch 6-R freeze)
+### Session 12 Batch 6 (committed)
 
 Session 12 Batch 6 adds the minimum forward-only Prisma and PostgreSQL persistence schema for the committed Batch 5 contracts. Session 12 Batch 6-R independently reviewed that uncommitted schema before freeze.
 
@@ -190,7 +193,7 @@ Session 12 Batch 6 adds the minimum forward-only Prisma and PostgreSQL persisten
 
 `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding.
 
-### Session 12 Batch 6-R (completed, awaiting commit)
+### Session 12 Batch 6-R (committed)
 
 Session 12 Batch 6-R independently reviewed, adversarially tested, and hardened the uncommitted Batch 6 schema and migration before freeze. Concrete corrections:
 
@@ -200,7 +203,35 @@ Session 12 Batch 6-R independently reviewed, adversarially tested, and hardened 
 - Completed runs cannot carry `durable_retry`. Released leases require `released_at >= heartbeat_at`. Retryable failure `retry_not_before` cannot exceed `terminal_at + 30 seconds`. Cancelled attempts cannot store a failure catalog without a failure code.
 - Concurrent stale-takeover CAS (`WHERE row_revision` and `fencing_token` plus `CURRENT_TIMESTAMP >= expires_at`) admits exactly one winner on disposable PostgreSQL.
 
-No lease adapter, heartbeat adapter, stale-takeover adapter, retry executor, scheduler, BackgroundJob routing, Outbox routing, kill-switch variable, or production composition is included. Tests do not contact `storage.googleapis.com` or `osv.dev`. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 7 PostgreSQL lease and retry adapters are next.
+No lease adapter, heartbeat adapter, stale-takeover adapter, retry executor, scheduler, BackgroundJob routing, Outbox routing, kill-switch variable, or production composition is included. Tests do not contact `storage.googleapis.com` or `osv.dev`. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 7 later added PostgreSQL adapters.
+
+### Session 12 Batch 7 (completed, awaiting Batch 7-R commit together)
+
+Session 12 Batch 7 implements `createOsvRuntimeCoordinationPersistence` in `@patchpilot/database` against the frozen Batch 6 schema and committed Batch 5 contracts. Verified from code and tests:
+
+- Request ensure is insert-once. Unique conflict reloads the natural key and compares every immutable field. Identical replay is `already_applied`. Any immutable mismatch is `immutable_conflict`. P2002 is never treated as success.
+- Run ensure is one run per request. Duplicate delivery reuses the authoritative run. Redis job IDs are not authority. Ensure does not change run state.
+- First lease acquisition uses `CURRENT_TIMESTAMP` and TTL `900000` milliseconds. Holder tokens are stored only as lowercase SHA-256 digests. Same-owner replay returns `already_held_by_same_owner` without incrementing the fencing token. Held-by-other returns bounded observations without digest or token.
+- Heartbeat is CAS on holder digest, row revision, fencing token, held state, and `CURRENT_TIMESTAMP < expires_at`. Heartbeat increments row revision and does not change fencing. An expired owner cannot heartbeat.
+- Explicit release is guarded, increments fencing, leaves the row durable, and is idempotent for the same terminal reason. Reacquisition after release increments fencing.
+- Expired-lease takeover is one guarded UPDATE. Concurrent contenders sharing the expected revision and fencing token admit exactly one winner. The prior owner cannot heartbeat, release, validate ownership, or complete a protected run.
+- Stage attempts reserve as planned, start to running with database `started_at`, and record terminals with database `terminal_at`. Attempt 4 cannot be reserved. Parser-timeout ordinal 3 is rejected. Retry-not-before is `CURRENT_TIMESTAMP + selectedDelayMs` and exists only when another attempt remains. Exhaustion preserves the exact failure code and blocks another ordinal.
+- Retry eligibility is inspection only. Adapters do not sleep, poll, enqueue, or execute retries.
+- Production worker, API, scheduler, queue, health, seed, and migration composition do not import the factory. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 7-R reviewed these adapters before commit.
+
+### Session 12 Batch 7-R (completed, awaiting commit)
+
+Session 12 Batch 7-R independently reviewed the uncommitted Batch 7 adapters with disposable PostgreSQL, synthetic holder proofs, and database-time SQL. It did not contact `storage.googleapis.com` or `osv.dev`. Concrete corrections:
+
+- Release CAS requires `CURRENT_TIMESTAMP < expires_at`. An expired holder cannot release. A non-owner heartbeat against an expired row returns `ownership_lost`, not `expired`.
+- Same-owner acquire after expiry is stale takeover (new fencing generation), not idempotent replay. The Batch 6-R trigger treats held→held same run and digest as a heartbeat, so that acquire bumps fencing through a same-transaction released-then-held pair. Public `release()` still rejects expired holders.
+- Attempt reservation runs in one transaction, bounds prior-row reads (`take: 4`), requires contiguous ordinals, and rejects attempt 2 while attempt 1 is still planned or running. Cancellation and success are not labeled exhaustion.
+- Terminal attempt commands reject planned-to-retryable-failed at the port. Adapters recheck the Batch 5 graph before UPDATE.
+- BIGINT mapping keeps exact decimal strings above `Number.MAX_SAFE_INTEGER` and fails closed on unsafe Number conversion. Heartbeat increment stays in SQL.
+- Unique-conflict reload remains compare-after-reload. Restrict-violation and integer overflow translate to bounded codes with no SQL, digest, or Prisma leakage.
+- Retry eligibility remains inspection only. Session 12 Batch 8 must recheck ownership, run state, and prior-attempt identity in the same transaction that reserves the next ordinal.
+
+No schema or migration change. No scheduler, BackgroundJob routing, Outbox routing, retry timer, kill-switch variable, or production composition. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 8 disabled runtime composition is next.
 
 ## Current repository state
 
@@ -411,7 +442,7 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - Tables are global and instance-owned. They have no tenant foreign key and no Finding relation. Raw holder tokens, page tokens, token digests, provider bodies, URLs, and arbitrary JSON are absent.
 - Current lease projection stores holder-token digest only. Row revision and fencing token are separate positive BIGINTs. Expired is not a stored state. Database timestamps support `databaseNow >= expiresAt` without application-clock authority.
 - Stage-attempt identity is immutable. Ordinal 4 cannot satisfy CHECK constraints. Parser timeout cannot use ordinal 3. Retry exhaustion preserves the exact failure code.
-- No lease adapter, heartbeat, release, takeover, retry executor, scheduler, BackgroundJob type, Outbox type, BullMQ processor, kill-switch variable, or production composition is included. The schema existing does not make `intelligence.osv.sync` executable.
+- The schema existing does not make `intelligence.osv.sync` executable. Session 12 Batch 7 later added uncomposed PostgreSQL adapters without production composition.
 - `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 6-R later reviewed this schema before freeze.
 
 ### Session 12 Batch 6-R (persistence and migration review)
@@ -423,9 +454,31 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - Lease projection DELETE is forbidden so an ordinary cleanup cannot recreate the scope row with `fencing_token = 1`. UPDATE requires strictly increasing `rowRevision`. Heartbeat cannot change `fencingToken`. Ownership change, release, and reacquisition must increment `fencingToken`.
 - Concurrent stale-takeover CAS against the same revision and fencing token admits exactly one winner. The prior owner cannot subsequently satisfy ownership fields.
 - Planned or running stage attempts may transition once to a terminal state. Terminal attempts and attempt identity fields are immutable. DELETE remains forbidden.
-- Completed runs cannot claim `durable_retry`. Retry-not-before is capped at `terminal_at + 30 seconds`. Batch 7 must still compute retry-not-before from database time plus selected delay.
-- No lease adapter, heartbeat, stale-takeover method, retry executor, scheduler, BackgroundJob routing, Outbox routing, kill-switch variable, or production composition is included.
-- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint is Session 12 Batch 7 PostgreSQL lease and retry adapters.
+- Completed runs cannot claim `durable_retry`. Retry-not-before is capped at `terminal_at + 30 seconds`. Batch 7 computes retry-not-before from database time plus selected delay.
+- Session 12 Batch 7 later added uncomposed PostgreSQL adapters. Retry execution, scheduler, BackgroundJob routing, Outbox routing, kill-switch variable, and production composition remain absent.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 7 later added PostgreSQL adapters. Session 12 Batch 7-R reviewed those adapters.
+
+### Session 12 Batch 7 (runtime coordination adapters)
+
+These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
+
+- Session 12 Batch 7 implements `createOsvRuntimeCoordinationPersistence` in `@patchpilot/database`. Worker, API, scheduler, queue, health, seed, and migration composition do not import it.
+- Adapters establish and inspect durable authority only. They do not execute retries, sleep, poll, parse live Retry-After headers, contact a provider, invoke storage or the parser, activate a catalog, or enable OSV.
+- Holder tokens remain in WeakMap proofs. PostgreSQL stores lowercase SHA-256 digests only. Public projections omit digest and raw token.
+- Lease time and retry-not-before use database `CURRENT_TIMESTAMP`. Application clocks are not takeover or retry authority.
+- Fencing tokens increment on acquire after absence/release, stale takeover, and release. Heartbeat does not change fencing. Lease rows are never deleted.
+- Attempt ordinal 4 is impossible. Parser timeout remains two total attempts. Exhaustion is queryable and does not replace the root failure code.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 7-R later reviewed these adapters.
+
+### Session 12 Batch 7-R (runtime coordination adapter review)
+
+These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
+
+- Session 12 Batch 7-R independently reviewed the uncommitted Batch 7 adapters with disposable PostgreSQL. It did not contact `storage.googleapis.com` or `osv.dev`.
+- Expired holders cannot heartbeat or release. Database time owns that boundary (`CURRENT_TIMESTAMP < expires_at` remains valid; `>=` is expired). Same-owner acquire after expiry is a new fencing generation via a same-transaction released-then-held pair, because the Batch 6-R trigger treats held→held same run and digest as a heartbeat.
+- Attempt reservation is transactional and ordered. Inspection of retry eligibility is not dispatch authority. Session 12 Batch 8 must recheck ownership and prior-attempt identity when reserving the next ordinal.
+- No schema or migration change. No scheduler, BackgroundJob routing, Outbox routing, retry timer, kill-switch variable, or production composition.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint is Session 12 Batch 8 disabled runtime composition.
 
 ## Historical checkpoint record
 
