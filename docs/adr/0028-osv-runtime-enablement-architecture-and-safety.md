@@ -1411,3 +1411,18 @@ No scheduler, BackgroundJob routing, Outbox routing, retry executor, periodic
 heartbeat loop, catalog activation, matching, Finding write, or OSV enablement
 is included. Tests do not contact `storage.googleapis.com` or `osv.dev`.
 Production OSV runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 10)
+
+Session 12 Batch 10 independently reviewed the committed Session 12
+runtime-enablement foundation. Listing transport, pagination, token
+confidentiality, lease fencing, disabled composition, halt defaults, and
+bounded observability remain consistent with this accepted decision.
+Heartbeat scheduling remains deferred to Session 13 or a dedicated heartbeat
+batch. Production OSV remains disabled. This note does not change the accepted
+decision, numeric policy, or ADR status.
+
+No scheduler, BackgroundJob routing, Outbox routing, retry executor, periodic
+heartbeat loop, catalog activation, matching, Finding write, or OSV enablement
+is included. Tests do not contact `storage.googleapis.com` or `osv.dev`.
+Production OSV runtime remains disabled. ADR 0027 remains Proposed.
