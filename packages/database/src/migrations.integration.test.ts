@@ -19,6 +19,7 @@ import {
   SESSION_10_CANONICAL_CVE_IDENTITY,
   SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
   SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+  SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
   applyMigrationSqlAndResolve,
   applySession3Schema,
   applyThroughAuditActorAnonymous,
@@ -31,6 +32,7 @@ import {
   applyThroughSession9,
   applyThroughSession10,
   applyThroughSession11,
+  applyThroughSession11ParsedRevisionCorrection,
   createEphemeralDatabase,
   deployMigrations,
   dropEphemeralDatabase,
@@ -100,6 +102,10 @@ const PRISMA_TABLES = [
   'osv_provider_presence_observation',
   'osv_active_catalog_pointer',
   'osv_activation_record',
+  'osv_runtime_synchronization_request',
+  'osv_runtime_synchronization_run',
+  'osv_runtime_lease_projection',
+  'osv_runtime_stage_attempt',
 ] as const;
 
 const PRISMA_FOREIGN_KEYS = [
@@ -128,6 +134,9 @@ const PRISMA_FOREIGN_KEYS = [
   'osv_parsed_advisory_revision_parser_attempt_id_fkey',
   'osv_active_catalog_pointer_generation_id_scope_fingerprint_fkey',
   'osv_activation_record_candidate_generation_id_scope_finger_fkey',
+  'osv_runtime_synchronization_run_request_id_work_scope_sync_fkey',
+  'osv_runtime_lease_projection_run_id_fkey',
+  'osv_runtime_stage_attempt_run_id_fkey',
 ] as const;
 
 const SQL_ONLY_CHECKS = [
@@ -253,6 +262,24 @@ const SQL_ONLY_CHECKS = [
   'osv_activation_record_version_chk',
   'osv_activation_record_reason_chk',
   'osv_activation_record_outcome_chk',
+  'osv_runtime_sync_request_job_type_chk',
+  'osv_runtime_sync_request_scope_chk',
+  'osv_runtime_sync_request_fingerprint_chk',
+  'osv_runtime_sync_request_reason_scope_chk',
+  'osv_runtime_sync_request_kind_chk',
+  'osv_runtime_sync_run_identifiers_chk',
+  'osv_runtime_sync_run_reason_scope_chk',
+  'osv_runtime_sync_run_timestamps_chk',
+  'osv_runtime_sync_run_state_chk',
+  'osv_runtime_lease_scope_chk',
+  'osv_runtime_lease_holder_digest_chk',
+  'osv_runtime_lease_integers_chk',
+  'osv_runtime_lease_updated_chk',
+  'osv_runtime_lease_state_chk',
+  'osv_runtime_stage_attempt_policy_chk',
+  'osv_runtime_stage_attempt_ordinal_chk',
+  'osv_runtime_stage_attempt_delay_chk',
+  'osv_runtime_stage_attempt_state_chk',
 ] as const;
 
 const SQL_ONLY_INDEXES = [
@@ -291,6 +318,9 @@ const SQL_ONLY_INDEXES = [
   'osv_acquisition_run_inflight_uidx',
   'osv_catalog_generation_one_active_uidx',
   'osv_object_attachment_cleanup_eligible_idx',
+  'osv_runtime_sync_request_scheduler_uidx',
+  'osv_runtime_stage_attempt_null_target_uidx',
+  'osv_runtime_stage_attempt_target_uidx',
 ] as const;
 
 const SQL_ONLY_TRIGGERS = [
@@ -311,6 +341,11 @@ const SQL_ONLY_TRIGGERS = [
   'kev_entry_cwe_append_only',
   'cve_identity_append_only',
   'vulnerability_cve_identity_append_only',
+  'osv_runtime_synchronization_request_append_only',
+  'osv_runtime_lease_projection_delete_forbidden',
+  'osv_runtime_lease_projection_fencing_monotonic',
+  'osv_runtime_stage_attempt_delete_forbidden',
+  'osv_runtime_stage_attempt_identity_terminal_immutable',
 ] as const;
 
 const SQL_ONLY_FUNCTIONS = [
@@ -322,6 +357,9 @@ const SQL_ONLY_FUNCTIONS = [
   'patchpilot_job_outbox_org_consistency',
   'patchpilot_audit_actor_membership_user',
   'patchpilot_intelligence_source_active_generation',
+  'patchpilot_forbid_osv_runtime_lease_delete',
+  'patchpilot_protect_osv_runtime_lease_projection',
+  'patchpilot_protect_osv_runtime_stage_attempt',
 ] as const;
 
 async function names(client: PrismaClient, sql: string): Promise<string[]> {
@@ -918,7 +956,8 @@ async function assertOsvAcquisitionCatalog(client: PrismaClient): Promise<void> 
         'raw_body',
         'body',
         'advisory_json',
-        'provider_body'
+        'provider_body',
+        'holder_token'
       )
   `;
   expect(forbiddenColumns).toEqual([]);
@@ -996,9 +1035,9 @@ async function assertOsvAcquisitionCatalog(client: PrismaClient): Promise<void> 
 }
 
 describe('frozen migrations', () => {
-  it('keeps Session 3 through Session 11 OSV ID CHECK correction SQL byte-stable', async () => {
-    expect(FROZEN_MIGRATIONS).toHaveLength(13);
-    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(13);
+  it('keeps Session 3 through Session 12 Batch 6 SQL byte-stable', async () => {
+    expect(FROZEN_MIGRATIONS).toHaveLength(14);
+    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(14);
     expect(FROZEN_MIGRATIONS.map((item) => item.directory)).toEqual([
       ...EXPECTED_APPLIED_MIGRATIONS,
     ]);
@@ -1014,7 +1053,7 @@ describe('frozen migrations', () => {
     expect(existsSync(path.join(sqlDir, 'review-corrections-extras.sql'))).toBe(false);
   });
 
-  it('lists the Session 11 OSV ID CHECK correction once, last, and frozen', async () => {
+  it('lists the Session 12 Batch 6 runtime coordination migration once, last, and frozen', async () => {
     expect(
       EXPECTED_APPLIED_MIGRATIONS.filter(
         (name) => name === SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
@@ -1025,13 +1064,21 @@ describe('frozen migrations', () => {
         (name) => name === SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
       ),
     ).toEqual([SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION]);
+    expect(
+      EXPECTED_APPLIED_MIGRATIONS.filter(
+        (name) => name === SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
+      ),
+    ).toEqual([SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE]);
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-1)).toBe(
-      SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+      SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
     );
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-2)).toBe(
+      SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+    );
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-3)).toBe(
       SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-3)).toBe(SESSION_10_CANONICAL_CVE_IDENTITY);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-4)).toBe(SESSION_10_CANONICAL_CVE_IDENTITY);
     expect(
       FROZEN_MIGRATIONS.filter(
         (item) => item.directory === SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
@@ -1053,6 +1100,16 @@ describe('frozen migrations', () => {
       },
     ]);
     expect(
+      FROZEN_MIGRATIONS.filter(
+        (item) => item.directory === SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
+      ),
+    ).toEqual([
+      {
+        directory: SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
+        sha256: '7017b1c4b1d4bcae8bed4bdd0eb43559c0c89fce5b3636e0e889b276013cc3a6',
+      },
+    ]);
+    expect(
       FROZEN_MIGRATIONS.filter((item) => item.directory === SESSION_10_CANONICAL_CVE_IDENTITY),
     ).toEqual([
       {
@@ -1066,6 +1123,9 @@ describe('frozen migrations', () => {
     expect(
       existsSync(frozenMigrationFile(SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION)),
     ).toBe(true);
+    expect(existsSync(frozenMigrationFile(SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE))).toBe(
+      true,
+    );
   });
 });
 
@@ -1302,6 +1362,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_10_CANONICAL_CVE_IDENTITY,
         SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
         SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+        SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
       ]);
       expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
 
@@ -1378,6 +1439,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_10_CANONICAL_CVE_IDENTITY,
         SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
         SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+        SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1511,6 +1573,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_10_CANONICAL_CVE_IDENTITY,
         SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
         SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+        SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -1567,6 +1630,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_10_CANONICAL_CVE_IDENTITY,
         SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
         SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+        SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1612,6 +1676,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_10_CANONICAL_CVE_IDENTITY,
         SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
         SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+        SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1655,6 +1720,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_10_CANONICAL_CVE_IDENTITY,
         SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
         SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+        SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1700,6 +1766,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_10_CANONICAL_CVE_IDENTITY,
         SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
         SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+        SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1744,6 +1811,7 @@ describe('migrations', { timeout: 90_000 }, () => {
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
         SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+        SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1752,7 +1820,7 @@ describe('migrations', { timeout: 90_000 }, () => {
     }
   });
 
-  it('upgrades a Batch 5C database by applying only the parsed-revision ID CHECK correction', async () => {
+  it('upgrades a Batch 5C database by applying the parsed-revision ID CHECK correction and Batch 6', async () => {
     const ephemeral = await createEphemeralDatabase('migrate');
     const client = new PrismaClient({
       datasources: { db: { url: ephemeral.databaseUrl } },
@@ -1779,6 +1847,7 @@ describe('migrations', { timeout: 90_000 }, () => {
       );
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+        SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
       ]);
       const afterDef = await names(
         client,
@@ -1787,6 +1856,36 @@ describe('migrations', { timeout: 90_000 }, () => {
       expect(afterDef[0]).toContain('char_length');
       expect(afterDef[0]).toContain('^[A-Z0-9][A-Z0-9._+-]*$');
       expect(afterDef[0]).not.toContain('{0,511}');
+      await assertFinalMigratedSchema(client);
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades a Batch 5C-R database by applying only Session 12 Batch 6', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughSession11ParsedRevisionCorrection(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore.at(-1)).toBe(SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION);
+      expect(appliedBefore).not.toContain(SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE);
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
+      ]);
       await assertFinalMigratedSchema(client);
     } finally {
       await client.$disconnect();
@@ -1830,6 +1929,10 @@ describe('migrations', { timeout: 90_000 }, () => {
       await applyMigrationSqlAndResolve(
         ephemeral.databaseUrl,
         SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+      );
+      await applyMigrationSqlAndResolve(
+        ephemeral.databaseUrl,
+        SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
       );
       await assertFinalMigratedSchema(client);
 
@@ -1920,6 +2023,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_10_CANONICAL_CVE_IDENTITY,
         SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
         SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+        SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
 

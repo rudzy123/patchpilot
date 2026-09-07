@@ -624,6 +624,104 @@ enum OsvAdvisoryParserFailurePhase {
   @@map("osv_advisory_parser_failure_phase")
 }
 
+/// Session 12 Batch 6 OSV runtime coordination persistence. Global,
+/// instance-owned. Distinct from KEV IntelligenceSyncRunState.
+enum OsvRuntimeJobRequestState {
+  requested
+  accepted
+  rejected
+  duplicate
+  superseded
+
+  @@map("osv_runtime_job_request_state")
+}
+
+enum OsvRuntimeSynchronizationReason {
+  scheduler
+  operator_canary
+  operator_production
+
+  @@map("osv_runtime_synchronization_reason")
+}
+
+enum OsvRuntimeWorkScope {
+  osv_runtime_production_scope_six_prefix_v1
+  osv_runtime_canary_scope_crates_io_rustsec_v1
+
+  @@map("osv_runtime_work_scope")
+}
+
+enum OsvRuntimeJobRequestKind {
+  scheduler_window
+  operator_request
+
+  @@map("osv_runtime_job_request_kind")
+}
+
+enum OsvRuntimeRunState {
+  planned
+  waiting_for_lease
+  running
+  retry_wait
+  halted
+  cancelled
+  failed
+  completed
+
+  @@map("osv_runtime_run_state")
+}
+
+enum OsvRuntimeLeaseProjectionState {
+  held
+  released
+
+  @@map("osv_runtime_lease_projection_state")
+}
+
+enum OsvRuntimeLeaseReleaseReason {
+  completed
+  cancelled
+  failed
+  shutdown
+
+  @@map("osv_runtime_lease_release_reason")
+}
+
+enum OsvRuntimeRetryableStage {
+  listing_page
+  inventory_convergence
+  provider_body_retrieval
+  artifact_attachment
+  database_stage
+  parser_startup
+  parser_execution_timeout
+  parser_capacity
+
+  @@map("osv_runtime_retryable_stage")
+}
+
+enum OsvRuntimeAttemptState {
+  planned
+  running
+  succeeded
+  retryable_failed
+  permanent_failed
+  exhausted
+  cancelled
+
+  @@map("osv_runtime_attempt_state")
+}
+
+enum OsvRuntimeRetryEligibility {
+  durable_retry
+  new_synchronization_attempt
+  no_retry
+  quarantine_required
+  retry_exhausted
+
+  @@map("osv_runtime_retry_eligibility")
+}
+
 enum ExternalCredentialStatus {
   pending
   active
@@ -725,12 +823,12 @@ model User {
   createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships          Membership[]
-  assetOwners          AssetOwner[]
-  teamMemberships      TeamMembership[]
-  localCredential      LocalCredential?
-  sessions             Session[]
-  auditEvents          AuditEvent[]          @relation("AuditActorUser")
+  memberships     Membership[]
+  assetOwners     AssetOwner[]
+  teamMemberships TeamMembership[]
+  localCredential LocalCredential?
+  sessions        Session[]
+  auditEvents     AuditEvent[]     @relation("AuditActorUser")
 
   @@index([status], map: "user_status_idx")
   @@map("user")
@@ -786,18 +884,18 @@ model Membership {
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization             Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  user                     User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organization             Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user                     User              @relation(fields: [userId], references: [id], onDelete: Restrict)
   teamMemberships          TeamMembership[]
-  assetOwners              AssetOwner[]          @relation("AssetOwnerMembership")
-  uploadedSboms            Sbom[]                @relation("SbomUploadedByMembership")
-  assignedFindings         Finding[]             @relation("FindingAssignedMembership")
-  assignedRemediationTasks RemediationTask[]     @relation("RemediationAssignedMembership")
-  requestedRiskAcceptances RiskAcceptance[]      @relation("RiskAcceptanceRequesterMembership")
-  approvedRiskAcceptances  RiskAcceptance[]      @relation("RiskAcceptanceApproverMembership")
-  submittedEvidence        Evidence[]            @relation("EvidenceSubmittedByMembership")
-  auditEvents              AuditEvent[]          @relation("AuditActorMembership")
-  createdRiskPolicies      RiskPolicy[]          @relation("RiskPolicyCreatedByMembership")
+  assetOwners              AssetOwner[]      @relation("AssetOwnerMembership")
+  uploadedSboms            Sbom[]            @relation("SbomUploadedByMembership")
+  assignedFindings         Finding[]         @relation("FindingAssignedMembership")
+  assignedRemediationTasks RemediationTask[] @relation("RemediationAssignedMembership")
+  requestedRiskAcceptances RiskAcceptance[]  @relation("RiskAcceptanceRequesterMembership")
+  approvedRiskAcceptances  RiskAcceptance[]  @relation("RiskAcceptanceApproverMembership")
+  submittedEvidence        Evidence[]        @relation("EvidenceSubmittedByMembership")
+  auditEvents              AuditEvent[]      @relation("AuditActorMembership")
+  createdRiskPolicies      RiskPolicy[]      @relation("RiskPolicyCreatedByMembership")
 
   @@unique([organizationId, id], map: "membership_org_id_key")
   @@unique([organizationId, userId], map: "membership_org_user_key")
@@ -816,12 +914,12 @@ model Team {
   createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  memberships           TeamMembership[]
-  ownedAssets           Asset[]                @relation("AssetOwningTeam")
-  assetOwners           AssetOwner[]
-  assignedFindings      Finding[]              @relation("FindingAssignedTeam")
-  assignedRemediation   RemediationTask[]      @relation("RemediationAssignedTeam")
+  organization        Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberships         TeamMembership[]
+  ownedAssets         Asset[]           @relation("AssetOwningTeam")
+  assetOwners         AssetOwner[]
+  assignedFindings    Finding[]         @relation("FindingAssignedTeam")
+  assignedRemediation RemediationTask[] @relation("RemediationAssignedTeam")
 
   @@unique([organizationId, id], map: "team_org_id_key")
   @@unique([organizationId, slug], map: "team_org_slug_key")
@@ -849,15 +947,15 @@ model TeamMembership {
 }
 
 model Environment {
-  id                String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId    String                       @map("organization_id") @db.Uuid
-  name              String                       @db.VarChar(200)
-  slug              String                       @db.VarChar(64)
-  sensitivityClass  EnvironmentSensitivityClass  @map("sensitivity_class")
-  status            EnvironmentStatus            @default(active)
-  version           Int                          @default(1)
-  createdAt         DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String                      @map("organization_id") @db.Uuid
+  name             String                      @db.VarChar(200)
+  slug             String                      @db.VarChar(64)
+  sensitivityClass EnvironmentSensitivityClass @map("sensitivity_class")
+  status           EnvironmentStatus           @default(active)
+  version          Int                         @default(1)
+  createdAt        DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   assets       Asset[]
@@ -870,37 +968,37 @@ model Environment {
 }
 
 model Asset {
-  id                             String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId                 String                  @map("organization_id") @db.Uuid
-  name                           String                  @db.VarChar(200)
-  description                    String?                 @db.VarChar(2000)
-  assetType                      AssetType               @map("asset_type")
-  lifecycleStatus                AssetLifecycleStatus    @default(active) @map("lifecycle_status")
-  environmentId                  String?                 @map("environment_id") @db.Uuid
-  owningTeamId                   String?                 @map("owning_team_id") @db.Uuid
-  businessCriticality            BusinessCriticality     @default(unspecified) @map("business_criticality")
-  internetExposure               InternetExposure        @default(unknown) @map("internet_exposure")
-  dataClassification             AssetDataClassification @default(unspecified) @map("data_classification")
-  repositoryUrl                  String?                 @map("repository_url") @db.VarChar(2048)
-  deploymentContext              String?                 @map("deployment_context") @db.VarChar(2000)
-  lastObservedAt                 DateTime?               @map("last_observed_at") @db.Timestamptz(6)
-  lastSuccessfulSbomIngestionId  String?                 @map("last_successful_sbom_ingestion_id") @db.Uuid
-  lastSuccessfulSbomIngestionAt  DateTime?               @map("last_successful_sbom_ingestion_at") @db.Timestamptz(6)
-  archivedAt                     DateTime?               @map("archived_at") @db.Timestamptz(6)
-  version                        Int                     @default(1)
-  createdAt                      DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                      DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                            String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId                String                  @map("organization_id") @db.Uuid
+  name                          String                  @db.VarChar(200)
+  description                   String?                 @db.VarChar(2000)
+  assetType                     AssetType               @map("asset_type")
+  lifecycleStatus               AssetLifecycleStatus    @default(active) @map("lifecycle_status")
+  environmentId                 String?                 @map("environment_id") @db.Uuid
+  owningTeamId                  String?                 @map("owning_team_id") @db.Uuid
+  businessCriticality           BusinessCriticality     @default(unspecified) @map("business_criticality")
+  internetExposure              InternetExposure        @default(unknown) @map("internet_exposure")
+  dataClassification            AssetDataClassification @default(unspecified) @map("data_classification")
+  repositoryUrl                 String?                 @map("repository_url") @db.VarChar(2048)
+  deploymentContext             String?                 @map("deployment_context") @db.VarChar(2000)
+  lastObservedAt                DateTime?               @map("last_observed_at") @db.Timestamptz(6)
+  lastSuccessfulSbomIngestionId String?                 @map("last_successful_sbom_ingestion_id") @db.Uuid
+  lastSuccessfulSbomIngestionAt DateTime?               @map("last_successful_sbom_ingestion_at") @db.Timestamptz(6)
+  archivedAt                    DateTime?               @map("archived_at") @db.Timestamptz(6)
+  version                       Int                     @default(1)
+  createdAt                     DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                     DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization                Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  environment                 Environment?                 @relation(fields: [organizationId, environmentId], references: [organizationId, id], onDelete: Restrict)
-  owningTeam                  Team?                        @relation("AssetOwningTeam", fields: [organizationId, owningTeamId], references: [organizationId, id], onDelete: Restrict)
-  lastSuccessfulSbomIngestion SbomIngestion?               @relation("AssetCurrentIngestion", fields: [organizationId, lastSuccessfulSbomIngestionId, id], references: [organizationId, id, assetId], onDelete: Restrict)
+  organization                Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  environment                 Environment?              @relation(fields: [organizationId, environmentId], references: [organizationId, id], onDelete: Restrict)
+  owningTeam                  Team?                     @relation("AssetOwningTeam", fields: [organizationId, owningTeamId], references: [organizationId, id], onDelete: Restrict)
+  lastSuccessfulSbomIngestion SbomIngestion?            @relation("AssetCurrentIngestion", fields: [organizationId, lastSuccessfulSbomIngestionId, id], references: [organizationId, id, assetId], onDelete: Restrict)
   owners                      AssetOwner[]
   tags                        AssetTag[]
   externalIdentifiers         AssetExternalIdentifier[]
   repositoryConnection        RepositoryConnection?
   sboms                       Sbom[]
-  sbomIngestions              SbomIngestion[]              @relation("AssetIngestions")
+  sbomIngestions              SbomIngestion[]           @relation("AssetIngestions")
   componentOccurrences        ComponentOccurrence[]
   findings                    Finding[]
   evidence                    Evidence[]
@@ -970,17 +1068,17 @@ model AssetExternalIdentifier {
 }
 
 model RepositoryConnection {
-  id                    String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId        String                      @map("organization_id") @db.Uuid
-  assetId               String                      @map("asset_id") @db.Uuid
-  provider              RepositoryProvider          @default(reserved)
-  externalRepositoryId  String?                     @map("external_repository_id") @db.VarChar(256)
-  displayUrl            String?                     @map("display_url") @db.VarChar(2048)
-  defaultBranch         String?                     @map("default_branch") @db.VarChar(256)
-  status                RepositoryConnectionStatus  @default(not_configured)
-  integrationId         String?                     @map("integration_id") @db.Uuid
-  createdAt             DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                   String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String                     @map("organization_id") @db.Uuid
+  assetId              String                     @map("asset_id") @db.Uuid
+  provider             RepositoryProvider         @default(reserved)
+  externalRepositoryId String?                    @map("external_repository_id") @db.VarChar(256)
+  displayUrl           String?                    @map("display_url") @db.VarChar(2048)
+  defaultBranch        String?                    @map("default_branch") @db.VarChar(256)
+  status               RepositoryConnectionStatus @default(not_configured)
+  integrationId        String?                    @map("integration_id") @db.Uuid
+  createdAt            DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   asset        Asset        @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
@@ -992,26 +1090,26 @@ model RepositoryConnection {
 }
 
 model Sbom {
-  id                          String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId              String                 @map("organization_id") @db.Uuid
-  assetId                     String                 @map("asset_id") @db.Uuid
-  objectKey                   String                 @unique @map("object_key") @db.VarChar(512)
-  sha256                      String                 @db.Char(64)
-  byteLength                  Int                    @map("byte_length")
-  declaredContentType         String                 @map("declared_content_type") @db.VarChar(255)
-  specificationType           SbomSpecificationType  @default(cyclonedx) @map("specification_type")
-  specificationVersion        String?                @map("specification_version") @db.VarChar(16)
-  source                      SbomSource             @default(upload)
-  originalFilename            String?                @map("original_filename") @db.VarChar(255)
-  uploadedByMembershipId      String?                @map("uploaded_by_membership_id") @db.Uuid
-  capturedAt                  DateTime?              @map("captured_at") @db.Timestamptz(6)
-  receivedAt                  DateTime               @map("received_at") @db.Timestamptz(6)
-  parserVersionLastSucceeded  String?                @map("parser_version_last_succeeded") @db.VarChar(64)
-  createdAt                   DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                         String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId             String                @map("organization_id") @db.Uuid
+  assetId                    String                @map("asset_id") @db.Uuid
+  objectKey                  String                @unique @map("object_key") @db.VarChar(512)
+  sha256                     String                @db.Char(64)
+  byteLength                 Int                   @map("byte_length")
+  declaredContentType        String                @map("declared_content_type") @db.VarChar(255)
+  specificationType          SbomSpecificationType @default(cyclonedx) @map("specification_type")
+  specificationVersion       String?               @map("specification_version") @db.VarChar(16)
+  source                     SbomSource            @default(upload)
+  originalFilename           String?               @map("original_filename") @db.VarChar(255)
+  uploadedByMembershipId     String?               @map("uploaded_by_membership_id") @db.Uuid
+  capturedAt                 DateTime?             @map("captured_at") @db.Timestamptz(6)
+  receivedAt                 DateTime              @map("received_at") @db.Timestamptz(6)
+  parserVersionLastSucceeded String?               @map("parser_version_last_succeeded") @db.VarChar(64)
+  createdAt                  DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  asset                Asset                 @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
-  uploadedByMembership Membership?           @relation("SbomUploadedByMembership", fields: [organizationId, uploadedByMembershipId], references: [organizationId, id], onDelete: Restrict)
+  organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  asset                Asset                    @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
+  uploadedByMembership Membership?              @relation("SbomUploadedByMembership", fields: [organizationId, uploadedByMembershipId], references: [organizationId, id], onDelete: Restrict)
   ingestions           SbomIngestion[]
   componentOccurrences ComponentOccurrence[]
   dependencyEdges      DependencyRelationship[]
@@ -1026,29 +1124,29 @@ model Sbom {
 }
 
 model SbomIngestion {
-  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId   String              @map("organization_id") @db.Uuid
-  sbomId           String              @map("sbom_id") @db.Uuid
-  assetId          String              @map("asset_id") @db.Uuid
-  state            SbomIngestionState  @default(accepted)
-  stage            SbomIngestionStage?
-  attemptNumber    Int                 @default(1) @map("attempt_number")
-  parserVersion    String              @map("parser_version") @db.VarChar(64)
-  idempotencyKey   String?             @map("idempotency_key") @db.VarChar(128)
-  startedAt             DateTime?              @map("started_at") @db.Timestamptz(6)
-  completedAt           DateTime?              @map("completed_at") @db.Timestamptz(6)
-  graphCompleteness     SbomGraphCompleteness? @map("graph_completeness")
-  normalizationVersion  String                 @default("1") @map("normalization_version") @db.VarChar(64)
-  componentCount        Int?                   @map("component_count")
-  dependencyEdgeCount   Int?                   @map("dependency_edge_count")
-  warningCount          Int?                   @map("warning_count")
-  failureCategory       String?                @map("failure_category") @db.VarChar(64)
-  failureCode           String?                @map("failure_code") @db.VarChar(64)
-  quarantineReason      String?                @map("quarantine_reason") @db.VarChar(64)
-  leaseExpiresAt        DateTime?              @map("lease_expires_at") @db.Timestamptz(6)
-  version               Int                    @default(1)
-  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String                 @map("organization_id") @db.Uuid
+  sbomId               String                 @map("sbom_id") @db.Uuid
+  assetId              String                 @map("asset_id") @db.Uuid
+  state                SbomIngestionState     @default(accepted)
+  stage                SbomIngestionStage?
+  attemptNumber        Int                    @default(1) @map("attempt_number")
+  parserVersion        String                 @map("parser_version") @db.VarChar(64)
+  idempotencyKey       String?                @map("idempotency_key") @db.VarChar(128)
+  startedAt            DateTime?              @map("started_at") @db.Timestamptz(6)
+  completedAt          DateTime?              @map("completed_at") @db.Timestamptz(6)
+  graphCompleteness    SbomGraphCompleteness? @map("graph_completeness")
+  normalizationVersion String                 @default("1") @map("normalization_version") @db.VarChar(64)
+  componentCount       Int?                   @map("component_count")
+  dependencyEdgeCount  Int?                   @map("dependency_edge_count")
+  warningCount         Int?                   @map("warning_count")
+  failureCategory      String?                @map("failure_category") @db.VarChar(64)
+  failureCode          String?                @map("failure_code") @db.VarChar(64)
+  quarantineReason     String?                @map("quarantine_reason") @db.VarChar(64)
+  leaseExpiresAt       DateTime?              @map("lease_expires_at") @db.Timestamptz(6)
+  version              Int                    @default(1)
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   sbom                 Sbom                     @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict)
@@ -1103,15 +1201,15 @@ model ComponentOccurrence {
   isDirect        Boolean? @map("is_direct")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization     Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  asset            Asset                     @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
-  sbom             Sbom                      @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict)
-  sbomIngestion    SbomIngestion             @relation(fields: [organizationId, sbomIngestionId, sbomId], references: [organizationId, id, sbomId], onDelete: Restrict)
-  component        Component                 @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict)
-  outgoingEdges    DependencyRelationship[]  @relation("DependencyFrom")
-  incomingEdges    DependencyRelationship[]  @relation("DependencyTo")
-  findings         Finding[]
-  observations     FindingObservation[]
+  organization  Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  asset         Asset                    @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
+  sbom          Sbom                     @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict)
+  sbomIngestion SbomIngestion            @relation(fields: [organizationId, sbomIngestionId, sbomId], references: [organizationId, id, sbomId], onDelete: Restrict)
+  component     Component                @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict)
+  outgoingEdges DependencyRelationship[] @relation("DependencyFrom")
+  incomingEdges DependencyRelationship[] @relation("DependencyTo")
+  findings      Finding[]
+  observations  FindingObservation[]
 
   @@unique([organizationId, id], map: "component_occurrence_org_id_key")
   @@unique([organizationId, id, sbomIngestionId], map: "component_occurrence_org_id_ingestion_key")
@@ -1125,18 +1223,18 @@ model ComponentOccurrence {
 }
 
 model DependencyRelationship {
-  id              String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId  String                      @map("organization_id") @db.Uuid
-  sbomId          String                      @map("sbom_id") @db.Uuid
-  sbomIngestionId String                      @map("sbom_ingestion_id") @db.Uuid
+  id               String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String                     @map("organization_id") @db.Uuid
+  sbomId           String                     @map("sbom_id") @db.Uuid
+  sbomIngestionId  String                     @map("sbom_ingestion_id") @db.Uuid
   fromOccurrenceId String                     @map("from_occurrence_id") @db.Uuid
   toOccurrenceId   String                     @map("to_occurrence_id") @db.Uuid
   relationshipType DependencyRelationshipType @default(depends_on) @map("relationship_type")
   createdAt        DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization  Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  sbom          Sbom                 @relation(fields: [organizationId, sbomId], references: [organizationId, id], onDelete: Restrict)
-  sbomIngestion SbomIngestion        @relation(fields: [organizationId, sbomIngestionId], references: [organizationId, id], onDelete: Restrict)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  sbom           Sbom                @relation(fields: [organizationId, sbomId], references: [organizationId, id], onDelete: Restrict)
+  sbomIngestion  SbomIngestion       @relation(fields: [organizationId, sbomIngestionId], references: [organizationId, id], onDelete: Restrict)
   fromOccurrence ComponentOccurrence @relation("DependencyFrom", fields: [organizationId, fromOccurrenceId, sbomIngestionId], references: [organizationId, id, sbomIngestionId], onDelete: Restrict)
   toOccurrence   ComponentOccurrence @relation("DependencyTo", fields: [organizationId, toOccurrenceId, sbomIngestionId], references: [organizationId, id, sbomIngestionId], onDelete: Restrict)
 
@@ -1147,15 +1245,15 @@ model DependencyRelationship {
 }
 
 model Vulnerability {
-  id          String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  osvId       String               @unique @map("osv_id") @db.VarChar(128)
-  cveId       String?              @map("cve_id") @db.VarChar(32)
-  status      VulnerabilityStatus  @default(active)
-  publishedAt DateTime?            @map("published_at") @db.Timestamptz(6)
-  modifiedAt  DateTime?            @map("modified_at") @db.Timestamptz(6)
-  withdrawnAt DateTime?            @map("withdrawn_at") @db.Timestamptz(6)
-  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  osvId       String              @unique @map("osv_id") @db.VarChar(128)
+  cveId       String?             @map("cve_id") @db.VarChar(32)
+  status      VulnerabilityStatus @default(active)
+  publishedAt DateTime?           @map("published_at") @db.Timestamptz(6)
+  modifiedAt  DateTime?           @map("modified_at") @db.Timestamptz(6)
+  withdrawnAt DateTime?           @map("withdrawn_at") @db.Timestamptz(6)
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   aliases          VulnerabilityAlias[]
   sourceRecords    VulnerabilitySourceRecord[]
@@ -1180,25 +1278,25 @@ model VulnerabilityAlias {
 }
 
 model VulnerabilitySourceRecord {
-  id                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  vulnerabilityId      String               @map("vulnerability_id") @db.Uuid
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vulnerabilityId      String              @map("vulnerability_id") @db.Uuid
   source               VulnerabilitySource
-  sourceIdentity       String               @map("source_identity") @db.VarChar(256)
-  sourceUrl            String?              @map("source_url") @db.VarChar(2048)
-  publishedAt          DateTime?            @map("published_at") @db.Timestamptz(6)
-  modifiedAt           DateTime?            @map("modified_at") @db.Timestamptz(6)
-  retrievedAt          DateTime             @map("retrieved_at") @db.Timestamptz(6)
-  payloadSha256        String               @map("payload_sha256") @db.Char(64)
-  normalizationVersion String               @map("normalization_version") @db.VarChar(64)
-  withdrawnAt          DateTime?            @map("withdrawn_at") @db.Timestamptz(6)
-  rawObjectKey         String?              @map("raw_object_key") @db.VarChar(512)
+  sourceIdentity       String              @map("source_identity") @db.VarChar(256)
+  sourceUrl            String?             @map("source_url") @db.VarChar(2048)
+  publishedAt          DateTime?           @map("published_at") @db.Timestamptz(6)
+  modifiedAt           DateTime?           @map("modified_at") @db.Timestamptz(6)
+  retrievedAt          DateTime            @map("retrieved_at") @db.Timestamptz(6)
+  payloadSha256        String              @map("payload_sha256") @db.Char(64)
+  normalizationVersion String              @map("normalization_version") @db.VarChar(64)
+  withdrawnAt          DateTime?           @map("withdrawn_at") @db.Timestamptz(6)
+  rawObjectKey         String?             @map("raw_object_key") @db.VarChar(512)
   /// Versioned provider-normalized metadata. schemaVersion required. See docs/architecture/database-model.md.
   normalized           Json
-  supersedesRecordId   String?              @map("supersedes_record_id") @db.Uuid
-  createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  supersedesRecordId   String?             @map("supersedes_record_id") @db.Uuid
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  vulnerability    Vulnerability              @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict)
-  supersedesRecord VulnerabilitySourceRecord? @relation("SourceRecordRevision", fields: [supersedesRecordId, vulnerabilityId, source, sourceIdentity], references: [id, vulnerabilityId, source, sourceIdentity], onDelete: Restrict)
+  vulnerability    Vulnerability               @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict)
+  supersedesRecord VulnerabilitySourceRecord?  @relation("SourceRecordRevision", fields: [supersedesRecordId, vulnerabilityId, source, sourceIdentity], references: [id, vulnerabilityId, source, sourceIdentity], onDelete: Restrict)
   supersededBy     VulnerabilitySourceRecord[] @relation("SourceRecordRevision")
 
   @@unique([id, vulnerabilityId, source, sourceIdentity], map: "vulnerability_source_record_revision_key")
@@ -1232,35 +1330,35 @@ model VulnerabilityCveIdentityLink {
 }
 
 model Finding {
-  id                       String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId           String        @map("organization_id") @db.Uuid
-  assetId                  String        @map("asset_id") @db.Uuid
-  vulnerabilityId          String        @map("vulnerability_id") @db.Uuid
-  componentId              String        @map("component_id") @db.Uuid
-  componentOccurrenceId    String?       @map("component_occurrence_id") @db.Uuid
-  state                    FindingState  @default(open)
-  firstObservedAt          DateTime      @map("first_observed_at") @db.Timestamptz(6)
-  lastObservedAt           DateTime      @map("last_observed_at") @db.Timestamptz(6)
-  resolvedAt               DateTime?     @map("resolved_at") @db.Timestamptz(6)
-  reopenedAt               DateTime?     @map("reopened_at") @db.Timestamptz(6)
-  assignedMembershipId     String?       @map("assigned_membership_id") @db.Uuid
-  assignedTeamId           String?       @map("assigned_team_id") @db.Uuid
-  dueAt                    DateTime?     @map("due_at") @db.Timestamptz(6)
-  currentRiskCalculationId String?       @map("current_risk_calculation_id") @db.Uuid
-  version                  Int           @default(1)
-  createdAt                DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                       String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId           String       @map("organization_id") @db.Uuid
+  assetId                  String       @map("asset_id") @db.Uuid
+  vulnerabilityId          String       @map("vulnerability_id") @db.Uuid
+  componentId              String       @map("component_id") @db.Uuid
+  componentOccurrenceId    String?      @map("component_occurrence_id") @db.Uuid
+  state                    FindingState @default(open)
+  firstObservedAt          DateTime     @map("first_observed_at") @db.Timestamptz(6)
+  lastObservedAt           DateTime     @map("last_observed_at") @db.Timestamptz(6)
+  resolvedAt               DateTime?    @map("resolved_at") @db.Timestamptz(6)
+  reopenedAt               DateTime?    @map("reopened_at") @db.Timestamptz(6)
+  assignedMembershipId     String?      @map("assigned_membership_id") @db.Uuid
+  assignedTeamId           String?      @map("assigned_team_id") @db.Uuid
+  dueAt                    DateTime?    @map("due_at") @db.Timestamptz(6)
+  currentRiskCalculationId String?      @map("current_risk_calculation_id") @db.Uuid
+  version                  Int          @default(1)
+  createdAt                DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization           Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  asset                  Asset                 @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
-  vulnerability          Vulnerability         @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict)
-  component              Component             @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict)
-  componentOccurrence    ComponentOccurrence?  @relation(fields: [organizationId, componentOccurrenceId, assetId, componentId], references: [organizationId, id, assetId, componentId], onDelete: Restrict)
-  assignedMembership     Membership?           @relation("FindingAssignedMembership", fields: [organizationId, assignedMembershipId], references: [organizationId, id], onDelete: Restrict)
-  assignedTeam           Team?                 @relation("FindingAssignedTeam", fields: [organizationId, assignedTeamId], references: [organizationId, id], onDelete: Restrict)
-  currentRiskCalculation RiskCalculation?      @relation("FindingCurrentCalculation", fields: [organizationId, currentRiskCalculationId], references: [organizationId, id], onDelete: Restrict)
+  organization           Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  asset                  Asset                @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
+  vulnerability          Vulnerability        @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict)
+  component              Component            @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict)
+  componentOccurrence    ComponentOccurrence? @relation(fields: [organizationId, componentOccurrenceId, assetId, componentId], references: [organizationId, id, assetId, componentId], onDelete: Restrict)
+  assignedMembership     Membership?          @relation("FindingAssignedMembership", fields: [organizationId, assignedMembershipId], references: [organizationId, id], onDelete: Restrict)
+  assignedTeam           Team?                @relation("FindingAssignedTeam", fields: [organizationId, assignedTeamId], references: [organizationId, id], onDelete: Restrict)
+  currentRiskCalculation RiskCalculation?     @relation("FindingCurrentCalculation", fields: [organizationId, currentRiskCalculationId], references: [organizationId, id], onDelete: Restrict)
   observations           FindingObservation[]
-  calculations           RiskCalculation[]     @relation("FindingCalculations")
+  calculations           RiskCalculation[]    @relation("FindingCalculations")
   remediationTasks       RemediationTask[]
   riskAcceptances        RiskAcceptance[]
   evidence               Evidence[]
@@ -1276,24 +1374,24 @@ model Finding {
 }
 
 model FindingObservation {
-  id              String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId  String                    @map("organization_id") @db.Uuid
-  findingId       String                    @map("finding_id") @db.Uuid
-  sbomId          String                    @map("sbom_id") @db.Uuid
-  sbomIngestionId String                    @map("sbom_ingestion_id") @db.Uuid
-  occurrenceId    String?                   @map("occurrence_id") @db.Uuid
+  id              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String                   @map("organization_id") @db.Uuid
+  findingId       String                   @map("finding_id") @db.Uuid
+  sbomId          String                   @map("sbom_id") @db.Uuid
+  sbomIngestionId String                   @map("sbom_ingestion_id") @db.Uuid
+  occurrenceId    String?                  @map("occurrence_id") @db.Uuid
   result          FindingObservationResult
-  method          String                    @db.VarChar(64)
-  observedAt      DateTime                  @map("observed_at") @db.Timestamptz(6)
+  method          String                   @db.VarChar(64)
+  observedAt      DateTime                 @map("observed_at") @db.Timestamptz(6)
   /// Safe evidence metadata. schemaVersion required. Must not contain raw SBOM content.
   evidence        Json
-  createdAt       DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization  Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  finding       Finding               @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
-  sbom          Sbom                  @relation(fields: [organizationId, sbomId], references: [organizationId, id], onDelete: Restrict)
-  sbomIngestion SbomIngestion         @relation(fields: [organizationId, sbomIngestionId], references: [organizationId, id], onDelete: Restrict)
-  occurrence    ComponentOccurrence?  @relation(fields: [organizationId, occurrenceId], references: [organizationId, id], onDelete: Restrict)
+  organization  Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  finding       Finding              @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
+  sbom          Sbom                 @relation(fields: [organizationId, sbomId], references: [organizationId, id], onDelete: Restrict)
+  sbomIngestion SbomIngestion        @relation(fields: [organizationId, sbomIngestionId], references: [organizationId, id], onDelete: Restrict)
+  occurrence    ComponentOccurrence? @relation(fields: [organizationId, occurrenceId], references: [organizationId, id], onDelete: Restrict)
 
   @@unique([organizationId, findingId, sbomIngestionId], map: "finding_observation_identity_key")
   @@index([organizationId, findingId, observedAt], map: "finding_observation_finding_time_idx")
@@ -1301,23 +1399,23 @@ model FindingObservation {
 }
 
 model RiskPolicy {
-  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId      String?          @map("organization_id") @db.Uuid
-  scope               RiskPolicyScope
-  policyKey           String           @map("policy_key") @db.VarChar(128)
-  name                String           @db.VarChar(200)
-  version             Int
-  status              RiskPolicyStatus @default(draft)
-  policySchemaVersion Int              @map("policy_schema_version")
+  id                    String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId        String?          @map("organization_id") @db.Uuid
+  scope                 RiskPolicyScope
+  policyKey             String           @map("policy_key") @db.VarChar(128)
+  name                  String           @db.VarChar(200)
+  version               Int
+  status                RiskPolicyStatus @default(draft)
+  policySchemaVersion   Int              @map("policy_schema_version")
   /// Versioned policy definition JSON. schemaVersion required. Published rows are immutable.
-  definition          Json
-  publishedAt             DateTime?        @map("published_at") @db.Timestamptz(6)
-  retiredAt               DateTime?        @map("retired_at") @db.Timestamptz(6)
-  createdByMembershipId   String?          @map("created_by_membership_id") @db.Uuid
-  createdAt               DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  definition            Json
+  publishedAt           DateTime?        @map("published_at") @db.Timestamptz(6)
+  retiredAt             DateTime?        @map("retired_at") @db.Timestamptz(6)
+  createdByMembershipId String?          @map("created_by_membership_id") @db.Uuid
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization        Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdByMembership Membership?   @relation("RiskPolicyCreatedByMembership", fields: [organizationId, createdByMembershipId], references: [organizationId, id], onDelete: Restrict)
+  organization        Organization?     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdByMembership Membership?       @relation("RiskPolicyCreatedByMembership", fields: [organizationId, createdByMembershipId], references: [organizationId, id], onDelete: Restrict)
   calculations        RiskCalculation[]
 
   @@unique([organizationId, id], map: "risk_policy_org_id_key")
@@ -1328,22 +1426,22 @@ model RiskPolicy {
 }
 
 model RiskCalculation {
-  id                      String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId          String                 @map("organization_id") @db.Uuid
-  findingId               String                 @map("finding_id") @db.Uuid
-  riskPolicyId            String                 @map("risk_policy_id") @db.Uuid
-  policyVersion           Int                    @map("policy_version")
-  policyDefinitionSha256  String                 @map("policy_definition_sha256") @db.Char(64)
-  calculatedAt            DateTime               @map("calculated_at") @db.Timestamptz(6)
+  id                       String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId           String                @map("organization_id") @db.Uuid
+  findingId                String                @map("finding_id") @db.Uuid
+  riskPolicyId             String                @map("risk_policy_id") @db.Uuid
+  policyVersion            Int                   @map("policy_version")
+  policyDefinitionSha256   String                @map("policy_definition_sha256") @db.Char(64)
+  calculatedAt             DateTime              @map("calculated_at") @db.Timestamptz(6)
   /// Full contributing-factor snapshot. schemaVersion required.
-  factors                 Json
+  factors                  Json
   /// Stored priority, band, due-date and escalation recommendation. schemaVersion required.
-  result                  Json
+  result                   Json
   calculationEngineVersion String                @map("calculation_engine_version") @db.VarChar(64)
-  calculationReason       RiskCalculationReason  @map("calculation_reason")
-  inputFingerprint        String                 @map("input_fingerprint") @db.Char(64)
-  sbomIngestionId         String?                @map("sbom_ingestion_id") @db.Uuid
-  createdAt               DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  calculationReason        RiskCalculationReason @map("calculation_reason")
+  inputFingerprint         String                @map("input_fingerprint") @db.Char(64)
+  sbomIngestionId          String?               @map("sbom_ingestion_id") @db.Uuid
+  createdAt                DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
 
   organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   finding           Finding        @relation("FindingCalculations", fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
@@ -1358,28 +1456,28 @@ model RiskCalculation {
 }
 
 model RemediationTask {
-  id                       String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId           String                 @map("organization_id") @db.Uuid
-  findingId                String                 @map("finding_id") @db.Uuid
-  status                   RemediationTaskStatus  @default(open)
-  title                    String                 @db.VarChar(200)
-  description              String?                @db.VarChar(4000)
-  assignedMembershipId     String?                @map("assigned_membership_id") @db.Uuid
-  assignedTeamId           String?                @map("assigned_team_id") @db.Uuid
-  dueAt                    DateTime?              @map("due_at") @db.Timestamptz(6)
-  startedAt                DateTime?              @map("started_at") @db.Timestamptz(6)
-  submittedAt              DateTime?              @map("submitted_at") @db.Timestamptz(6)
-  verificationRequestedAt  DateTime?              @map("verification_requested_at") @db.Timestamptz(6)
-  completedAt              DateTime?              @map("completed_at") @db.Timestamptz(6)
-  cancelledAt              DateTime?              @map("cancelled_at") @db.Timestamptz(6)
-  version                  Int                    @default(1)
-  createdAt                DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                      String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId          String                @map("organization_id") @db.Uuid
+  findingId               String                @map("finding_id") @db.Uuid
+  status                  RemediationTaskStatus @default(open)
+  title                   String                @db.VarChar(200)
+  description             String?               @db.VarChar(4000)
+  assignedMembershipId    String?               @map("assigned_membership_id") @db.Uuid
+  assignedTeamId          String?               @map("assigned_team_id") @db.Uuid
+  dueAt                   DateTime?             @map("due_at") @db.Timestamptz(6)
+  startedAt               DateTime?             @map("started_at") @db.Timestamptz(6)
+  submittedAt             DateTime?             @map("submitted_at") @db.Timestamptz(6)
+  verificationRequestedAt DateTime?             @map("verification_requested_at") @db.Timestamptz(6)
+  completedAt             DateTime?             @map("completed_at") @db.Timestamptz(6)
+  cancelledAt             DateTime?             @map("cancelled_at") @db.Timestamptz(6)
+  version                 Int                   @default(1)
+  createdAt               DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  finding      Finding      @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
-  assignedMembership Membership? @relation("RemediationAssignedMembership", fields: [organizationId, assignedMembershipId], references: [organizationId, id], onDelete: Restrict)
-  assignedTeam Team?        @relation("RemediationAssignedTeam", fields: [organizationId, assignedTeamId], references: [organizationId, id], onDelete: Restrict)
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  finding            Finding      @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
+  assignedMembership Membership?  @relation("RemediationAssignedMembership", fields: [organizationId, assignedMembershipId], references: [organizationId, id], onDelete: Restrict)
+  assignedTeam       Team?        @relation("RemediationAssignedTeam", fields: [organizationId, assignedTeamId], references: [organizationId, id], onDelete: Restrict)
 
   @@unique([organizationId, id], map: "remediation_task_org_id_key")
   @@index([organizationId, status], map: "remediation_task_org_status_idx")
@@ -1389,27 +1487,27 @@ model RemediationTask {
 }
 
 model RiskAcceptance {
-  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId       String                @map("organization_id") @db.Uuid
-  findingId            String                @map("finding_id") @db.Uuid
-  status               RiskAcceptanceStatus  @default(active)
-  requestedByMembershipId String                @map("requested_by_membership_id") @db.Uuid
-  approvedByMembershipId  String?               @map("approved_by_membership_id") @db.Uuid
-  reason               String                @db.VarChar(4000)
-  compensatingControls String?               @map("compensating_controls") @db.VarChar(4000)
-  startsAt             DateTime              @map("starts_at") @db.Timestamptz(6)
-  expiresAt            DateTime              @map("expires_at") @db.Timestamptz(6)
-  reviewAt             DateTime              @map("review_at") @db.Timestamptz(6)
-  approvedAt           DateTime?             @map("approved_at") @db.Timestamptz(6)
-  revokedAt            DateTime?             @map("revoked_at") @db.Timestamptz(6)
-  revocationReason     String?               @map("revocation_reason") @db.VarChar(4000)
-  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                      String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId          String               @map("organization_id") @db.Uuid
+  findingId               String               @map("finding_id") @db.Uuid
+  status                  RiskAcceptanceStatus @default(active)
+  requestedByMembershipId String               @map("requested_by_membership_id") @db.Uuid
+  approvedByMembershipId  String?              @map("approved_by_membership_id") @db.Uuid
+  reason                  String               @db.VarChar(4000)
+  compensatingControls    String?              @map("compensating_controls") @db.VarChar(4000)
+  startsAt                DateTime             @map("starts_at") @db.Timestamptz(6)
+  expiresAt               DateTime             @map("expires_at") @db.Timestamptz(6)
+  reviewAt                DateTime             @map("review_at") @db.Timestamptz(6)
+  approvedAt              DateTime?            @map("approved_at") @db.Timestamptz(6)
+  revokedAt               DateTime?            @map("revoked_at") @db.Timestamptz(6)
+  revocationReason        String?              @map("revocation_reason") @db.VarChar(4000)
+  createdAt               DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   finding      Finding      @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
-  requestedBy Membership  @relation("RiskAcceptanceRequesterMembership", fields: [organizationId, requestedByMembershipId], references: [organizationId, id], onDelete: Restrict)
-  approvedBy  Membership? @relation("RiskAcceptanceApproverMembership", fields: [organizationId, approvedByMembershipId], references: [organizationId, id], onDelete: Restrict)
+  requestedBy  Membership   @relation("RiskAcceptanceRequesterMembership", fields: [organizationId, requestedByMembershipId], references: [organizationId, id], onDelete: Restrict)
+  approvedBy   Membership?  @relation("RiskAcceptanceApproverMembership", fields: [organizationId, approvedByMembershipId], references: [organizationId, id], onDelete: Restrict)
 
   @@unique([organizationId, id], map: "risk_acceptance_org_id_key")
   @@index([organizationId, findingId, status], map: "risk_acceptance_org_finding_status_idx")
@@ -1418,21 +1516,21 @@ model RiskAcceptance {
 }
 
 model Evidence {
-  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId    String       @map("organization_id") @db.Uuid
-  kind              EvidenceKind
-  findingId         String?      @map("finding_id") @db.Uuid
-  sbomId            String?      @map("sbom_id") @db.Uuid
-  assetId           String?      @map("asset_id") @db.Uuid
-  objectKey         String?      @map("object_key") @db.VarChar(512)
-  sha256            String?      @db.Char(64)
-  byteLength        Int?         @map("byte_length")
-  contentType       String?      @map("content_type") @db.VarChar(255)
-  description       String?      @db.VarChar(2000)
+  id                      String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId          String       @map("organization_id") @db.Uuid
+  kind                    EvidenceKind
+  findingId               String?      @map("finding_id") @db.Uuid
+  sbomId                  String?      @map("sbom_id") @db.Uuid
+  assetId                 String?      @map("asset_id") @db.Uuid
+  objectKey               String?      @map("object_key") @db.VarChar(512)
+  sha256                  String?      @db.Char(64)
+  byteLength              Int?         @map("byte_length")
+  contentType             String?      @map("content_type") @db.VarChar(255)
+  description             String?      @db.VarChar(2000)
   submittedByMembershipId String?      @map("submitted_by_membership_id") @db.Uuid
   /// Extensible evidence metadata. schemaVersion required. No secrets or raw SBOM bodies.
-  metadata          Json
-  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  metadata                Json
+  createdAt               DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   finding      Finding?     @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
@@ -1446,23 +1544,23 @@ model Evidence {
 }
 
 model AuditEvent {
-  id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId    String?                 @map("organization_id") @db.Uuid
-  actorUserId       String?                 @map("actor_user_id") @db.Uuid
-  actorMembershipId String?                 @map("actor_membership_id") @db.Uuid
-  actorType         AuditActorType          @map("actor_type")
-  action            String                  @db.VarChar(128)
-  subjectType       String                  @map("subject_type") @db.VarChar(64)
-  subjectId         String                  @map("subject_id") @db.Uuid
-  occurredAt        DateTime                @default(now()) @map("occurred_at") @db.Timestamptz(6)
-  requestId         String?                 @map("request_id") @db.VarChar(128)
-  correlationId     String                  @map("correlation_id") @db.VarChar(128)
-  sourceIp          String?                 @map("source_ip") @db.VarChar(64)
-  userAgent         String?                 @map("user_agent") @db.VarChar(512)
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String?                @map("organization_id") @db.Uuid
+  actorUserId       String?                @map("actor_user_id") @db.Uuid
+  actorMembershipId String?                @map("actor_membership_id") @db.Uuid
+  actorType         AuditActorType         @map("actor_type")
+  action            String                 @db.VarChar(128)
+  subjectType       String                 @map("subject_type") @db.VarChar(64)
+  subjectId         String                 @map("subject_id") @db.Uuid
+  occurredAt        DateTime               @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  requestId         String?                @map("request_id") @db.VarChar(128)
+  correlationId     String                 @map("correlation_id") @db.VarChar(128)
+  sourceIp          String?                @map("source_ip") @db.VarChar(64)
+  userAgent         String?                @map("user_agent") @db.VarChar(512)
   /// Redacted structured metadata. schemaVersion required. No secrets, SBOMs, or tokens.
   payload           Json
-  schemaVersion     Int                     @map("schema_version")
-  retentionCategory AuditRetentionCategory  @default(security) @map("retention_category")
+  schemaVersion     Int                    @map("schema_version")
+  retentionCategory AuditRetentionCategory @default(security) @map("retention_category")
 
   organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   actorUser       User?         @relation("AuditActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
@@ -1474,10 +1572,10 @@ model AuditEvent {
 }
 
 model IntegrationProvider {
-  id          String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  providerKey IntegrationProviderKey  @unique @map("provider_key")
-  displayName String                  @map("display_name") @db.VarChar(200)
-  createdAt   DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  id          String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerKey IntegrationProviderKey @unique @map("provider_key")
+  displayName String                 @map("display_name") @db.VarChar(200)
+  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
 
   intelligenceSource IntelligenceSource?
   integrations       Integration[]
@@ -1489,19 +1587,19 @@ model IntegrationProvider {
 }
 
 model IntelligenceSource {
-  id                   String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  providerKey          IntegrationProviderKey  @unique @map("provider_key")
-  state                IntegrationState        @default(disabled)
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerKey          IntegrationProviderKey @unique @map("provider_key")
+  state                IntegrationState       @default(disabled)
   /// Non-secret sync configuration. schemaVersion required. No tokens.
   config               Json
-  lastSuccessfulSyncAt DateTime?               @map("last_successful_sync_at") @db.Timestamptz(6)
-  lastFailureAt        DateTime?               @map("last_failure_at") @db.Timestamptz(6)
-  lastAttemptAt        DateTime?               @map("last_attempt_at") @db.Timestamptz(6)
-  lastFailureCode      String?                 @map("last_failure_code") @db.VarChar(64)
-  activeGenerationId   String?                 @map("active_generation_id") @db.Uuid
-  version              Int                     @default(1)
-  createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastSuccessfulSyncAt DateTime?              @map("last_successful_sync_at") @db.Timestamptz(6)
+  lastFailureAt        DateTime?              @map("last_failure_at") @db.Timestamptz(6)
+  lastAttemptAt        DateTime?              @map("last_attempt_at") @db.Timestamptz(6)
+  lastFailureCode      String?                @map("last_failure_code") @db.VarChar(64)
+  activeGenerationId   String?                @map("active_generation_id") @db.Uuid
+  version              Int                    @default(1)
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   provider         IntegrationProvider @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
   activeGeneration KevGeneration?      @relation(fields: [activeGenerationId], references: [id], onDelete: Restrict)
@@ -1510,60 +1608,60 @@ model IntelligenceSource {
 }
 
 model VulnerabilitySyncRun {
-  id                         String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  providerKey                IntegrationProviderKey          @map("provider_key")
-  sourceIdentifier           String                          @map("source_identifier") @db.VarChar(64)
-  state                      IntelligenceSyncRunState        @default(requested)
-  stage                      IntelligenceSyncRunStage?
-  requestedAt                DateTime                        @map("requested_at") @db.Timestamptz(6)
-  startedAt                  DateTime?                       @map("started_at") @db.Timestamptz(6)
-  completedAt                DateTime?                       @map("completed_at") @db.Timestamptz(6)
-  nextAttemptAt              DateTime?                       @map("next_attempt_at") @db.Timestamptz(6)
-  executionAttempt           Int                             @default(0) @map("execution_attempt")
-  snapshotId                 String?                         @map("snapshot_id") @db.Uuid
-  generationId               String?                         @map("generation_id") @db.Uuid
-  priorAcceptedGenerationId  String?                         @map("prior_accepted_generation_id") @db.Uuid
-  parserVersion              String                          @map("parser_version") @db.VarChar(64)
-  normalizationVersion       String                          @map("normalization_version") @db.VarChar(64)
-  failureCategory            String?                         @map("failure_category") @db.VarChar(64)
-  failureCode                String?                         @map("failure_code") @db.VarChar(64)
-  acceptedEntryCount         Int?                            @map("accepted_entry_count")
-  warningCount               Int?                            @map("warning_count")
-  notModifiedReason          IntelligenceNotModifiedReason?  @map("not_modified_reason")
-  correlationId              String                          @map("correlation_id") @db.VarChar(128)
-  version                    Int                             @default(1)
-  createdAt                  DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                  DateTime                        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                        String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerKey               IntegrationProviderKey         @map("provider_key")
+  sourceIdentifier          String                         @map("source_identifier") @db.VarChar(64)
+  state                     IntelligenceSyncRunState       @default(requested)
+  stage                     IntelligenceSyncRunStage?
+  requestedAt               DateTime                       @map("requested_at") @db.Timestamptz(6)
+  startedAt                 DateTime?                      @map("started_at") @db.Timestamptz(6)
+  completedAt               DateTime?                      @map("completed_at") @db.Timestamptz(6)
+  nextAttemptAt             DateTime?                      @map("next_attempt_at") @db.Timestamptz(6)
+  executionAttempt          Int                            @default(0) @map("execution_attempt")
+  snapshotId                String?                        @map("snapshot_id") @db.Uuid
+  generationId              String?                        @map("generation_id") @db.Uuid
+  priorAcceptedGenerationId String?                        @map("prior_accepted_generation_id") @db.Uuid
+  parserVersion             String                         @map("parser_version") @db.VarChar(64)
+  normalizationVersion      String                         @map("normalization_version") @db.VarChar(64)
+  failureCategory           String?                        @map("failure_category") @db.VarChar(64)
+  failureCode               String?                        @map("failure_code") @db.VarChar(64)
+  acceptedEntryCount        Int?                           @map("accepted_entry_count")
+  warningCount              Int?                           @map("warning_count")
+  notModifiedReason         IntelligenceNotModifiedReason? @map("not_modified_reason")
+  correlationId             String                         @map("correlation_id") @db.VarChar(128)
+  version                   Int                            @default(1)
+  createdAt                 DateTime                       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime                       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  provider                 IntegrationProvider            @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
-  snapshot                 VulnerabilityProviderSnapshot? @relation("SyncRunCurrentSnapshot", fields: [snapshotId], references: [id], onDelete: Restrict)
-  generation               KevGeneration?                 @relation("SyncRunCurrentGeneration", fields: [generationId], references: [id], onDelete: Restrict)
-  priorAcceptedGeneration  KevGeneration?                 @relation("SyncRunPriorGeneration", fields: [priorAcceptedGenerationId], references: [id], onDelete: Restrict)
-  createdSnapshots         VulnerabilityProviderSnapshot[] @relation("SnapshotCreatingRun")
-  ownedGeneration          KevGeneration?                 @relation("GenerationOwningRun")
+  provider                IntegrationProvider             @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
+  snapshot                VulnerabilityProviderSnapshot?  @relation("SyncRunCurrentSnapshot", fields: [snapshotId], references: [id], onDelete: Restrict)
+  generation              KevGeneration?                  @relation("SyncRunCurrentGeneration", fields: [generationId], references: [id], onDelete: Restrict)
+  priorAcceptedGeneration KevGeneration?                  @relation("SyncRunPriorGeneration", fields: [priorAcceptedGenerationId], references: [id], onDelete: Restrict)
+  createdSnapshots        VulnerabilityProviderSnapshot[] @relation("SnapshotCreatingRun")
+  ownedGeneration         KevGeneration?                  @relation("GenerationOwningRun")
 
   @@index([providerKey, sourceIdentifier, requestedAt(sort: Desc), id(sort: Desc)], map: "vulnerability_sync_run_provider_requested_idx")
   @@map("vulnerability_sync_run")
 }
 
 model VulnerabilityProviderSnapshot {
-  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  providerKey          IntegrationProviderKey @map("provider_key")
-  sourceIdentifier     String                 @map("source_identifier") @db.VarChar(64)
-  responseSha256       String                 @map("response_sha256") @db.Char(64)
-  byteLength           Int                    @map("byte_length")
-  declaredContentType  String?                @map("declared_content_type") @db.VarChar(128)
-  detectedContentType  String?                @map("detected_content_type") @db.VarChar(128)
-  objectKey            String                 @map("object_key") @db.VarChar(512)
-  retrievedAt          DateTime               @map("retrieved_at") @db.Timestamptz(6)
-  storedAt             DateTime               @map("stored_at") @db.Timestamptz(6)
-  etagHash             String?                @map("etag_hash") @db.Char(64)
-  lastModified         DateTime?              @map("last_modified") @db.Timestamptz(6)
-  creatingSyncRunId    String                 @map("creating_sync_run_id") @db.Uuid
-  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                  String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerKey         IntegrationProviderKey @map("provider_key")
+  sourceIdentifier    String                 @map("source_identifier") @db.VarChar(64)
+  responseSha256      String                 @map("response_sha256") @db.Char(64)
+  byteLength          Int                    @map("byte_length")
+  declaredContentType String?                @map("declared_content_type") @db.VarChar(128)
+  detectedContentType String?                @map("detected_content_type") @db.VarChar(128)
+  objectKey           String                 @map("object_key") @db.VarChar(512)
+  retrievedAt         DateTime               @map("retrieved_at") @db.Timestamptz(6)
+  storedAt            DateTime               @map("stored_at") @db.Timestamptz(6)
+  etagHash            String?                @map("etag_hash") @db.Char(64)
+  lastModified        DateTime?              @map("last_modified") @db.Timestamptz(6)
+  creatingSyncRunId   String                 @map("creating_sync_run_id") @db.Uuid
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  provider        IntegrationProvider   @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
-  creatingSyncRun VulnerabilitySyncRun  @relation("SnapshotCreatingRun", fields: [creatingSyncRunId], references: [id], onDelete: Restrict)
+  provider        IntegrationProvider    @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
+  creatingSyncRun VulnerabilitySyncRun   @relation("SnapshotCreatingRun", fields: [creatingSyncRunId], references: [id], onDelete: Restrict)
   attachedRuns    VulnerabilitySyncRun[] @relation("SyncRunCurrentSnapshot")
   generations     KevGeneration[]
 
@@ -1572,33 +1670,33 @@ model VulnerabilityProviderSnapshot {
 }
 
 model KevGeneration {
-  id                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  providerKey            IntegrationProviderKey @map("provider_key")
-  sourceIdentifier       String                 @map("source_identifier") @db.VarChar(64)
-  syncRunId              String                 @unique(map: "kev_generation_sync_run_uidx") @map("sync_run_id") @db.Uuid
-  snapshotId             String                 @map("snapshot_id") @db.Uuid
-  state                  KevGenerationState     @default(staging)
-  expectedEntryCount     Int                    @map("expected_entry_count")
-  stagedEntryCount       Int                    @default(0) @map("staged_entry_count")
-  parserVersion          String                 @map("parser_version") @db.VarChar(64)
-  normalizationVersion   String                 @map("normalization_version") @db.VarChar(64)
-  catalogVersion         String?                @map("catalog_version") @db.VarChar(128)
-  catalogReleasedAt      DateTime?              @map("catalog_released_at") @db.Timestamptz(6)
-  completedAt            DateTime?              @map("completed_at") @db.Timestamptz(6)
-  activatedAt            DateTime?              @map("activated_at") @db.Timestamptz(6)
-  supersededAt           DateTime?              @map("superseded_at") @db.Timestamptz(6)
-  abandonedAt            DateTime?              @map("abandoned_at") @db.Timestamptz(6)
-  version                Int                    @default(1)
-  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerKey          IntegrationProviderKey @map("provider_key")
+  sourceIdentifier     String                 @map("source_identifier") @db.VarChar(64)
+  syncRunId            String                 @unique(map: "kev_generation_sync_run_uidx") @map("sync_run_id") @db.Uuid
+  snapshotId           String                 @map("snapshot_id") @db.Uuid
+  state                KevGenerationState     @default(staging)
+  expectedEntryCount   Int                    @map("expected_entry_count")
+  stagedEntryCount     Int                    @default(0) @map("staged_entry_count")
+  parserVersion        String                 @map("parser_version") @db.VarChar(64)
+  normalizationVersion String                 @map("normalization_version") @db.VarChar(64)
+  catalogVersion       String?                @map("catalog_version") @db.VarChar(128)
+  catalogReleasedAt    DateTime?              @map("catalog_released_at") @db.Timestamptz(6)
+  completedAt          DateTime?              @map("completed_at") @db.Timestamptz(6)
+  activatedAt          DateTime?              @map("activated_at") @db.Timestamptz(6)
+  supersededAt         DateTime?              @map("superseded_at") @db.Timestamptz(6)
+  abandonedAt          DateTime?              @map("abandoned_at") @db.Timestamptz(6)
+  version              Int                    @default(1)
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  provider              IntegrationProvider            @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
-  syncRun               VulnerabilitySyncRun           @relation("GenerationOwningRun", fields: [syncRunId], references: [id], onDelete: Restrict)
-  snapshot              VulnerabilityProviderSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
-  currentForSyncRuns    VulnerabilitySyncRun[]         @relation("SyncRunCurrentGeneration")
-  priorForSyncRuns      VulnerabilitySyncRun[]         @relation("SyncRunPriorGeneration")
-  intelligenceSources   IntelligenceSource[]
-  entries               KevEntry[]
+  provider            IntegrationProvider           @relation(fields: [providerKey], references: [providerKey], onDelete: Restrict)
+  syncRun             VulnerabilitySyncRun          @relation("GenerationOwningRun", fields: [syncRunId], references: [id], onDelete: Restrict)
+  snapshot            VulnerabilityProviderSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  currentForSyncRuns  VulnerabilitySyncRun[]        @relation("SyncRunCurrentGeneration")
+  priorForSyncRuns    VulnerabilitySyncRun[]        @relation("SyncRunPriorGeneration")
+  intelligenceSources IntelligenceSource[]
+  entries             KevEntry[]
 
   @@unique([id, syncRunId], map: "kev_generation_id_sync_run_key")
   @@index([snapshotId], map: "kev_generation_snapshot_idx")
@@ -1606,21 +1704,21 @@ model KevGeneration {
 }
 
 model KevEntry {
-  id                              String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  generationId                    String                      @map("generation_id") @db.Uuid
-  ordinal                         Int
-  normalizedCve                   String                      @map("normalized_cve") @db.VarChar(32)
-  vendorProject                   String                      @map("vendor_project") @db.Text
-  product                         String                      @db.Text
-  vulnerabilityName               String                      @map("vulnerability_name") @db.Text
-  dateAdded                       String                      @map("date_added") @db.Char(10)
-  shortDescription                String                      @map("short_description") @db.Text
-  requiredAction                  String                      @map("required_action") @db.Text
-  dueDate                         String                      @map("due_date") @db.Char(10)
-  knownRansomwareCampaignUse      KnownRansomwareCampaignUse  @map("known_ransomware_campaign_use")
-  rawKnownRansomwareCampaignUse   String?                     @map("raw_known_ransomware_campaign_use") @db.VarChar(64)
-  notes                           String?                     @db.Text
-  createdAt                       DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                            String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  generationId                  String                     @map("generation_id") @db.Uuid
+  ordinal                       Int
+  normalizedCve                 String                     @map("normalized_cve") @db.VarChar(32)
+  vendorProject                 String                     @map("vendor_project") @db.Text
+  product                       String                     @db.Text
+  vulnerabilityName             String                     @map("vulnerability_name") @db.Text
+  dateAdded                     String                     @map("date_added") @db.Char(10)
+  shortDescription              String                     @map("short_description") @db.Text
+  requiredAction                String                     @map("required_action") @db.Text
+  dueDate                       String                     @map("due_date") @db.Char(10)
+  knownRansomwareCampaignUse    KnownRansomwareCampaignUse @map("known_ransomware_campaign_use")
+  rawKnownRansomwareCampaignUse String?                    @map("raw_known_ransomware_campaign_use") @db.VarChar(64)
+  notes                         String?                    @db.Text
+  createdAt                     DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
 
   generation KevGeneration @relation(fields: [generationId], references: [id], onDelete: Restrict)
   cwes       KevEntryCwe[]
@@ -2085,6 +2183,132 @@ model OsvActivationRecord {
   @@map("osv_activation_record")
 }
 
+/// Session 12 Batch 6 / 6-R OSV runtime coordination persistence. Global,
+/// instance-owned provider-runtime state. No tenant, Finding, catalog-activation,
+/// or BackgroundJob/Outbox coupling. Schema only; no lease or retry adapters.
+/// Request rows are append-only. Lease projection is one durable row per scope;
+/// DELETE is forbidden so fencing tokens cannot reset. Attempt identity is
+/// immutable; planned or running may transition once to a terminal state.
+/// Digests are TEXT with exact lowercase SHA-256 CHECKs. CHAR/VARCHAR(64) would
+/// silently truncate extra trailing spaces.
+model OsvRuntimeSynchronizationRequest {
+  id                     String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobType                String                          @map("job_type") @db.VarChar(128)
+  jobSchemaVersion       String                          @map("job_schema_version") @db.VarChar(128)
+  synchronizationReason  OsvRuntimeSynchronizationReason @map("synchronization_reason")
+  workScope              OsvRuntimeWorkScope             @map("work_scope")
+  leaseScope             String                          @map("lease_scope") @db.VarChar(128)
+  catalogScope           String                          @map("catalog_scope") @db.VarChar(128)
+  versionSetFingerprint  String                          @map("version_set_fingerprint") @db.Text
+  requestedAt            DateTime                        @map("requested_at") @db.Timestamptz(6)
+  correlationId          String                          @map("correlation_id") @db.Uuid
+  canaryPolicyIdentifier String?                         @map("canary_policy_identifier") @db.VarChar(128)
+  requestKind            OsvRuntimeJobRequestKind        @map("request_kind")
+  schedulerWindowId      String?                         @map("scheduler_window_id") @db.VarChar(128)
+  operatorRequestId      String?                         @map("operator_request_id") @db.Uuid
+  requestState           OsvRuntimeJobRequestState       @map("request_state")
+  createdAt              DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  runs OsvRuntimeSynchronizationRun[]
+
+  @@unique([id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], map: "osv_runtime_sync_request_pin_key")
+  @@unique([operatorRequestId], map: "osv_runtime_sync_request_operator_uidx")
+  @@index([correlationId], map: "osv_runtime_sync_request_correlation_idx")
+  @@index([requestedAt], map: "osv_runtime_sync_request_requested_idx")
+  @@map("osv_runtime_synchronization_request")
+}
+
+model OsvRuntimeSynchronizationRun {
+  id                                 String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId                          String                          @map("request_id") @db.Uuid
+  workScope                          OsvRuntimeWorkScope             @map("work_scope")
+  leaseScope                         String                          @map("lease_scope") @db.VarChar(128)
+  synchronizationReason              OsvRuntimeSynchronizationReason @map("synchronization_reason")
+  paginationPolicyIdentifier         String                          @map("pagination_policy_identifier") @db.VarChar(128)
+  versionSetFingerprint              String                          @map("version_set_fingerprint") @db.Text
+  runtimeArchitectureIdentifier      String                          @map("runtime_architecture_identifier") @db.VarChar(128)
+  synchronizationAlgorithmIdentifier String                          @map("synchronization_algorithm_identifier") @db.VarChar(128)
+  retryPolicyIdentifier              String                          @map("retry_policy_identifier") @db.VarChar(128)
+  state                              OsvRuntimeRunState
+  startedAt                          DateTime?                       @map("started_at") @db.Timestamptz(6)
+  terminalAt                         DateTime?                       @map("terminal_at") @db.Timestamptz(6)
+  terminalCode                       String?                         @map("terminal_code") @db.VarChar(64)
+  retryDisposition                   OsvRuntimeRetryEligibility?     @map("retry_disposition")
+  lastAcceptedStage                  OsvRuntimeRetryableStage?       @map("last_accepted_stage")
+  cancellationBoundary               String?                         @map("cancellation_boundary") @db.VarChar(64)
+  createdAt                          DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                          DateTime                        @map("updated_at") @db.Timestamptz(6)
+
+  request  OsvRuntimeSynchronizationRequest @relation(fields: [requestId, workScope, synchronizationReason, versionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict)
+  leases   OsvRuntimeLeaseProjection[]
+  attempts OsvRuntimeStageAttempt[]
+
+  @@unique([requestId], map: "osv_runtime_sync_run_request_uidx")
+  @@index([workScope, state], map: "osv_runtime_sync_run_scope_state_idx")
+  @@index([versionSetFingerprint], map: "osv_runtime_sync_run_fingerprint_idx")
+  @@index([state, createdAt], map: "osv_runtime_sync_run_state_created_idx")
+  @@map("osv_runtime_synchronization_run")
+}
+
+/// Current acquisition-lease projection. Absent means no row. Expired is derived
+/// from database time and expiresAt, not a stored state. Holder token is digest
+/// only. rowRevision increments on every mutation; fencingToken increments on
+/// new ownership, stale takeover, and release, not heartbeat.
+model OsvRuntimeLeaseProjection {
+  scope             String                         @id @map("scope") @db.VarChar(128)
+  runId             String                         @map("run_id") @db.Uuid
+  holderTokenDigest String                         @map("holder_token_digest") @db.Text
+  rowRevision       BigInt                         @map("row_revision")
+  fencingToken      BigInt                         @map("fencing_token")
+  state             OsvRuntimeLeaseProjectionState
+  acquiredAt        DateTime                       @map("acquired_at") @db.Timestamptz(6)
+  heartbeatAt       DateTime                       @map("heartbeat_at") @db.Timestamptz(6)
+  expiresAt         DateTime                       @map("expires_at") @db.Timestamptz(6)
+  releasedAt        DateTime?                      @map("released_at") @db.Timestamptz(6)
+  releaseReason     OsvRuntimeLeaseReleaseReason?  @map("release_reason")
+  createdAt         DateTime                       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                       @map("updated_at") @db.Timestamptz(6)
+
+  run OsvRuntimeSynchronizationRun @relation(fields: [runId], references: [id], onDelete: Restrict)
+
+  @@index([runId], map: "osv_runtime_lease_projection_run_idx")
+  @@index([expiresAt], map: "osv_runtime_lease_projection_expires_idx")
+  @@map("osv_runtime_lease_projection")
+}
+
+/// Immutable attempt identity (run, stage, optional target digest, ordinal).
+/// planned/running may be updated to one terminal state. Terminal rows cannot
+/// change. DELETE is forbidden. Retry-not-before is constructed by a future
+/// adapter from database time plus selected delay, never caller absolute time.
+model OsvRuntimeStageAttempt {
+  id                    String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId                 String                     @map("run_id") @db.Uuid
+  stage                 OsvRuntimeRetryableStage
+  targetIdentityDigest  String?                    @map("target_identity_digest") @db.Text
+  attemptOrdinal        Int                        @map("attempt_ordinal")
+  retryPolicyIdentifier String                     @map("retry_policy_identifier") @db.VarChar(128)
+  state                 OsvRuntimeAttemptState
+  startedAt             DateTime?                  @map("started_at") @db.Timestamptz(6)
+  terminalAt            DateTime?                  @map("terminal_at") @db.Timestamptz(6)
+  failureCode           String?                    @map("failure_code") @db.VarChar(64)
+  failureCatalog        String?                    @map("failure_catalog") @db.VarChar(32)
+  retryDisposition      OsvRuntimeRetryEligibility @map("retry_disposition")
+  nominalDelayMs        Int                        @map("nominal_delay_ms")
+  selectedDelayMs       Int                        @map("selected_delay_ms")
+  retryNotBefore        DateTime?                  @map("retry_not_before") @db.Timestamptz(6)
+  retryExhausted        Boolean                    @map("retry_exhausted")
+  versionSetFingerprint String                     @map("version_set_fingerprint") @db.Text
+  createdAt             DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  run OsvRuntimeSynchronizationRun @relation(fields: [runId], references: [id], onDelete: Restrict)
+
+  @@index([runId, stage], map: "osv_runtime_stage_attempt_run_stage_idx")
+  @@index([runId, targetIdentityDigest, attemptOrdinal], map: "osv_runtime_stage_attempt_target_ordinal_idx")
+  @@index([retryNotBefore], map: "osv_runtime_stage_attempt_retry_not_before_idx")
+  @@index([runId, state], map: "osv_runtime_stage_attempt_run_state_idx")
+  @@map("osv_runtime_stage_attempt")
+}
+
 model Integration {
   id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId       String           @map("organization_id") @db.Uuid
@@ -2100,8 +2324,8 @@ model Integration {
   createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization          Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  provider              IntegrationProvider     @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  provider              IntegrationProvider    @relation(fields: [providerId], references: [id], onDelete: Restrict)
   credentials           ExternalCredential[]
   repositoryConnections RepositoryConnection[]
 
@@ -2112,18 +2336,18 @@ model Integration {
 }
 
 model ExternalCredential {
-  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId   String                   @map("organization_id") @db.Uuid
-  integrationId    String                   @map("integration_id") @db.Uuid
-  storageProvider  SecretStorageProvider    @map("storage_provider")
-  secretReference  String                   @map("secret_reference") @db.VarChar(512)
-  keyVersion       String                   @map("key_version") @db.VarChar(128)
-  status           ExternalCredentialStatus @default(pending)
-  expiresAt        DateTime?                @map("expires_at") @db.Timestamptz(6)
-  rotatedAt        DateTime?                @map("rotated_at") @db.Timestamptz(6)
-  version          Int                      @default(1)
-  createdAt        DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String                   @map("organization_id") @db.Uuid
+  integrationId   String                   @map("integration_id") @db.Uuid
+  storageProvider SecretStorageProvider    @map("storage_provider")
+  secretReference String                   @map("secret_reference") @db.VarChar(512)
+  keyVersion      String                   @map("key_version") @db.VarChar(128)
+  status          ExternalCredentialStatus @default(pending)
+  expiresAt       DateTime?                @map("expires_at") @db.Timestamptz(6)
+  rotatedAt       DateTime?                @map("rotated_at") @db.Timestamptz(6)
+  version         Int                      @default(1)
+  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   integration  Integration  @relation(fields: [organizationId, integrationId], references: [organizationId, id], onDelete: Restrict)
@@ -2189,18 +2413,18 @@ model BackgroundJob {
 }
 
 model IdempotencyRecord {
-  id                 String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId     String                   @map("organization_id") @db.Uuid
-  scope              String                   @db.VarChar(128)
-  keyHash            String                   @map("key_hash") @db.Char(64)
-  requestFingerprint String                   @map("request_fingerprint") @db.Char(64)
-  status             IdempotencyRecordStatus  @default(started)
-  responseStatus     Int?                     @map("response_status")
+  id                 String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String                  @map("organization_id") @db.Uuid
+  scope              String                  @db.VarChar(128)
+  keyHash            String                  @map("key_hash") @db.Char(64)
+  requestFingerprint String                  @map("request_fingerprint") @db.Char(64)
+  status             IdempotencyRecordStatus @default(started)
+  responseStatus     Int?                    @map("response_status")
   /// Bounded safe response metadata. schemaVersion required. No bearer tokens or raw keys.
   response           Json?
-  createdAt          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-  expiresAt          DateTime                 @map("expires_at") @db.Timestamptz(6)
-  completedAt        DateTime?                @map("completed_at") @db.Timestamptz(6)
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt          DateTime                @map("expires_at") @db.Timestamptz(6)
+  completedAt        DateTime?               @map("completed_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 

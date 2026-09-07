@@ -1269,3 +1269,37 @@ Clarifications that remain compatible with the accepted decision:
 No Prisma, migration, lease adapter, retry executor, scheduler, or production
 composition is included. Tests do not contact `storage.googleapis.com` or
 `osv.dev`. Production OSV runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 6 / 6-R)
+
+Session 12 Batch 6 records the schema-only PostgreSQL persistence for the
+committed Batch 5 contracts: immutable synchronization request and run, one
+current lease projection per shared acquisition scope, holder-token digest
+only, separate CAS row revision and fencing token, database timestamps, and
+stage attempts. Session 12 Batch 6-R independently reviewed that uncommitted
+schema and froze migration
+`20260907120000_osv_runtime_coordination_persistence` at SHA-256
+`7017b1c4b1d4bcae8bed4bdd0eb43559c0c89fce5b3636e0e889b276013cc3a6`. This note
+does not change the accepted decision, numeric policy, or ADR status.
+
+Clarifications that remain compatible with the accepted decision:
+
+- Raw holder tokens are not stored. Only a lowercase SHA-256 digest is durable.
+  Digests use TEXT plus an exact 64-character lowercase hex CHECK so
+  CHAR/VARCHAR(64) trailing-space truncation cannot admit a padded value.
+- Expired is derived from database time and `expiresAt`, not stored as a
+  mutable lease state. Stored projection states are `held` and `released`.
+- The current lease projection cannot be deleted in ordinary operation.
+  Fencing tokens are monotonic for the lease scope. Heartbeat does not change
+  the fencing token.
+- Request rows are append-only. Duplicate request delivery cannot create a
+  second run. Attempt identity is immutable. Planned or running attempts may
+  transition once to a terminal state. Attempt ordinal 4 cannot satisfy CHECK
+  constraints.
+- Parser timeout remains two total attempts. Inventory convergence cannot use
+  durable retry rows beyond ordinal 1.
+
+No lease adapter, heartbeat, stale takeover, retry executor, scheduler, or
+production composition is included. Tests do not contact
+`storage.googleapis.com` or `osv.dev`. Production OSV runtime remains
+disabled. ADR 0027 remains Proposed.

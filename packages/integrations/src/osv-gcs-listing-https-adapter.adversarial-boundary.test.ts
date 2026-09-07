@@ -117,6 +117,6 @@ describe('OSV GCS listing adversarial source and Finding boundaries', () => {
     const directories = readdirSync(migrationsRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name);
-    expect(directories).toHaveLength(13);
+    expect(directories).toHaveLength(14);
   });
 });
