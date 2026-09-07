@@ -19,12 +19,12 @@ Do not treat product, styling, or convenience guidance as permission to bypass d
 
 ## Authoritative current project status
 
-Last verified checkpoint: Session 12 Batch 4-R (implemented, awaiting commit).
+Last verified checkpoint: Session 12 Batch 5 (implemented, awaiting commit).
 Current session: Session 12.
-Current checkpoint: Session 12 Batch 4-R pagination adversarial review is implemented and awaiting commit. Session 12 Batch 5 runtime job, lease, and retry contracts are next. Production runtime composition remains absent.
+Current checkpoint: Session 12 Batch 5 runtime job, lease, retry, parser-capacity, halt, cancellation, and operational-event contracts are implemented and awaiting commit. Session 12 Batch 6 runtime lease and retry persistence schema is next. Production runtime composition remains absent.
 Current branch: `feat/osv-runtime-enablement`.
 
-PatchPilot currently provides authentication, organization selection, asset inventory, SBOM upload and ingestion, local graph persistence, local CISA KEV synchronization, sanitized provider status, canonical CVE identity, a disabled synthetically verified OSV acquisition foundation, an uncomposed, adversarially reviewed Session 12 Batch 1 GCS listing-page HTTPS executor, Session 12 Batch 3 framework-independent listing pagination and two-pass inventory convergence contracts, an explicitly invoked Session 12 Batch 4 in-memory pagination and convergence service, and the Session 12 Batch 4-R adversarial review of that service. The pagination service is production-unreachable. Tests do not contact a provider.
+PatchPilot currently provides authentication, organization selection, asset inventory, SBOM upload and ingestion, local graph persistence, local CISA KEV synchronization, sanitized provider status, canonical CVE identity, a disabled synthetically verified OSV acquisition foundation, an uncomposed, adversarially reviewed Session 12 Batch 1 GCS listing-page HTTPS executor, Session 12 Batch 3 framework-independent listing pagination and two-pass inventory convergence contracts, an explicitly invoked Session 12 Batch 4 in-memory pagination and convergence service, the Session 12 Batch 4-R adversarial review of that service, and Session 12 Batch 5 framework-independent durable synchronization job, lease, retry, parser-capacity, halt, cancellation, and operational-event contracts. The pagination service and Batch 5 contracts are production-unreachable. Tests do not contact a provider.
 
 PatchPilot does not yet provide the primary end-user vulnerability workflow: authoritative package normalization, affected-version evaluation, component-to-advisory matching, OSV-derived Findings, explainable production risk scores, remediation workflows, dashboards, or reports.
 
@@ -41,13 +41,14 @@ Implemented:
 - Session 12 Batch 1 uncomposed GCS listing-page HTTPS executor (`createOsvGcsListingHttpsAdapter` in `@patchpilot/integrations`), adversarially reviewed and hardened in Session 12 Batch 2. Successful one-page results expose exact `responseByteCount`.
 - Session 12 Batch 3 framework-independent OSV listing pagination and two-pass inventory convergence contracts in `@patchpilot/vulnerability-intelligence` (`src/osv/listing-pagination/`).
 - Session 12 Batch 4 explicitly invoked in-memory listing pagination and two-pass inventory-convergence service (`createOsvListingPaginationService`) using an injected one-page listing port. One prefix, one pass, and one page at a time. No production composition and no provider contact in tests. Session 12 Batch 4-R adversarially reviewed and hardened that service with synthetic listing pages and scripted ports only.
+- Session 12 Batch 5 framework-independent OSV durable synchronization job, lease, fencing, retry, parser-capacity, halt, cancellation, restart, and bounded operational-event contracts in `@patchpilot/vulnerability-intelligence` (`src/osv/runtime-coordination/`). No Prisma, lease adapter, retry execution, scheduler, or production composition.
 
 Disabled:
 
 - Production OSV runtime. `INTELLIGENCE_OSV_ENABLED=true` remains rejected.
 - Catalog activation is not invoked. No production OSV catalog is active.
 - The listing executor is exported and is not imported by worker, API, scheduler, queue, health, seed, or migration composition.
-- Session 12 Batch 3 pagination contracts, Session 12 Batch 4 `createOsvListingPaginationService`, and the Session 12 Batch 4-R hardened pagination service are exported from `@patchpilot/vulnerability-intelligence` and are not imported by worker, API, scheduler, queue, health, seed, or migration composition.
+- Session 12 Batch 3 pagination contracts, Session 12 Batch 4 `createOsvListingPaginationService`, the Session 12 Batch 4-R hardened pagination service, and Session 12 Batch 5 runtime-coordination contracts are exported from `@patchpilot/vulnerability-intelligence` and are not imported by worker, API, scheduler, queue, health, seed, or migration composition. The future job type `intelligence.osv.sync` is not registered in production worker routing.
 
 Not yet implemented:
 
@@ -55,7 +56,7 @@ Not yet implemented:
 - Package normalization and affected-version evaluation. The implemented ecosystem registry is empty.
 - Component-to-advisory matching, match-evaluation persistence, and OSV-derived Finding writes.
 - Explainable production risk scoring and complete remediation workflows.
-- Durable OSV jobs, retries, scheduler wiring, canary execution, catalog activation, matching, and Finding writes. Token-cycle detection and A/B convergence execute only inside the uncomposed Batch 4 in-memory service.
+- Durable OSV job registration, lease persistence, retry execution, scheduler wiring, canary execution, catalog activation, matching, and Finding writes. Token-cycle detection and A/B convergence execute only inside the uncomposed Batch 4 in-memory service. Batch 5 defines those coordination contracts only.
 
 Repository integrity:
 
@@ -71,13 +72,14 @@ Repository integrity:
 - Session 12 Batch 2 adversarially reviewed and hardened the Batch 1 listing executor. Scheduling, retries, runtime enablement, activation, matching, and Findings remain out of scope.
 - Session 12 Batch 3 defines pure pagination and two-pass inventory convergence contracts. It does not persist raw tokens, retrieve advisory bodies, or enable OSV.
 - Session 12 Batch 4 implements bounded in-memory pagination and two-pass inventory convergence through an injected one-page listing port. It is explicitly invoked and production-unreachable. Raw tokens and token digests remain in memory only. No same-attempt restart, no automatic retry, no body retrieval, no persistence, and no activation. Durable jobs, retries, scheduler wiring, canary execution, and activation remain later gates.
-- Session 12 Batch 4-R adversarially reviewed that pagination service with synthetic pages and scripted ports. Concrete corrections: rejected pages do not commit candidate counts; only constructed transport success is admitted; hung listing ports lose to cancellation; unsafe ceiling arithmetic fails closed; async event-sink rejections cannot become unhandled. Durable jobs remain gated.
-- Parser pending capacity: ADR 0028 selects runtime parser pending capacity **0**. The current parser host already has occupancy 1 and rejects a second concurrent parse (`invalid_request`). The historical isolation-policy status constant still reports pending-capacity policy as `unavailable`. A later Session 12 runtime batch must reconcile that machine-readable status before production composition. No body-bearing parser queue is authorized. The disabled orchestrator's metadata pending capacity 32 is a separate policy.
+- Session 12 Batch 4-R adversarially reviewed that pagination service with synthetic pages and scripted ports. Concrete corrections: rejected pages do not commit candidate counts; only constructed transport success is admitted; hung listing ports lose to cancellation; unsafe ceiling arithmetic fails closed; async event-sink rejections cannot become unhandled.
+- Session 12 Batch 5 defines framework-independent contracts for future job type `intelligence.osv.sync`, one immutable payload and version-set fingerprint, one catalog-scope lease shared by canary and production, holder-token plus row-revision plus fencing-token fencing, database-time expiry, three total attempts including the initial attempt, parser-timeout maximum two attempts, bounded full jitter, HTTP 429 Retry-After capped at 30 seconds, parser pending capacity 0, future halt default halted, cancellation and redelivery, and bounded operational events. No runtime job is registered. No lease is acquired. No retry executes. Reserved Outbox name `intelligence.osv.sync.requested.v1` remains deferred until scheduler and job persistence prove a transaction-bound publication requirement.
+- Parser pending capacity: ADR 0028 selects runtime parser pending capacity **0**. Batch 5 represents that selected value. The current parser host already has occupancy 1 and rejects a second concurrent parse (`invalid_request`). The historical isolation-policy status constant still reports pending-capacity policy as `unavailable`. A later Session 12 runtime-composition batch must reconcile that machine-readable status before production composition. No body-bearing parser queue is authorized. The disabled orchestrator's metadata pending capacity 32 is a separate policy.
 - Finding writes are not authorized in Session 12. They remain blocked until an active authoritative catalog, package normalization, a reviewed ecosystem evaluator, a deterministic `affected` result, persisted immutable match evidence, [ADR 0026](docs/adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) gates, tenant-isolation proof, and explicit Finding-write authorization are complete. Architectural gates are authoritative, not the assigned session number. The current roadmap places that work no earlier than Session 16.
 
 ### Current roadmap (gates remain authoritative)
 
-- Session 12: runtime-enablement foundation (listing executor and pagination contracts implemented; Batch 4 in-memory pagination implemented and uncomposed; Batch 4-R adversarial review implemented and awaiting commit; durable jobs and disabled production composition remain gated).
+- Session 12: runtime-enablement foundation (listing executor and pagination contracts implemented; Batch 4 in-memory pagination implemented and uncomposed; Batch 4-R adversarial review committed; Batch 5 job/lease/retry contracts implemented and awaiting commit; Batch 6 lease and retry persistence schema is next; disabled production composition remains gated).
 - Session 13: disabled provider canary and catalog-activation work.
 - Session 14: package normalization and matching architecture.
 - Session 15: first ecosystem evaluator and match evidence.
@@ -142,7 +144,7 @@ Session 12 Batch 4 implements bounded in-memory listing pagination and two-pass 
 - Tests use scripted ports and synthetic local HTTPS doubles only. They do not contact `storage.googleapis.com` or `osv.dev`.
 - Production composition does not construct the service. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding.
 
-### Session 12 Batch 4-R (implemented, awaiting commit)
+### Session 12 Batch 4-R (committed)
 
 Session 12 Batch 4-R adversarially reviewed the committed Batch 4 pagination service with synthetic listing pages and scripted listing-port doubles only. Tests do not contact `storage.googleapis.com` or `osv.dev`. Concrete corrections:
 
@@ -153,7 +155,24 @@ Session 12 Batch 4-R adversarially reviewed the committed Batch 4 pagination ser
 - Event-sink thenables are forwarded and swallowed so a rejected Promise cannot become an unhandled rejection or alter control flow.
 - Canonical convergence also checks the exact algorithm identifier. Equal digest with different observations, and different digest with equal observations, fail closed as `internal_validation_failure`.
 
-No durable jobs, retries, schedulers, body retrieval, persistence, activation, matching, Findings, Prisma, or dependency change is included. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 5 is next.
+No durable jobs, retries, schedulers, body retrieval, persistence, activation, matching, Findings, Prisma, or dependency change is included. `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding.
+
+### Session 12 Batch 5 (implemented, awaiting commit)
+
+Session 12 Batch 5 adds framework-independent OSV durable synchronization job, lease, fencing, retry, parser-capacity, halt, cancellation, restart, and bounded operational-event contracts in `@patchpilot/vulnerability-intelligence` at `src/osv/runtime-coordination/`. Verified from uncommitted code and tests:
+
+- Future job type is exactly `intelligence.osv.sync`. It is distinct from KEV `intelligence.sync` and SBOM `sbom.ingest`. It is not registered in worker routing, BackgroundJob production discriminants, or Outbox production discriminants.
+- One immutable payload pins committed version-set identifiers. Callers cannot supply fingerprints, retry limits, lease timing, concurrency, activation, matching, Finding, tenant, token, body, URL, or credential fields.
+- Closed reasons are `scheduler`, `operator_canary`, and `operator_production`. Canary and production work scopes are distinct and share one catalog-scope lease so they cannot overlap. KEV uses a separate scope.
+- One run belongs to one job request. Duplicate delivery reuses the authoritative run. Redis job IDs are not authority. Incomplete prefix passes restart at page one. One A/B pair remains one synchronization attempt.
+- Lease fencing separates holder token (secret UUID v4), compare-and-swap row revision (PostgreSQL BIGINT-safe decimal string, increments on every mutation including heartbeat), and fencing token (increments on acquire, stale takeover, and release, not on heartbeat). Expiry uses database-owned time. Takeover is permitted when `databaseNow >= expiresAt`.
+- Retry policy `osv_runtime_retry_policy_v1` allows three total attempts including the initial attempt (ordinals 1–3). Parser timeout is restricted to two total attempts. Adapter-level retry remains prohibited. Nominal backoff is 0/1000/4000 ms with inclusive full jitter `[0, nominal]` and a 30 000 ms maximum. HTTP 429 Retry-After uses unsigned delta-seconds or a parseable IMF-fixdate, capped at 30 seconds; malformed and non-429 values use normal bounded backoff.
+- Parser pending capacity is represented as 0. The parser-host occupancy-1 rejection behavior is unchanged. The historical pending-queue marker remains `unavailable` until a later runtime-composition batch.
+- Future halt name `INTELLIGENCE_OSV_ACQUISITION_HALT` is documented only. Default, missing, and malformed values are halted. The environment variable is not added. Enablement does not clear halt.
+- Reserved Outbox name `intelligence.osv.sync.requested.v1` remains deferred until scheduler and job persistence prove a transaction-bound publication requirement.
+- No Prisma, migration, lease adapter, heartbeat timer, retry execution, backoff timer, scheduler, provider contact, activation, matching, Finding, or dependency change is included.
+
+`INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 6 is next.
 
 ## Current repository state
 
@@ -340,7 +359,21 @@ These are deliberate. Do not silently close one inside an unrelated change, and 
 - Raw tokens remain ephemeral and confidential. Token cycles, digest collisions, and cross-pass token reuse fail closed. Detector state cannot exceed the pass page maximum.
 - Canonical sets remain length-prefixed and order-independent. Convergence requires digest plus exact observation equality plus the committed algorithm identifier. Canary completeness cannot satisfy production completeness.
 - Retry disposition is recorded and never executed. There is no prefetch, third pass, same-attempt restart, body retrieval, scheduler, job, lease, or production composition.
-- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint is Session 12 Batch 5 runtime job, lease, and retry contracts.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Session 12 Batch 5 later added framework-independent job, lease, and retry contracts without registering a runtime job.
+
+### Session 12 Batch 5 (runtime job, lease, and retry contracts)
+
+These are deliberate. Do not silently close one inside an unrelated change, and do not write documentation that assumes any of them exists:
+
+- Session 12 Batch 5 implements pure job, lease, fencing, retry, parser-capacity, halt, cancellation, restart, and operational-event contracts in `@patchpilot/vulnerability-intelligence` at `src/osv/runtime-coordination/`. It does not persist leases, acquire leases, execute retries, parse environment variables, contact a provider, or compose production runtime.
+- Future job type `intelligence.osv.sync` is a design contract only. Worker routing still recognizes `sbom.ingest` and `intelligence.sync` only.
+- Canary and production share one OSV GCS public-export lease scope and remain distinct work scopes. KEV synchronization remains a separate job and lease domain.
+- Holder token, lease row revision, and fencing token are separate. Database time is the takeover authority. Heartbeat does not substitute for stage fencing.
+- Three total attempts include the initial attempt. Parser timeout is two total attempts. Retry-After is HTTP 429 only and is capped at 30 seconds. Exhaustion is terminal and does not create attempt 4.
+- Parser pending capacity is contracted as 0. The parser-host pending-queue status constant remains `unavailable` until a later runtime-composition batch. No body-bearing parser queue is authorized.
+- Future halt defaults halted. `INTELLIGENCE_OSV_ACQUISITION_HALT` is not added. Enablement does not clear halt.
+- Reserved Outbox event `intelligence.osv.sync.requested.v1` is deferred, not registered.
+- `INTELLIGENCE_OSV_ENABLED=true` remains rejected. Session 12 remains zero-Finding. Next checkpoint is Session 12 Batch 6 runtime lease and retry persistence schema.
 
 ## Historical checkpoint record
 

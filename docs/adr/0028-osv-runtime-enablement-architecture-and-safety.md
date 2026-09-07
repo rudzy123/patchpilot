@@ -1238,3 +1238,34 @@ cannot become unhandled rejections; canonical convergence checks the exact
 algorithm identifier. Raw tokens remain in memory only. Retry disposition is
 recorded and not executed. Tests do not contact `storage.googleapis.com` or
 `osv.dev`. Production OSV runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 5)
+
+Session 12 Batch 5 records framework-independent contracts for the future
+`intelligence.osv.sync` job, shared catalog-scope lease, holder token, CAS
+row revision, fencing token, database-time expiry, retry policy
+`osv_runtime_retry_policy_v1`, parser pending capacity 0, future halt default
+halted, and bounded operational events. This note does not change the accepted
+decision, numeric policy, or ADR status.
+
+Clarifications that remain compatible with the accepted decision:
+
+- Canary and production acquisition for the same OSV GCS public export share
+  one lease so they cannot overlap. Work scopes remain distinct.
+- Heartbeat increments lease row revision. Fencing token increments on
+  acquire, stale takeover, and release, not on heartbeat.
+- Parser timeout remains two total attempts, including the initial attempt.
+  Ordinary retryable stages remain three total attempts, including the initial
+  attempt.
+- HTTP 429 Retry-After is capped at 30 seconds. Malformed and non-429 values
+  use bounded full jitter. Full jitter still applies to honored Retry-After
+  values and cannot exceed 30 seconds.
+- Reserved Outbox name `intelligence.osv.sync.requested.v1` is deferred until
+  scheduler and job persistence prove a transaction-bound publication
+  requirement. The name remains reserved and is not registered.
+- `INTELLIGENCE_OSV_ACQUISITION_HALT` is not added. Parser-host pending-queue
+  status remains `unavailable` until a later runtime-composition batch.
+
+No Prisma, migration, lease adapter, retry executor, scheduler, or production
+composition is included. Tests do not contact `storage.googleapis.com` or
+`osv.dev`. Production OSV runtime remains disabled. ADR 0027 remains Proposed.
