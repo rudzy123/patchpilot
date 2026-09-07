@@ -11,7 +11,10 @@ import { sbomVersionLabelPattern } from './sbom.js';
  *
  * OSV runtime synchronization does not ship in Session 9.
  * `INTELLIGENCE_OSV_ENABLED=true` is rejected in every deployment environment.
- * Observed OSV archive size is documented elsewhere and is not encoded here.
+ * Session 12 Batch 9 adds typed `INTELLIGENCE_OSV_ACQUISITION_HALT`.
+ * Missing and empty values default to halted. Explicit `false` releases
+ * the halt control only. It does not enable OSV. Enablement remains
+ * rejected. Environment refresh is process-bound.
  */
 
 export const INTELLIGENCE_KEV_ORIGIN = 'https://www.cisa.gov';
@@ -23,6 +26,22 @@ export const INTELLIGENCE_OSV_RUNTIME_STATUS = 'deferred' as const;
 
 export const INTELLIGENCE_OSV_ENABLED_SESSION9_ERROR =
   'INTELLIGENCE_OSV_ENABLED must be false. Session 9 does not ship OSV runtime synchronization.';
+
+export const INTELLIGENCE_OSV_ACQUISITION_HALT_NAME = 'INTELLIGENCE_OSV_ACQUISITION_HALT' as const;
+export const INTELLIGENCE_OSV_ACQUISITION_HALT_DEFAULT = true;
+export const INTELLIGENCE_OSV_ACQUISITION_HALT_REFRESH =
+  'process_snapshot_restart_required' as const;
+
+export const intelligenceOsvAcquisitionHaltControls = [
+  'halted',
+  'permitted_by_halt_control',
+] as const;
+export type IntelligenceOsvAcquisitionHaltControl =
+  (typeof intelligenceOsvAcquisitionHaltControls)[number];
+
+export const intelligenceOsvAcquisitionHaltSources = ['defaulted', 'explicit'] as const;
+export type IntelligenceOsvAcquisitionHaltSource =
+  (typeof intelligenceOsvAcquisitionHaltSources)[number];
 
 export const INTELLIGENCE_VERSION_LABEL_MAX_LENGTH = 64;
 export const intelligenceVersionLabelPattern = sbomVersionLabelPattern;
@@ -173,6 +192,8 @@ export type IntelligenceCompiledKevSource = {
 export const intelligenceConfigSchema = z.object({
   kevEnabled: z.boolean(),
   osvEnabled: z.boolean(),
+  osvAcquisitionHalt: z.enum(intelligenceOsvAcquisitionHaltControls),
+  osvAcquisitionHaltSource: z.enum(intelligenceOsvAcquisitionHaltSources),
   kevSource: z.object({
     origin: z.literal(INTELLIGENCE_KEV_ORIGIN),
     path: z.literal(INTELLIGENCE_KEV_PATH),
@@ -512,6 +533,7 @@ export function intelligenceDefaultEnvironmentVariables(): Record<string, string
   return {
     INTELLIGENCE_KEV_ENABLED: String(INTELLIGENCE_KEV_ENABLED_DEFAULT),
     INTELLIGENCE_OSV_ENABLED: String(INTELLIGENCE_OSV_ENABLED_DEFAULT),
+    INTELLIGENCE_OSV_ACQUISITION_HALT: String(INTELLIGENCE_OSV_ACQUISITION_HALT_DEFAULT),
     INTELLIGENCE_KEV_SYNC_INTERVAL_SECONDS: String(INTELLIGENCE_KEV_SYNC_INTERVAL_SECONDS_DEFAULT),
     INTELLIGENCE_KEV_STALE_THRESHOLD_SECONDS: String(
       INTELLIGENCE_KEV_STALE_THRESHOLD_SECONDS_DEFAULT,
@@ -578,6 +600,7 @@ export function loadIntelligenceConfigFrom(
       readRequired(env, 'INTELLIGENCE_OSV_ENABLED'),
       'INTELLIGENCE_OSV_ENABLED',
     ),
+    ...loadOsvAcquisitionHalt(env),
     kevSource: compiledIntelligenceKevSource(),
     osvRuntime: INTELLIGENCE_OSV_RUNTIME_STATUS,
     httpRedirectMax: INTELLIGENCE_HTTP_REDIRECT_MAX,
@@ -909,6 +932,44 @@ export function refineIntelligenceNumericBounds(
     INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS_MAX,
     addIssue,
   );
+}
+
+function loadOsvAcquisitionHalt(env: Readonly<Record<string, string | undefined>>): {
+  osvAcquisitionHalt: IntelligenceOsvAcquisitionHaltControl;
+  osvAcquisitionHaltSource: IntelligenceOsvAcquisitionHaltSource;
+} {
+  if (!Object.hasOwn(env, INTELLIGENCE_OSV_ACQUISITION_HALT_NAME)) {
+    return {
+      osvAcquisitionHalt: 'halted',
+      osvAcquisitionHaltSource: 'defaulted',
+    };
+  }
+
+  const raw = env[INTELLIGENCE_OSV_ACQUISITION_HALT_NAME];
+  if (raw === undefined) {
+    return {
+      osvAcquisitionHalt: 'halted',
+      osvAcquisitionHaltSource: 'defaulted',
+    };
+  }
+
+  if (typeof raw !== 'string') {
+    throw new Error(`${INTELLIGENCE_OSV_ACQUISITION_HALT_NAME} must be "true" or "false".`);
+  }
+
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) {
+    return {
+      osvAcquisitionHalt: 'halted',
+      osvAcquisitionHaltSource: 'defaulted',
+    };
+  }
+
+  const halted = parseBoolean(trimmed, INTELLIGENCE_OSV_ACQUISITION_HALT_NAME);
+  return {
+    osvAcquisitionHalt: halted ? 'halted' : 'permitted_by_halt_control',
+    osvAcquisitionHaltSource: 'explicit',
+  };
 }
 
 function bound(

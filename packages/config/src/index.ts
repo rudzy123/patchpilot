@@ -200,7 +200,12 @@ export {
   INTELLIGENCE_ORPHAN_GRACE_SECONDS_MIN,
   INTELLIGENCE_OSV_ENABLED_DEFAULT,
   INTELLIGENCE_OSV_ENABLED_SESSION9_ERROR,
+  INTELLIGENCE_OSV_ACQUISITION_HALT_DEFAULT,
+  INTELLIGENCE_OSV_ACQUISITION_HALT_NAME,
+  INTELLIGENCE_OSV_ACQUISITION_HALT_REFRESH,
   INTELLIGENCE_OSV_RUNTIME_STATUS,
+  intelligenceOsvAcquisitionHaltControls,
+  intelligenceOsvAcquisitionHaltSources,
   INTELLIGENCE_PARSER_VERSION_DEFAULT,
   INTELLIGENCE_SNAPSHOT_RETENTION_COUNT_DEFAULT,
   INTELLIGENCE_SNAPSHOT_RETENTION_COUNT_MAX,
@@ -217,6 +222,8 @@ export {
   intelligenceVersionLabelPattern,
   loadIntelligenceConfigFrom,
   type IntelligenceConfig,
+  type IntelligenceOsvAcquisitionHaltControl,
+  type IntelligenceOsvAcquisitionHaltSource,
 } from './intelligence.js';
 export {
   assertDestructiveDatabaseCommandAllowed,

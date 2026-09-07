@@ -1373,3 +1373,41 @@ No schema, migration, scheduler, BackgroundJob routing, Outbox routing,
 kill-switch variable, catalog activation, or OSV enablement is included.
 Tests do not contact `storage.googleapis.com` or `osv.dev`. Production OSV
 runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 9)
+
+Session 12 Batch 9 records typed `INTELLIGENCE_OSV_ACQUISITION_HALT` in
+`@patchpilot/config` and bounded operational observability for the disabled
+composition. Default, missing, and empty values are halted. Explicit `true` is
+halted. Explicit `false` releases halt only. Malformed values fail configuration
+validation. Enablement and halt remain independent: `INTELLIGENCE_OSV_ENABLED=true`
+is still rejected, and halt false does not enable OSV, register a job, start a
+scheduler, or contact a provider. Halt is re-evaluated synchronously at protected
+checkpoints through a typed port. Production environment refresh is a process
+snapshot; restart is required to pick up a new environment value. There is no
+polling loop. Operational events use catalog identifier
+`osv_runtime_operational_event_catalog_v1`. Logs, metrics, and traces remain
+distinct. Metric labels are closed. Event-sink failure cannot change the domain
+result. This note does not change the accepted decision, numeric policy, or ADR
+status.
+
+No scheduler, BackgroundJob routing, Outbox routing, retry executor, periodic
+heartbeat loop, catalog activation, matching, Finding write, or OSV enablement
+is included. Tests do not contact `storage.googleapis.com` or `osv.dev`.
+Production OSV runtime remains disabled. ADR 0027 remains Proposed.
+
+## Implementation note (Session 12 Batch 9-R)
+
+Session 12 Batch 9-R independently reviewed the uncommitted Batch 9 halt and
+observability controls. Prototype-derived and non-string halt values cannot
+release halt. The public halt-state factory observes trusted typed state only and
+does not authorize synthetic or production execution. Pass B and next-prefix
+listing transitions are named halt checkpoints; the first blocking checkpoint is
+preserved. Event-sink failure, thenables, and recursive emission cannot change
+the domain result. Metric labels are closed per metric name. This note does not
+change the accepted decision, numeric policy, or ADR status.
+
+No scheduler, BackgroundJob routing, Outbox routing, retry executor, periodic
+heartbeat loop, catalog activation, matching, Finding write, or OSV enablement
+is included. Tests do not contact `storage.googleapis.com` or `osv.dev`.
+Production OSV runtime remains disabled. ADR 0027 remains Proposed.

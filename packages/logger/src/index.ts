@@ -164,6 +164,20 @@ const redactPaths = [
   '*.REDIS_URL',
   'env',
   'process.env',
+  'pageToken',
+  'nextPageToken',
+  'continuationToken',
+  'tokenDigest',
+  'holderToken',
+  'holderTokenDigest',
+  'holderDigest',
+  '*.pageToken',
+  '*.nextPageToken',
+  '*.continuationToken',
+  '*.tokenDigest',
+  '*.holderToken',
+  '*.holderTokenDigest',
+  '*.holderDigest',
 ] as const;
 
 export function createLogger(options: LoggerFactoryOptions): Logger {

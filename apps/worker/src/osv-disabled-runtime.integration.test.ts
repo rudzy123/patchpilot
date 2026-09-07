@@ -37,8 +37,10 @@ import {
   createOsvListedObjectObservation,
   createOsvListingPage,
   createOsvListingPageTransportSuccess,
+  createOsvRuntimeHaltStatePort,
   createOsvRuntimeJobIdempotencyIdentity,
   createOsvRuntimeSyncJobPayload,
+  createOsvRuntimeTrustedHaltSnapshot,
   digestOsvProviderObjectKey,
   OSV_RUNTIME_DISABLED_COMPOSITION_STATUS,
 } from '@patchpilot/vulnerability-intelligence';
@@ -125,6 +127,100 @@ describe('Session 12 Batch 8 disabled runtime composition', { timeout: 120_000 }
     }
   });
 
+  it('halt before lease persists request and run without listing or provider contact', async () => {
+    let listingCalls = 0;
+    const listingPage = {
+      async listPage() {
+        listingCalls += 1;
+        throw new Error('listing must not run under halt');
+      },
+    };
+    const coordination = createOsvRuntimeCoordinationPersistence(prisma);
+    const persistence = createOsvAcquisitionPersistence(prisma);
+    const service = createOsvDisabledRuntimeSynchronizationForVerification({
+      coordination,
+      listingPage,
+      haltState: createOsvRuntimeHaltStatePort(
+        createOsvRuntimeTrustedHaltSnapshot({
+          control: 'halted',
+          source: 'defaulted',
+        }),
+      ),
+      acquisition: {
+        catalogGenerations: persistence.catalogGenerations,
+        inventory: persistence.inventory,
+        providerObjects: persistence.providerObjects,
+        bodySnapshots: persistence.bodySnapshots,
+        parserAttempts: persistence.parserAttempts,
+        parsedRevisions: persistence.parsedRevisions,
+        memberships: persistence.memberships,
+        quarantine: persistence.quarantine,
+        reconciliation: persistence.reconciliation,
+        inspection: createOsvAcquisitionResumeInspection(prisma),
+        retrieval: {
+          async retrieveGenerationBoundObject() {
+            throw new Error('retrieval must not run under halt');
+          },
+        },
+        attachment: {
+          attachProviderBody: async () => {
+            throw new Error('attachment must not run under halt');
+          },
+          attachParsedDocument: async () => {
+            throw new Error('parsed attachment must not run under halt');
+          },
+          recoverProviderBody: async () => {
+            throw new Error('recovery must not run under halt');
+          },
+          verifyReadBack: async () => {
+            throw new Error('read-back must not run under halt');
+          },
+        },
+        parser: {
+          async parse() {
+            throw new Error('parser must not run under halt');
+          },
+        },
+        readAttachedBody: {
+          async readAttachedAdvisoryBody() {
+            return null;
+          },
+        },
+      },
+    });
+    const job = expectOk(
+      createOsvRuntimeSyncJobPayload(
+        createClosedOsvRuntimeSyncJobInput({
+          synchronizationReason: 'operator_canary',
+          requestedAt: TS,
+          correlationId: randomUUID(),
+        }),
+      ),
+      'payload',
+    );
+    const idempotency = expectOk(
+      createOsvRuntimeJobIdempotencyIdentity({
+        workScope: job.workScope,
+        reason: job.synchronizationReason,
+        versionSetFingerprint: job.versionSetFingerprint,
+        requestKind: 'operator_request',
+        schedulerWindowId: null,
+        operatorRequestId: randomUUID(),
+      }),
+      'idempotency',
+    );
+    const result = await service.synchronize({
+      payload: job,
+      idempotency,
+      catalogGenerationId: randomUUID(),
+    });
+    expect(result.primaryCode).toBe('halted');
+    expect(result.leaseOutcome).toBe('skipped');
+    expect(listingCalls).toBe(0);
+    expect(result.callBudget.activation).toBe(0);
+    expect(await prisma.finding.count()).toBe(findingCount);
+  });
+
   it('keeps composition production-unreachable', () => {
     expect(OSV_RUNTIME_DISABLED_COMPOSITION_STATUS).toBe(
       'disabled_runtime_composition_explicitly_invoked_production_unreachable',
@@ -186,6 +282,12 @@ describe('Session 12 Batch 8 disabled runtime composition', { timeout: 120_000 }
     const service = createOsvDisabledRuntimeSynchronizationForVerification({
       coordination,
       listingPage,
+      haltState: createOsvRuntimeHaltStatePort(
+        createOsvRuntimeTrustedHaltSnapshot({
+          control: 'permitted_by_halt_control',
+          source: 'explicit',
+        }),
+      ),
       acquisition: {
         catalogGenerations: persistence.catalogGenerations,
         inventory: persistence.inventory,
@@ -241,11 +343,17 @@ describe('Session 12 Batch 8 disabled runtime composition', { timeout: 120_000 }
       payload: job,
       idempotency,
       catalogGenerationId,
+      eventSink: {
+        emit() {
+          throw new Error('observability sink must not alter domain result');
+        },
+      },
     };
     try {
       const first = await service.synchronize(input);
       const second = await service.synchronize(input);
       expect(first.primaryCode).toBe('completed');
+      expect(first.discrepancy).toBe('event_sink_failed');
       expect(first.requestId).toBe(second.requestId);
       expect(first.runId).toBe(second.runId);
       expect(first.acquisition.activatesCatalog).toBe(false);
