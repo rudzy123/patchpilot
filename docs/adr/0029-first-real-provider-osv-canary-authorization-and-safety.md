@@ -1101,15 +1101,76 @@ Legal-decision issuance remains a blocking preexecution dependency. Halt
 release and synthetic verification grant no authority. Prisma is unchanged.
 OD-10 remains open for general console identity.
 
+## Session 13 Batch 2B implementation note
+
+Session 13 Batch 2B adds schema-only persistence for the committed Batch 2A
+contracts in `@patchpilot/database`. Migration
+`20260908120000_osv_canary_authorization_persistence` (frozen SHA-256
+`321ac38a02090470aa5f09661cb0e29562327c16c9e341b44bc99516bd7fbd99`) is the
+fifteenth frozen catalog entry. All fourteen prior migrations remain
+byte-for-byte unchanged. Later SQL corrections require another forward-only
+migration.
+
+This note does not change the Accepted status of this ADR and does not
+authorize provider contact, listing-only execution, body retrieval,
+production enablement, scheduler registration, automatic retry, catalog
+activation, matching, or Finding writes.
+
+Batch 2B persists:
+
+- instance-scoped operator identity (`osv_canary_instance_operator_identity`)
+- one-shot phase-specific authorization (`osv_canary_authorization`)
+
+Operator identity is instance owned. No tenant User or Organization relation
+exists. Anonymous operator identity cannot persist. Listing-only and
+bounded-body remain distinct rows. Authorization policy and budget bindings
+are immutable. Bounded-body requires accepted listing-review evidence bound
+to a completed listing-only authorization whose consumed request and run
+match. Database time owns consumption, revocation, and expiration
+transitions. One authorization is consumable once. Restrictive
+`ON DELETE RESTRICT` relationships preserve evidence. No issuance,
+consumption, or revocation adapter exists. No operator CLI, heartbeat, or
+deadline implementation exists. Schema existence does not issue or consume
+an authorization. OD-10 remains open. Session 13 remains zero-Finding.
+
+## Session 13 Batch 2B-R implementation note
+
+Session 13 Batch 2B-R independently reviewed the uncommitted Batch 2B schema
+with disposable PostgreSQL and direct SQL. It did not contact
+`storage.googleapis.com` or `osv.dev`. The same uncommitted migration
+`20260908120000_osv_canary_authorization_persistence` was corrected and
+frozen (SHA-256
+`321ac38a02090470aa5f09661cb0e29562327c16c9e341b44bc99516bd7fbd99`).
+Fifteen frozen migrations. All fourteen prior migrations remain
+byte-for-byte unchanged. Later SQL corrections require another forward-only
+migration.
+
+This note does not change the Accepted status of this ADR and does not
+authorize provider contact, listing-only execution, body retrieval,
+production enablement, scheduler registration, automatic retry, catalog
+activation, matching, or Finding writes.
+
+Concrete schema corrections:
+
+- operator identity must be inserted as active
+- authorization must be inserted as issued
+- bounded-body listing review requires a completed listing_only row
+- listing request, run, and version-set fingerprint must match the consumed
+  listing authorization
+- one listing authorization may authorize one bounded-body row
+- consume, revoke, and expire transitions compare against database time
+
+Legal-decision and inventory-evidence UUIDs remain opaque references. Batch
+2C must transactionally verify those referenced issuances. No production
+authorization adapters exist yet. Next checkpoint is Session 13 Batch 2C.
+
 ## Follow-up
 
 - Legal and provenance revalidation of listing contact and, separately, RustSec
   body permissions.
-- Session 13 Batch 2B: persist provisional canary operator identity and the
-  closed authorization record against the Batch 2A contracts. Do not close
+- Session 13 Batch 2C: persist-and-compare adapters plus one-shot Node.js
+  administrative command and canary-only execution boundary. Do not close
   OD-10.
-- Session 13 Batch 2C: one-shot Node.js administrative command and canary-only
-  execution boundary.
 - Session 13 Batch 2D: heartbeat controller and deadline controller.
 - Session 13 Batch 2E: executable runbooks and preflight.
 - Session 13 Batch 2-R: combined operational-control adversarial review.

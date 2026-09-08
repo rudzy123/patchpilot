@@ -722,6 +722,57 @@ enum OsvRuntimeRetryEligibility {
   @@map("osv_runtime_retry_eligibility")
 }
 
+/// Session 13 Batch 2B canary-scoped instance-operator identity. Global,
+/// instance-owned. Not a tenant User. Authentication remains unimplemented.
+enum OsvCanaryOperatorIdentityStatus {
+  active
+  revoked
+
+  @@map("osv_canary_operator_identity_status")
+}
+
+enum OsvCanaryPhase {
+  listing_only
+  bounded_body
+
+  @@map("osv_canary_phase")
+}
+
+enum OsvCanaryAuthorizationPurpose {
+  initial_listing_compatibility
+  approved_listing_repetition
+  bounded_body_compatibility
+  corrective_canary_after_review
+
+  @@map("osv_canary_authorization_purpose")
+}
+
+enum OsvCanaryAuthorizationState {
+  issued
+  consumed
+  completed
+  failed
+  cancelled
+  revoked
+  expired
+
+  @@map("osv_canary_authorization_state")
+}
+
+enum OsvCanaryListingReviewVerdict {
+  listing_canary_evidence_accepted
+  listing_evidence_accepted_with_corrections
+
+  @@map("osv_canary_listing_review_verdict")
+}
+
+enum OsvCanaryLegalPermittedOperation {
+  list_object_metadata
+  retrieve_provider_bodies
+
+  @@map("osv_canary_legal_permitted_operation")
+}
+
 enum ExternalCredentialStatus {
   pending
   active
@@ -2209,7 +2260,9 @@ model OsvRuntimeSynchronizationRequest {
   requestState           OsvRuntimeJobRequestState       @map("request_state")
   createdAt              DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  runs OsvRuntimeSynchronizationRun[]
+  runs                              OsvRuntimeSynchronizationRun[]
+  consumedCanaryAuthorizations      OsvCanaryAuthorization[]       @relation("OsvCanaryAuthorizationConsumedRequest")
+  listingReviewCanaryAuthorizations OsvCanaryAuthorization[]       @relation("OsvCanaryAuthorizationListingRequest")
 
   @@unique([id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], map: "osv_runtime_sync_request_pin_key")
   @@unique([operatorRequestId], map: "osv_runtime_sync_request_operator_uidx")
@@ -2239,11 +2292,14 @@ model OsvRuntimeSynchronizationRun {
   createdAt                          DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                          DateTime                        @map("updated_at") @db.Timestamptz(6)
 
-  request  OsvRuntimeSynchronizationRequest @relation(fields: [requestId, workScope, synchronizationReason, versionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict)
-  leases   OsvRuntimeLeaseProjection[]
-  attempts OsvRuntimeStageAttempt[]
+  request                           OsvRuntimeSynchronizationRequest @relation(fields: [requestId, workScope, synchronizationReason, versionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict)
+  leases                            OsvRuntimeLeaseProjection[]
+  attempts                          OsvRuntimeStageAttempt[]
+  consumedCanaryAuthorizations      OsvCanaryAuthorization[]         @relation("OsvCanaryAuthorizationConsumedRun")
+  listingReviewCanaryAuthorizations OsvCanaryAuthorization[]         @relation("OsvCanaryAuthorizationListingRun")
 
   @@unique([requestId], map: "osv_runtime_sync_run_request_uidx")
+  @@unique([id, requestId], map: "osv_runtime_sync_run_id_request_uidx")
   @@index([workScope, state], map: "osv_runtime_sync_run_scope_state_idx")
   @@index([versionSetFingerprint], map: "osv_runtime_sync_run_fingerprint_idx")
   @@index([state, createdAt], map: "osv_runtime_sync_run_state_created_idx")
@@ -2307,6 +2363,141 @@ model OsvRuntimeStageAttempt {
   @@index([retryNotBefore], map: "osv_runtime_stage_attempt_retry_not_before_idx")
   @@index([runId, state], map: "osv_runtime_stage_attempt_run_state_idx")
   @@map("osv_runtime_stage_attempt")
+}
+
+/// Session 13 Batch 2B canary-scoped instance-operator identity. Global,
+/// instance-owned, tenant-independent. The primary key is the configured
+/// attestation UUID v4. No password, token, certificate, session, tenant User,
+/// or Organization relation. Identity facts are immutable; status may move
+/// once from active to revoked. Schema only; authentication is not implemented.
+model OsvCanaryInstanceOperatorIdentity {
+  id                    String                          @id @db.Uuid
+  identitySchemaVersion String                          @map("identity_schema_version") @db.VarChar(128)
+  identityType          String                          @map("identity_type") @db.VarChar(64)
+  authenticationSource  String                          @map("authentication_source") @db.VarChar(128)
+  provenanceIdentifier  String                          @map("provenance_identifier") @db.VarChar(128)
+  displayLabel          String                          @map("display_label") @db.VarChar(64)
+  establishedAt         DateTime                        @default(now()) @map("established_at") @db.Timestamptz(6)
+  status                OsvCanaryOperatorIdentityStatus
+  revokedAt             DateTime?                       @map("revoked_at") @db.Timestamptz(6)
+  createdAt             DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  issuedAuthorizations  OsvCanaryAuthorization[] @relation("OsvCanaryAuthorizationIssuer")
+  revokedAuthorizations OsvCanaryAuthorization[] @relation("OsvCanaryAuthorizationRevoker")
+
+  @@index([status], map: "osv_canary_operator_identity_status_idx")
+  @@map("osv_canary_instance_operator_identity")
+}
+
+/// Session 13 Batch 2B / 2B-R immutable one-shot OSV canary authorization.
+/// Global, instance-owned. One row authorizes exactly one phase. Listing-only
+/// cannot store body-selection or listing-review fields. Bounded-body requires
+/// accepted listing-review evidence bound to a completed listing_only row whose
+/// consumed request and run match. One listing authorization may authorize one
+/// bounded-body row. Consumption binds one canary request and its run. DELETE
+/// is forbidden. Schema only; no issuance, consumption, CLI, heartbeat, or
+/// provider contact.
+model OsvCanaryAuthorization {
+  id                 String @id @db.Uuid
+  operatorIdentityId String @map("operator_identity_id") @db.Uuid
+
+  authorizationSchemaVersion     String                          @map("authorization_schema_version") @db.VarChar(128)
+  canaryArchitectureIdentifier   String                          @map("canary_architecture_identifier") @db.VarChar(128)
+  runtimeArchitectureIdentifier  String                          @map("runtime_architecture_identifier") @db.VarChar(128)
+  listingProtocolIdentifier      String                          @map("listing_protocol_identifier") @db.VarChar(128)
+  actorKind                      String                          @map("actor_kind") @db.VarChar(64)
+  phase                          OsvCanaryPhase
+  synchronizationReason          OsvRuntimeSynchronizationReason @map("synchronization_reason")
+  authorizationPurpose           OsvCanaryAuthorizationPurpose   @map("authorization_purpose")
+  providerPrefix                 String                          @map("provider_prefix") @db.VarChar(32)
+  sourceIdentifier               String                          @map("source_identifier") @db.VarChar(128)
+  family                         String                          @db.VarChar(32)
+  canaryPolicyIdentifier         String                          @map("canary_policy_identifier") @db.VarChar(128)
+  workScope                      OsvRuntimeWorkScope             @map("work_scope")
+  leaseScope                     String                          @map("lease_scope") @db.VarChar(128)
+  runtimeVersionSetFingerprint   String                          @map("runtime_version_set_fingerprint") @db.Text
+  budgetProfileIdentifier        String                          @map("budget_profile_identifier") @db.VarChar(128)
+  unusedTtlSeconds               Int                             @map("unused_ttl_seconds")
+  singleUsePolicy                String                          @map("single_use_policy") @db.VarChar(32)
+  catalogActivationAuthorization String                          @map("catalog_activation_authorization") @db.VarChar(32)
+  matchingAuthorization          String                          @map("matching_authorization") @db.VarChar(32)
+  findingAuthorization           String                          @map("finding_authorization") @db.VarChar(32)
+  postcanaryReviewRequirement    String                          @map("postcanary_review_requirement") @db.VarChar(32)
+
+  legalDecisionReferenceIdentifier    String                           @map("legal_decision_reference_identifier") @db.VarChar(128)
+  legalDecisionId                     String                           @map("legal_decision_id") @db.Uuid
+  legalDecisionSourceRegistryVersion  String                           @map("legal_decision_source_registry_version") @db.VarChar(128)
+  legalDecisionPhase                  OsvCanaryPhase                   @map("legal_decision_phase")
+  legalDecisionPermittedOperation     OsvCanaryLegalPermittedOperation @map("legal_decision_permitted_operation")
+  legalDecisionState                  String                           @map("legal_decision_state") @db.VarChar(128)
+  legalDecisionIssuance               String                           @map("legal_decision_issuance") @db.VarChar(128)
+  legalDecisionIssuedAt               DateTime                         @map("legal_decision_issued_at") @db.Timestamptz(6)
+  legalDecisionRevalidationBoundaryAt DateTime                         @map("legal_decision_revalidation_boundary_at") @db.Timestamptz(6)
+  legalDecisionResponsibleRole        String                           @map("legal_decision_responsible_role") @db.VarChar(128)
+  legalDecisionEvidenceSetId          String                           @map("legal_decision_evidence_set_id") @db.Uuid
+
+  bodyLegalDecisionId                     String?                           @map("body_legal_decision_id") @db.Uuid
+  bodyLegalDecisionPhase                  OsvCanaryPhase?                   @map("body_legal_decision_phase")
+  bodyLegalDecisionPermittedOperation     OsvCanaryLegalPermittedOperation? @map("body_legal_decision_permitted_operation")
+  bodyLegalDecisionIssuedAt               DateTime?                         @map("body_legal_decision_issued_at") @db.Timestamptz(6)
+  bodyLegalDecisionRevalidationBoundaryAt DateTime?                         @map("body_legal_decision_revalidation_boundary_at") @db.Timestamptz(6)
+  bodyLegalDecisionEvidenceSetId          String?                           @map("body_legal_decision_evidence_set_id") @db.Uuid
+  bodyRetrieveDisposition                 String?                           @map("body_retrieve_disposition") @db.VarChar(128)
+  bodyTransientInspectionDisposition      String?                           @map("body_transient_inspection_disposition") @db.VarChar(128)
+  bodyPrivateRetentionDisposition         String?                           @map("body_private_retention_disposition") @db.VarChar(128)
+  bodyParseDisposition                    String?                           @map("body_parse_disposition") @db.VarChar(128)
+  bodyExternalExposureDisposition         String?                           @map("body_external_exposure_disposition") @db.VarChar(128)
+  bodyMatchingDisposition                 String?                           @map("body_matching_disposition") @db.VarChar(128)
+
+  listingReviewEvidenceIdentifier     String?                        @map("listing_review_evidence_identifier") @db.VarChar(128)
+  listingReviewId                     String?                        @map("listing_review_id") @db.Uuid
+  listingAuthorizationId              String?                        @map("listing_authorization_id") @db.Uuid
+  listingRequestId                    String?                        @map("listing_request_id") @db.Uuid
+  listingRunId                        String?                        @map("listing_run_id") @db.Uuid
+  listingCanonicalInventoryEvidenceId String?                        @map("listing_canonical_inventory_evidence_id") @db.Uuid
+  listingReviewVerdict                OsvCanaryListingReviewVerdict? @map("listing_review_verdict")
+  listingReviewedAt                   DateTime?                      @map("listing_reviewed_at") @db.Timestamptz(6)
+  listingReviewerRole                 String?                        @map("listing_reviewer_role") @db.VarChar(128)
+  bodySelectionAlgorithmIdentifier    String?                        @map("body_selection_algorithm_identifier") @db.VarChar(128)
+
+  runbookSetIdentifier            String   @map("runbook_set_identifier") @db.VarChar(128)
+  runbookVersion                  String   @map("runbook_version") @db.VarChar(128)
+  runbookAcknowledgedAt           DateTime @map("runbook_acknowledged_at") @db.Timestamptz(6)
+  runbookEmergencyHaltProcedure   String   @map("runbook_emergency_halt_procedure") @db.VarChar(128)
+  haltAcknowledgementIdentifier   String   @map("halt_acknowledgement_identifier") @db.VarChar(128)
+  haltAcknowledgedAt              DateTime @map("halt_acknowledged_at") @db.Timestamptz(6)
+  activationProhibitionIdentifier String   @map("activation_prohibition_identifier") @db.VarChar(128)
+  retryProhibitionIdentifier      String   @map("retry_prohibition_identifier") @db.VarChar(128)
+
+  issuedAt                           DateTime                     @default(now()) @map("issued_at") @db.Timestamptz(6)
+  expiresAt                          DateTime                     @map("expires_at") @db.Timestamptz(6)
+  state                              OsvCanaryAuthorizationState
+  consumedAt                         DateTime?                    @map("consumed_at") @db.Timestamptz(6)
+  consumedBySynchronizationRequestId String?                      @map("consumed_by_synchronization_request_id") @db.Uuid
+  consumedBySynchronizationRunId     String?                      @map("consumed_by_synchronization_run_id") @db.Uuid
+  terminalAt                         DateTime?                    @map("terminal_at") @db.Timestamptz(6)
+  terminalDisposition                OsvCanaryAuthorizationState? @map("terminal_disposition")
+  terminalReasonCode                 String?                      @map("terminal_reason_code") @db.VarChar(64)
+  revokedAt                          DateTime?                    @map("revoked_at") @db.Timestamptz(6)
+  revokedByOperatorIdentityId        String?                      @map("revoked_by_operator_identity_id") @db.Uuid
+  createdAt                          DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  operatorIdentity          OsvCanaryInstanceOperatorIdentity  @relation("OsvCanaryAuthorizationIssuer", fields: [operatorIdentityId], references: [id], onDelete: Restrict)
+  revokedByOperatorIdentity OsvCanaryInstanceOperatorIdentity? @relation("OsvCanaryAuthorizationRevoker", fields: [revokedByOperatorIdentityId], references: [id], onDelete: Restrict)
+  listingAuthorization      OsvCanaryAuthorization?            @relation("OsvCanaryAuthorizationListingReview", fields: [listingAuthorizationId], references: [id], onDelete: Restrict)
+  boundedBodyAuthorizations OsvCanaryAuthorization[]           @relation("OsvCanaryAuthorizationListingReview")
+  listingRequest            OsvRuntimeSynchronizationRequest?  @relation("OsvCanaryAuthorizationListingRequest", fields: [listingRequestId], references: [id], onDelete: Restrict)
+  listingRun                OsvRuntimeSynchronizationRun?      @relation("OsvCanaryAuthorizationListingRun", fields: [listingRunId], references: [id], onDelete: Restrict)
+  consumedRequest           OsvRuntimeSynchronizationRequest?  @relation("OsvCanaryAuthorizationConsumedRequest", fields: [consumedBySynchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict)
+  consumedRun               OsvRuntimeSynchronizationRun?      @relation("OsvCanaryAuthorizationConsumedRun", fields: [consumedBySynchronizationRunId, consumedBySynchronizationRequestId], references: [id, requestId], onDelete: Restrict)
+
+  @@index([state, expiresAt], map: "osv_canary_authorization_state_expires_idx")
+  @@index([operatorIdentityId, issuedAt], map: "osv_canary_authorization_operator_issued_idx")
+  @@index([consumedBySynchronizationRequestId], map: "osv_canary_authorization_consumed_request_idx")
+  @@index([consumedBySynchronizationRunId], map: "osv_canary_authorization_consumed_run_idx")
+  @@index([phase, state], map: "osv_canary_authorization_phase_state_idx")
+  @@index([revokedByOperatorIdentityId], map: "osv_canary_authorization_revoker_idx")
+  @@map("osv_canary_authorization")
 }
 
 model Integration {
