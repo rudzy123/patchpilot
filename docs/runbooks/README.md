@@ -4,7 +4,7 @@ These runbooks are the v0.1 **operational failure plans** for security-sensitive
 
 The SBOM ingestion pipeline, the outbox relay, `sbom.ingest`, and scheduled CISA KEV import are implemented, so [SBOM ingestion failure](sbom-ingestion-failure.md), [outbox backlog](outbox-backlog.md), [background job failure](background-job-failure.md), and [vulnerability sync failure](vulnerability-sync-failure.md) describe live behavior. Authenticated provider-status GET routes exist; they are not anonymous. Correlation, scoring, a dashboard, manual sync/retry, and a detailed operator SyncRun API are not implemented.
 
-OSV runtime remains disabled. Session 12 Batch 9 adds typed `INTELLIGENCE_OSV_ACQUISITION_HALT` (default halted) and bounded operational observability for the uncomposed disabled runtime. Session 12 Batch 9-R reviewed those halt and observability controls: missing configuration remains halted; halt false does not enable OSV; event sinks cannot change domain results. Those controls do not start a scheduler, job, or provider request. Accepted [ADR 0028](../adr/0028-osv-runtime-enablement-architecture-and-safety.md) contains operational **outlines** for a future OSV runtime. Those outlines are not live procedures. Do not contact `storage.googleapis.com` or `osv.dev` from these runbooks.
+OSV runtime remains disabled. Session 12 Batch 9 adds typed `INTELLIGENCE_OSV_ACQUISITION_HALT` (default halted) and bounded operational observability for the uncomposed disabled runtime. Session 12 Batch 9-R reviewed those halt and observability controls: missing configuration remains halted; halt false does not enable OSV; event sinks cannot change domain results. Those controls do not start a scheduler, job, or provider request. Accepted [ADR 0028](../adr/0028-osv-runtime-enablement-architecture-and-safety.md) contains operational **outlines** for a future OSV runtime. Accepted [ADR 0029](../adr/0029-first-real-provider-osv-canary-authorization-and-safety.md) adds first-canary outlines in [osv-canary.md](osv-canary.md). Those outlines are not live procedures. Do not contact `storage.googleapis.com` or `osv.dev` from these runbooks.
 
 Three recoveries currently require direct database or bucket work by an instance operator, because no API covers them: requeueing a `failed` ingestion, releasing a `quarantined` one, and cleaning up orphan objects.
 
@@ -14,6 +14,7 @@ They do not include exploit payloads. They do not claim compliance.
 | --- | --- |
 | [SBOM ingestion failure](sbom-ingestion-failure.md) | Upload, parse, quarantine, or orphan-object problems |
 | [Vulnerability sync failure](vulnerability-sync-failure.md) | OSV or CISA KEV refresh stale, rate-limited, or inconsistent |
+| [OSV first-provider canary outlines](osv-canary.md) | Session 13 canary preflight, halt, listing, body, and review outlines (not live procedures) |
 | [Database migration failure](database-migration-failure.md) | Migrate deploy fails or `_prisma_migrations` is inconsistent |
 | [Database constraint failure](database-constraint-failure.md) | Check, unique, FK, or append-only trigger rejection |
 | [Outbox backlog](outbox-backlog.md) | Unpublished or stuck outbox events |
