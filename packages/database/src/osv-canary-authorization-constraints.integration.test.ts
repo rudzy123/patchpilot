@@ -1179,8 +1179,8 @@ describe(
       expect(await prisma.osvActiveCatalogPointer.count()).toBe(0);
     });
 
-    it('keeps schema free of issuance adapters and production composition', () => {
-      expect(existsSync(path.join(srcDir, 'osv-canary-authorization-persistence.ts'))).toBe(false);
+    it('keeps schema free of production composition while exposing uncomposed adapters', () => {
+      expect(existsSync(path.join(srcDir, 'osv-canary-authorization-persistence.ts'))).toBe(true);
       const schema = readFileSync(path.join(srcDir, '../prisma/schema.prisma'), 'utf8');
       expect(schema).toContain('model OsvCanaryInstanceOperatorIdentity');
       expect(schema).toContain('model OsvCanaryAuthorization');

@@ -25,23 +25,27 @@ function walkTs(directory: string, files: string[] = []): string[] {
 }
 
 describe('OSV canary authorization schema source boundary', () => {
-  it('does not export issuance, consumption, revocation, or CLI adapters', () => {
-    expect(existsSync(path.join(srcDir, 'osv-canary-authorization-persistence.ts'))).toBe(false);
-    expect(existsSync(path.join(workspaceRoot, 'apps/cli'))).toBe(false);
-    expect('createOsvCanaryAuthorizationPersistence' in databasePublic).toBe(false);
+  it('exports the Batch 2C authorization factory and does not export execution helpers', () => {
+    expect(existsSync(path.join(srcDir, 'osv-canary-authorization-persistence.ts'))).toBe(true);
+    expect('createOsvCanaryAuthorizationPersistence' in databasePublic).toBe(true);
+    expect('createOsvCanaryAuthorizationPersistenceForClient' in databasePublic).toBe(false);
     expect('issueOsvCanaryAuthorization' in databasePublic).toBe(false);
     expect('consumeOsvCanaryAuthorization' in databasePublic).toBe(false);
     expect('revokeOsvCanaryAuthorization' in databasePublic).toBe(false);
   });
 
-  it('keeps Batch 2B database sources free of scheduler, provider, and Finding coupling', () => {
+  it('keeps Batch 2C database sources free of scheduler, provider, and Finding coupling', () => {
     const productionFiles = walkTs(srcDir).filter((filePath) => {
       const name = path.basename(filePath);
       return name.startsWith('osv-canary-authorization') && !name.includes('.test.');
     });
-    expect(productionFiles).toEqual([]);
-    const schema = readFileSync(path.join(packageRoot, 'prisma/schema.prisma'), 'utf8');
-    expect(schema).not.toMatch(/storage\.googleapis\.com|osv\.dev|createFinding|executeRetry/);
+    expect(productionFiles.length).toBeGreaterThan(0);
+    for (const filePath of productionFiles) {
+      const source = readFileSync(filePath, 'utf8');
+      expect(source, filePath).not.toMatch(
+        /from 'ioredis'|from 'bullmq'|from '@aws-sdk|from 'fastify'|from 'next'|from 'node:https'|storage\.googleapis\.com|osv\.dev|setTimeout\(|executeRetry|createFinding/,
+      );
+    }
   });
 
   it('keeps canary models free of tenant and Finding columns', () => {

@@ -1160,18 +1160,58 @@ Concrete schema corrections:
 - one listing authorization may authorize one bounded-body row
 - consume, revoke, and expire transitions compare against database time
 
-Legal-decision and inventory-evidence UUIDs remain opaque references. Batch
-2C must transactionally verify those referenced issuances. No production
-authorization adapters exist yet. Next checkpoint is Session 13 Batch 2C.
+Legal-decision and inventory-evidence UUIDs remain opaque references. Session
+13 Batch 2C implements persist-and-compare adapters that verify locally
+available immutable fields and completed listing-review evidence. Those
+adapters do not authenticate operators, execute the canary, or contact a
+provider. Session 13 Batch 2C-R independently reviewed those adapters.
+Next checkpoint is Session 13 Batch 2D one-shot operator command boundary.
+
+## Session 13 Batch 2C implementation note
+
+Session 13 Batch 2C implements `createOsvCanaryAuthorizationPersistence` in
+`@patchpilot/database` against the frozen Batch 2B schema. Operator and
+authorization ensure are insert-once with immutable replay comparison.
+Consumption is a database-time CAS that binds one request and one run.
+Same-run replay is distinguishable from a second execution. Production
+composition does not construct the factory. No CLI, heartbeat, deadline,
+scheduler, or provider contact is included.
+
+This note does not change the Accepted status of this ADR and does not
+authorize provider contact, listing-only execution, body retrieval,
+production enablement, scheduler registration, automatic retry, catalog
+activation, matching, or Finding writes.
+
+## Session 13 Batch 2C-R implementation note
+
+Session 13 Batch 2C-R independently reviewed the uncommitted Batch 2C
+adapters. Operator identity replay cannot overwrite immutable authority.
+Revoked operators cannot issue new authorizations or consume unconsumed
+authorizations. Authorization replay cannot overwrite immutable bindings.
+Listing-only cannot escalate to bounded-body. Legal-decision and
+listing-review substitution fail closed. Database time controls issuance,
+expiration, consumption, revocation, and terminalization. Exactly one
+concurrent consumer can win. Same-run replay is status reuse, not second
+execution. Different-run replay is rejected. Terminal authorization
+outcomes are immutable. Production composition does not construct the
+factory. No CLI, heartbeat, deadline, scheduler, or provider contact is
+included. Authorization consumption alone does not execute the canary.
+
+This note does not change the Accepted status of this ADR and does not
+authorize provider contact, listing-only execution, body retrieval,
+production enablement, scheduler registration, automatic retry, catalog
+activation, matching, or Finding writes.
 
 ## Follow-up
 
 - Legal and provenance revalidation of listing contact and, separately, RustSec
   body permissions.
-- Session 13 Batch 2C: persist-and-compare adapters plus one-shot Node.js
-  administrative command and canary-only execution boundary. Do not close
-  OD-10.
-- Session 13 Batch 2D: heartbeat controller and deadline controller.
+- Session 13 Batch 2C: persist-and-compare adapters implemented and
+  adversarially reviewed in Batch 2C-R. One-shot Node.js administrative
+  command and canary-only execution boundary remain later.
+  Do not close OD-10.
+- Session 13 Batch 2D: one-shot Node.js administrative command and canary-only
+  execution boundary. Do not close OD-10. Heartbeat and deadline remain later.
 - Session 13 Batch 2E: executable runbooks and preflight.
 - Session 13 Batch 2-R: combined operational-control adversarial review.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
