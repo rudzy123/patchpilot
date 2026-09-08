@@ -1227,6 +1227,48 @@ authorize provider contact, listing-only execution, body retrieval,
 production enablement, scheduler registration, automatic retry, catalog
 activation, matching, or Finding writes.
 
+## Session 13 Batch 2E implementation note
+
+Session 13 Batch 2E implements `createOsvCanaryLeaseHeartbeatController` and
+`createOsvCanaryDeadlineController` in `@patchpilot/vulnerability-intelligence`
+(`src/osv/canary-runtime-controls/`). Heartbeat cadence is exactly 60000 ms and
+lease TTL remains 900000 ms. Both listing-only and bounded-body deadlines are
+the committed 1800 seconds (1800000 ms) of monotonic elapsed time and are not
+the lease TTL. At most one heartbeat is in flight. Successful heartbeat
+replaces the row revision and keeps the fencing token unchanged. Delayed
+callbacks revalidate ownership and fail closed at or beyond lease TTL without
+catch-up. Stop blocks dispatch, cancels the timer, awaits one in-flight
+heartbeat or the abort signal, and yields a private latest-revision proof for
+later guarded release outside the controller. Deadline arms once, settles
+once, and ignores late callbacks after completion or cancellation. Construction
+performs no I/O. Production composition does not construct the factories. The
+controllers do not acquire a lease, contact a provider, register a CLI, or
+enable OSV. The closer Session 13 Batch 2 split used on this branch is 2A
+contracts, 2B schema, 2C adapters, 2D command, 2E heartbeat and deadline
+controllers; executable runbooks and preflight remain later.
+
+## Session 13 Batch 2E-R implementation note
+
+Session 13 Batch 2E-R independently reviewed the uncommitted Batch 2E heartbeat
+and deadline controllers. Heartbeat cadence remains exactly 60000 ms and lease
+TTL remains 900000 ms. Both phase deadlines remain 1800000 ms of monotonic
+elapsed time. Callers cannot override cadence, TTL, lateness, or duration.
+Synchronous schedule callbacks fail closed and cannot resurrect terminal
+state. Stale callbacks after reschedule cannot heartbeat. Halt during an
+in-flight heartbeat prevents reschedule. Row revision must be the exact
+successor; fencing changes fail closed. Already-aborted stop still awaits the
+in-flight heartbeat so the latest accepted revision is retained. Early
+deadline callbacks fail closed and cancel the timer. Event-sink failure cannot
+change controller state. Construction still starts no timer. Production
+composition still does not construct the factories. The controllers do not
+acquire a lease, contact a provider, register a CLI, or enable OSV. Next
+checkpoint is Session 13 Batch 2F executable canary preflight and runbooks.
+
+This note does not change the Accepted status of this ADR and does not
+authorize provider contact, listing-only execution, body retrieval,
+production enablement, scheduler registration, automatic retry, catalog
+activation, matching, or Finding writes.
+
 - Legal and provenance revalidation of listing contact and, separately, RustSec
   body permissions.
 - Session 13 Batch 2C: persist-and-compare adapters implemented and
@@ -1234,9 +1276,11 @@ activation, matching, or Finding writes.
   Do not close OD-10.
 - Session 13 Batch 2D: one-shot Node.js administrative command boundary
   implemented and uncomposed. Authentication remains an injected port.
-  Session 13 Batch 2D-R independently reviewed that command. Production CLI,
-  heartbeat, and deadline remain later. Do not close OD-10.
-- Session 13 Batch 2E: executable runbooks and preflight.
+  Session 13 Batch 2D-R independently reviewed that command. Production CLI
+  remains later. Do not close OD-10.
+- Session 13 Batch 2E: heartbeat and deadline controllers implemented and
+  uncomposed. Session 13 Batch 2E-R independently reviewed those controllers.
+  Executable runbooks and preflight remain later.
 - Session 13 Batch 2-R: combined operational-control adversarial review.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
   prerequisite; schema only if contracts cannot distinguish safely).

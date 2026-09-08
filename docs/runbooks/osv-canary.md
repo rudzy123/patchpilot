@@ -24,8 +24,12 @@ Finding mutation.
   proof; legal gate current for the requested phase. Session 13 Batch 2D
   implements an uncomposed one-shot command that returns
   `authorized_preflight_required` and is not a live CLI. Session 13 Batch
-  2D-R independently reviewed that command. Authorization contracts and
-  adapters are not a live authorization store and do not make this outline
+  2D-R independently reviewed that command. Session 13 Batch 2E implements
+  uncomposed heartbeat and deadline controllers (60000 ms cadence, 900000 ms
+  TTL, 1800000 ms monotonic deadline) that do not acquire a lease or contact a
+  provider. Session 13 Batch 2E-R independently reviewed those controllers.
+  Authorization contracts, adapters, the command, and the controllers
+  are not a live authorization store and do not make this outline
   operational.
 - **Forbidden:** Releasing worker halt; registering a scheduler; using a tenant
   user; contacting a provider.
@@ -39,10 +43,12 @@ Finding mutation.
   canary-scoped operator attestation configured; heartbeat and deadline
   implemented; runbooks rehearsed. ADR 0029 acceptance alone is not this
   trigger.
-- **Containment:** One-shot CLI only after later heartbeat, deadline, and
-  executable preflight. One phase. One prefix. Stop on first retryable
-  provider failure. Session 13 Batch 2D-R reviewed the uncomposed command
-  boundary; it remains preparation only.
+- **Containment:** One-shot CLI only after later heartbeat composition,
+  deadline arming, and executable preflight. One phase. One prefix. Stop on
+  first retryable provider failure. Session 13 Batch 2D-R reviewed the
+  uncomposed command boundary; it remains preparation only. Session 13 Batch
+  2E controllers exist and remain uncomposed; they do not run the
+  canary.
 - **Evidence:** Request ID, run ID, authorization identity, policy versions,
   counts, buckets, stage outcomes. No tokens, bodies, URLs, or headers.
 - **Forbidden:** Automatic retry; activation; second phase without review;
