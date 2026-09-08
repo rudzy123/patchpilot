@@ -1075,16 +1075,43 @@ controls and Batch 3 is authorized, the live OSV controls remain: reject
 composition. Do not invent operator SQL that deletes evidence. Do not include
 secrets.
 
+## Session 13 Batch 2A implementation note
+
+Session 13 Batch 2A implements framework-independent contracts only in
+`@patchpilot/vulnerability-intelligence` (`src/osv/canary-authorization/`).
+This note does not change the Accepted status of this ADR and does not
+authorize provider contact, listing-only execution, body retrieval,
+production enablement, scheduler registration, automatic retry, catalog
+activation, matching, or Finding writes.
+
+The original Batch 2 sequence named operator-identity and authorization
+persistence as Batch 2A. Closer implementation splits that work the same
+way Session 12 split Batch 5 contracts from Batch 6 persistence:
+
+- Batch 2A: operator-identity and single-use authorization **contracts**.
+- Batch 2B: canary authorization **persistence**.
+- Batch 2C: one-shot administrative command and canary-only execution
+  boundary.
+- Batch 2D: heartbeat and deadline controllers.
+- Batch 2E: executable runbooks and preflight.
+
+Batch 2A does **not** implement operator authentication, authorization
+persistence, CLI, API, scheduler, heartbeat, deadline, or provider contact.
+Legal-decision issuance remains a blocking preexecution dependency. Halt
+release and synthetic verification grant no authority. Prisma is unchanged.
+OD-10 remains open for general console identity.
+
 ## Follow-up
 
 - Legal and provenance revalidation of listing contact and, separately, RustSec
   body permissions.
-- Session 13 Batch 2A: persist provisional canary operator identity and the
-  closed authorization record. Do not close OD-10.
-- Session 13 Batch 2B: one-shot Node.js administrative command and canary-only
+- Session 13 Batch 2B: persist provisional canary operator identity and the
+  closed authorization record against the Batch 2A contracts. Do not close
+  OD-10.
+- Session 13 Batch 2C: one-shot Node.js administrative command and canary-only
   execution boundary.
-- Session 13 Batch 2C: heartbeat controller and deadline controller.
-- Session 13 Batch 2D: executable runbooks and preflight.
+- Session 13 Batch 2D: heartbeat controller and deadline controller.
+- Session 13 Batch 2E: executable runbooks and preflight.
 - Session 13 Batch 2-R: combined operational-control adversarial review.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
   prerequisite; schema only if contracts cannot distinguish safely).

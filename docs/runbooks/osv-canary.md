@@ -21,7 +21,9 @@ Finding mutation.
 - **Evidence:** Durable authorization absent or unconsumed; no active OSV
   lease; active-pointer snapshot; zero-Finding baseline; parser readiness;
   database and object-storage health; egress control evidence; telemetry sink
-  proof; legal gate current for the requested phase.
+  proof; legal gate current for the requested phase. Session 13 Batch 2A
+  defines identity and authorization contracts only; they are not a live
+  authorization store and do not make this outline operational.
 - **Forbidden:** Releasing worker halt; registering a scheduler; using a tenant
   user; contacting a provider.
 - **Recovery:** Close gaps, then re-run preflight.
