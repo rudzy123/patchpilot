@@ -31,6 +31,10 @@ export {
   createOsvCanaryAuthorizationPersistence,
   type OsvCanaryAuthorizationPersistenceAdapters,
 } from './osv-canary-authorization-persistence.js';
+export {
+  createOsvCanaryPreflightReadiness,
+  type OsvCanaryPreflightReadinessAdapters,
+} from './osv-canary-preflight-readiness.js';
 export { createOsvAcquisitionResumeInspection } from './osv-acquisition-inspection.js';
 export { developmentSeedIds, seedDevelopmentData } from './seed/development.js';
 export { boundPageSize } from './paging.js';

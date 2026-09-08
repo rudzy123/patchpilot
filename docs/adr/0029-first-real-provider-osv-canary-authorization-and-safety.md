@@ -1245,7 +1245,8 @@ performs no I/O. Production composition does not construct the factories. The
 controllers do not acquire a lease, contact a provider, register a CLI, or
 enable OSV. The closer Session 13 Batch 2 split used on this branch is 2A
 contracts, 2B schema, 2C adapters, 2D command, 2E heartbeat and deadline
-controllers; executable runbooks and preflight remain later.
+controllers, and 2F executable preflight. Provider-facing execution remains
+later.
 
 ## Session 13 Batch 2E-R implementation note
 
@@ -1261,8 +1262,38 @@ in-flight heartbeat so the latest accepted revision is retained. Early
 deadline callbacks fail closed and cancel the timer. Event-sink failure cannot
 change controller state. Construction still starts no timer. Production
 composition still does not construct the factories. The controllers do not
-acquire a lease, contact a provider, register a CLI, or enable OSV. Next
-checkpoint is Session 13 Batch 2F executable canary preflight and runbooks.
+acquire a lease, contact a provider, register a CLI, or enable OSV. Session
+13 Batch 2F later added uncomposed executable preflight.
+
+## Session 13 Batch 2F implementation note
+
+Session 13 Batch 2F implements uncomposed `createOsvCanaryPreflightService`.
+Preflight accepts one existing consumed authorization bound to the exact
+request and run. Halt must be separately released and is rechecked immediately
+before success. Lease scope is inspected without acquisition. Heartbeat and
+deadline policies are validated without starting timers. Egress readiness
+evaluates committed deployment policy without provider DNS or HTTP.
+Listing-only skips storage and parser readiness; bounded-body requires them.
+Active-pointer and zero-Finding baselines are captured and not modified.
+Success is `canary_execution_preflight_passed_provider_contact_not_authorized`
+and is not permission to contact a provider. Production composition does not
+construct the factory. No public CLI, scheduler, job route, lease acquisition,
+provider contact, activation, matching, or Finding writes.
+
+## Session 13 Batch 2F-R implementation note
+
+Session 13 Batch 2F-R independently reviewed the uncommitted Batch 2F
+preflight. Halt is re-evaluated at each protected checkpoint and immediately
+before success, including after authorization validation so request/run
+inspection does not start under halt. Public fake-ready committed ports are
+not package exports. Event-sink reentry cannot start a nested preflight.
+Egress distinguishes application-verified controls from deployment controls
+that are declared but not externally proven. Active-pointer and
+activation-history reads share one read-only Repeatable Read transaction.
+Zero-Finding baseline captures bounded counts and canary-attributed write
+proofs; global Finding absence is not required. Success still does not
+authorize provider contact. Next checkpoint is Session 13 Batch 2-R
+combined operational-controls review.
 
 This note does not change the Accepted status of this ADR and does not
 authorize provider contact, listing-only execution, body retrieval,
@@ -1280,7 +1311,9 @@ activation, matching, or Finding writes.
   remains later. Do not close OD-10.
 - Session 13 Batch 2E: heartbeat and deadline controllers implemented and
   uncomposed. Session 13 Batch 2E-R independently reviewed those controllers.
-  Executable runbooks and preflight remain later.
+- Session 13 Batch 2F: executable preflight and operator runbooks implemented
+  and uncomposed. Success does not authorize provider contact. Session 13
+  Batch 2F-R independently reviewed that preflight.
 - Session 13 Batch 2-R: combined operational-control adversarial review.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
   prerequisite; schema only if contracts cannot distinguish safely).

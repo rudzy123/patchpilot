@@ -1,305 +1,399 @@
-# OSV first real-provider canary runbook outlines
+# OSV first real-provider canary operator procedures
 
-These outlines support Accepted [ADR 0029](../adr/0029-first-real-provider-osv-canary-authorization-and-safety.md).
-They are **not** live procedures. Do not contact `storage.googleapis.com` or
-`osv.dev` from this document. Do not enable OSV. Do not release production
-acquisition halt as a canary trigger. Do not include secrets or destructive
-commands.
+These procedures support Accepted
+[ADR 0029](../adr/0029-first-real-provider-osv-canary-authorization-and-safety.md).
+Session 13 Batch 2F adds an uncomposed executable preflight
+(`createOsvCanaryPreflightService`) whose success outcome is
+`canary_execution_preflight_passed_provider_contact_not_authorized`.
+That outcome is evidence only. It does not authorize provider contact,
+lease acquisition, heartbeat start, deadline arming, catalog activation,
+matching, or Finding writes.
 
-Escalation owner is the instance operator until [OD-10](../architecture/open-decisions.md)
-is closed. Legal questions escalate to the instance legal and provenance
-reviewer role. Security incidents escalate to the instance security reviewer
-role. No outline authorizes evidence deletion, catalog activation, matching, or
-Finding mutation.
+Distinguish these states; they are not interchangeable:
+- preflight passed
+- provider contact separately authorized
+- canary executed
+- canary evidence reviewed
 
-## 1. Canary preflight
+Session 13 Batch 2F-R adversarially reviewed that preflight. Halt is
+rechecked at each protected checkpoint and immediately before success.
+Lease inspection remains read-only. Controller readiness starts no timer.
+Egress readiness performs no external DNS or HTTP. Observability sink
+readiness is an operational gate and is not workflow authority.
+Zero-Finding baseline proves no canary Finding writes; it does not
+require the platform to contain zero Finding rows.
 
-- **Trigger:** Operator intends to request listing-only or bounded-body
-  authorization.
-- **Containment:** Do not start the CLI. Confirm production halt remains true
-  and `INTELLIGENCE_OSV_ENABLED` remains false.
-- **Evidence:** Durable authorization absent or unconsumed; no active OSV
-  lease; active-pointer snapshot; zero-Finding baseline; parser readiness;
-  database and object-storage health; egress control evidence; telemetry sink
-  proof; legal gate current for the requested phase. Session 13 Batch 2D
-  implements an uncomposed one-shot command that returns
-  `authorized_preflight_required` and is not a live CLI. Session 13 Batch
-  2D-R independently reviewed that command. Session 13 Batch 2E implements
-  uncomposed heartbeat and deadline controllers (60000 ms cadence, 900000 ms
-  TTL, 1800000 ms monotonic deadline) that do not acquire a lease or contact a
-  provider. Session 13 Batch 2E-R independently reviewed those controllers.
-  Authorization contracts, adapters, the command, and the controllers
-  are not a live authorization store and do not make this outline
-  operational.
-- **Forbidden:** Releasing worker halt; registering a scheduler; using a tenant
-  user; contacting a provider.
-- **Recovery:** Close gaps, then re-run preflight.
-- **Escalation:** Instance operator.
-- **Closure:** Preflight checklist recorded; no provider request issued.
+Do not contact `storage.googleapis.com` or `osv.dev` from this document.
+Do not enable OSV. Do not treat halt release as canary authorization.
+Do not include secrets or destructive commands.
 
-## 2. Canary execution
+Provider-facing execution steps are **unavailable until Batch 3** is
+separately authorized. Escalation owner is the instance operator until
+[OD-10](../architecture/open-decisions.md) is closed. Legal questions
+escalate to the instance legal and provenance reviewer. Security incidents
+escalate to the instance security reviewer. No procedure authorizes
+evidence deletion, catalog activation, matching, or Finding mutation.
 
-- **Trigger:** Independent architecture review accepted; legal gate current;
-  canary-scoped operator attestation configured; heartbeat and deadline
-  implemented; runbooks rehearsed. ADR 0029 acceptance alone is not this
-  trigger.
-- **Containment:** One-shot CLI only after later heartbeat composition,
-  deadline arming, and executable preflight. One phase. One prefix. Stop on
-  first retryable provider failure. Session 13 Batch 2D-R reviewed the
-  uncomposed command boundary; it remains preparation only. Session 13 Batch
-  2E controllers exist and remain uncomposed; they do not run the
-  canary.
-- **Evidence:** Request ID, run ID, authorization identity, policy versions,
-  counts, buckets, stage outcomes. No tokens, bodies, URLs, or headers.
-- **Forbidden:** Automatic retry; activation; second phase without review;
-  shared env-file halt edits.
-- **Recovery:** Terminalize; consume authorization; verify production remains
-  halted.
-- **Escalation:** Instance operator.
-- **Closure:** Bounded result recorded; lease released or recovery inspected.
+## 1. Canary authorization preflight
 
-## 3. Emergency halt
+- **Purpose:** Prove whether one consumed canary authorization and its
+  authoritative request and run are ready for a later separately
+  authorized provider-facing phase.
+- **Prerequisites:** Durable consumed authorization bound to the exact
+  request and run; halt independently released through trusted state;
+  production OSV remains disabled; no public operator CLI.
+- **Trigger:** Operator intends to evaluate listing-only or bounded-body
+  readiness after `authorized_preflight_required`.
+- **Immediate containment:** Do not start a CLI, scheduler, or provider
+  request. Keep production acquisition halt restored after the check.
+- **Evidence to collect:** Preflight outcome identifier; authorization,
+  request, and run identities; halt result; lease-inspection status
+  without holder secrets; heartbeat and deadline policy readiness;
+  egress application-control evidence; local dependency result;
+  active-pointer baseline; zero-Finding counts; remaining closed gates.
+- **Forbidden actions:** Treating preflight success as provider
+  permission; contacting a provider; acquiring a lease; starting
+  heartbeat or deadline timers; releasing halt as a substitute for
+  authorization; copying listing continuation handles.
+- **Recovery:** Close the named failure, restore halt if it was
+  temporarily released in a dedicated process, and re-run preflight.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** Outcome is
+  `canary_execution_preflight_passed_provider_contact_not_authorized`
+  or a closed failure with provider calls 0. No provider request issued.
 
-- **Trigger:** Unexpected side effect, activation attempt, confidentiality
-  violation, or operator judgment.
-- **Containment:** Cancel in-flight work. Do not start successor stages.
-  Production halt remains true. Consume canary authorization if present.
-- **Evidence:** First blocking checkpoint, run state, lease observation without
-  digest, pointer snapshot, zero-Finding proof.
-- **Forbidden:** Retry; deleting evidence; weakening TLS or ceilings.
-- **Recovery:** Guarded release if current owner; preserve immutable evidence.
-- **Escalation:** Instance security reviewer.
-- **Closure:** No active work; halt restored/consumed; review opened.
+## 2. Halt release and restoration
 
-## 3a. Authorization expired or consumed
+- **Purpose:** Release acquisition halt only for a dedicated preflight
+  process snapshot, then restore it.
+- **Prerequisites:** Consumed authorization already exists. Halt release
+  is not authorization and does not enable OSV.
+- **Trigger:** Preflight reports `halt_engaged` under default or explicit
+  halt.
+- **Immediate containment:** Do not start worker or API with halt
+  released. Do not change shared production environment files.
+- **Evidence to collect:** Halt control and source; authorization still
+  consumed; no lease mutation; no provider calls.
+- **Forbidden actions:** Using halt release as execution permission;
+  leaving halt released in production worker or API processes.
+- **Recovery:** Restore halt to default halted. Re-run preflight only in
+  the dedicated process that explicitly released halt.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** Production processes remain halted. Dedicated
+  preflight either passed with halt rechecked or stopped at
+  `halt_engaged`.
 
-- **Trigger:** Unused authorization past 3600 seconds, or consume-at-start
-  already recorded.
-- **Containment:** Do not start work. Do not replay the same authorization.
-- **Evidence:** Authorization identity, issued-at, expires-at, consumed-at.
-- **Forbidden:** Extending TTL in place; reusing a consumed record.
-- **Recovery:** Issue a new authorization after review if still appropriate.
-- **Escalation:** Instance operator.
-- **Closure:** No provider request from the expired or consumed record.
+## 3. Lease unavailable or ambiguous
 
-## 4. Provider unavailable
+- **Purpose:** Interpret a read-only lease-scope inspection without
+  acquiring, taking over, heartbeating, or releasing.
+- **Prerequisites:** Preflight reached lease inspection. Scope is the
+  shared OSV public-export lease.
+- **Trigger:** Preflight reports `lease_unavailable` or
+  `lease_state_ambiguous`, or inspection is `held_by_another`,
+  `ownership_ambiguous`, or `database_unavailable`.
+- **Immediate containment:** Do not acquire. Do not take over an expired
+  projection. Do not heartbeat or release.
+- **Evidence to collect:** Inspection status; later acquisition action
+  identifier; run identity expected by preflight; database availability.
+  Do not collect holder secrets or digests.
+- **Forbidden actions:** Creating a lease row from preflight; treating
+  an expired projection as acquired authority; resetting fencing.
+- **Recovery:** Wait for the other holder to finish, or stop. Later
+  guarded acquisition remains a Batch 3 concern, unavailable until
+  Batch 3.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** Preflight remains failed closed. Lease row
+  revision and fencing are unchanged by preflight.
 
-- **Trigger:** DNS, timeout, or retryable 5xx on the compiled GCS surface.
-- **Containment:** Stop. Record retry disposition. Do not retry during the
-  canary.
-- **Evidence:** Bounded failure code, attempt ordinal 1, request count.
-- **Forbidden:** Raising ceilings; disabling pinning; following redirects.
-- **Recovery:** Human review; new authorization if later allowed.
-- **Escalation:** Instance operator.
-- **Closure:** Run failed or incomplete; no activation.
+## 4. Heartbeat startup failure
 
-## 5. HTTP 429 or provider-rate concern
+- **Purpose:** Handle heartbeat policy that is not ready without starting
+  a timer.
+- **Prerequisites:** Preflight validates cadence 60000 ms, lease TTL
+  900000 ms, one in-flight heartbeat, pending capacity 0.
+- **Trigger:** `heartbeat_policy_not_ready` or a later Batch 3 start
+  failure. Start remains unavailable until Batch 3.
+- **Immediate containment:** Do not call heartbeat start. Do not
+  schedule catch-up.
+- **Evidence to collect:** Policy identifier; interval; TTL; in-flight
+  and pending capacities; timer-started false.
+- **Forbidden actions:** Overriding cadence or TTL; starting a
+  production timer; inspecting holder proofs.
+- **Recovery:** Correct policy composition. Re-run preflight. Do not
+  start the controller.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** Heartbeat remains unstarted. Provider calls 0.
 
-- **Trigger:** HTTP 429 or suspected rate limiting.
-- **Containment:** Stop immediately. No Retry-After sleep. No automatic retry.
-- **Evidence:** `provider_rate_limited` or mapped transport failure; request
-  count.
-- **Forbidden:** Parallel requests; inventing extra delays as a bypass to
-  continue the same authorization.
-- **Recovery:** New explicit authorization after review.
-- **Escalation:** Instance operator.
-- **Closure:** One-shot consumed; cooldown is operator-defined.
+## 5. Heartbeat ownership loss
 
-## 6. Listing token cycle
+- **Purpose:** Contain ownership loss after a later heartbeat start.
+  Execution remains unavailable until Batch 3.
+- **Prerequisites:** A later guarded owner exists. Preflight itself does
+  not start heartbeat.
+- **Trigger:** Ownership lost, fencing changed, or expiry observed during
+  a future heartbeat loop.
+- **Immediate containment:** Stop dispatch. Do not adopt takeover. Do
+  not contact a provider.
+- **Evidence to collect:** Terminal heartbeat reason; run identity;
+  fencing unchanged-vs-changed flag without token values.
+- **Forbidden actions:** Catch-up bursts; resurrecting a lost owner;
+  releasing another holder's lease.
+- **Recovery:** Terminalize the canary attempt. Preserve immutable
+  evidence. Restore halt.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** No further heartbeat. Lease not mutated by
+  preflight. Review opened.
 
-- **Trigger:** `listing_token_cycle`.
-- **Containment:** Terminate the prefix. No body retrieval.
-- **Evidence:** Page ordinal, digest-only cycle event. Never the raw token.
-- **Forbidden:** Persisting or injecting a token.
-- **Recovery:** New run from page one under a new authorization.
-- **Escalation:** Instance operator.
-- **Closure:** Cycle recorded; candidate not created from that run.
+## 6. Canary deadline exceeded
 
-## 7. Inventory nonconvergence
+- **Purpose:** Contain an exceeded 1800000 ms monotonic phase deadline.
+  Arming remains unavailable until Batch 3.
+- **Prerequisites:** Deadline policy ready during preflight. Timer not
+  armed by preflight.
+- **Trigger:** `deadline_policy_not_ready` now, or a later armed timer
+  firing at or beyond 1800000 ms.
+- **Immediate containment:** Do not arm a replacement timer. Do not
+  continue provider work.
+- **Evidence to collect:** Phase; duration 1800000 ms; monotonic clock
+  availability; timer-armed false during preflight.
+- **Forbidden actions:** Using wall-clock elapsed time; using lease TTL
+  as the deadline; restarting the deadline.
+- **Recovery:** Stop the phase. Preserve evidence. Restore halt.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** Deadline remains unarmed after preflight, or a
+  later Batch 3 run is terminal with no provider retry.
 
-- **Trigger:** Pass A and pass B disagree, or a pass is incomplete.
-- **Containment:** No body retrieval. Do not force completeness.
-- **Evidence:** Pass counts, convergence outcome.
-- **Forbidden:** Treating canary completeness as production completeness.
-- **Recovery:** New explicit attempt after review.
-- **Escalation:** Instance operator.
-- **Closure:** Evidence-only or failed; not listing-only success.
+## 7. Egress-policy failure
 
-## 8. Listing ceiling reached
+- **Purpose:** Fail closed when application or declared deployment
+  egress controls are missing. No provider DNS or HTTP.
+- **Prerequisites:** Fixed host, HTTPS, port 443, GCS listing path,
+  bucket, redirect rejection, DNS-pinning policy, prohibited-address
+  policy, TLS verification, post-connect peer verification, cloud
+  metadata denial, no caller-selected proxy.
+- **Trigger:** `egress_policy_not_ready` or missing operational evidence.
+- **Immediate containment:** Do not resolve provider DNS. Do not open
+  TLS. Do not send HTTP.
+- **Evidence to collect:** Evidence class per control
+  (`application_control_verified`,
+  `deployment_control_declared_but_not_externally_proven`, or
+  `missing_operational_evidence`). DNS, TLS, and provider call counts
+  remain 0.
+- **Forbidden actions:** Claiming network-level enforcement that is not
+  configured; disabling certificate verification; selecting a proxy.
+- **Recovery:** Restore missing controls. Re-run preflight without
+  external probes.
+- **Escalation role:** Instance security reviewer.
+- **Closure criteria:** Required controls are present. Missing evidence
+  still blocks success.
 
-- **Trigger:** Page, observation, or byte ceiling.
-- **Containment:** Stop incomplete. No silent truncation. No body retrieval.
-- **Evidence:** Exact counts and ceiling dimension.
-- **Forbidden:** Raising limits without a new policy identifier.
-- **Recovery:** Record evidence-only outcome.
-- **Escalation:** Instance operator.
-- **Closure:** Incomplete inventory retained as evidence.
+## 8. Provider unavailable
 
-## 9. Deadline exceeded
+- **Purpose:** Contain a later provider outage. Contact remains
+  unavailable until Batch 3.
+- **Prerequisites:** Preflight succeeded or failed without provider
+  calls. Production remains halted.
+- **Trigger:** A later Batch 3 listing or retrieval cannot complete.
+- **Immediate containment:** Stop the phase. Do not retry automatically.
+- **Evidence to collect:** Closed failure kind; provider call count;
+  reached stage. No response bodies or headers.
+- **Forbidden actions:** Automatic retry; polling; backoff loops;
+  copying provider prose.
+- **Recovery:** Terminalize. Restore halt. Re-issue a new authorization
+  only after review.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** No automatic retry. Authorization remains
+  consumed. Provider calls remain bounded to the later Batch 3 attempt.
 
-- **Trigger:** 1800-second monotonic deadline.
-- **Containment:** Cancel in-flight transport and parser work. Block successor
-  stages.
-- **Evidence:** Deadline outcome, stage at stop, lease observation.
-- **Forbidden:** Retry; extending the same authorization.
-- **Recovery:** Guarded release if current owner.
-- **Escalation:** Instance operator.
-- **Closure:** `deadline_exceeded`; evidence retained.
+## 9. HTTP 429 or provider-rate concern
 
-## 10. Lease heartbeat failure
+- **Purpose:** Treat rate limiting as terminal for the first canary.
+  Retry-After execution is unavailable until Batch 3 and remains
+  prohibited for canary retries (retry count 0).
+- **Prerequisites:** Canary retry prohibition acknowledgement.
+- **Trigger:** HTTP 429 or operator suspicion of rate limiting during a
+  later Batch 3 attempt.
+- **Immediate containment:** Stop. Do not sleep on Retry-After. Do not
+  enqueue a retry.
+- **Evidence to collect:** Closed 429 failure kind; no header dump; no
+  token material.
+- **Forbidden actions:** Automatic retry; interpreting Retry-After as
+  dispatch authority; looping.
+- **Recovery:** Terminalize. Restore halt. Schedule a new authorization
+  only after operator review.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** Retry disposition is `no_automatic_retry`.
 
-- **Trigger:** Heartbeat CAS failure or missed keep-alive while work continues.
-- **Containment:** Cancel protected work. Do not overlap heartbeat calls.
-- **Evidence:** Heartbeat outcome without holder token.
-- **Forbidden:** Continuing after ownership uncertainty.
-- **Recovery:** Guarded release if still current; otherwise inspect fencing.
-- **Escalation:** Instance operator.
-- **Closure:** `heartbeat_failed`; no stale-owner continuation.
+## 10. Listing token cycle
 
-## 11. Ownership lost
+- **Purpose:** Fail closed on listing continuation-cycle detection.
+  Listing execution is unavailable until Batch 3.
+- **Prerequisites:** In-memory cycle detection policy from Session 12
+  Batch 3/4.
+- **Trigger:** `listing_token_cycle` during a later listing-only phase.
+- **Immediate containment:** Stop pagination. Do not persist raw
+  continuation handles.
+- **Evidence to collect:** Cycle failure code; page counts; no raw
+  continuation handle; no digest in logs.
+- **Forbidden actions:** Inspecting continuation handles; restarting the
+  same pass; contacting the provider again.
+- **Recovery:** Terminalize. Quarantine as required by listing policy.
+  Restore halt.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** No further listing I/O. Evidence omits
+  continuation handles.
 
-- **Trigger:** Fencing mismatch, stale takeover, or expired owner.
-- **Containment:** Discard late listing or retrieval success. Do not release
-  another holder's lease. Do not fail another holder's run.
-- **Evidence:** Ownership-lost code, fencing observation without digest.
-- **Forbidden:** Heartbeat or release as the prior owner.
-- **Recovery:** Inspect current lease; new authorization only after review.
-- **Escalation:** Instance operator.
-- **Closure:** Prior run not rewritten as the new owner's failure.
+## 11. Inventory nonconvergence
 
-## 12. Object too large
+- **Purpose:** Stop when pass A and pass B do not converge. Listing
+  execution is unavailable until Batch 3.
+- **Prerequisites:** Two-pass inventory policy. Canary completeness
+  cannot satisfy production completeness.
+- **Trigger:** Nonconvergence during a later listing-only phase.
+- **Immediate containment:** Do not retrieve bodies. Do not activate.
+- **Evidence to collect:** Convergence failure code; prefix; pass
+  identifiers. No observation payloads in operator notes.
+- **Forbidden actions:** Waiving convergence; using canary completeness
+  as production completeness; body retrieval.
+- **Recovery:** Terminalize. Restore halt. Re-authorize only after
+  review.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** Body retrieval remains 0. Activation remains
+  prohibited.
 
-- **Trigger:** Listing page or body exceeds 1,048,576 received bytes.
-- **Containment:** Fail closed. Do not retry that unit as success.
-- **Evidence:** Size bucket, not raw payload.
-- **Forbidden:** Raising 1 MiB without a new policy.
-- **Recovery:** Item or run incomplete; quarantine if required.
-- **Escalation:** Instance operator.
-- **Closure:** No truncated success.
+## 12. Listing ceiling reached
 
-## 13. Generation mismatch
+- **Purpose:** Stop at exact canary listing ceilings. Execution is
+  unavailable until Batch 3.
+- **Prerequisites:** Canary ceilings 8/16 pages, 2000/4000 observations,
+  8,388,608 / 16,777,216 listing bytes.
+- **Trigger:** Ceiling exceeded by one during a later listing-only phase.
+- **Immediate containment:** Admit no further pages. Do not raise
+  ceilings.
+- **Evidence to collect:** Which ceiling; exact counts; no page bodies.
+- **Forbidden actions:** Caller-selected limits; continuing after
+  overflow; treating exact ceiling overflow as success.
+- **Recovery:** Terminalize. Restore halt.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** Counts remain exact. No provider retry.
 
-- **Trigger:** Response generation ≠ requested `ifGenerationMatch`.
-- **Containment:** Fail closed. No attach.
-- **Evidence:** Bounded generation-mismatch code.
-- **Forbidden:** Fetching by `mediaLink` or ignoring generation.
-- **Recovery:** New authorization after review.
-- **Escalation:** Instance operator.
-- **Closure:** Snapshot not attached.
+## 13. Operator cancellation
 
-## 14. Integrity mismatch
+- **Purpose:** Stop preflight or a later phase at the next cancellation
+  boundary without resetting authorization or mutating the lease.
+- **Prerequisites:** Abort signal available to preflight.
+- **Trigger:** Operator aborts, or preflight reports
+  `cancellation_observed`.
+- **Immediate containment:** Do not start successor checks. Do not
+  contact a provider. Do not acquire or release a lease.
+- **Evidence to collect:** Cancellation boundary; reached stage;
+  authorization still consumed if consumption already occurred;
+  `authorizationReset` false.
+- **Forbidden actions:** Resetting authorization to issued; starting
+  controllers; activating; deleting evidence.
+- **Recovery:** Leave consumed authorization consumed. Restore halt.
+  Issue a new authorization only after review if a new run is required.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** One bounded result. Provider calls 0. Retry
+  disposition `no_automatic_retry`.
 
-- **Trigger:** SHA-256 or declared-size reconciliation failure.
-- **Containment:** Fail closed. No attach.
-- **Evidence:** Integrity failure code, expected vs received size bucket.
-- **Forbidden:** Trusting ETag or md5Hash as PatchPilot identity.
-- **Recovery:** New authorization after review.
-- **Escalation:** Instance operator.
-- **Closure:** Bytes not retained as attached evidence.
+## 14. Lease release uncertainty
 
-## 15. Storage failure
+- **Purpose:** Handle uncertainty about whether a later owner still
+  holds the lease. Preflight does not release.
+- **Prerequisites:** Stop proof from a later heartbeat controller, if
+  any. Preflight yields no release.
+- **Trigger:** Operator cannot confirm a later guarded release.
+- **Immediate containment:** Do not delete the lease row. Do not guess
+  fencing. Do not release without current ownership.
+- **Evidence to collect:** Inspection status; whether later acquisition
+  action is `none`, `exact_acquire`, or `guarded_stale_takeover`.
+- **Forbidden actions:** DELETE of the lease projection; fencing reset;
+  releasing another holder's lease.
+- **Recovery:** Inspect read-only. If expired, later guarded takeover
+  remains unavailable until Batch 3.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** Lease row remains durable. Preflight mutation
+  count 0.
 
-- **Trigger:** Object-storage timeout, conflict, or false attached state risk.
-- **Containment:** Fail closed. Do not overwrite. Do not mint attached metadata
-  without verified bytes.
-- **Evidence:** Storage failure code without locator leakage.
-- **Forbidden:** Broad bucket purge.
-- **Recovery:** Known temp cleanup only when eligible.
-- **Escalation:** Instance operator.
-- **Closure:** Attached state remains truthful.
+## 15. Unexpected active-pointer mutation
 
-## 16. Parser timeout or crash
+- **Purpose:** Detect unauthorized catalog-pointer change. Preflight
+  captures a read-only baseline and must not modify the pointer.
+- **Prerequisites:** Active-pointer baseline policy
+  `osv_canary_active_pointer_baseline_v1`.
+- **Trigger:** Baseline capture fails, pointer count changes during
+  preflight, or activation history appears unexpectedly.
+- **Immediate containment:** Do not activate. Do not repair by writing
+  the pointer. Stop canary work.
+- **Evidence to collect:** Present vs absent; activation-history count;
+  captured-at; activation call count 0; `activePointerModified` false.
+- **Forbidden actions:** Calling activation; swapping the pointer;
+  deleting history.
+- **Recovery:** Preserve rows. Open a security review. Restore halt.
+- **Escalation role:** Instance security reviewer.
+- **Closure criteria:** Pointer unchanged by preflight. Activation
+  remains prohibited.
 
-- **Trigger:** Parser timeout, worker crash, or malformed worker output.
-- **Containment:** Occupancy remains 1. Pending remains 0. No retry during
-  canary.
-- **Evidence:** Parser attempt row, bounded failure kind.
-- **Forbidden:** Raising pending capacity; feeding raw bytes to logs.
-- **Recovery:** New authorization after review.
-- **Escalation:** Instance operator.
-- **Closure:** Attempt retained; no activation.
+## 16. Unexpected tenant or Finding activity
 
-## 17. Source permission failure
+- **Purpose:** Prove zero-tenant and zero-Finding baselines and contain
+  unexpected Finding or tenant-scoped activity.
+- **Prerequisites:** Aggregate Finding and FindingObservation counts
+  only. No tenant identity in preflight results.
+- **Trigger:** `zero_finding_baseline_failed`, tenant context present,
+  or Finding counts change during preflight.
+- **Immediate containment:** Do not write Findings. Do not emit
+  recalculation events. Do not process assets or components.
+- **Evidence to collect:** Finding count; observation count;
+  `findingWritePlanned` false; `tenantContextPresent` false.
+- **Forbidden actions:** Selecting tenant rows by organization identity
+  in operator notes; creating Findings; matching.
+- **Recovery:** Preserve counts. Open a security review. Restore halt.
+- **Escalation role:** Instance security reviewer.
+- **Closure criteria:** Counts unchanged by preflight. Session remains
+  zero-Finding for canary work.
 
-- **Trigger:** Registry, legal gate, or per-advisory license failure.
-- **Containment:** No retention. No external exposure. No matching.
-- **Evidence:** Policy-violation or quarantine code; registry version.
-- **Forbidden:** Inferring body permission from listing permission.
-- **Recovery:** Legal revalidation.
-- **Escalation:** Legal and provenance reviewer.
-- **Closure:** `legal_gate_blocked` or quarantined item; canary not repeated
-  until resolved.
+## 17. Postcanary evidence review
 
-## 18. Quarantine accumulation
+- **Purpose:** Require postcanary review after any later phase.
+  Review is mandatory even if preflight passed.
+- **Prerequisites:** Remaining gate `postcanary_review_required`.
+  Provider contact remains separately authorized.
+- **Trigger:** Preflight success or any later terminal canary result.
+- **Immediate containment:** Do not proceed to activation, matching, or
+  Findings. Do not start Batch 3 from review notes.
+- **Evidence to collect:** Authorization identity; request and run;
+  phase; remaining gates; halt restored; lease inspection; baselines.
+- **Forbidden actions:** Treating review as execution permission;
+  enabling OSV; copying provider bodies into tickets.
+- **Recovery:** Record the review verdict. Issue a new authorization
+  only for a new run after accepted review.
+- **Escalation role:** Instance canary evidence reviewer, countersigned
+  by the instance operator.
+- **Closure criteria:** Review recorded. Activation still prohibited.
 
-- **Trigger:** Unexpected quarantine count during body canary.
-- **Containment:** Stop if policy requires. Do not activate.
-- **Evidence:** Quarantine counts and closed reasons.
-- **Forbidden:** Deleting quarantine rows.
-- **Recovery:** Review source and parser evidence.
-- **Escalation:** Legal + operator.
-- **Closure:** Candidate remains nonactive.
+## 18. Evidence retention and cleanup
 
-## 19. Reconciliation failure
-
-- **Trigger:** Completeness equations fail.
-- **Containment:** No activation. No matching.
-- **Evidence:** Reconciliation counts.
-- **Forbidden:** Waiving integer equations.
-- **Recovery:** New authorization after review.
-- **Escalation:** Instance operator.
-- **Closure:** Candidate not ready for activation.
-
-## 20. Lease release uncertainty
-
-- **Trigger:** `release_uncertain` or release CAS miss.
-- **Containment:** Do not retry release in a loop. Do not delete the lease row.
-- **Evidence:** Release outcome, fencing observation.
-- **Forbidden:** SQL that resets fencing.
-- **Recovery:** Inspect current projection; escalate if another holder exists.
-- **Escalation:** Instance operator.
-- **Closure:** Uncertainty recorded; no fencing reset.
-
-## 21. Unexpected activation attempt
-
-- **Trigger:** Any call toward `activateReadyGeneration` or pointer mutation.
-- **Containment:** Emergency halt. Do not continue the canary.
-- **Evidence:** Call count, pointer snapshot before/after, activation history.
-- **Forbidden:** Completing activation to "see what happens."
-- **Recovery:** Prove pointer unchanged; security review.
-- **Escalation:** Instance security reviewer.
-- **Closure:** Canary must not be repeated until root cause is closed.
-
-## 22. Unexpected tenant or Finding effect
-
-- **Trigger:** Any organization, asset, component, Finding, Evidence,
-  RiskCalculation, or `finding.recalculate` side effect.
-- **Containment:** Emergency halt. Preserve forensics.
-- **Evidence:** Zero-Finding proof failure details without tenant payload
-  echo.
-- **Forbidden:** Using a tenant user to "clean up."
-- **Recovery:** Tenant-isolation incident process.
-- **Escalation:** Instance security reviewer.
-- **Closure:** Must not repeat until root cause is closed.
-
-## 23. Postcanary review
-
-- **Trigger:** Terminal canary of either phase.
-- **Containment:** Do not start the next phase automatically.
-- **Evidence:** ADR 0029 review package fields only.
-- **Forbidden:** Bodies, tokens, URLs, headers, locators, tenant data.
-- **Recovery:** Return one closed review verdict.
-- **Escalation:** Independent reviewer, not the executing operator alone.
-- **Closure:** Verdict recorded; authorization consumed.
-
-## 24. Evidence retention and cleanup
-
-- **Trigger:** Canary complete or failed.
-- **Containment:** No broad deletion.
-- **Evidence:** Classification of each artifact class.
-- **Forbidden:** Deleting attached evidence because the canary ended;
-  interpreting provider absence as deletion; inventing a retention duration.
-- **Recovery:** Known temporary staged objects only, exact identity.
-- **Escalation:** Legal reviewer if license questions arise.
-- **Closure:** Retention disposition recorded; cleanup executor still not
-  authorized.
+- **Purpose:** Keep immutable canary evidence and bound cleanup so
+  fencing and single-use authority cannot reset.
+- **Prerequisites:** Authorization DELETE forbidden. Lease projection
+  DELETE forbidden. Frozen migrations remain unchanged.
+- **Trigger:** Operator wants to remove test rows or expired unused
+  authorizations after review.
+- **Immediate containment:** Do not edit frozen migrations. Do not
+  reset fencing by recreating the lease row. Do not purge Findings
+  because none should exist from this preflight.
+- **Evidence to collect:** Authorization state; lease presence;
+  object-storage locators omitted from notes; retention identifiers.
+- **Forbidden actions:** Destructive database reset; migration edits;
+  deleting lease rows; deleting consumed authorization rows to mint a
+  second use; copying provider responses.
+- **Recovery:** Leave production evidence durable. Remove only
+  test-owned disposable database rows in FK-safe order after a test
+  rehearsal.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** Production evidence retained. Test rehearsal
+  cleanup, if any, does not contact a provider and does not alter the
+  active catalog pointer.
