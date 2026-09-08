@@ -1202,16 +1202,40 @@ authorize provider contact, listing-only execution, body retrieval,
 production enablement, scheduler registration, automatic retry, catalog
 activation, matching, or Finding writes.
 
-## Follow-up
+## Session 13 Batch 2D implementation note
+
+Session 13 Batch 2D implements `createOsvCanaryOneShotCommandService` in
+`@patchpilot/vulnerability-intelligence`. The command authenticates an
+instance operator through an injected port, loads one existing
+authorization, evaluates acquisition halt independently, ensures one
+canary synchronization request and run, consumes the authorization once,
+and returns `authorized_preflight_required`. It does not create operator
+identity or authorization. Production authentication is not operational.
+There is no public CLI. The command does not acquire a lease, start
+heartbeat or deadline, contact a provider, or enable OSV. Same-run replay
+is status reuse. Different-run replay is rejected. Default halt does not
+consume an issued authorization. Production composition does not construct
+the factory. Session 13 Batch 2D-R independently reviewed and hardened this
+command boundary: halt is re-evaluated immediately before consumption,
+same-run replay compares consumed request/run bindings, authentication
+proofs are bounded and redacted, and listing-only cannot escalate to
+bounded-body. Next checkpoint is Session 13 Batch 2E heartbeat and deadline
+controllers.
+
+This note does not change the Accepted status of this ADR and does not
+authorize provider contact, listing-only execution, body retrieval,
+production enablement, scheduler registration, automatic retry, catalog
+activation, matching, or Finding writes.
 
 - Legal and provenance revalidation of listing contact and, separately, RustSec
   body permissions.
 - Session 13 Batch 2C: persist-and-compare adapters implemented and
-  adversarially reviewed in Batch 2C-R. One-shot Node.js administrative
-  command and canary-only execution boundary remain later.
+  adversarially reviewed in Batch 2C-R.
   Do not close OD-10.
-- Session 13 Batch 2D: one-shot Node.js administrative command and canary-only
-  execution boundary. Do not close OD-10. Heartbeat and deadline remain later.
+- Session 13 Batch 2D: one-shot Node.js administrative command boundary
+  implemented and uncomposed. Authentication remains an injected port.
+  Session 13 Batch 2D-R independently reviewed that command. Production CLI,
+  heartbeat, and deadline remain later. Do not close OD-10.
 - Session 13 Batch 2E: executable runbooks and preflight.
 - Session 13 Batch 2-R: combined operational-control adversarial review.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
