@@ -1403,13 +1403,12 @@ provider-free preflight attestation. Listing-only is the only representable
 phase. Body retrieval remains prohibited. Database time owns issuance,
 expiration, consumption, revocation, and terminalization. DELETE is
 forbidden. Schema existence does not issue or consume an authorization.
-No issuance or consumption adapter exists. Session 13 Batch 3B evaluation
-still fails closed with `persistence_required`. Production composition does
-not construct the evaluation factory. No public CLI, API, scheduler, or job
-route is added. Session 13 Batch 3B-P-R independently reviewed and hardened
-that uncommitted schema before freeze. Next checkpoint is durable listing-only
-provider-contact authorization issuance. Batch 3C remains blocked until
-durable issuance exists.
+No issuance or consumption adapter existed in Batch 3B-P. Session 13 Batch 3B
+evaluation still fails closed with `persistence_required`. Production
+composition does not construct the evaluation factory. No public CLI, API,
+scheduler, or job route is added. Session 13 Batch 3B-P-R independently
+reviewed and hardened that uncommitted schema before freeze. Next checkpoint
+relative to this note was Session 13 Batch 3B-A durable issuance.
 
 This note does not change the Accepted status of this ADR and does not
 authorize real provider contact, body retrieval, production enablement,
@@ -1433,9 +1432,46 @@ attesting unauthorized provider contact; a consumed source cannot leave
 consumed while a child grant is issued or
 `consumed_for_listing_execution`; insert matches source provider, prefix,
 family, policy, and listing budget. Schema existence still does not issue or consume an
-authorization. No issuance or consumption adapter exists. Batch 3B
-evaluation still fails closed with `persistence_required`. Next checkpoint
-is durable issuance. Batch 3C remains blocked until durable issuance exists.
+authorization. No issuance or consumption adapter exists in Batch 3B-P-R.
+Batch 3B evaluation still fails closed with `persistence_required`. Next
+checkpoint relative to this note was Session 13 Batch 3B-A.
+
+This note does not change the Accepted status of this ADR and does not
+authorize real provider contact, body retrieval, production enablement,
+scheduler registration, automatic retry, catalog activation, matching, or
+Finding writes.
+
+## Session 13 Batch 3B-A implementation note
+
+Session 13 Batch 3B-A implements uncomposed PostgreSQL adapters
+(`createOsvListingProviderContactAuthorizationPersistence` in
+`@patchpilot/database`) against the frozen Batch 3B-P schema. Issuance
+validates the consumed listing-only source canary authorization, exact
+request and run, accepted provider-free preflight evidence, operator,
+legal, egress, deployment, and closed listing-only policy bindings, then
+inserts with database-owned `issued_at` and
+`expires_at = issued_at + 3600 seconds`. Identical issued replay is
+`already_applied`. Immutable disagreement is `immutable_conflict`.
+Inspection is read-only and uses database time so
+`databaseNow >= expiresAt` is expired. Consumption is one
+compare-and-swap from `issued` with exact bindings and
+`CURRENT_TIMESTAMP < expires_at`. Same-run replay is status only.
+Different-run replay fails closed without revealing the other run.
+Revocation is from `issued` only. There is no row-revision column; CAS
+uses issued state, bindings, and database time. Adapters perform no
+provider, lease, timer, activation, matching, or Finding work. Production
+composition does not construct the factory. Session 13 Batch 3B evaluation
+still fails closed with `persistence_required`. Successful consumption
+remains necessary but insufficient for provider contact. Session 13 Batch
+3B-A-R independently reviewed and hardened those adapters: issuance replay
+compares legal evidence-set identity, legal issued-at, and acknowledgement
+timestamps; time-expired issued rows are `immutable_conflict`; insert
+requires current legal revalidation at database time; consume after
+operator revocation is `operator_revoked`; inspect omits the record on
+`consumed_other_run`. Schema and migration remain unchanged. Next
+checkpoint is Session 13 Batch 3B-R combined provider-contact
+authorization review. Batch 3C remains blocked until reviewed consumption
+composition exists.
 
 This note does not change the Accepted status of this ADR and does not
 authorize real provider contact, body retrieval, production enablement,
@@ -1469,9 +1505,14 @@ Remaining Session 13 execution gates after this combined review:
   in-memory authority.
 - Session 13 Batch 3B-P: schema-only distinct listing-only provider-contact
   authorization persistence implemented. Session 13 Batch 3B-P-R independently
-  reviewed and froze that schema. Next is durable issuance. Batch 3B-R
-  of the evaluation service remains deferred until durable issuance exists.
-  Batch 3C remains blocked until durable issuance exists.
+  reviewed and froze that schema.
+- Session 13 Batch 3B-A: uncomposed listing-only provider-contact
+  authorization issuance, inspection, consumption, and revocation adapters
+  implemented. Production composition does not construct the factory.
+  Successful consumption does not authorize provider contact. Session 13
+  Batch 3B-A-R independently reviewed those adapters. Next is Session 13
+  Batch 3B-R combined provider-contact authorization review. Batch 3C
+  remains blocked until reviewed consumption composition exists.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
   prerequisite; schema only if contracts cannot distinguish safely).
 - Per-advisory license-inspection parse and duplicate-aware license

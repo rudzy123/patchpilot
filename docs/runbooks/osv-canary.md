@@ -20,11 +20,13 @@ Distinguish these states; they are not interchangeable:
 2. Provider-free preflight
    (`canary_execution_preflight_passed_provider_contact_not_authorized`).
 3. Provider-contact authorization evaluation (`persistence_required` until
-   durable issuance adapters exist after Session 13 Batch 3B-P-R).
+   production composition constructs reviewed issuance adapters after
+   Session 13 Batch 3B-A-R).
 4. Independent provider-contact authorization review.
-5. Future durable provider-contact authorization issuance and consumption
-   (schema exists after Session 13 Batch 3B-P; adapters remain later, then
-   Batch 3C).
+5. Durable provider-contact authorization issuance and consumption
+   (schema exists after Session 13 Batch 3B-P; uncomposed adapters exist
+   after Session 13 Batch 3B-A and were independently reviewed in Session
+   13 Batch 3B-A-R; production composition and Batch 3C remain later).
 6. Future operator execution confirmation.
 7. Future lease, heartbeat, deadline, and ownership setup.
 8. Provider contact.
@@ -33,9 +35,12 @@ Distinguish these states; they are not interchangeable:
 Batch 3B evaluates listing-only provider-contact prerequisites and fails
 closed with `persistence_required`. **Batch 3B does not authorize the operator to
 execute the provider call.** It does not mint in-memory authorization. Batch 3B-P
-persists the distinct listing-only schema only; it does not issue or consume
-an authorization. Batch 3C must not proceed without reloading and consuming
-durable authority after issuance adapters exist.
+persists the distinct listing-only schema only. Session 13 Batch 3B-A adds
+uncomposed issuance, inspection, consumption, and revocation adapters.
+Session 13 Batch 3B-A-R independently reviewed those adapters. Production
+composition does not construct them. Successful consumption does not
+authorize provider contact. Batch 3C must not proceed without reloading
+and consuming durable authority through a reviewed composition.
 
 Halt is rechecked at each protected command and preflight checkpoint.
 Lease inspection remains read-only. Controller readiness starts no timer.
