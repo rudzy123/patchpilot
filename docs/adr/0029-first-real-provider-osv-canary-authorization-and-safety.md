@@ -1468,10 +1468,27 @@ compares legal evidence-set identity, legal issued-at, and acknowledgement
 timestamps; time-expired issued rows are `immutable_conflict`; insert
 requires current legal revalidation at database time; consume after
 operator revocation is `operator_revoked`; inspect omits the record on
-`consumed_other_run`. Schema and migration remain unchanged. Next
-checkpoint is Session 13 Batch 3B-R combined provider-contact
-authorization review. Batch 3C remains blocked until reviewed consumption
-composition exists.
+`consumed_other_run`. Schema and migration remain unchanged.
+
+## Session 13 Batch 3B-R implementation note
+
+Session 13 Batch 3B-R independently reviewed the complete listing-only
+OSV provider-contact authorization chain. Operator authentication,
+consumed listing-only canary authorization, exact synchronization request
+and run, provider-free preflight evidence, and uncomposed issuance,
+inspection, revocation, and atomic single-use consumption remain distinct
+authorities. Preflight success, halt release, and lease ownership do not
+authorize provider contact. Consumption does not execute a provider
+operation. Consume results carry closed safety facts:
+`providerOperationExecuted=false`, `remainingRuntimeGatesRequired=true`,
+and `executionPermitted=false`. Issuance and consumption remain distinct.
+Database time owns expiry (`databaseNow >= expiresAt` is expired).
+Same-run replay is status reuse only. Different-run replay fails closed.
+Concurrent consumers admit one winner. Evaluation remains
+`persistence_required`. Production composition does not construct the
+factories. Next checkpoint is Session 13 Batch 3C-Auth listing-canary
+execution authorization. Batch 3C remains blocked until reviewed
+consumption composition exists.
 
 This note does not change the Accepted status of this ADR and does not
 authorize real provider contact, body retrieval, production enablement,
@@ -1510,8 +1527,9 @@ Remaining Session 13 execution gates after this combined review:
   authorization issuance, inspection, consumption, and revocation adapters
   implemented. Production composition does not construct the factory.
   Successful consumption does not authorize provider contact. Session 13
-  Batch 3B-A-R independently reviewed those adapters. Next is Session 13
-  Batch 3B-R combined provider-contact authorization review. Batch 3C
+  Batch 3B-A-R independently reviewed those adapters. Session 13 Batch
+  3B-R independently reviewed the complete authorization chain. Next is
+  Session 13 Batch 3C-Auth listing-canary execution authorization. Batch 3C
   remains blocked until reviewed consumption composition exists.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
   prerequisite; schema only if contracts cannot distinguish safely).

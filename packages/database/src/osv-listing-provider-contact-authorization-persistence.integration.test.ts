@@ -579,6 +579,9 @@ describe(
       expect(inspected.record?.state).toBe('issued');
       const consumed = expectOk(await adapters.consume(consumeCommand(fresh)), 'consume');
       expect(consumed.outcome).toBe('consumed');
+      expect(consumed.providerOperationExecuted).toBe(false);
+      expect(consumed.remainingRuntimeGatesRequired).toBe(true);
+      expect(consumed.executionPermitted).toBe(false);
       expect(consumed.record.state).toBe('consumed_for_listing_execution');
       expect(consumed.record.consumedAt).not.toBeNull();
       const replay = expectOk(await adapters.consume(consumeCommand(fresh)), 'same-run replay');

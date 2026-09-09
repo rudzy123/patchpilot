@@ -13,6 +13,7 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import {
   compareOsvListingProviderContactPersistedAuthorization,
+  createOsvListingProviderContactConsumeResult,
   databaseNowIsExpired,
   isOsvListingProviderContactAuthorizationConsumeCommand,
   isOsvListingProviderContactAuthorizationInspectForRunQuery,
@@ -428,10 +429,10 @@ class PrismaOsvListingProviderContactAuthorizationRepository implements OsvListi
         if (consumed !== undefined) {
           return {
             ok: true as const,
-            value: {
-              outcome: 'consumed' as const,
+            value: createOsvListingProviderContactConsumeResult({
+              outcome: 'consumed',
               record: mapRow(consumed),
-            },
+            }),
           };
         }
         return this.reloadConsume(tx, command);
@@ -906,7 +907,10 @@ class PrismaOsvListingProviderContactAuthorizationRepository implements OsvListi
       }
       return {
         ok: true,
-        value: { outcome: 'already_consumed_same_run', record: mapped },
+        value: createOsvListingProviderContactConsumeResult({
+          outcome: 'already_consumed_same_run',
+          record: mapped,
+        }),
       };
     }
     if (existing.state === 'revoked') {
