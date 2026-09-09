@@ -31,12 +31,12 @@ Do not contact `storage.googleapis.com` or `osv.dev` from this document.
 Do not enable OSV. Do not treat halt release as canary authorization.
 Do not include secrets or destructive commands.
 
-No production operator CLI is registered. The one-shot command and
-preflight factories remain uncomposed. The listing-only execution bridge
-is **unavailable until Session 13 Batch 3A** is implemented and reviewed
-against a scripted provider port. Provider-facing execution steps are
-**unavailable until Batch 3**, specifically Batch 3B after the Batch 3A
-bridge is independently reviewed. Escalation owner is the instance operator until
+No production operator CLI is registered. The one-shot command, preflight,
+and listing-only execution-bridge factories remain uncomposed. The Batch 3A
+bridge supports **scripted provider execution only** and was independently
+reviewed in Batch 3A-R. Real-provider capability does not exist.
+Provider-facing execution steps remain **unavailable until Batch 3B**.
+Escalation owner is the instance operator until
 [OD-10](../architecture/open-decisions.md) is closed. Legal questions
 escalate to the instance legal and provenance reviewer. Security incidents
 escalate to the instance security reviewer. No procedure authorizes
@@ -153,8 +153,8 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   a timer.
 - **Prerequisites:** Preflight validates cadence 60000 ms, lease TTL
   900000 ms, one in-flight heartbeat, pending capacity 0.
-- **Trigger:** `heartbeat_policy_not_ready` or a later Batch 3 start
-  failure. Start remains unavailable until Batch 3.
+- **Trigger:** `heartbeat_policy_not_ready` or a Batch 3A controller start
+  failure. Real-provider start remains unavailable until Batch 3B.
 - **Immediate containment:** Do not call heartbeat start. Do not
   schedule catch-up.
 - **Evidence to collect:** Policy identifier; interval; TTL; in-flight
@@ -169,7 +169,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 ## 6. Heartbeat ownership loss
 
 - **Purpose:** Contain ownership loss after a later heartbeat start.
-  Execution remains unavailable until Batch 3.
+  Real-provider execution remains unavailable until Batch 3B.
 - **Prerequisites:** A later guarded owner exists. Preflight itself does
   not start heartbeat.
 - **Trigger:** Ownership lost, fencing changed, or expiry observed during
@@ -189,7 +189,8 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 ## 7. Canary deadline exceeded
 
 - **Purpose:** Contain an exceeded 1800000 ms monotonic phase deadline.
-  Arming remains unavailable until Batch 3.
+  Batch 3A arms the listing-only deadline before scripted listing.
+  Real-provider arming remains unavailable until Batch 3B.
 - **Prerequisites:** Deadline policy ready during preflight. Timer not
   armed by preflight.
 - **Trigger:** `deadline_policy_not_ready` now, or a later armed timer
@@ -231,8 +232,8 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 
 ## 9. Provider unavailable
 
-- **Purpose:** Contain a later provider outage. Contact remains
-  unavailable until Batch 3.
+- **Purpose:** Contain a later provider outage. Real-provider contact remains
+  unavailable until Batch 3B.
 - **Prerequisites:** Preflight succeeded or failed without provider
   calls. Production remains halted.
 - **Trigger:** A later Batch 3 listing or retrieval cannot complete.
@@ -250,8 +251,8 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 ## 10. HTTP 429 or provider-rate concern
 
 - **Purpose:** Treat rate limiting as terminal for the first canary.
-  Retry-After execution is unavailable until Batch 3 and remains
-  prohibited for canary retries (retry count 0).
+  Retry-After execution remains prohibited for canary retries (retry count 0).
+  Batch 3A records HTTP 429 and does not retry.
 - **Prerequisites:** Canary retry prohibition acknowledgement.
 - **Trigger:** HTTP 429 or operator suspicion of rate limiting during a
   later Batch 3 attempt.
@@ -269,7 +270,8 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 ## 11. Listing token cycle
 
 - **Purpose:** Fail closed on listing continuation-cycle detection.
-  Listing execution is unavailable until Batch 3.
+  Listing execution against a scripted port exists in uncomposed Batch 3A.
+  Real-provider listing remains unavailable until Batch 3B.
 - **Prerequisites:** In-memory cycle detection policy from Session 12
   Batch 3/4.
 - **Trigger:** `listing_token_cycle` during a later listing-only phase.
@@ -287,8 +289,9 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 
 ## 12. Inventory nonconvergence
 
-- **Purpose:** Stop when pass A and pass B do not converge. Listing
-  execution is unavailable until Batch 3.
+- **Purpose:** Stop when pass A and pass B do not converge. Scripted listing
+  execution exists in uncomposed Batch 3A. Real-provider listing remains
+  unavailable until Batch 3B.
 - **Prerequisites:** Two-pass inventory policy. Canary completeness
   cannot satisfy production completeness.
 - **Trigger:** Nonconvergence during a later listing-only phase.
@@ -305,8 +308,9 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 
 ## 13. Listing ceiling reached
 
-- **Purpose:** Stop at exact canary listing ceilings. Execution is
-  unavailable until Batch 3.
+- **Purpose:** Stop at exact canary listing ceilings. Scripted Batch 3A
+  enforces those ceilings. Real-provider execution remains unavailable
+  until Batch 3B.
 - **Prerequisites:** Canary ceilings 8/16 pages, 2000/4000 observations,
   8,388,608 / 16,777,216 listing bytes.
 - **Trigger:** Ceiling exceeded by one during a later listing-only phase.
@@ -353,7 +357,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Forbidden actions:** DELETE of the lease projection; fencing reset;
   releasing another holder's lease.
 - **Recovery:** Inspect read-only. If expired, later guarded takeover
-  remains unavailable until Batch 3.
+  remains unavailable until Batch 3B.
 - **Escalation role:** Instance operator.
 - **Closure criteria:** Lease row remains durable. Preflight mutation
   count 0.
@@ -404,7 +408,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   Provider contact remains separately authorized.
 - **Trigger:** Preflight success or any later terminal canary result.
 - **Immediate containment:** Do not proceed to activation, matching, or
-  Findings. Do not start Batch 3A or Batch 3B from review notes.
+  Findings. Do not treat Batch 3A scripted success as Batch 3B authorization.
 - **Evidence to collect:** Authorization identity; request and run;
   phase; remaining gates; halt restored; lease inspection; baselines.
 - **Forbidden actions:** Treating review as execution permission;

@@ -1309,15 +1309,52 @@ The command stops at `authorized_preflight_required`. Preflight success is
 `canary_execution_preflight_passed_provider_contact_not_authorized` and is
 not permission to contact a provider. Lease inspection remains read-only.
 Heartbeat and deadline readiness start no timers. No production CLI, API,
-scheduler, or job route is registered. The listing-only execution bridge
-does not exist. Next checkpoint is Session 13 Batch 3A listing-only
-execution bridge against a scripted provider port, then Batch 3A-R review,
-then separately authorized Batch 3B real-provider listing-only execution.
+scheduler, or job route is registered. At this Batch 2-R checkpoint the
+listing-only execution bridge did not exist. Next checkpoint was Session 13
+Batch 3A listing-only execution bridge against a scripted provider port.
+
+## Session 13 Batch 3A implementation note
+
+Session 13 Batch 3A implements uncomposed
+`createOsvCanaryListingOnlyExecutionBridge` in
+`@patchpilot/vulnerability-intelligence`. It requires a fresh
+instance-operator execution confirmation, reloads consumed listing-only
+authorization plus exact request/run and accepted preflight evidence,
+rechecks halt and egress, acquires the global OSV lease, starts heartbeat,
+arms the listing-only deadline, and then executes one scripted prefix with
+exact pass A and pass B. Ownership is revalidated before every page.
+Continuation tokens remain in memory only. Body retrieval, parser, storage,
+activation, matching, and Finding writes remain zero. Automatic retries
+remain zero. Controllers stop, then the run and authorization are
+terminalized under current ownership, then guarded release uses the latest
+row revision. Success is
+`listing_only_scripted_inventory_converged` with
+`executionMode=scripted_provider_only` and
+`realProviderContactAuthorized=false`. Preflight evidence alone cannot
+authorize provider contact. The scripted listing-capability constructor and
+verification factory are not public package exports. No real-provider
+capability exists. Production composition does not construct the factory.
+No public CLI, API, scheduler, or job route is added. Session 13 Batch 3A-R independently reviewed this bridge. This note does not change the Accepted status of this ADR and does not
+authorize real provider contact, body retrieval, production enablement,
+scheduler registration, automatic retry, catalog activation, matching, or
+Finding writes.
+
+## Session 13 Batch 3A-R review note
+
+Session 13 Batch 3A-R independently reviewed the uncommitted Batch 3A
+listing-only execution bridge. Concrete corrections: held-by-other does
+not terminalize the authorization or run; accepted preflight evidence must
+wrap a constructed preflight success; legal revalidation uses inspect
+observed-at against the recorded boundary; halt and scripted egress are
+rechecked before every page; halt during listing remains `halt_engaged`
+and still releases a current lease; a generic listing `policy_violation`
+is not classified as ownership loss. Fresh operator confirmation remains
+mandatory. Real-provider capability remains absent. Production composition
+does not construct the factory. Next checkpoint is Session 13 Batch 3B
+listing-only provider canary authorization.
 
 This note does not change the Accepted status of this ADR and does not
-authorize provider contact, listing-only execution, body retrieval,
-production enablement, scheduler registration, automatic retry, catalog
-activation, matching, or Finding writes.
+authorize real provider contact.
 
 Remaining Session 13 execution gates after this combined review:
 
@@ -1336,9 +1373,11 @@ Remaining Session 13 execution gates after this combined review:
   and uncomposed. Success does not authorize provider contact. Session 13
   Batch 2F-R independently reviewed that preflight.
 - Session 13 Batch 2-R: combined operational-control adversarial review
-  complete. No execution bridge. Next is Batch 3A (scripted listing-only
-  bridge), then Batch 3A-R, then Batch 3B real-provider listing-only
-  authorization.
+  complete.
+- Session 13 Batch 3A: listing-only execution bridge against a scripted
+  provider port implemented and uncomposed. Real-provider capability does
+  not exist. Session 13 Batch 3A-R independently reviewed that bridge.
+  Next is Batch 3B real-provider listing-only authorization.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
   prerequisite; schema only if contracts cannot distinguish safely).
 - Per-advisory license-inspection parse and duplicate-aware license
