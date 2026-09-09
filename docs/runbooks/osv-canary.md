@@ -14,11 +14,28 @@ lease acquisition, heartbeat start, deadline arming, catalog activation,
 matching, or Finding writes.
 
 Distinguish these states; they are not interchangeable:
-- authorization prepared (`authorized_preflight_required`)
-- preflight passed
-- provider contact separately authorized
-- canary executed
-- canary evidence reviewed
+
+1. Canary phase authorization (`authorized_preflight_required` after
+   consume).
+2. Provider-free preflight
+   (`canary_execution_preflight_passed_provider_contact_not_authorized`).
+3. Provider-contact authorization evaluation (`persistence_required` until
+   durable issuance adapters exist after Session 13 Batch 3B-P-R).
+4. Independent provider-contact authorization review.
+5. Future durable provider-contact authorization issuance and consumption
+   (schema exists after Session 13 Batch 3B-P; adapters remain later, then
+   Batch 3C).
+6. Future operator execution confirmation.
+7. Future lease, heartbeat, deadline, and ownership setup.
+8. Provider contact.
+9. Postcanary review.
+
+Batch 3B evaluates listing-only provider-contact prerequisites and fails
+closed with `persistence_required`. **Batch 3B does not authorize the operator to
+execute the provider call.** It does not mint in-memory authorization. Batch 3B-P
+persists the distinct listing-only schema only; it does not issue or consume
+an authorization. Batch 3C must not proceed without reloading and consuming
+durable authority after issuance adapters exist.
 
 Halt is rechecked at each protected command and preflight checkpoint.
 Lease inspection remains read-only. Controller readiness starts no timer.
@@ -32,10 +49,12 @@ Do not enable OSV. Do not treat halt release as canary authorization.
 Do not include secrets or destructive commands.
 
 No production operator CLI is registered. The one-shot command, preflight,
-and listing-only execution-bridge factories remain uncomposed. The Batch 3A
-bridge supports **scripted provider execution only** and was independently
-reviewed in Batch 3A-R. Real-provider capability does not exist.
-Provider-facing execution steps remain **unavailable until Batch 3B**.
+listing-only execution-bridge, and provider-contact authorization
+factories remain uncomposed. The Batch 3A bridge supports **scripted
+provider execution only** and was independently reviewed in Batch 3A-R.
+Real-provider capability does not exist. Provider-facing execution steps
+remain unavailable until durable issuance adapters and
+separately authorized Batch 3C consumption.
 Escalation owner is the instance operator until
 [OD-10](../architecture/open-decisions.md) is closed. Legal questions
 escalate to the instance legal and provenance reviewer. Security incidents
@@ -87,8 +106,18 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Evidence to collect:** Preflight outcome identifier; authorization,
   request, and run identities; halt result; lease-inspection status
   without holder secrets; heartbeat and deadline policy readiness;
-  egress application-control evidence; local dependency result;
+  legal-decision identity and listing-metadata permission only;
+  deployment egress-evidence identity and control classes;
+  DNS, TLS, redirect, proxy, and prohibited-address evidence classes
+  without hostnames, addresses, or certificates;
+  operator runbook version;
+  emergency-containment acknowledgement;
+  postcanary reviewer assignment (independent of the issuing operator);
+  evidence-retention disposition;
   active-pointer baseline; zero-Finding counts; remaining closed gates.
+  Provider-rate budget remains the committed listing-only profile
+  (retries 0). Postrun halt restoration remains required after any later
+  dedicated process.
 - **Forbidden actions:** Treating preflight success as provider
   permission; contacting a provider; acquiring a lease; starting
   heartbeat or deadline timers; releasing halt as a substitute for
@@ -100,29 +129,78 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   `canary_execution_preflight_passed_provider_contact_not_authorized`
   or a closed failure with provider calls 0. No provider request issued.
 
+## 2A. Provider-contact authorization evaluation
+
+- **Purpose:** Evaluate whether listing-only real-provider contact
+  prerequisites are satisfied. This is not execution and is not durable
+  authorization.
+- **Prerequisites:** Durable consumed listing-only canary authorization
+  bound to the exact request and run; accepted provider-free preflight
+  evidence with `providerContactAuthorized=false`; current listing-metadata
+  legal approval; versioned egress and deployment evidence; heartbeat and
+  deadline policy versions; runbook, containment, independent reviewer,
+  and retention acknowledgements; active-pointer and zero-Finding
+  baselines. Halt procedure acknowledgement is required. Halt is not
+  cleared.
+- **Trigger:** Operator intends to evaluate listing-only provider-contact
+  authorization after provider-free preflight.
+- **Immediate containment:** Do not construct a real-provider capability.
+  Do not resolve DNS. Do not send HTTP. Do not acquire a lease. Do not
+  start heartbeat or deadline timers. Do not consume the original canary
+  authorization again.
+- **Evidence to collect:** Closed failure `persistence_required` after
+  other gates pass, or an earlier named failure; source canary
+  authorization identity; request and run; halt observed and not cleared;
+  provider, DNS, HTTP, lease, and timer counts 0.
+- **Forbidden actions:** Treating evaluation as Batch 3C execution
+  permission; minting in-memory authorization to skip durable issuance;
+  contacting a provider; enabling OSV; using halt false as
+  authorization; substituting bounded-body or body-retrieval legal
+  approval; using generic `ready: true` as egress evidence; self-review
+  by the issuing operator.
+- **Recovery:** Close the named failure. Restore halt if it was
+  temporarily released in a dedicated process. Re-evaluate after the
+  missing evidence is current. Do not invent a replacement authorization.
+- **Escalation role:** Instance operator. Independent postcanary
+  reviewer assignment is required and is not the issuing operator.
+- **Closure criteria:** Evaluation remains `persistence_required` after
+  other gates pass, or a named earlier failure. `providerContactStarted`
+  is false. Schema existence after Batch 3B-P still issues nothing.
+  Batch 3C remains blocked until durable issuance adapters exist. No
+  provider request issued.
+
 ## 3. Halt release and restoration
 
 - **Purpose:** Release acquisition halt only for a dedicated command or
-  preflight process snapshot, then restore it.
+  preflight process snapshot, then restore it. Provider-contact
+  authorization evaluation observes halt and does not clear it.
 - **Prerequisites:** An issued authorization exists for command
   preparation, or a consumed authorization exists for preflight. Halt
-  release is not authorization and does not enable OSV.
+  release is not authorization and does not enable OSV. Batch 3B
+  evaluation must fail closed under default halt when the halt procedure
+  is acknowledged (`persistence_required` after other gates, or
+  `halt_procedure_not_ready` if acknowledgement is missing).
 - **Trigger:** Command or preflight reports `halt_engaged` under default
   or explicit halt.
 - **Immediate containment:** Do not start worker or API with halt
-  released. Do not change shared production environment files.
+  released. Do not change shared production environment files. Do not
+  treat halt false as provider-contact authorization.
 - **Evidence to collect:** Halt control and source; authorization state;
   no lease mutation; no provider calls.
 - **Forbidden actions:** Using halt release as execution permission;
-  leaving halt released in production worker or API processes.
+  leaving halt released in production worker or API processes; clearing
+  halt from Batch 3B evaluation.
 - **Recovery:** Restore halt to default halted. Re-run command
   preparation or preflight only in the dedicated process that explicitly
-  released halt.
+  released halt. Plan halt release for a later Batch 3C execution only
+  after durable provider-contact authorization exists.
 - **Escalation role:** Instance operator.
 - **Closure criteria:** Production processes remain halted. Dedicated
   command preparation either reached `authorized_preflight_required` or
   stopped at `halt_engaged`. Dedicated preflight either passed with halt
-  rechecked or stopped at `halt_engaged`.
+  rechecked or stopped at `halt_engaged`. Batch 3B evaluation either
+  failed `persistence_required` after observing halt or failed
+  `halt_procedure_not_ready`.
 
 ## 4. Lease unavailable or ambiguous
 
@@ -154,7 +232,8 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Prerequisites:** Preflight validates cadence 60000 ms, lease TTL
   900000 ms, one in-flight heartbeat, pending capacity 0.
 - **Trigger:** `heartbeat_policy_not_ready` or a Batch 3A controller start
-  failure. Real-provider start remains unavailable until Batch 3B.
+  failure. Real-provider start remains unavailable until durable
+  provider-contact authorization is issued and consumed after Batch 3B-P.
 - **Immediate containment:** Do not call heartbeat start. Do not
   schedule catch-up.
 - **Evidence to collect:** Policy identifier; interval; TTL; in-flight
@@ -169,7 +248,8 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 ## 6. Heartbeat ownership loss
 
 - **Purpose:** Contain ownership loss after a later heartbeat start.
-  Real-provider execution remains unavailable until Batch 3B.
+  Real-provider execution remains unavailable until durable
+  provider-contact authorization is issued and consumed after Batch 3B-P.
 - **Prerequisites:** A later guarded owner exists. Preflight itself does
   not start heartbeat.
 - **Trigger:** Ownership lost, fencing changed, or expiry observed during
@@ -190,7 +270,8 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 
 - **Purpose:** Contain an exceeded 1800000 ms monotonic phase deadline.
   Batch 3A arms the listing-only deadline before scripted listing.
-  Real-provider arming remains unavailable until Batch 3B.
+  Real-provider arming remains unavailable until durable
+  provider-contact authorization is issued and consumed after Batch 3B-P.
 - **Prerequisites:** Deadline policy ready during preflight. Timer not
   armed by preflight.
 - **Trigger:** `deadline_policy_not_ready` now, or a later armed timer
@@ -214,18 +295,23 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   bucket, redirect rejection, DNS-pinning policy, prohibited-address
   policy, TLS verification, post-connect peer verification, cloud
   metadata denial, no caller-selected proxy.
-- **Trigger:** `egress_policy_not_ready` or missing operational evidence.
+- **Trigger:** `egress_policy_not_ready`, `egress_evidence_missing`,
+  `egress_evidence_stale`, or missing operational evidence.
 - **Immediate containment:** Do not resolve provider DNS. Do not open
   TLS. Do not send HTTP.
 - **Evidence to collect:** Evidence class per control
-  (`application_control_verified`,
-  `deployment_control_declared_but_not_externally_proven`, or
-  `missing_operational_evidence`). DNS, TLS, and provider call counts
-  remain 0.
+  (`application_control_implemented_and_tested`,
+  `deployment_control_configured`,
+  `deployment_control_independently_verified`,
+  `provider_connectivity_not_exercised`, or
+  `missing_required_evidence`). Generic `ready: true` is insufficient.
+  DNS, TLS, and provider call counts remain 0. Hostnames, IP addresses,
+  proxy values, and certificate material are omitted.
 - **Forbidden actions:** Claiming network-level enforcement that is not
-  configured; disabling certificate verification; selecting a proxy.
-- **Recovery:** Restore missing controls. Re-run preflight without
-  external probes.
+  configured; disabling certificate verification; selecting a proxy;
+  probing the provider to mint evidence.
+- **Recovery:** Restore missing controls. Re-run preflight and Batch 3B
+  evaluation without external probes.
 - **Escalation role:** Instance security reviewer.
 - **Closure criteria:** Required controls are present. Missing evidence
   still blocks success.
@@ -233,7 +319,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 ## 9. Provider unavailable
 
 - **Purpose:** Contain a later provider outage. Real-provider contact remains
-  unavailable until Batch 3B.
+  unavailable until durable provider-contact authorization is issued and consumed after Batch 3B-P.
 - **Prerequisites:** Preflight succeeded or failed without provider
   calls. Production remains halted.
 - **Trigger:** A later Batch 3 listing or retrieval cannot complete.
@@ -271,7 +357,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 
 - **Purpose:** Fail closed on listing continuation-cycle detection.
   Listing execution against a scripted port exists in uncomposed Batch 3A.
-  Real-provider listing remains unavailable until Batch 3B.
+  Real-provider listing remains unavailable until durable provider-contact authorization is issued and consumed after Batch 3B-P.
 - **Prerequisites:** In-memory cycle detection policy from Session 12
   Batch 3/4.
 - **Trigger:** `listing_token_cycle` during a later listing-only phase.
@@ -291,7 +377,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 
 - **Purpose:** Stop when pass A and pass B do not converge. Scripted listing
   execution exists in uncomposed Batch 3A. Real-provider listing remains
-  unavailable until Batch 3B.
+  unavailable until durable provider-contact authorization is issued and consumed after Batch 3B-P.
 - **Prerequisites:** Two-pass inventory policy. Canary completeness
   cannot satisfy production completeness.
 - **Trigger:** Nonconvergence during a later listing-only phase.
@@ -310,7 +396,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 
 - **Purpose:** Stop at exact canary listing ceilings. Scripted Batch 3A
   enforces those ceilings. Real-provider execution remains unavailable
-  until Batch 3B.
+  until durable provider-contact authorization is issued and consumed after Batch 3B-P.
 - **Prerequisites:** Canary ceilings 8/16 pages, 2000/4000 observations,
   8,388,608 / 16,777,216 listing bytes.
 - **Trigger:** Ceiling exceeded by one during a later listing-only phase.
@@ -357,7 +443,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Forbidden actions:** DELETE of the lease projection; fencing reset;
   releasing another holder's lease.
 - **Recovery:** Inspect read-only. If expired, later guarded takeover
-  remains unavailable until Batch 3B.
+  remains unavailable until durable provider-contact authorization is issued and consumed after Batch 3B-P.
 - **Escalation role:** Instance operator.
 - **Closure criteria:** Lease row remains durable. Preflight mutation
   count 0.
@@ -408,7 +494,8 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   Provider contact remains separately authorized.
 - **Trigger:** Preflight success or any later terminal canary result.
 - **Immediate containment:** Do not proceed to activation, matching, or
-  Findings. Do not treat Batch 3A scripted success as Batch 3B authorization.
+  Findings. Do not treat Batch 3A scripted success or Batch 3B
+  in-memory evaluation as Batch 3C execution permission.
 - **Evidence to collect:** Authorization identity; request and run;
   phase; remaining gates; halt restored; lease inspection; baselines.
 - **Forbidden actions:** Treating review as execution permission;

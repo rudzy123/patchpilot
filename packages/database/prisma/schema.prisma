@@ -773,6 +773,21 @@ enum OsvCanaryLegalPermittedOperation {
   @@map("osv_canary_legal_permitted_operation")
 }
 
+/// Session 13 Batch 3B-P listing-only provider-contact authorization lifecycle.
+/// Distinct from OsvCanaryAuthorizationState. consumed_for_listing_execution is
+/// the single consumption edge. No retry or bounded-body state exists.
+enum OsvListingProviderContactAuthorizationState {
+  issued
+  consumed_for_listing_execution
+  completed
+  failed
+  cancelled
+  revoked
+  expired
+
+  @@map("osv_listing_provider_contact_authorization_state")
+}
+
 enum ExternalCredentialStatus {
   pending
   active
@@ -2260,9 +2275,12 @@ model OsvRuntimeSynchronizationRequest {
   requestState           OsvRuntimeJobRequestState       @map("request_state")
   createdAt              DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  runs                              OsvRuntimeSynchronizationRun[]
-  consumedCanaryAuthorizations      OsvCanaryAuthorization[]       @relation("OsvCanaryAuthorizationConsumedRequest")
-  listingReviewCanaryAuthorizations OsvCanaryAuthorization[]       @relation("OsvCanaryAuthorizationListingRequest")
+  runs                                         OsvRuntimeSynchronizationRun[]
+  consumedCanaryAuthorizations                 OsvCanaryAuthorization[]                    @relation("OsvCanaryAuthorizationConsumedRequest")
+  listingReviewCanaryAuthorizations            OsvCanaryAuthorization[]                    @relation("OsvCanaryAuthorizationListingRequest")
+  listingProviderContactAuthorizations         OsvListingProviderContactAuthorization[]    @relation("OsvListingProviderContactRequest")
+  consumedListingProviderContactAuthorizations OsvListingProviderContactAuthorization[]    @relation("OsvListingProviderContactConsumedRequest")
+  providerFreePreflightAttestations            OsvCanaryProviderFreePreflightAttestation[] @relation("OsvCanaryProviderFreePreflightRequest")
 
   @@unique([id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], map: "osv_runtime_sync_request_pin_key")
   @@unique([operatorRequestId], map: "osv_runtime_sync_request_operator_uidx")
@@ -2292,11 +2310,14 @@ model OsvRuntimeSynchronizationRun {
   createdAt                          DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                          DateTime                        @map("updated_at") @db.Timestamptz(6)
 
-  request                           OsvRuntimeSynchronizationRequest @relation(fields: [requestId, workScope, synchronizationReason, versionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict)
-  leases                            OsvRuntimeLeaseProjection[]
-  attempts                          OsvRuntimeStageAttempt[]
-  consumedCanaryAuthorizations      OsvCanaryAuthorization[]         @relation("OsvCanaryAuthorizationConsumedRun")
-  listingReviewCanaryAuthorizations OsvCanaryAuthorization[]         @relation("OsvCanaryAuthorizationListingRun")
+  request                                      OsvRuntimeSynchronizationRequest            @relation(fields: [requestId, workScope, synchronizationReason, versionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict)
+  leases                                       OsvRuntimeLeaseProjection[]
+  attempts                                     OsvRuntimeStageAttempt[]
+  consumedCanaryAuthorizations                 OsvCanaryAuthorization[]                    @relation("OsvCanaryAuthorizationConsumedRun")
+  listingReviewCanaryAuthorizations            OsvCanaryAuthorization[]                    @relation("OsvCanaryAuthorizationListingRun")
+  listingProviderContactAuthorizations         OsvListingProviderContactAuthorization[]    @relation("OsvListingProviderContactRun")
+  consumedListingProviderContactAuthorizations OsvListingProviderContactAuthorization[]    @relation("OsvListingProviderContactConsumedRun")
+  providerFreePreflightAttestations            OsvCanaryProviderFreePreflightAttestation[] @relation("OsvCanaryProviderFreePreflightRun")
 
   @@unique([requestId], map: "osv_runtime_sync_run_request_uidx")
   @@unique([id, requestId], map: "osv_runtime_sync_run_id_request_uidx")
@@ -2382,8 +2403,11 @@ model OsvCanaryInstanceOperatorIdentity {
   revokedAt             DateTime?                       @map("revoked_at") @db.Timestamptz(6)
   createdAt             DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  issuedAuthorizations  OsvCanaryAuthorization[] @relation("OsvCanaryAuthorizationIssuer")
-  revokedAuthorizations OsvCanaryAuthorization[] @relation("OsvCanaryAuthorizationRevoker")
+  issuedAuthorizations                    OsvCanaryAuthorization[]                    @relation("OsvCanaryAuthorizationIssuer")
+  revokedAuthorizations                   OsvCanaryAuthorization[]                    @relation("OsvCanaryAuthorizationRevoker")
+  issuedProviderContactAuthorizations     OsvListingProviderContactAuthorization[]    @relation("OsvListingProviderContactAuthorizationIssuer")
+  revokedProviderContactAuthorizations    OsvListingProviderContactAuthorization[]    @relation("OsvListingProviderContactAuthorizationRevoker")
+  issuedProviderFreePreflightAttestations OsvCanaryProviderFreePreflightAttestation[] @relation("OsvCanaryProviderFreePreflightAttestationOperator")
 
   @@index([status], map: "osv_canary_operator_identity_status_idx")
   @@map("osv_canary_instance_operator_identity")
@@ -2482,14 +2506,16 @@ model OsvCanaryAuthorization {
   revokedByOperatorIdentityId        String?                      @map("revoked_by_operator_identity_id") @db.Uuid
   createdAt                          DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  operatorIdentity          OsvCanaryInstanceOperatorIdentity  @relation("OsvCanaryAuthorizationIssuer", fields: [operatorIdentityId], references: [id], onDelete: Restrict)
-  revokedByOperatorIdentity OsvCanaryInstanceOperatorIdentity? @relation("OsvCanaryAuthorizationRevoker", fields: [revokedByOperatorIdentityId], references: [id], onDelete: Restrict)
-  listingAuthorization      OsvCanaryAuthorization?            @relation("OsvCanaryAuthorizationListingReview", fields: [listingAuthorizationId], references: [id], onDelete: Restrict)
-  boundedBodyAuthorizations OsvCanaryAuthorization[]           @relation("OsvCanaryAuthorizationListingReview")
-  listingRequest            OsvRuntimeSynchronizationRequest?  @relation("OsvCanaryAuthorizationListingRequest", fields: [listingRequestId], references: [id], onDelete: Restrict)
-  listingRun                OsvRuntimeSynchronizationRun?      @relation("OsvCanaryAuthorizationListingRun", fields: [listingRunId], references: [id], onDelete: Restrict)
-  consumedRequest           OsvRuntimeSynchronizationRequest?  @relation("OsvCanaryAuthorizationConsumedRequest", fields: [consumedBySynchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict)
-  consumedRun               OsvRuntimeSynchronizationRun?      @relation("OsvCanaryAuthorizationConsumedRun", fields: [consumedBySynchronizationRunId, consumedBySynchronizationRequestId], references: [id, requestId], onDelete: Restrict)
+  operatorIdentity                     OsvCanaryInstanceOperatorIdentity           @relation("OsvCanaryAuthorizationIssuer", fields: [operatorIdentityId], references: [id], onDelete: Restrict)
+  revokedByOperatorIdentity            OsvCanaryInstanceOperatorIdentity?          @relation("OsvCanaryAuthorizationRevoker", fields: [revokedByOperatorIdentityId], references: [id], onDelete: Restrict)
+  listingAuthorization                 OsvCanaryAuthorization?                     @relation("OsvCanaryAuthorizationListingReview", fields: [listingAuthorizationId], references: [id], onDelete: Restrict)
+  boundedBodyAuthorizations            OsvCanaryAuthorization[]                    @relation("OsvCanaryAuthorizationListingReview")
+  listingRequest                       OsvRuntimeSynchronizationRequest?           @relation("OsvCanaryAuthorizationListingRequest", fields: [listingRequestId], references: [id], onDelete: Restrict)
+  listingRun                           OsvRuntimeSynchronizationRun?               @relation("OsvCanaryAuthorizationListingRun", fields: [listingRunId], references: [id], onDelete: Restrict)
+  consumedRequest                      OsvRuntimeSynchronizationRequest?           @relation("OsvCanaryAuthorizationConsumedRequest", fields: [consumedBySynchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict)
+  consumedRun                          OsvRuntimeSynchronizationRun?               @relation("OsvCanaryAuthorizationConsumedRun", fields: [consumedBySynchronizationRunId, consumedBySynchronizationRequestId], references: [id, requestId], onDelete: Restrict)
+  listingProviderContactAuthorizations OsvListingProviderContactAuthorization[]    @relation("OsvListingProviderContactSourceAuthorization")
+  providerFreePreflightAttestations    OsvCanaryProviderFreePreflightAttestation[] @relation("OsvCanaryProviderFreePreflightSourceAuthorization")
 
   @@index([state, expiresAt], map: "osv_canary_authorization_state_expires_idx")
   @@index([operatorIdentityId, issuedAt], map: "osv_canary_authorization_operator_issued_idx")
@@ -2498,6 +2524,191 @@ model OsvCanaryAuthorization {
   @@index([phase, state], map: "osv_canary_authorization_phase_state_idx")
   @@index([revokedByOperatorIdentityId], map: "osv_canary_authorization_revoker_idx")
   @@map("osv_canary_authorization")
+}
+
+/// Session 13 Batch 3B-P / 3B-P-R durable accepted provider-free preflight
+/// attestation. Global, instance-owned. Pins the Batch 2F success outcome
+/// that provider contact remained unauthorized. Not a complete readiness
+/// payload and not arbitrary JSON. INSERT-once and DELETE-forbidden. Insert
+/// requires an active operator and a consumed listing-only source whose
+/// provider, prefix, budget, request, run, and fingerprint match.
+/// captured_at and created_at cannot be after database now. Schema only.
+model OsvCanaryProviderFreePreflightAttestation {
+  id String @id @db.Uuid
+
+  evidenceSchemaVersion          String                          @map("evidence_schema_version") @db.VarChar(128)
+  sourceCanaryAuthorizationId    String                          @map("source_canary_authorization_id") @db.Uuid
+  operatorIdentityId             String                          @map("operator_identity_id") @db.Uuid
+  synchronizationRequestId       String                          @map("synchronization_request_id") @db.Uuid
+  synchronizationRunId           String                          @map("synchronization_run_id") @db.Uuid
+  /// Closed identifier listing_only. SQL CHECK rejects any other phase.
+  phase                          String                          @db.VarChar(32)
+  providerIdentity               String                          @map("provider_identity") @db.VarChar(128)
+  approvedPrefix                 String                          @map("approved_prefix") @db.VarChar(32)
+  canaryPolicyIdentifier         String                          @map("canary_policy_identifier") @db.VarChar(128)
+  listingBudgetProfile           String                          @map("listing_budget_profile") @db.VarChar(128)
+  workScope                      OsvRuntimeWorkScope             @map("work_scope")
+  leaseScope                     String                          @map("lease_scope") @db.VarChar(128)
+  synchronizationReason          OsvRuntimeSynchronizationReason @map("synchronization_reason")
+  runtimeVersionSetFingerprint   String                          @map("runtime_version_set_fingerprint") @db.Text
+  legalDecisionVersion           String                          @map("legal_decision_version") @db.VarChar(128)
+  egressEvidenceVersion          String                          @map("egress_evidence_version") @db.VarChar(128)
+  heartbeatPolicyIdentifier      String                          @map("heartbeat_policy_identifier") @db.VarChar(128)
+  deadlinePolicyIdentifier       String                          @map("deadline_policy_identifier") @db.VarChar(128)
+  activePointerBaselineIdentity  String                          @map("active_pointer_baseline_identity") @db.Uuid
+  zeroFindingBaselineIdentity    String                          @map("zero_finding_baseline_identity") @db.Uuid
+  outcome                        String                          @db.VarChar(128)
+  providerContactAuthorized      Boolean                         @map("provider_contact_authorized")
+  executionPermitted             Boolean                         @map("execution_permitted")
+  acceptedForProviderContactAuth Boolean                         @map("accepted_for_provider_contact_authorization")
+  capturedAt                     DateTime                        @map("captured_at") @db.Timestamptz(6)
+  createdAt                      DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sourceCanaryAuthorization           OsvCanaryAuthorization                  @relation("OsvCanaryProviderFreePreflightSourceAuthorization", fields: [sourceCanaryAuthorizationId], references: [id], onDelete: Restrict, map: "osv_canary_provider_free_preflight_source_fkey")
+  operatorIdentity                    OsvCanaryInstanceOperatorIdentity       @relation("OsvCanaryProviderFreePreflightAttestationOperator", fields: [operatorIdentityId], references: [id], onDelete: Restrict, map: "osv_canary_provider_free_preflight_operator_fkey")
+  synchronizationRequest              OsvRuntimeSynchronizationRequest        @relation("OsvCanaryProviderFreePreflightRequest", fields: [synchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict, map: "osv_canary_provider_free_preflight_request_fkey")
+  synchronizationRun                  OsvRuntimeSynchronizationRun            @relation("OsvCanaryProviderFreePreflightRun", fields: [synchronizationRunId, synchronizationRequestId], references: [id, requestId], onDelete: Restrict, map: "osv_canary_provider_free_preflight_run_fkey")
+  listingProviderContactAuthorization OsvListingProviderContactAuthorization?
+
+  @@unique([sourceCanaryAuthorizationId], map: "osv_canary_provider_free_preflight_source_uidx")
+  @@unique([synchronizationRequestId], map: "osv_canary_provider_free_preflight_request_uidx")
+  @@unique([synchronizationRunId], map: "osv_canary_provider_free_preflight_run_uidx")
+  @@index([operatorIdentityId], map: "osv_canary_provider_free_preflight_operator_idx")
+  @@map("osv_canary_provider_free_preflight_attestation")
+}
+
+/// Session 13 Batch 3B-P / 3B-P-R distinct listing-only OSV provider-contact
+/// authorization. Global, instance-owned, tenant-independent. One row
+/// authorizes at most one future listing-only provider contact. It cannot
+/// reuse OsvCanaryAuthorization. Body retrieval, parser, retry, activation,
+/// matching, and Finding writes remain prohibited. DELETE is forbidden.
+/// issued_at cannot be after database now and cannot precede preflight
+/// captured_at. Consumption rechecks that the operator is active, the source
+/// canary authorization is still consumed, and the bound preflight still
+/// attests unauthorized provider contact. A consumed source cannot leave
+/// consumed while this row is issued or consumed_for_listing_execution.
+/// Schema only; no issuance, consumption, CLI, or provider contact.
+model OsvListingProviderContactAuthorization {
+  id String @id @db.Uuid
+
+  authorizationSchemaVersion  String @map("authorization_schema_version") @db.VarChar(128)
+  sourceCanaryAuthorizationId String @map("source_canary_authorization_id") @db.Uuid
+  operatorIdentityId          String @map("operator_identity_id") @db.Uuid
+  synchronizationRequestId    String @map("synchronization_request_id") @db.Uuid
+  synchronizationRunId        String @map("synchronization_run_id") @db.Uuid
+  preflightEvidenceId         String @map("preflight_evidence_id") @db.Uuid
+
+  /// Closed identifier listing_only. SQL CHECK rejects any other phase.
+  phase                          String                          @db.VarChar(32)
+  providerIdentity               String                          @map("provider_identity") @db.VarChar(128)
+  bucketIdentity                 String                          @map("bucket_identity") @db.VarChar(64)
+  listingApiPathPolicy           String                          @map("listing_api_path_policy") @db.VarChar(128)
+  listingProtocol                String                          @map("listing_protocol") @db.VarChar(128)
+  approvedPrefix                 String                          @map("approved_prefix") @db.VarChar(32)
+  family                         String                          @db.VarChar(32)
+  canaryPolicyIdentifier         String                          @map("canary_policy_identifier") @db.VarChar(128)
+  listingBudgetProfile           String                          @map("listing_budget_profile") @db.VarChar(128)
+  workScope                      OsvRuntimeWorkScope             @map("work_scope")
+  leaseScope                     String                          @map("lease_scope") @db.VarChar(128)
+  synchronizationReason          OsvRuntimeSynchronizationReason @map("synchronization_reason")
+  runtimeArchitectureIdentifier  String                          @map("runtime_architecture_identifier") @db.VarChar(128)
+  runtimeVersionSetFingerprint   String                          @map("runtime_version_set_fingerprint") @db.Text
+  queryGrammarPolicy             String                          @map("query_grammar_policy") @db.VarChar(32)
+  transportPolicy                String                          @map("transport_policy") @db.VarChar(128)
+  contentEncodingPolicy          String                          @map("content_encoding_policy") @db.VarChar(32)
+  redirectPolicy                 String                          @map("redirect_policy") @db.VarChar(32)
+  unusedTtlSeconds               Int                             @map("unused_ttl_seconds")
+  singleUsePolicy                String                          @map("single_use_policy") @db.VarChar(32)
+  providerRetryAuthorization     String                          @map("provider_retry_authorization") @db.VarChar(32)
+  providerBodyAuthorization      String                          @map("provider_body_authorization") @db.VarChar(32)
+  parserAuthorization            String                          @map("parser_authorization") @db.VarChar(32)
+  catalogActivationAuthorization String                          @map("catalog_activation_authorization") @db.VarChar(32)
+  matchingAuthorization          String                          @map("matching_authorization") @db.VarChar(32)
+  findingAuthorization           String                          @map("finding_authorization") @db.VarChar(32)
+
+  legalApprovalIdentifier            String   @map("legal_approval_identifier") @db.VarChar(128)
+  legalDecisionId                    String   @map("legal_decision_id") @db.Uuid
+  sourceCanaryLegalDecisionId        String   @map("source_canary_legal_decision_id") @db.Uuid
+  legalDecisionSourceRegistryVersion String   @map("legal_decision_source_registry_version") @db.VarChar(128)
+  legalListingMetadataPermission     String   @map("legal_listing_metadata_permission") @db.VarChar(32)
+  legalBodyRetrievalPermission       String   @map("legal_body_retrieval_permission") @db.VarChar(32)
+  legalParsingPermission             String   @map("legal_parsing_permission") @db.VarChar(32)
+  legalMatchingPermission            String   @map("legal_matching_permission") @db.VarChar(32)
+  legalIssuedAt                      DateTime @map("legal_issued_at") @db.Timestamptz(6)
+  legalRevalidationBoundaryAt        DateTime @map("legal_revalidation_boundary_at") @db.Timestamptz(6)
+  legalEvidenceSetId                 String   @map("legal_evidence_set_id") @db.Uuid
+  legalApprovalRole                  String   @map("legal_approval_role") @db.VarChar(128)
+  legalSupersessionStatus            String   @map("legal_supersession_status") @db.VarChar(32)
+
+  egressEvidenceIdentifier      String   @map("egress_evidence_identifier") @db.VarChar(128)
+  egressEvidenceId              String   @map("egress_evidence_id") @db.Uuid
+  egressEvidenceVersion         String   @map("egress_evidence_version") @db.VarChar(128)
+  egressReviewerRole            String   @map("egress_reviewer_role") @db.VarChar(128)
+  egressReviewedAt              DateTime @map("egress_reviewed_at") @db.Timestamptz(6)
+  providerConnectivityExercised Boolean  @map("provider_connectivity_exercised")
+
+  deploymentApprovalIdentifier  String   @map("deployment_approval_identifier") @db.VarChar(128)
+  deploymentId                  String   @map("deployment_id") @db.Uuid
+  environmentClass              String   @map("environment_class") @db.VarChar(128)
+  runtimeArtifactVersion        String   @map("runtime_artifact_version") @db.VarChar(128)
+  configurationFingerprint      String   @map("configuration_fingerprint") @db.Text
+  observabilityPolicy           String   @map("observability_policy") @db.VarChar(128)
+  deploymentApprovalRole        String   @map("deployment_approval_role") @db.VarChar(128)
+  deploymentApprovedAt          DateTime @map("deployment_approved_at") @db.Timestamptz(6)
+  invalidatesOnDeploymentChange Boolean  @map("invalidates_on_deployment_change")
+
+  heartbeatPolicyIdentifier String @map("heartbeat_policy_identifier") @db.VarChar(128)
+  deadlinePolicyIdentifier  String @map("deadline_policy_identifier") @db.VarChar(128)
+
+  runbookSetIdentifier              String   @map("runbook_set_identifier") @db.VarChar(128)
+  runbookVersion                    String   @map("runbook_version") @db.VarChar(128)
+  runbookAcknowledgedAt             DateTime @map("runbook_acknowledged_at") @db.Timestamptz(6)
+  haltProcedureIdentifier           String   @map("halt_procedure_identifier") @db.VarChar(128)
+  haltAcknowledgedAt                DateTime @map("halt_acknowledged_at") @db.Timestamptz(6)
+  containmentCatalogIdentifier      String   @map("containment_catalog_identifier") @db.VarChar(128)
+  containmentAcknowledgedAt         DateTime @map("containment_acknowledged_at") @db.Timestamptz(6)
+  postcanaryReviewPolicyIdentifier  String   @map("postcanary_review_policy_identifier") @db.VarChar(128)
+  requiredReviewRole                String   @map("required_review_role") @db.VarChar(128)
+  reviewerAssignedAt                DateTime @map("reviewer_assigned_at") @db.Timestamptz(6)
+  issuingOperatorMayReview          Boolean  @map("issuing_operator_may_review")
+  automaticProgression              Boolean  @map("automatic_progression")
+  evidenceRetentionPolicyIdentifier String   @map("evidence_retention_policy_identifier") @db.VarChar(128)
+  retentionAcknowledgedAt           DateTime @map("retention_acknowledged_at") @db.Timestamptz(6)
+
+  activePointerBaselineIdentity String @map("active_pointer_baseline_identity") @db.Uuid
+  zeroFindingBaselineIdentity   String @map("zero_finding_baseline_identity") @db.Uuid
+
+  issuedAt                           DateTime                                     @default(now()) @map("issued_at") @db.Timestamptz(6)
+  expiresAt                          DateTime                                     @map("expires_at") @db.Timestamptz(6)
+  state                              OsvListingProviderContactAuthorizationState
+  consumedAt                         DateTime?                                    @map("consumed_at") @db.Timestamptz(6)
+  consumedBySynchronizationRequestId String?                                      @map("consumed_by_synchronization_request_id") @db.Uuid
+  consumedBySynchronizationRunId     String?                                      @map("consumed_by_synchronization_run_id") @db.Uuid
+  terminalAt                         DateTime?                                    @map("terminal_at") @db.Timestamptz(6)
+  terminalDisposition                OsvListingProviderContactAuthorizationState? @map("terminal_disposition")
+  terminalReasonCode                 String?                                      @map("terminal_reason_code") @db.VarChar(64)
+  revokedAt                          DateTime?                                    @map("revoked_at") @db.Timestamptz(6)
+  revokedByOperatorIdentityId        String?                                      @map("revoked_by_operator_identity_id") @db.Uuid
+  createdAt                          DateTime                                     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sourceCanaryAuthorization OsvCanaryAuthorization                    @relation("OsvListingProviderContactSourceAuthorization", fields: [sourceCanaryAuthorizationId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_source_fkey")
+  operatorIdentity          OsvCanaryInstanceOperatorIdentity         @relation("OsvListingProviderContactAuthorizationIssuer", fields: [operatorIdentityId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_operator_fkey")
+  revokedByOperatorIdentity OsvCanaryInstanceOperatorIdentity?        @relation("OsvListingProviderContactAuthorizationRevoker", fields: [revokedByOperatorIdentityId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_revoker_fkey")
+  preflightEvidence         OsvCanaryProviderFreePreflightAttestation @relation(fields: [preflightEvidenceId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_preflight_fkey")
+  synchronizationRequest    OsvRuntimeSynchronizationRequest          @relation("OsvListingProviderContactRequest", fields: [synchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict, map: "osv_listing_provider_contact_request_fkey")
+  synchronizationRun        OsvRuntimeSynchronizationRun              @relation("OsvListingProviderContactRun", fields: [synchronizationRunId, synchronizationRequestId], references: [id, requestId], onDelete: Restrict, map: "osv_listing_provider_contact_run_fkey")
+  consumedRequest           OsvRuntimeSynchronizationRequest?         @relation("OsvListingProviderContactConsumedRequest", fields: [consumedBySynchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict, map: "osv_listing_provider_contact_consumed_request_fkey")
+  consumedRun               OsvRuntimeSynchronizationRun?             @relation("OsvListingProviderContactConsumedRun", fields: [consumedBySynchronizationRunId, consumedBySynchronizationRequestId], references: [id, requestId], onDelete: Restrict, map: "osv_listing_provider_contact_consumed_run_fkey")
+
+  @@unique([sourceCanaryAuthorizationId], map: "osv_listing_provider_contact_source_uidx")
+  @@unique([synchronizationRequestId], map: "osv_listing_provider_contact_request_uidx")
+  @@unique([synchronizationRunId], map: "osv_listing_provider_contact_run_uidx")
+  @@unique([preflightEvidenceId], map: "osv_listing_provider_contact_preflight_uidx")
+  @@index([state, expiresAt], map: "osv_listing_provider_contact_state_expires_idx")
+  @@index([operatorIdentityId, issuedAt], map: "osv_listing_provider_contact_operator_issued_idx")
+  @@index([consumedBySynchronizationRunId], map: "osv_listing_provider_contact_consumed_run_idx")
+  @@index([revokedByOperatorIdentityId], map: "osv_listing_provider_contact_revoker_idx")
+  @@map("osv_listing_provider_contact_authorization")
 }
 
 model Integration {

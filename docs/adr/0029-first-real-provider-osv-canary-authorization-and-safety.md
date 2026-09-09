@@ -1350,11 +1350,97 @@ rechecked before every page; halt during listing remains `halt_engaged`
 and still releases a current lease; a generic listing `policy_violation`
 is not classified as ownership loss. Fresh operator confirmation remains
 mandatory. Real-provider capability remains absent. Production composition
-does not construct the factory. Next checkpoint is Session 13 Batch 3B
-listing-only provider canary authorization.
+does not construct the factory. Next checkpoint relative to this
+Batch 3A-R note was Session 13 Batch 3B listing-only provider-contact
+authorization.
 
 This note does not change the Accepted status of this ADR and does not
 authorize real provider contact.
+
+## Session 13 Batch 3B implementation note
+
+Session 13 Batch 3B implements uncomposed
+`createOsvListingProviderContactAuthorizationService` in
+`@patchpilot/vulnerability-intelligence`
+(`src/osv/canary-provider-contact-authorization/`). The operation is
+`evaluateOsvListingProviderContactAuthorization`. Fresh instance-operator
+confirmation remains mandatory. Only an existing consumed listing-only
+canary authorization bound to the exact request and run may proceed.
+Accepted provider-free preflight evidence must keep
+`providerContactAuthorized=false`. Current listing-metadata legal approval
+is required; body retrieval remains prohibited. Versioned egress and
+deployment evidence are fail-closed; generic `ready: true` is insufficient.
+Heartbeat and deadline policies are validated without starting timers.
+Acquisition halt is observed and not cleared. Existing
+`osv_canary_authorization` cannot represent this without phase and
+lifecycle ambiguity. After other gates pass, evaluation fails closed with
+`persistence_required` and does not return an in-memory authorization
+package. Session 13 Batch 3B-P later added the distinct schema. Durable
+issuance adapters remain later. No real-provider capability exists.
+Production composition does not construct the factory. No public CLI, API,
+scheduler, or job route is added. Batch 3B-R is deferred until durable
+issuance exists. Batch 3C remains blocked until durable issuance exists.
+
+This note does not change the Accepted status of this ADR and does not
+authorize real provider contact, body retrieval, production enablement,
+scheduler registration, automatic retry, catalog activation, matching, or
+Finding writes.
+
+## Session 13 Batch 3B-P implementation note
+
+Session 13 Batch 3B-P adds schema-only persistence for a distinct
+listing-only OSV provider-contact authorization. Existing
+`osv_canary_authorization` is not reused. Migration
+`20260909120000_osv_listing_provider_contact_authorization_persistence`
+(frozen SHA-256
+`8e9a462e329733660b970adca64fcadce0431d65f342d15dbaecf08b91a80bbc`).
+Sixteen frozen migrations. All fifteen prior migrations remain
+byte-for-byte unchanged. Tables `osv_canary_provider_free_preflight_attestation`
+and `osv_listing_provider_contact_authorization` are global and instance
+owned. One provider-contact authorization binds one consumed listing-only
+source canary authorization, one request, one run, and one accepted
+provider-free preflight attestation. Listing-only is the only representable
+phase. Body retrieval remains prohibited. Database time owns issuance,
+expiration, consumption, revocation, and terminalization. DELETE is
+forbidden. Schema existence does not issue or consume an authorization.
+No issuance or consumption adapter exists. Session 13 Batch 3B evaluation
+still fails closed with `persistence_required`. Production composition does
+not construct the evaluation factory. No public CLI, API, scheduler, or job
+route is added. Session 13 Batch 3B-P-R independently reviewed and hardened
+that uncommitted schema before freeze. Next checkpoint is durable listing-only
+provider-contact authorization issuance. Batch 3C remains blocked until
+durable issuance exists.
+
+This note does not change the Accepted status of this ADR and does not
+authorize real provider contact, body retrieval, production enablement,
+scheduler registration, automatic retry, catalog activation, matching, or
+Finding writes.
+
+## Session 13 Batch 3B-P-R implementation note
+
+Session 13 Batch 3B-P-R independently reviewed the uncommitted Batch 3B-P
+schema with disposable PostgreSQL and direct SQL. It did not contact
+`storage.googleapis.com` or `osv.dev`. Migration
+`20260909120000_osv_listing_provider_contact_authorization_persistence`
+(frozen SHA-256 after review
+`8e9a462e329733660b970adca64fcadce0431d65f342d15dbaecf08b91a80bbc`).
+Sixteen frozen migrations. Concrete corrections: future `issued_at` is
+rejected; `issued_at` cannot precede preflight `captured_at`; future
+preflight timestamps and future `consumed_at` are rejected; consumption
+rechecks an active operator, a still-consumed source canary authorization,
+a current legal revalidation boundary, and the bound preflight still
+attesting unauthorized provider contact; a consumed source cannot leave
+consumed while a child grant is issued or
+`consumed_for_listing_execution`; insert matches source provider, prefix,
+family, policy, and listing budget. Schema existence still does not issue or consume an
+authorization. No issuance or consumption adapter exists. Batch 3B
+evaluation still fails closed with `persistence_required`. Next checkpoint
+is durable issuance. Batch 3C remains blocked until durable issuance exists.
+
+This note does not change the Accepted status of this ADR and does not
+authorize real provider contact, body retrieval, production enablement,
+scheduler registration, automatic retry, catalog activation, matching, or
+Finding writes.
 
 Remaining Session 13 execution gates after this combined review:
 
@@ -1377,7 +1463,15 @@ Remaining Session 13 execution gates after this combined review:
 - Session 13 Batch 3A: listing-only execution bridge against a scripted
   provider port implemented and uncomposed. Real-provider capability does
   not exist. Session 13 Batch 3A-R independently reviewed that bridge.
-  Next is Batch 3B real-provider listing-only authorization.
+- Session 13 Batch 3B: listing-only provider-contact authorization
+  evaluation implemented and uncomposed. After other gates pass,
+  evaluation fails closed with `persistence_required` and does not mint
+  in-memory authority.
+- Session 13 Batch 3B-P: schema-only distinct listing-only provider-contact
+  authorization persistence implemented. Session 13 Batch 3B-P-R independently
+  reviewed and froze that schema. Next is durable issuance. Batch 3B-R
+  of the evaluation service remains deferred until durable issuance exists.
+  Batch 3C remains blocked until durable issuance exists.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
   prerequisite; schema only if contracts cannot distinguish safely).
 - Per-advisory license-inspection parse and duplicate-aware license

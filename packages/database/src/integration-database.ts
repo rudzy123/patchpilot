@@ -82,6 +82,10 @@ export const FROZEN_MIGRATIONS = [
     directory: '20260908120000_osv_canary_authorization_persistence',
     sha256: '321ac38a02090470aa5f09661cb0e29562327c16c9e341b44bc99516bd7fbd99',
   },
+  {
+    directory: '20260909120000_osv_listing_provider_contact_authorization_persistence',
+    sha256: '8e9a462e329733660b970adca64fcadce0431d65f342d15dbaecf08b91a80bbc',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
@@ -107,6 +111,9 @@ export const SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE =
 export const SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE =
   '20260908120000_osv_canary_authorization_persistence' as const;
 
+export const SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE =
+  '20260909120000_osv_listing_provider_contact_authorization_persistence' as const;
+
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
   '20260827120000_tenant_model',
@@ -123,6 +130,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
   SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
   SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
+  SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
