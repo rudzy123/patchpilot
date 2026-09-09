@@ -1016,19 +1016,24 @@ Session 13 sequence:
    boundary.
 5. **Batch 2C:** heartbeat and deadline controllers.
 6. **Batch 2D:** executable runbooks and preflight.
-7. **Batch 2-R:** combined operational-control adversarial review.
-8. **Batch 3:** listing-only real-provider canary execution, only after legal
-   revalidation, configured operator attestation, heartbeat, runbooks, and
-   egress proof.
-9. **Batch 3-R:** listing-canary evidence review.
-10. **Batch 4:** bounded provider-body canary execution, only after listing
+7. **Batch 2-R:** combined operational-control adversarial review (this
+   checkpoint). The listing-only execution bridge does not yet exist.
+8. **Batch 3A:** listing-only execution bridge and final operator-confirmation
+   contract, implemented and tested against a scripted provider port only.
+   No real provider contact.
+9. **Batch 3A-R:** execution-bridge adversarial review.
+10. **Batch 3B:** explicitly authorized listing-only real-provider canary
+    execution, only after legal revalidation, configured operator attestation,
+    the reviewed Batch 3A bridge, heartbeat, runbooks, and egress proof.
+11. **Batch 3B-R:** listing-canary evidence review.
+12. **Batch 4:** bounded provider-body canary execution, only after listing
     evidence accepted, license-field gate, retention disposition, duplicate-aware
     license classification, and canary-ineligible candidate marker.
-11. **Batch 4-R:** body, parser, storage, and legal evidence review.
-12. **Batch 5:** catalog-activation architecture and authorization review.
-13. **Batch 6:** explicit activation implementation, if authorized.
-14. **Batch 6-R:** activation and rollback adversarial review.
-15. **Session 13 closure:** session-wide review and PR.
+13. **Batch 4-R:** body, parser, storage, and legal evidence review.
+14. **Batch 5:** catalog-activation architecture and authorization review.
+15. **Batch 6:** explicit activation implementation, if authorized.
+16. **Batch 6-R:** activation and rollback adversarial review.
+17. **Session 13 closure:** session-wide review and PR.
 
 Batch 1-R permitted changes: documentation, this Accepted ADR, narrow
 contracts, invariant tests. Forbidden: CLI, job route, heartbeat controller,
@@ -1292,13 +1297,29 @@ that are declared but not externally proven. Active-pointer and
 activation-history reads share one read-only Repeatable Read transaction.
 Zero-Finding baseline captures bounded counts and canary-attributed write
 proofs; global Finding absence is not required. Success still does not
-authorize provider contact. Next checkpoint is Session 13 Batch 2-R
+authorize provider contact. Next checkpoint was Session 13 Batch 2-R
 combined operational-controls review.
+
+## Session 13 Batch 2-R implementation note
+
+Session 13 Batch 2-R independently reviewed the combined operational-control
+chain. Authentication establishes identity only. Authorization remains
+distinct from halt and lease ownership. One authorization is consumed once.
+The command stops at `authorized_preflight_required`. Preflight success is
+`canary_execution_preflight_passed_provider_contact_not_authorized` and is
+not permission to contact a provider. Lease inspection remains read-only.
+Heartbeat and deadline readiness start no timers. No production CLI, API,
+scheduler, or job route is registered. The listing-only execution bridge
+does not exist. Next checkpoint is Session 13 Batch 3A listing-only
+execution bridge against a scripted provider port, then Batch 3A-R review,
+then separately authorized Batch 3B real-provider listing-only execution.
 
 This note does not change the Accepted status of this ADR and does not
 authorize provider contact, listing-only execution, body retrieval,
 production enablement, scheduler registration, automatic retry, catalog
 activation, matching, or Finding writes.
+
+Remaining Session 13 execution gates after this combined review:
 
 - Legal and provenance revalidation of listing contact and, separately, RustSec
   body permissions.
@@ -1314,7 +1335,10 @@ activation, matching, or Finding writes.
 - Session 13 Batch 2F: executable preflight and operator runbooks implemented
   and uncomposed. Success does not authorize provider contact. Session 13
   Batch 2F-R independently reviewed that preflight.
-- Session 13 Batch 2-R: combined operational-control adversarial review.
+- Session 13 Batch 2-R: combined operational-control adversarial review
+  complete. No execution bridge. Next is Batch 3A (scripted listing-only
+  bridge), then Batch 3A-R, then Batch 3B real-provider listing-only
+  authorization.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
   prerequisite; schema only if contracts cannot distinguish safely).
 - Per-advisory license-inspection parse and duplicate-aware license

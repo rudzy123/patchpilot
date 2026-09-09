@@ -2,21 +2,25 @@
 
 These procedures support Accepted
 [ADR 0029](../adr/0029-first-real-provider-osv-canary-authorization-and-safety.md).
-Session 13 Batch 2F adds an uncomposed executable preflight
-(`createOsvCanaryPreflightService`) whose success outcome is
+Session 13 Batch 2-R independently reviewed the combined operational-control
+chain: instance-operator identity, injected authentication, durable
+authority inspection, phase-specific single-use authorization, the one-shot
+command, halt ordering, request/run ensure, executable preflight, read-only
+lease inspection, heartbeat and deadline policy readiness, and operator
+runbooks. Preflight success remains
 `canary_execution_preflight_passed_provider_contact_not_authorized`.
 That outcome is evidence only. It does not authorize provider contact,
 lease acquisition, heartbeat start, deadline arming, catalog activation,
 matching, or Finding writes.
 
 Distinguish these states; they are not interchangeable:
+- authorization prepared (`authorized_preflight_required`)
 - preflight passed
 - provider contact separately authorized
 - canary executed
 - canary evidence reviewed
 
-Session 13 Batch 2F-R adversarially reviewed that preflight. Halt is
-rechecked at each protected checkpoint and immediately before success.
+Halt is rechecked at each protected command and preflight checkpoint.
 Lease inspection remains read-only. Controller readiness starts no timer.
 Egress readiness performs no external DNS or HTTP. Observability sink
 readiness is an operational gate and is not workflow authority.
@@ -27,14 +31,48 @@ Do not contact `storage.googleapis.com` or `osv.dev` from this document.
 Do not enable OSV. Do not treat halt release as canary authorization.
 Do not include secrets or destructive commands.
 
-Provider-facing execution steps are **unavailable until Batch 3** is
-separately authorized. Escalation owner is the instance operator until
+No production operator CLI is registered. The one-shot command and
+preflight factories remain uncomposed. The listing-only execution bridge
+is **unavailable until Session 13 Batch 3A** is implemented and reviewed
+against a scripted provider port. Provider-facing execution steps are
+**unavailable until Batch 3**, specifically Batch 3B after the Batch 3A
+bridge is independently reviewed. Escalation owner is the instance operator until
 [OD-10](../architecture/open-decisions.md) is closed. Legal questions
 escalate to the instance legal and provenance reviewer. Security incidents
 escalate to the instance security reviewer. No procedure authorizes
 evidence deletion, catalog activation, matching, or Finding mutation.
 
-## 1. Canary authorization preflight
+## 1. Canary authorization preparation
+
+- **Purpose:** Authenticate one instance operator, load one existing
+  issued authorization, evaluate halt independently, ensure one canary
+  request and run, and consume the authorization once.
+- **Prerequisites:** Durable issued authorization already exists. The
+  command does not create operator identity or authorization. Production
+  authentication remains unimplemented. No public CLI.
+- **Trigger:** Operator intends to prepare listing-only (or a later
+  bounded-body) canary work after legal issuance and before preflight.
+- **Immediate containment:** Do not start a CLI, scheduler, lease, timer,
+  or provider request. Default halt must remain engaged in production
+  worker and API processes.
+- **Evidence to collect:** Outcome `authorized_preflight_required`;
+  authorization, request, and run identities; halt decision;
+  `executionPermitted` false; provider and lease call counts 0.
+- **Forbidden actions:** Treating command success as execution
+  permission; creating authorization through the command; using a tenant
+  User, Organization role, or anonymous identity; logging authentication
+  proof; acquiring a lease; starting heartbeat or deadline; contacting a
+  provider; resetting a consumed authorization to issued.
+- **Recovery:** Same-run replay is status reuse only and does not start
+  a second execution. Different-run replay is rejected. If halt blocked
+  consumption, leave the authorization issued, restore halt, and retry
+  preparation only after halt is released in a dedicated process.
+- **Escalation role:** Instance operator.
+- **Closure criteria:** Outcome is `authorized_preflight_required` with
+  `executionPermitted=false`, or a closed failure with provider calls 0.
+  Preflight remains required.
+
+## 2. Canary authorization preflight
 
 - **Purpose:** Prove whether one consumed canary authorization and its
   authoritative request and run are ready for a later separately
@@ -62,28 +100,31 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   `canary_execution_preflight_passed_provider_contact_not_authorized`
   or a closed failure with provider calls 0. No provider request issued.
 
-## 2. Halt release and restoration
+## 3. Halt release and restoration
 
-- **Purpose:** Release acquisition halt only for a dedicated preflight
-  process snapshot, then restore it.
-- **Prerequisites:** Consumed authorization already exists. Halt release
-  is not authorization and does not enable OSV.
-- **Trigger:** Preflight reports `halt_engaged` under default or explicit
-  halt.
+- **Purpose:** Release acquisition halt only for a dedicated command or
+  preflight process snapshot, then restore it.
+- **Prerequisites:** An issued authorization exists for command
+  preparation, or a consumed authorization exists for preflight. Halt
+  release is not authorization and does not enable OSV.
+- **Trigger:** Command or preflight reports `halt_engaged` under default
+  or explicit halt.
 - **Immediate containment:** Do not start worker or API with halt
   released. Do not change shared production environment files.
-- **Evidence to collect:** Halt control and source; authorization still
-  consumed; no lease mutation; no provider calls.
+- **Evidence to collect:** Halt control and source; authorization state;
+  no lease mutation; no provider calls.
 - **Forbidden actions:** Using halt release as execution permission;
   leaving halt released in production worker or API processes.
-- **Recovery:** Restore halt to default halted. Re-run preflight only in
-  the dedicated process that explicitly released halt.
+- **Recovery:** Restore halt to default halted. Re-run command
+  preparation or preflight only in the dedicated process that explicitly
+  released halt.
 - **Escalation role:** Instance operator.
 - **Closure criteria:** Production processes remain halted. Dedicated
-  preflight either passed with halt rechecked or stopped at
-  `halt_engaged`.
+  command preparation either reached `authorized_preflight_required` or
+  stopped at `halt_engaged`. Dedicated preflight either passed with halt
+  rechecked or stopped at `halt_engaged`.
 
-## 3. Lease unavailable or ambiguous
+## 4. Lease unavailable or ambiguous
 
 - **Purpose:** Interpret a read-only lease-scope inspection without
   acquiring, taking over, heartbeating, or releasing.
@@ -106,7 +147,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** Preflight remains failed closed. Lease row
   revision and fencing are unchanged by preflight.
 
-## 4. Heartbeat startup failure
+## 5. Heartbeat startup failure
 
 - **Purpose:** Handle heartbeat policy that is not ready without starting
   a timer.
@@ -125,7 +166,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Escalation role:** Instance operator.
 - **Closure criteria:** Heartbeat remains unstarted. Provider calls 0.
 
-## 5. Heartbeat ownership loss
+## 6. Heartbeat ownership loss
 
 - **Purpose:** Contain ownership loss after a later heartbeat start.
   Execution remains unavailable until Batch 3.
@@ -145,7 +186,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** No further heartbeat. Lease not mutated by
   preflight. Review opened.
 
-## 6. Canary deadline exceeded
+## 7. Canary deadline exceeded
 
 - **Purpose:** Contain an exceeded 1800000 ms monotonic phase deadline.
   Arming remains unavailable until Batch 3.
@@ -164,7 +205,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** Deadline remains unarmed after preflight, or a
   later Batch 3 run is terminal with no provider retry.
 
-## 7. Egress-policy failure
+## 8. Egress-policy failure
 
 - **Purpose:** Fail closed when application or declared deployment
   egress controls are missing. No provider DNS or HTTP.
@@ -188,7 +229,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** Required controls are present. Missing evidence
   still blocks success.
 
-## 8. Provider unavailable
+## 9. Provider unavailable
 
 - **Purpose:** Contain a later provider outage. Contact remains
   unavailable until Batch 3.
@@ -206,7 +247,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** No automatic retry. Authorization remains
   consumed. Provider calls remain bounded to the later Batch 3 attempt.
 
-## 9. HTTP 429 or provider-rate concern
+## 10. HTTP 429 or provider-rate concern
 
 - **Purpose:** Treat rate limiting as terminal for the first canary.
   Retry-After execution is unavailable until Batch 3 and remains
@@ -225,7 +266,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Escalation role:** Instance operator.
 - **Closure criteria:** Retry disposition is `no_automatic_retry`.
 
-## 10. Listing token cycle
+## 11. Listing token cycle
 
 - **Purpose:** Fail closed on listing continuation-cycle detection.
   Listing execution is unavailable until Batch 3.
@@ -244,7 +285,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** No further listing I/O. Evidence omits
   continuation handles.
 
-## 11. Inventory nonconvergence
+## 12. Inventory nonconvergence
 
 - **Purpose:** Stop when pass A and pass B do not converge. Listing
   execution is unavailable until Batch 3.
@@ -262,7 +303,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** Body retrieval remains 0. Activation remains
   prohibited.
 
-## 12. Listing ceiling reached
+## 13. Listing ceiling reached
 
 - **Purpose:** Stop at exact canary listing ceilings. Execution is
   unavailable until Batch 3.
@@ -278,7 +319,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Escalation role:** Instance operator.
 - **Closure criteria:** Counts remain exact. No provider retry.
 
-## 13. Operator cancellation
+## 14. Operator cancellation
 
 - **Purpose:** Stop preflight or a later phase at the next cancellation
   boundary without resetting authorization or mutating the lease.
@@ -298,7 +339,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** One bounded result. Provider calls 0. Retry
   disposition `no_automatic_retry`.
 
-## 14. Lease release uncertainty
+## 15. Lease release uncertainty
 
 - **Purpose:** Handle uncertainty about whether a later owner still
   holds the lease. Preflight does not release.
@@ -317,7 +358,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** Lease row remains durable. Preflight mutation
   count 0.
 
-## 15. Unexpected active-pointer mutation
+## 16. Unexpected active-pointer mutation
 
 - **Purpose:** Detect unauthorized catalog-pointer change. Preflight
   captures a read-only baseline and must not modify the pointer.
@@ -336,7 +377,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** Pointer unchanged by preflight. Activation
   remains prohibited.
 
-## 16. Unexpected tenant or Finding activity
+## 17. Unexpected tenant or Finding activity
 
 - **Purpose:** Prove zero-tenant and zero-Finding baselines and contain
   unexpected Finding or tenant-scoped activity.
@@ -355,7 +396,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** Counts unchanged by preflight. Session remains
   zero-Finding for canary work.
 
-## 17. Postcanary evidence review
+## 18. Postcanary evidence review
 
 - **Purpose:** Require postcanary review after any later phase.
   Review is mandatory even if preflight passed.
@@ -363,7 +404,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   Provider contact remains separately authorized.
 - **Trigger:** Preflight success or any later terminal canary result.
 - **Immediate containment:** Do not proceed to activation, matching, or
-  Findings. Do not start Batch 3 from review notes.
+  Findings. Do not start Batch 3A or Batch 3B from review notes.
 - **Evidence to collect:** Authorization identity; request and run;
   phase; remaining gates; halt restored; lease inspection; baselines.
 - **Forbidden actions:** Treating review as execution permission;
@@ -374,7 +415,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   by the instance operator.
 - **Closure criteria:** Review recorded. Activation still prohibited.
 
-## 18. Evidence retention and cleanup
+## 19. Evidence retention and cleanup
 
 - **Purpose:** Keep immutable canary evidence and bound cleanup so
   fencing and single-use authority cannot reset.
