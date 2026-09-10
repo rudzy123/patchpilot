@@ -788,6 +788,138 @@ enum OsvListingProviderContactAuthorizationState {
   @@map("osv_listing_provider_contact_authorization_state")
 }
 
+/// Session 13 Batch 3D-S protected listing-observation evidence-set lifecycle.
+/// constructed and duplicate_ambiguous may be persisted. Terminal states cannot
+/// reopen. review_accepted does not grant body, selection, or Finding authority.
+enum OsvListingObservationEvidenceSetState {
+  constructed
+  incomplete
+  overflow_rejected
+  conflict_quarantine_required
+  duplicate_ambiguous
+  malformed_rejected
+  review_pending
+  review_accepted
+  review_rejected
+  failed
+  purged
+
+  @@map("osv_listing_observation_evidence_set_state")
+}
+
+enum OsvListingObservationSetCandidateReadiness {
+  metadata_complete_selection_not_authorized
+  empty_page_not_candidate_ready
+  ineligible_incomplete
+  ineligible_overflow
+  ineligible_conflict
+  ineligible_duplicate_ambiguity
+  ineligible_binding_mismatch
+  review_not_accepted
+
+  @@map("osv_listing_observation_set_candidate_readiness")
+}
+
+enum OsvListingObservationCandidateSelectionEligibility {
+  eligible_for_later_selection_evaluation
+  ineligible_unknown_or_ambiguous_family
+  ineligible_unclassifiable_family
+  ineligible_declared_size
+  ineligible_missing_protected_identity
+  ineligible_missing_generation
+  ineligible_duplicate
+  ineligible_conflict
+  ineligible_set_incomplete
+
+  @@map("osv_listing_observation_candidate_selection_eligibility")
+}
+
+enum OsvListingObservationDuplicateClassification {
+  none
+  exact_duplicate
+  duplicate_across_translator_positions
+  malformed_duplicate
+
+  @@map("osv_listing_observation_duplicate_classification")
+}
+
+enum OsvListingObservationImmutableConflictClassification {
+  none
+  declared_size_mismatch_same_object_generation
+  source_family_mismatch_same_object_generation
+  classification_mismatch_same_object_generation
+  binding_mismatch_same_object_generation
+  provider_key_digest_collision
+  cross_object_generation_substitution
+
+  @@map("osv_listing_observation_immutable_conflict_classification")
+}
+
+enum OsvListingObservationLegalHoldClassification {
+  hold_absent
+  legal_hold_active
+  hold_released
+
+  @@map("osv_listing_observation_legal_hold_classification")
+}
+
+enum OsvListingObservationRetentionOverdueClassification {
+  not_overdue
+  retention_overdue_review_required_no_automatic_delete
+
+  @@map("osv_listing_observation_retention_overdue_classification")
+}
+
+/// Persistable envelope states only. plaintext_protected_in_memory and
+/// pending_protection cannot be stored.
+enum OsvListingObservationEnvelopeState {
+  current
+  rotation_pending
+  decrypt_only
+  rotation_required
+  retired
+  failed
+  erased
+
+  @@map("osv_listing_observation_envelope_state")
+}
+
+enum OsvListingObservationEnvelopeRotationState {
+  current
+  rotation_required
+  rotated
+  not_applicable_policy_only
+
+  @@map("osv_listing_observation_envelope_rotation_state")
+}
+
+enum OsvListingObservationEnvelopeErasureState {
+  not_erased
+  erasure_eligible
+  cryptographically_erased
+  erasure_blocked
+
+  @@map("osv_listing_observation_envelope_erasure_state")
+}
+
+enum OsvListingObservationKeyVersionClassification {
+  current
+  historical
+
+  @@map("osv_listing_observation_key_version_classification")
+}
+
+enum OsvListingObservationPurgeErasureOutcome {
+  envelopes_redacted_metadata_retained
+  blocked_legal_hold
+  blocked_dependency_authorization
+  blocked_cleanup_unauthorized
+  already_erased_cannot_restore
+  shared_key_collateral_erasure_rejected
+
+  @@map("osv_listing_observation_purge_erasure_outcome")
+}
+
 enum ExternalCredentialStatus {
   pending
   active
@@ -2281,6 +2413,7 @@ model OsvRuntimeSynchronizationRequest {
   listingProviderContactAuthorizations         OsvListingProviderContactAuthorization[]    @relation("OsvListingProviderContactRequest")
   consumedListingProviderContactAuthorizations OsvListingProviderContactAuthorization[]    @relation("OsvListingProviderContactConsumedRequest")
   providerFreePreflightAttestations            OsvCanaryProviderFreePreflightAttestation[] @relation("OsvCanaryProviderFreePreflightRequest")
+  listingObservationEvidenceSets               OsvListingObservationEvidenceSet[]          @relation("OsvListingObservationEvidenceSetRequest")
 
   @@unique([id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], map: "osv_runtime_sync_request_pin_key")
   @@unique([operatorRequestId], map: "osv_runtime_sync_request_operator_uidx")
@@ -2318,6 +2451,7 @@ model OsvRuntimeSynchronizationRun {
   listingProviderContactAuthorizations         OsvListingProviderContactAuthorization[]    @relation("OsvListingProviderContactRun")
   consumedListingProviderContactAuthorizations OsvListingProviderContactAuthorization[]    @relation("OsvListingProviderContactConsumedRun")
   providerFreePreflightAttestations            OsvCanaryProviderFreePreflightAttestation[] @relation("OsvCanaryProviderFreePreflightRun")
+  listingObservationEvidenceSets               OsvListingObservationEvidenceSet[]          @relation("OsvListingObservationEvidenceSetRun")
 
   @@unique([requestId], map: "osv_runtime_sync_run_request_uidx")
   @@unique([id, requestId], map: "osv_runtime_sync_run_id_request_uidx")
@@ -2697,8 +2831,9 @@ model OsvListingProviderContactAuthorization {
   preflightEvidence         OsvCanaryProviderFreePreflightAttestation @relation(fields: [preflightEvidenceId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_preflight_fkey")
   synchronizationRequest    OsvRuntimeSynchronizationRequest          @relation("OsvListingProviderContactRequest", fields: [synchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict, map: "osv_listing_provider_contact_request_fkey")
   synchronizationRun        OsvRuntimeSynchronizationRun              @relation("OsvListingProviderContactRun", fields: [synchronizationRunId, synchronizationRequestId], references: [id, requestId], onDelete: Restrict, map: "osv_listing_provider_contact_run_fkey")
-  consumedRequest           OsvRuntimeSynchronizationRequest?         @relation("OsvListingProviderContactConsumedRequest", fields: [consumedBySynchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict, map: "osv_listing_provider_contact_consumed_request_fkey")
-  consumedRun               OsvRuntimeSynchronizationRun?             @relation("OsvListingProviderContactConsumedRun", fields: [consumedBySynchronizationRunId, consumedBySynchronizationRequestId], references: [id, requestId], onDelete: Restrict, map: "osv_listing_provider_contact_consumed_run_fkey")
+  consumedRequest                OsvRuntimeSynchronizationRequest?         @relation("OsvListingProviderContactConsumedRequest", fields: [consumedBySynchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict, map: "osv_listing_provider_contact_consumed_request_fkey")
+  consumedRun                    OsvRuntimeSynchronizationRun?             @relation("OsvListingProviderContactConsumedRun", fields: [consumedBySynchronizationRunId, consumedBySynchronizationRequestId], references: [id, requestId], onDelete: Restrict, map: "osv_listing_provider_contact_consumed_run_fkey")
+  listingObservationEvidenceSets OsvListingObservationEvidenceSet[]
 
   @@unique([sourceCanaryAuthorizationId], map: "osv_listing_provider_contact_source_uidx")
   @@unique([synchronizationRequestId], map: "osv_listing_provider_contact_request_uidx")
@@ -2709,6 +2844,225 @@ model OsvListingProviderContactAuthorization {
   @@index([consumedBySynchronizationRunId], map: "osv_listing_provider_contact_consumed_run_idx")
   @@index([revokedByOperatorIdentityId], map: "osv_listing_provider_contact_revoker_idx")
   @@map("osv_listing_provider_contact_authorization")
+}
+
+/// Session 13 Batch 3D-S protected listing-observation evidence set.
+/// Global, instance-owned, tenant-independent. One set binds one listing
+/// execution, one listing-only provider-contact authorization, one request,
+/// one run, one provider, one prefix, page 1, and one runtime version set.
+/// Counts, review lifecycle, legal hold, and retention-overdue markers may
+/// mutate under trigger guard. Binding, policy, and authority columns are
+/// insert-once. DELETE is forbidden. `failed`, `review_accepted`,
+/// `review_rejected`, and `purged` are successor-only. Schema only; no
+/// encryption, adapter, or provider contact. review_accepted does not
+/// grant body retrieval.
+model OsvListingObservationEvidenceSet {
+  id String @id @db.Uuid
+
+  evidenceSchemaVersion            String @map("evidence_schema_version") @db.VarChar(128)
+  evidencePolicyId                 String @map("evidence_policy_id") @db.VarChar(128)
+  purposeId                        String @map("purpose_id") @db.VarChar(128)
+  ownership                        String @db.VarChar(64)
+  listingExecutionId               String @map("listing_execution_id") @db.Uuid
+  providerContactAuthorizationId   String @map("provider_contact_authorization_id") @db.Uuid
+  synchronizationRequestId         String @map("synchronization_request_id") @db.Uuid
+  synchronizationRunId             String @map("synchronization_run_id") @db.Uuid
+  provider                         String @db.VarChar(32)
+  approvedPrefix                   String @map("approved_prefix") @db.VarChar(32)
+  listingProtocolId                String @map("listing_protocol_id") @db.VarChar(128)
+  listingPolicyId                  String @map("listing_policy_id") @db.VarChar(128)
+  budgetProfileId                  String @map("budget_profile_id") @db.VarChar(128)
+  workScope                        OsvRuntimeWorkScope             @map("work_scope")
+  leaseScope                       String                          @map("lease_scope") @db.VarChar(128)
+  synchronizationReason            OsvRuntimeSynchronizationReason @map("synchronization_reason")
+  runtimeVersionSetFingerprint     String @map("runtime_version_set_fingerprint") @db.Text
+  sourceLicenseRegistryVersion     String @map("source_license_registry_version") @db.VarChar(128)
+  classificationPolicyId           String @map("classification_policy_id") @db.VarChar(128)
+  canonicalEvidenceSetAlgorithmId  String @map("canonical_evidence_set_algorithm_id") @db.VarChar(128)
+  encryptionPolicyId               String @map("encryption_policy_id") @db.VarChar(128)
+  associatedDataPolicyId           String @map("associated_data_policy_id") @db.VarChar(128)
+  associatedDataAlgorithmId        String @map("associated_data_algorithm_id") @db.VarChar(128)
+  envelopeSchemaVersion            String @map("envelope_schema_version") @db.VarChar(128)
+  algorithmId                      String @map("algorithm_id") @db.VarChar(32)
+  retentionPolicyId                String @map("retention_policy_id") @db.VarChar(128)
+  pageOrdinal                      Int    @map("page_ordinal")
+  canonicalEvidenceSetDigest       String @map("canonical_evidence_set_digest") @db.Text
+
+  translatorObservationCount   Int    @map("translator_observation_count")
+  acceptedObservationCount     Int    @map("accepted_observation_count")
+  protectedObservationCount    Int    @map("protected_observation_count")
+  rejectedObservationCount     Int    @map("rejected_observation_count")
+  exactDuplicateCount          Int    @map("exact_duplicate_count")
+  duplicateAmbiguityCount      Int    @map("duplicate_ambiguity_count")
+  immutableConflictCount       Int    @map("immutable_conflict_count")
+  totalProtectedKeyPlaintextBytes BigInt @map("total_protected_key_plaintext_bytes")
+  totalEnvelopeBytes           BigInt @map("total_envelope_bytes")
+  totalCanonicalBytes          BigInt @map("total_canonical_bytes")
+  totalMetadataBytes           BigInt @map("total_metadata_bytes")
+  eventCount                   Int    @map("event_count")
+
+  evidenceState                  OsvListingObservationEvidenceSetState            @map("evidence_state")
+  candidateSelectionReadiness    OsvListingObservationSetCandidateReadiness       @map("candidate_selection_readiness")
+  retentionOverdueClassification OsvListingObservationRetentionOverdueClassification @map("retention_overdue_classification")
+  legalHoldActive                Boolean                                          @map("legal_hold_active")
+  legalHoldClassification        OsvListingObservationLegalHoldClassification     @map("legal_hold_classification")
+  dependentAuthorizationsTerminal Boolean                                         @map("dependent_authorizations_terminal")
+  candidateSelectionAuthorized   Boolean                                          @map("candidate_selection_authorized")
+  bodyRetrievalAuthorized        Boolean                                          @map("body_retrieval_authorized")
+  batch4pPermitted               Boolean                                          @map("batch_4p_permitted")
+  paginationAuthorized           Boolean                                          @map("pagination_authorized")
+  activationAuthorized           Boolean                                          @map("activation_authorized")
+  matchingAuthorized             Boolean                                          @map("matching_authorized")
+  findingWritesAuthorized        Boolean                                          @map("finding_writes_authorized")
+  providerContactAuthorized      Boolean                                          @map("provider_contact_authorized")
+
+  rowRevision          BigInt    @map("row_revision")
+  capturedAt           DateTime  @default(now()) @map("captured_at") @db.Timestamptz(6)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  reviewRecordedAt     DateTime? @map("review_recorded_at") @db.Timestamptz(6)
+  legalHoldChangedAt   DateTime? @map("legal_hold_changed_at") @db.Timestamptz(6)
+  retentionOverdueAt   DateTime? @map("retention_overdue_at") @db.Timestamptz(6)
+  purgedAt             DateTime? @map("purged_at") @db.Timestamptz(6)
+
+  providerContactAuthorization OsvListingProviderContactAuthorization @relation(fields: [providerContactAuthorizationId], references: [id], onDelete: Restrict, map: "osv_listing_observation_evidence_set_authorization_fkey")
+  synchronizationRequest       OsvRuntimeSynchronizationRequest       @relation("OsvListingObservationEvidenceSetRequest", fields: [synchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict, map: "osv_listing_observation_evidence_set_request_fkey")
+  synchronizationRun           OsvRuntimeSynchronizationRun           @relation("OsvListingObservationEvidenceSetRun", fields: [synchronizationRunId, synchronizationRequestId], references: [id, requestId], onDelete: Restrict, map: "osv_listing_observation_evidence_set_run_fkey")
+  observations                 OsvListingObservationEvidence[]
+  envelopes                    OsvListingObservationEvidenceEnvelope[]
+  purgeRecords                 OsvListingObservationEvidencePurge[]
+
+  @@unique([listingExecutionId], map: "osv_listing_observation_evidence_set_execution_uidx")
+  @@unique([providerContactAuthorizationId], map: "osv_listing_observation_evidence_set_authorization_uidx")
+  @@unique([synchronizationRequestId], map: "osv_listing_observation_evidence_set_request_uidx")
+  @@unique([synchronizationRunId], map: "osv_listing_observation_evidence_set_run_uidx")
+  @@unique([id, listingExecutionId, providerContactAuthorizationId, synchronizationRequestId, synchronizationRunId, provider, approvedPrefix, listingProtocolId, sourceLicenseRegistryVersion, runtimeVersionSetFingerprint], map: "osv_listing_observation_evidence_set_aad_pin")
+  @@index([evidenceState], map: "osv_listing_observation_evidence_set_state_idx")
+  @@index([retentionOverdueClassification], map: "osv_listing_observation_evidence_set_retention_idx")
+  @@index([legalHoldActive], map: "osv_listing_observation_evidence_set_legal_hold_idx")
+  @@map("osv_listing_observation_evidence_set")
+}
+
+/// Session 13 Batch 3D-S protected listing observation. Immutable metadata
+/// plus associated-data context. The encrypted identity lives on envelope
+/// version rows, never as plaintext. INSERT-once. DELETE forbidden.
+model OsvListingObservationEvidence {
+  id String @id @db.Uuid
+
+  evidenceSetId                    String @map("evidence_set_id") @db.Uuid
+  listingExecutionId               String @map("listing_execution_id") @db.Uuid
+  providerContactAuthorizationId   String @map("provider_contact_authorization_id") @db.Uuid
+  synchronizationRequestId         String @map("synchronization_request_id") @db.Uuid
+  synchronizationRunId             String @map("synchronization_run_id") @db.Uuid
+  provider                         String @db.VarChar(32)
+  approvedPrefix                   String @map("approved_prefix") @db.VarChar(32)
+  listingProtocolId                String @map("listing_protocol_id") @db.VarChar(128)
+  sourceLicenseRegistryVersion     String @map("source_license_registry_version") @db.VarChar(128)
+  runtimeVersionSetFingerprint     String @map("runtime_version_set_fingerprint") @db.Text
+  evidenceSchemaVersion            String @map("evidence_schema_version") @db.VarChar(128)
+  classificationPolicyId           String @map("classification_policy_id") @db.VarChar(128)
+  observationCanonicalAlgorithmId  String @map("observation_canonical_algorithm_id") @db.VarChar(128)
+  encryptionPolicyId               String @map("encryption_policy_id") @db.VarChar(128)
+  associatedDataPolicyId           String @map("associated_data_policy_id") @db.VarChar(128)
+  associatedDataAlgorithmId        String @map("associated_data_algorithm_id") @db.VarChar(128)
+  envelopeSchemaVersion            String @map("envelope_schema_version") @db.VarChar(128)
+
+  observationOrdinal               Int    @map("observation_ordinal")
+  listingObservationIdentity       String @map("listing_observation_identity") @db.Text
+  providerGeneration               String @map("provider_generation") @db.Text
+  /// Declared listing byte count. Not retrieved size and not body authority.
+  declaredListingByteCount         BigInt @map("declared_listing_byte_count")
+  sourceFamilyClassification       String @map("source_family_classification") @db.VarChar(96)
+  classificationStatus             OsvClassificationStatus @map("classification_status")
+  duplicateClassification          OsvListingObservationDuplicateClassification @map("duplicate_classification")
+  immutableConflictClassification  OsvListingObservationImmutableConflictClassification @map("immutable_conflict_classification")
+  candidateSelectionEligibility    OsvListingObservationCandidateSelectionEligibility @map("candidate_selection_eligibility")
+  evidenceState                    OsvListingObservationEvidenceSetState @map("evidence_state")
+  candidateSelectionAuthorized     Boolean @map("candidate_selection_authorized")
+  bodyRetrievalAuthorized          Boolean @map("body_retrieval_authorized")
+  batch4pPermitted                 Boolean @map("batch_4p_permitted")
+  plaintextLengthAccounting        Int     @map("plaintext_length_accounting")
+
+  rowRevision BigInt   @map("row_revision")
+  capturedAt  DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  evidenceSet OsvListingObservationEvidenceSet @relation(fields: [evidenceSetId, listingExecutionId, providerContactAuthorizationId, synchronizationRequestId, synchronizationRunId, provider, approvedPrefix, listingProtocolId, sourceLicenseRegistryVersion, runtimeVersionSetFingerprint], references: [id, listingExecutionId, providerContactAuthorizationId, synchronizationRequestId, synchronizationRunId, provider, approvedPrefix, listingProtocolId, sourceLicenseRegistryVersion, runtimeVersionSetFingerprint], onDelete: Restrict, map: "osv_listing_observation_evidence_set_aad_fkey")
+  envelopes   OsvListingObservationEvidenceEnvelope[]
+
+  @@unique([evidenceSetId, observationOrdinal], map: "osv_listing_observation_evidence_ordinal_uidx")
+  @@unique([evidenceSetId, listingObservationIdentity], map: "osv_listing_observation_evidence_canonical_uidx")
+  @@unique([id, evidenceSetId, providerGeneration, declaredListingByteCount, sourceFamilyClassification, classificationStatus], map: "osv_listing_observation_evidence_envelope_pin")
+  @@map("osv_listing_observation_evidence")
+}
+
+/// Session 13 Batch 3D-S encrypted identity envelope versions. Binary layout
+/// is nonce_12 || ciphertext || tag_16 in one restricted BYTEA column.
+/// Rotation inserts a new row and retains the prior readable envelope.
+/// SQL enforces at most one `current` and one `rotation_pending` per
+/// observation, and a deferred exactly-one-current rule unless every
+/// envelope is cryptographically erased. Legal hold blocks BYTEA redaction.
+/// Model B purge may null the BYTEA under erasure authority. No plaintext
+/// provider identity. Public reads must omit protectedIdentityEnvelope and
+/// opaqueKeyAlias. Database access is not decryption authority.
+model OsvListingObservationEvidenceEnvelope {
+  id String @id @db.Uuid
+
+  observationId                  String @map("observation_id") @db.Uuid
+  evidenceSetId                  String @map("evidence_set_id") @db.Uuid
+  providerGeneration             String @map("provider_generation") @db.Text
+  declaredListingByteCount       BigInt @map("declared_listing_byte_count")
+  sourceFamilyClassification     String @map("source_family_classification") @db.VarChar(96)
+  classificationStatus           OsvClassificationStatus @map("classification_status")
+  envelopeOrdinal                Int    @map("envelope_ordinal")
+  envelopeSchemaVersion          String @map("envelope_schema_version") @db.VarChar(128)
+  cryptographicPolicyId          String @map("cryptographic_policy_id") @db.VarChar(128)
+  algorithmId                    String @map("algorithm_id") @db.VarChar(32)
+  associatedDataPolicyId         String @map("associated_data_policy_id") @db.VarChar(128)
+  opaqueKeyAlias                 String @map("opaque_key_alias") @db.VarChar(64)
+  keyVersionClassification       OsvListingObservationKeyVersionClassification @map("key_version_classification")
+  envelopeState                  OsvListingObservationEnvelopeState @map("envelope_state")
+  rotationState                  OsvListingObservationEnvelopeRotationState @map("rotation_state")
+  erasureState                   OsvListingObservationEnvelopeErasureState @map("erasure_state")
+  plaintextLengthAccounting      Int    @map("plaintext_length_accounting")
+  ciphertextLengthAccounting     Int    @map("ciphertext_length_accounting")
+  /// Restricted. nonce_12 || ciphertext || tag_16. Public queries must omit.
+  protectedIdentityEnvelope      Bytes? @map("protected_identity_envelope") @db.ByteA
+  rowRevision                    BigInt @map("row_revision")
+  createdAt                      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  rotationRecordedAt             DateTime? @map("rotation_recorded_at") @db.Timestamptz(6)
+  erasureAttemptedAt             DateTime? @map("erasure_attempted_at") @db.Timestamptz(6)
+  erasureCompletedAt             DateTime? @map("erasure_completed_at") @db.Timestamptz(6)
+
+  observation OsvListingObservationEvidence    @relation(fields: [observationId, evidenceSetId, providerGeneration, declaredListingByteCount, sourceFamilyClassification, classificationStatus], references: [id, evidenceSetId, providerGeneration, declaredListingByteCount, sourceFamilyClassification, classificationStatus], onDelete: Restrict, map: "osv_listing_observation_evidence_envelope_observation_fkey")
+  evidenceSet OsvListingObservationEvidenceSet @relation(fields: [evidenceSetId], references: [id], onDelete: Restrict, map: "osv_listing_observation_evidence_envelope_set_fkey")
+
+  @@unique([observationId, envelopeOrdinal], map: "osv_listing_observation_evidence_envelope_ordinal_uidx")
+  @@index([evidenceSetId, envelopeState], map: "osv_listing_observation_evidence_envelope_set_state_idx")
+  @@index([observationId, envelopeState], map: "osv_listing_observation_evidence_envelope_observation_state_idx")
+  @@map("osv_listing_observation_evidence_envelope")
+}
+
+/// Session 13 Batch 3D-S append-only purge evidence. Does not store ciphertext,
+/// key material, or provider identity. DELETE forbidden. Successful purge
+/// redacts envelope BYTEA columns and retains observation metadata.
+model OsvListingObservationEvidencePurge {
+  id String @id @db.Uuid
+
+  evidenceSetId                    String @map("evidence_set_id") @db.Uuid
+  purgeAuthorizationClassification String @map("purge_authorization_classification") @db.VarChar(128)
+  purgeReasonCode                  String @map("purge_reason_code") @db.VarChar(64)
+  legalHoldDecision                String @map("legal_hold_decision") @db.VarChar(64)
+  dependentAuthorityTerminalDecision String @map("dependent_authority_terminal_decision") @db.VarChar(64)
+  erasureMechanismClassification   String @map("erasure_mechanism_classification") @db.VarChar(128)
+  erasureOutcome                   OsvListingObservationPurgeErasureOutcome @map("erasure_outcome")
+  attemptedAt                      DateTime @default(now()) @map("attempted_at") @db.Timestamptz(6)
+  completedAt                      DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt                        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  evidenceSet OsvListingObservationEvidenceSet @relation(fields: [evidenceSetId], references: [id], onDelete: Restrict, map: "osv_listing_observation_evidence_purge_set_fkey")
+
+  @@index([evidenceSetId], map: "osv_listing_observation_evidence_purge_set_idx")
+  @@map("osv_listing_observation_evidence_purge")
 }
 
 model Integration {

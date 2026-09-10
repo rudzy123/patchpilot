@@ -51,7 +51,7 @@ describe('OSV canary authorization schema source boundary', () => {
   it('keeps canary models free of tenant and Finding columns', () => {
     const schema = readFileSync(path.join(packageRoot, 'prisma/schema.prisma'), 'utf8');
     const start = schema.indexOf('model OsvCanaryInstanceOperatorIdentity');
-    const end = schema.indexOf('\nmodel Integration {');
+    const end = schema.indexOf('\nmodel OsvListingObservationEvidenceSet {');
     expect(start).toBeGreaterThan(0);
     expect(end).toBeGreaterThan(start);
     const block = schema.slice(start, end);

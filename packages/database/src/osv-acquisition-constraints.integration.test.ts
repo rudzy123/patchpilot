@@ -522,11 +522,12 @@ describe('session 11 OSV acquisition SQL constraints', { timeout: 90_000 }, () =
     );
     const schema = readFileSync(schemaPath, 'utf8');
     const start = schema.indexOf('model OsvCatalogGeneration');
-    const end = schema.indexOf('\nmodel Integration {');
+    const end = schema.indexOf('\nmodel OsvListingObservationEvidenceSet {');
     expect(start).toBeGreaterThan(0);
     expect(end).toBeGreaterThan(start);
     const osvBlock = schema.slice(start, end);
     expect(osvBlock).toContain('model OsvActiveCatalogPointer');
+    expect(osvBlock).not.toContain('model OsvListingObservationEvidenceEnvelope');
     expect(osvBlock).not.toContain('organizationId');
     expect(osvBlock).not.toContain('findingId');
     expect(osvBlock).not.toContain('Bytes');
