@@ -27,9 +27,12 @@ Distinguish these states; they are not interchangeable:
    (schema exists after Session 13 Batch 3B-P; uncomposed adapters exist
    after Session 13 Batch 3B-A and were independently reviewed in Session
    13 Batch 3B-A-R; the complete chain was independently reviewed in
-   Session 13 Batch 3B-R; production composition and Batch 3C-Auth remain later).
-6. Future operator execution confirmation.
-7. Future lease, heartbeat, deadline, and ownership setup.
+   Session 13 Batch 3B-R; production composition remains later).
+6. Uncomposed listing-canary execution authorization
+   (`listing_canary_execution_authority_prepared_provider_attempt_not_executed`
+   after Session 13 Batch 3C-Auth; Session 13 Batch 3C-Auth-R independently
+   reviewed that boundary; production composition remains later).
+7. Future reviewed Batch 3C listing composition.
 8. Provider contact.
 9. Postcanary review.
 
@@ -43,9 +46,22 @@ Session 13 Batch 3B-R independently reviewed the complete authorization
 chain. Production composition does not construct them. Successful
 consumption does not authorize provider contact. Consume results state
 that the provider-contact record was consumed and that remaining runtime
-gates are still required. Session 13 Batch 3C-Auth must not proceed
-without reloading and consuming durable authority through a reviewed
-composition.
+gates are still required.
+
+Session 13 Batch 3C-Auth implements uncomposed listing-canary execution
+authorization. Explicit operator execution confirmation is required.
+Provider-contact authorization consumption is necessary but insufficient.
+Halt is freshly checked. Lease acquisition is guarded. Heartbeat must
+start and the listing-only deadline must arm before permit creation.
+Final egress validation performs no DNS, TLS, or HTTP. Ownership is
+revalidated immediately before one private one-use listing-attempt
+permit. Pending provider-attempt capacity is zero. Automatic retries
+are zero. Cleanup order is deadline stop, heartbeat stop, then guarded
+release. Body retrieval, activation, matching, and Findings remain
+unauthorized. OSV remains generally disabled. Production composition
+does not construct the factory. No provider request occurs. Session 13
+Batch 3C-Auth-R independently reviewed that boundary. Next is Session 13
+Batch 3C first bounded real-provider listing canary.
 
 Halt is rechecked at each protected command and preflight checkpoint.
 Lease inspection remains read-only. Controller readiness starts no timer.
@@ -59,12 +75,12 @@ Do not enable OSV. Do not treat halt release as canary authorization.
 Do not include secrets or destructive commands.
 
 No production operator CLI is registered. The one-shot command, preflight,
-listing-only execution-bridge, and provider-contact authorization
-factories remain uncomposed. The Batch 3A bridge supports **scripted
-provider execution only** and was independently reviewed in Batch 3A-R.
-Real-provider capability does not exist. Provider-facing execution steps
-remain unavailable until durable issuance adapters and
-separately authorized Batch 3C consumption.
+listing-only execution-bridge, provider-contact authorization, and
+listing-canary execution-authorization factories remain uncomposed. The
+Batch 3A bridge supports **scripted provider execution only** and was
+independently reviewed in Batch 3A-R. Real-provider capability does not
+exist. Provider-facing execution steps remain unavailable until separately
+authorized Session 13 Batch 3C listing composition.
 Escalation owner is the instance operator until
 [OD-10](../architecture/open-decisions.md) is closed. Legal questions
 escalate to the instance legal and provenance reviewer. Security incidents

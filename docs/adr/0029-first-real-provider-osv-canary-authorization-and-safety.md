@@ -1486,9 +1486,57 @@ Database time owns expiry (`databaseNow >= expiresAt` is expired).
 Same-run replay is status reuse only. Different-run replay fails closed.
 Concurrent consumers admit one winner. Evaluation remains
 `persistence_required`. Production composition does not construct the
-factories. Next checkpoint is Session 13 Batch 3C-Auth listing-canary
-execution authorization. Batch 3C remains blocked until reviewed
-consumption composition exists.
+factories. Next checkpoint relative to this Batch 3B-R note was Session
+13 Batch 3C-Auth listing-canary execution authorization. Batch 3C remains
+blocked until reviewed consumption composition exists.
+
+This note does not change the Accepted status of this ADR and does not
+authorize real provider contact, body retrieval, production enablement,
+scheduler registration, automatic retry, catalog activation, matching, or
+Finding writes.
+
+## Session 13 Batch 3C-Auth implementation note
+
+Session 13 Batch 3C-Auth implements uncomposed
+`createOsvListingCanaryExecutionAuthorizationService`. A distinct
+ephemeral operator execution confirmation is required. Issued listing-only
+provider-contact authorization is consumed once; same-run consumed replay
+is status inspection and does not mint a second permit. Halt is rechecked
+before lease acquisition, after controller startup, and immediately before
+permit creation. Guarded lease acquisition rejects held-by-other and stale
+takeover. Heartbeat starts and the listing-only deadline arms before final
+egress validation. Ownership is revalidated immediately before one private
+one-use listing-attempt permit. Success is
+`listing_canary_execution_authority_prepared_provider_attempt_not_executed`.
+Provider, DNS, TLS, HTTP, body, retry, activation, matching, and Finding
+counts remain 0. Cleanup order is deadline stop, heartbeat stop, then
+guarded release using the latest accepted row revision. Production
+composition does not construct the factory. No public CLI, API, scheduler,
+or job route is added. Session 13 Batch 3C-Auth-R independently reviewed
+and hardened that boundary. Concrete corrections: halt, heartbeat,
+deadline, cancellation, and ownership are rechecked after permit
+preparation and immediately before claim; halt after permit preparation
+fails the invocation; cancellation during shutdown is terminal; hostile
+duplicate scheduler callbacks that terminalize a controller fail closed;
+abort listeners are detached on every protected path; fencing generation
+is validated without `Number` conversion. Remaining gate is
+`bounded_real_provider_listing_canary_not_authorized`. Next checkpoint is
+Session 13 Batch 3C first bounded real-provider listing canary.
+
+This note does not change the Accepted status of this ADR and does not
+authorize real provider contact, body retrieval, production enablement,
+scheduler registration, automatic retry, catalog activation, matching, or
+Finding writes.
+
+## Session 13 Batch 3C-Auth-R review note
+
+Session 13 Batch 3C-Auth-R independently reviewed the uncommitted Batch
+3C-Auth listing-canary execution-authorization boundary. Tests do not
+contact `storage.googleapis.com` or `osv.dev`. No real provider request
+occurred. The listing canary did not run. Production composition still
+does not construct the factory. No public CLI, API, scheduler, or job
+route is added. OSV remains generally disabled. Acquisition halt remains
+defaulted to true. Zero-Finding remains enforced for this workflow.
 
 This note does not change the Accepted status of this ADR and does not
 authorize real provider contact, body retrieval, production enablement,
@@ -1528,9 +1576,12 @@ Remaining Session 13 execution gates after this combined review:
   implemented. Production composition does not construct the factory.
   Successful consumption does not authorize provider contact. Session 13
   Batch 3B-A-R independently reviewed those adapters. Session 13 Batch
-  3B-R independently reviewed the complete authorization chain. Next is
-  Session 13 Batch 3C-Auth listing-canary execution authorization. Batch 3C
-  remains blocked until reviewed consumption composition exists.
+  3B-R independently reviewed the complete authorization chain. Session 13
+  Batch 3C-Auth implements uncomposed listing-canary execution authorization
+  that prepares one private one-use listing-attempt permit and does not
+  contact a provider. Session 13 Batch 3C-Auth-R independently reviewed
+  that boundary. Next is Session 13 Batch 3C first bounded real-provider
+  listing canary.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
   prerequisite; schema only if contracts cannot distinguish safely).
 - Per-advisory license-inspection parse and duplicate-aware license
