@@ -1559,9 +1559,26 @@ Finding operations. Raw response bytes and continuation tokens were not
 persisted. No provider fixture was committed. Production composition does
 not construct the factory. The operator script is not registered in
 worker, API, or application startup. `INTELLIGENCE_OSV_ENABLED=true`
-remains rejected. Session 13 Batch 3C-R listing-canary evidence review is
-mandatory. Do not retry the real-provider request. Do not request a
+remains rejected. Session 13 Batch 3C-R independently reviewed this
+listing canary. Candidate-selection evidence is unavailable, so Batch
+4-P is blocked. Do not retry the real-provider request. Do not request a
 second page.
+
+## Session 13 Batch 3C-R implementation note
+
+Session 13 Batch 3C-R independently reviewed the committed Batch 3C
+listing canary. Exactly one real-provider listing HTTPS request occurred.
+No retry, redirect follow-up, pagination, second prefix, body retrieval,
+storage write, parser execution, reconciliation, activation,
+normalization, matching, tenant, or Finding operation occurred. Halt was
+restored. Deadline and heartbeat stopped. The lease was released. The
+active pointer and activation history were unchanged. Raw response bytes
+and continuation tokens were not retained. Per-observation object
+identity, generation, declared size, and source-family classification
+were not retained in a protected internal store. Classification:
+`candidate_selection_evidence_unavailable_new_provider_authorization_required`.
+That classification does not authorize another request. Session 13
+Batch 4-P is blocked.
 
 This note does not change the Accepted status of this ADR and does not
 authorize body retrieval, production enablement, scheduler registration,
@@ -1605,9 +1622,15 @@ Remaining Session 13 execution gates after this combined review:
   that prepares one private one-use listing-attempt permit and does not
   contact a provider. Session 13 Batch 3C-Auth-R independently reviewed
 that boundary. Session 13 Batch 3C later executed one operator-controlled
-listing-only real-provider canary.
+listing-only real-provider canary. Session 13 Batch 3C-R independently
+reviewed that listing-canary evidence. Candidate-selection metadata is
+unavailable. Session 13 Batch 4-P is blocked and is not authorized by
+this review.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
   prerequisite; schema only if contracts cannot distinguish safely).
+  Session 13 Batch 4-P remains blocked until a separately authorized
+  future listing retains protected observation metadata. This review does
+  not authorize another provider request.
 - Per-advisory license-inspection parse and duplicate-aware license
   classification before bounded-body. Do not reuse attach-then-parse as-is.
 - Duplicate-key detection or named exception with expiry before activation.

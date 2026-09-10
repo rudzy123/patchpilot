@@ -34,7 +34,8 @@ Distinguish these states; they are not interchangeable:
    reviewed that boundary; production composition remains later).
 7. Operator-controlled bounded listing canary
    (`listing_canary_one_page_classified` after Session 13 Batch 3C;
-   Session 13 Batch 3C-R evidence review is mandatory; do not retry).
+   Session 13 Batch 3C-R independently reviewed that evidence;
+   candidate-selection evidence unavailable; Batch 4-P blocked; do not retry).
 8. Provider contact.
 9. Postcanary review.
 
@@ -76,8 +77,9 @@ continuation token present and unused, retries 0, pagination follow-ups
 Heartbeat stopped. Guarded lease release `released`. Active pointer
 unchanged. Zero Finding operations. Raw response bytes and continuation
 tokens were not persisted. Do not retry that request. Do not request a
-second page. Session 13 Batch 3C-R listing-canary evidence review is
-mandatory.
+second page. Session 13 Batch 3C-R independently reviewed that listing
+canary. Candidate-selection evidence is unavailable, so Batch 4-P is
+blocked. That classification does not authorize another request.
 
 Halt is rechecked at each protected command and preflight checkpoint.
 Lease inspection remains read-only. Controller readiness starts no timer.
@@ -242,15 +244,16 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   download; parser worker; storage write; activation; matching; Finding
   writes; enabling `INTELLIGENCE_OSV_ENABLED`; committing provider
   fixtures.
-- **Recovery:** If the request failed safely, collect bounded evidence
-  and proceed to Session 13 Batch 3C-R. Do not retry. If halt restoration
-  cannot be proven, treat that as a critical operational outcome.
+- **Recovery:** If the request failed safely, collect bounded evidence.
+  Session 13 Batch 3C-R has independently reviewed the committed listing
+  canary. Do not retry. If halt restoration cannot be proven, treat that
+  as a critical operational outcome.
 - **Escalation role:** Instance operator. Independent postcanary
   reviewer is required and is not the issuing operator.
 - **Closure criteria:** One explicit invocation. One listing request.
   Halt restored. Controllers stopped. Lease released or release
-  uncertainty contained. Session 13 Batch 3C-R evidence review remains
-  mandatory. Do not retry.
+  uncertainty contained. Session 13 Batch 3C-R independently reviewed
+  that evidence. Do not retry.
 
 ## 3. Halt release and restoration
 
@@ -596,7 +599,8 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Escalation role:** Instance canary evidence reviewer, countersigned
   by the instance operator.
 - **Closure criteria:** Review recorded. Activation still prohibited.
-  Session 13 Batch 3C-R remains mandatory.
+  Session 13 Batch 3C-R independently reviewed the listing canary.
+  Candidate-selection evidence is unavailable. Batch 4-P is blocked.
 
 ## 19. Evidence retention and cleanup
 
