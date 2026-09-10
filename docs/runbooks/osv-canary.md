@@ -32,7 +32,9 @@ Distinguish these states; they are not interchangeable:
    (`listing_canary_execution_authority_prepared_provider_attempt_not_executed`
    after Session 13 Batch 3C-Auth; Session 13 Batch 3C-Auth-R independently
    reviewed that boundary; production composition remains later).
-7. Future reviewed Batch 3C listing composition.
+7. Operator-controlled bounded listing canary
+   (`listing_canary_one_page_classified` after Session 13 Batch 3C;
+   Session 13 Batch 3C-R evidence review is mandatory; do not retry).
 8. Provider contact.
 9. Postcanary review.
 
@@ -59,9 +61,23 @@ permit. Pending provider-attempt capacity is zero. Automatic retries
 are zero. Cleanup order is deadline stop, heartbeat stop, then guarded
 release. Body retrieval, activation, matching, and Findings remain
 unauthorized. OSV remains generally disabled. Production composition
-does not construct the factory. No provider request occurs. Session 13
-Batch 3C-Auth-R independently reviewed that boundary. Next is Session 13
-Batch 3C first bounded real-provider listing canary.
+does not construct the factory. Session 13 Batch 3C-Auth-R independently
+reviewed that boundary.
+
+Session 13 Batch 3C implements the nonpublic operator command
+`scripts/run-osv-listing-canary.mjs`. Dry-run contacts no provider.
+After synthetic rehearsal and one explicit operator invocation, exactly
+one listing HTTPS request was sent to the committed GCS JSON Objects
+listing endpoint for prefix `crates.io/`. Outcome
+`listing_canary_one_page_classified`: one request attempted, one HTTP
+200 listing page accepted, 320143 response bytes, 1000 observations,
+continuation token present and unused, retries 0, pagination follow-ups
+0, body requests 0. Halt restoration `restored`. Deadline stopped.
+Heartbeat stopped. Guarded lease release `released`. Active pointer
+unchanged. Zero Finding operations. Raw response bytes and continuation
+tokens were not persisted. Do not retry that request. Do not request a
+second page. Session 13 Batch 3C-R listing-canary evidence review is
+mandatory.
 
 Halt is rechecked at each protected command and preflight checkpoint.
 Lease inspection remains read-only. Controller readiness starts no timer.
@@ -70,17 +86,20 @@ readiness is an operational gate and is not workflow authority.
 Zero-Finding baseline proves no canary Finding writes; it does not
 require the platform to contain zero Finding rows.
 
-Do not contact `storage.googleapis.com` or `osv.dev` from this document.
-Do not enable OSV. Do not treat halt release as canary authorization.
-Do not include secrets or destructive commands.
+Do not copy provider response bodies, continuation tokens, or object
+keys into this document. Do not enable OSV. Do not treat halt release as
+canary authorization. Do not include secrets or destructive commands.
 
 No production operator CLI is registered. The one-shot command, preflight,
-listing-only execution-bridge, provider-contact authorization, and
-listing-canary execution-authorization factories remain uncomposed. The
-Batch 3A bridge supports **scripted provider execution only** and was
-independently reviewed in Batch 3A-R. Real-provider capability does not
-exist. Provider-facing execution steps remain unavailable until separately
-authorized Session 13 Batch 3C listing composition.
+listing-only execution-bridge, provider-contact authorization,
+listing-canary execution-authorization, and bounded listing-canary
+factories remain uncomposed. The Batch 3A bridge supports **scripted
+provider execution only** and was independently reviewed in Batch 3A-R.
+The Batch 3C operator script is not registered in worker, API, `dev`,
+`start`, `test`, or `build`. Do not retry the Batch 3C listing request.
+Body retrieval, catalog activation, matching, and Finding writes remain
+unauthorized.
+
 Escalation owner is the instance operator until
 [OD-10](../architecture/open-decisions.md) is closed. Legal questions
 escalate to the instance legal and provenance reviewer. Security incidents
@@ -192,8 +211,46 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** Evaluation remains `persistence_required` after
   other gates pass, or a named earlier failure. `providerContactStarted`
   is false. Schema existence after Batch 3B-P still issues nothing.
-  Batch 3C remains blocked until durable issuance adapters exist. No
-  provider request issued.
+  Batch 3C later consumed durable issuance after Batch 3B-A. No
+  additional provider request is authorized from this evaluation.
+
+## 2B. Bounded listing-canary execution
+
+- **Purpose:** Execute exactly one listing-only real-provider HTTPS
+  request after local gates, consumed provider-contact authorization,
+  halt release in a dedicated process, guarded lease, heartbeat,
+  listing-only deadline, egress revalidation, and one-use permit claim.
+- **Prerequisites:** Session 13 Batch 3C-Auth-R reviewed execution
+  authorization. Synthetic rehearsal passed. Dry-run succeeded with
+  provider calls 0. Explicit operator confirmation
+  `--i-understand-this-sends-one-real-provider-listing-request`.
+- **Trigger:** Operator intends the first listing-only canary after
+  all local gates. Tests, build, lint, typecheck, and startup must not
+  invoke this command.
+- **Immediate containment:** Maximum provider requests 1. Maximum
+  in-flight 1. Pending 0. Automatic retries 0. Pagination follow-ups 0.
+  Body requests 0. Do not follow a continuation token. Restore halt.
+  Stop deadline then heartbeat. Guardedly release the lease.
+- **Evidence to collect:** Outcome identifier; request and run
+  identities; command execution identity; provider request count;
+  HTTP result classification; response-byte count; observation count;
+  continuation-token-present Boolean; halt restoration; deadline stop;
+  heartbeat stop; lease release; active-pointer unchanged; zero-Finding
+  operations. Omit raw bodies, tokens, URLs with query, headers, object
+  keys, holder proofs, and Finding data.
+- **Forbidden actions:** Retry; second page; body retrieval; GCS media
+  download; parser worker; storage write; activation; matching; Finding
+  writes; enabling `INTELLIGENCE_OSV_ENABLED`; committing provider
+  fixtures.
+- **Recovery:** If the request failed safely, collect bounded evidence
+  and proceed to Session 13 Batch 3C-R. Do not retry. If halt restoration
+  cannot be proven, treat that as a critical operational outcome.
+- **Escalation role:** Instance operator. Independent postcanary
+  reviewer is required and is not the issuing operator.
+- **Closure criteria:** One explicit invocation. One listing request.
+  Halt restored. Controllers stopped. Lease released or release
+  uncertainty contained. Session 13 Batch 3C-R evidence review remains
+  mandatory. Do not retry.
 
 ## 3. Halt release and restoration
 
@@ -218,8 +275,9 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   halt from Batch 3B evaluation.
 - **Recovery:** Restore halt to default halted. Re-run command
   preparation or preflight only in the dedicated process that explicitly
-  released halt. Plan halt release for a later Batch 3C execution only
-  after durable provider-contact authorization exists.
+  released halt. Halt restoration after the Batch 3C listing attempt
+  completed as `restored`. Do not leave halt released in production
+  worker or API processes.
 - **Escalation role:** Instance operator.
 - **Closure criteria:** Production processes remain halted. Dedicated
   command preparation either reached `authorized_preflight_required` or
@@ -344,8 +402,9 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 
 ## 9. Provider unavailable
 
-- **Purpose:** Contain a later provider outage. Real-provider contact remains
-  unavailable until durable provider-contact authorization is issued and consumed after Batch 3B-P.
+- **Purpose:** Contain a later provider outage. Session 13 Batch 3C
+  already executed one listing-only request. Do not retry that request.
+  Body retrieval remains unauthorized.
 - **Prerequisites:** Preflight succeeded or failed without provider
   calls. Production remains halted.
 - **Trigger:** A later Batch 3 listing or retrieval cannot complete.
@@ -369,7 +428,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Trigger:** HTTP 429 or operator suspicion of rate limiting during a
   later Batch 3 attempt.
 - **Immediate containment:** Stop. Do not sleep on Retry-After. Do not
-  enqueue a retry.
+  enqueue a retry. Do not retry the Batch 3C listing request.
 - **Evidence to collect:** Closed 429 failure kind; no header dump; no
   token material.
 - **Forbidden actions:** Automatic retry; interpreting Retry-After as
@@ -514,23 +573,30 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 
 ## 18. Postcanary evidence review
 
-- **Purpose:** Require postcanary review after any later phase.
-  Review is mandatory even if preflight passed.
+- **Purpose:** Require postcanary review after the Batch 3C listing
+  canary. Review is mandatory even if the listing page was accepted.
 - **Prerequisites:** Remaining gate `postcanary_review_required`.
-  Provider contact remains separately authorized.
-- **Trigger:** Preflight success or any later terminal canary result.
-- **Immediate containment:** Do not proceed to activation, matching, or
-  Findings. Do not treat Batch 3A scripted success or Batch 3B
-  in-memory evaluation as Batch 3C execution permission.
+  Body retrieval remains separately unauthorized.
+- **Trigger:** Batch 3C terminal canary result
+  (`listing_canary_one_page_classified` or a contained failure).
+- **Immediate containment:** Do not proceed to activation, matching,
+  Findings, pagination, or body retrieval. Do not retry the listing
+  request. Do not treat Batch 3A scripted success as additional
+  provider-contact permission.
 - **Evidence to collect:** Authorization identity; request and run;
-  phase; remaining gates; halt restored; lease inspection; baselines.
-- **Forbidden actions:** Treating review as execution permission;
-  enabling OSV; copying provider bodies into tickets.
+  phase; provider request count; HTTP classification; response-byte
+  count; observation count; continuation-token-present Boolean; halt
+  restored; deadline stop; heartbeat stop; lease release; active-pointer
+  unchanged; zero-Finding operations.
+- **Forbidden actions:** Treating review as a second execution;
+  enabling OSV; copying provider bodies or continuation tokens into
+  tickets.
 - **Recovery:** Record the review verdict. Issue a new authorization
-  only for a new run after accepted review.
+  only for a new run after accepted review. Do not retry Batch 3C.
 - **Escalation role:** Instance canary evidence reviewer, countersigned
   by the instance operator.
 - **Closure criteria:** Review recorded. Activation still prohibited.
+  Session 13 Batch 3C-R remains mandatory.
 
 ## 19. Evidence retention and cleanup
 

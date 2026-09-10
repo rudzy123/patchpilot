@@ -1519,14 +1519,13 @@ preparation and immediately before claim; halt after permit preparation
 fails the invocation; cancellation during shutdown is terminal; hostile
 duplicate scheduler callbacks that terminalize a controller fail closed;
 abort listeners are detached on every protected path; fencing generation
-is validated without `Number` conversion. Remaining gate is
-`bounded_real_provider_listing_canary_not_authorized`. Next checkpoint is
-Session 13 Batch 3C first bounded real-provider listing canary.
+is validated without `Number` conversion. Remaining gate after Batch 3C-Auth-R
+was `bounded_real_provider_listing_canary_not_authorized`. Session 13
+Batch 3C later executed that listing-only canary.
 
 This note does not change the Accepted status of this ADR and does not
-authorize real provider contact, body retrieval, production enablement,
-scheduler registration, automatic retry, catalog activation, matching, or
-Finding writes.
+authorize body retrieval, production enablement, scheduler registration,
+automatic retry, catalog activation, matching, or Finding writes.
 
 ## Session 13 Batch 3C-Auth-R review note
 
@@ -1539,9 +1538,34 @@ route is added. OSV remains generally disabled. Acquisition halt remains
 defaulted to true. Zero-Finding remains enforced for this workflow.
 
 This note does not change the Accepted status of this ADR and does not
-authorize real provider contact, body retrieval, production enablement,
-scheduler registration, automatic retry, catalog activation, matching, or
-Finding writes.
+authorize body retrieval, production enablement, scheduler registration,
+automatic retry, catalog activation, matching, or Finding writes.
+
+## Session 13 Batch 3C implementation note
+
+Session 13 Batch 3C implements uncomposed
+`createOsvBoundedListingCanaryService` and the nonpublic operator command
+`scripts/run-osv-listing-canary.mjs`. Dry-run contacts no provider and is
+not execution authority. After synthetic rehearsal and one explicit
+operator invocation, exactly one listing HTTPS request was sent to the
+committed GCS JSON Objects listing endpoint for prefix `crates.io/`.
+Outcome `listing_canary_one_page_classified`: one request attempted, one
+HTTP 200 listing page accepted, 320143 response bytes, 1000 observations,
+continuation token present and unused, retries 0, pagination follow-ups 0,
+body requests 0. Halt restoration `restored`. Deadline stop classification `cancelled`
+(timer removed before the 1800000 ms expiry). Heartbeat stop `stopped`.
+Guarded lease release `released`. Active pointer unchanged. Zero
+Finding operations. Raw response bytes and continuation tokens were not
+persisted. No provider fixture was committed. Production composition does
+not construct the factory. The operator script is not registered in
+worker, API, or application startup. `INTELLIGENCE_OSV_ENABLED=true`
+remains rejected. Session 13 Batch 3C-R listing-canary evidence review is
+mandatory. Do not retry the real-provider request. Do not request a
+second page.
+
+This note does not change the Accepted status of this ADR and does not
+authorize body retrieval, production enablement, scheduler registration,
+automatic retry, catalog activation, matching, or Finding writes.
 
 Remaining Session 13 execution gates after this combined review:
 
@@ -1580,8 +1604,8 @@ Remaining Session 13 execution gates after this combined review:
   Batch 3C-Auth implements uncomposed listing-canary execution authorization
   that prepares one private one-use listing-attempt permit and does not
   contact a provider. Session 13 Batch 3C-Auth-R independently reviewed
-  that boundary. Next is Session 13 Batch 3C first bounded real-provider
-  listing canary.
+that boundary. Session 13 Batch 3C later executed one operator-controlled
+listing-only real-provider canary.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
   prerequisite; schema only if contracts cannot distinguish safely).
 - Per-advisory license-inspection parse and duplicate-aware license
