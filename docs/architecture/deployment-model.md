@@ -33,7 +33,7 @@ Only `packages/config` reads `process.env`. Production must:
 
 - Require HTTPS termination (operator ingress).
 - Disable development adapters: `deploymentEnvironment=production` implies `allowDevelopmentAdapters=false`. Construction of fake auth, unrestricted HTTP, or unsigned webhooks must throw at boot.
-- Require secrets for DB, Redis, object storage, session material, and credential KEK ([OD-4](open-decisions.md)).
+- Require secrets for DB, Redis, object storage, session material, and credential KEK ([OD-4](open-decisions.md)). Future protected listing-evidence encryption keys are a separate instance-level operator secret loaded only through `packages/config`. Session 13 Batch 3D-E defines that policy and does not add environment variables, generate keys, or enable encryption at startup. Session 13 Batch 3D-E-R independently reviewed that boundary.
 - Set allowlists for OSV and KEV hosts.
 - First boot with empty intel catalogs is supported; correlation simply finds nothing until snapshots exist.
 
@@ -57,6 +57,7 @@ Operator duty ([OD-13](open-decisions.md)):
 - PostgreSQL logical/physical backups **and** object-storage backups together (SBOMs are not only in the DB).
 - Treat backups as **Restricted**. Encrypt at rest if the operator's platform supports it.
 - Restoring backups does not grant a product-level cross-org console.
+- Future protected listing-evidence ciphertext may appear in PostgreSQL backups. Raw listing-evidence encryption keys must not. Restoring the database without the required key capability leaves protected object identities unavailable. Restoring old database state must not reactivate destroyed keys. Backup operators must not receive general decryption authority merely because they control backups. Cryptographic erasure does not immediately remove ciphertext from backups. Session 13 Batch 3D-E-R treats recorded purge evidence as authoritative after restore even if keys remain available.
 
 ## AI
 

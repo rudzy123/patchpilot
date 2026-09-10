@@ -39,8 +39,10 @@ Distinguish these states; they are not interchangeable:
 8. Protected listing-observation evidence policy
    (`osv_protected_listing_observation_evidence_policy_v1` after Session 13
    Batch 3D-P-R; provider-free; durable persistence required and not
-   implemented; encryption-policy checkpoint required before schema; a new
-   listing request is not authorized).
+   implemented; Session 13 Batch 3D-E defines encryption policy
+   `osv_protected_listing_evidence_encryption_policy_v1`; Session 13
+   Batch 3D-E-R independently reviewed that policy; schema design may
+   proceed; a new listing request is not authorized).
 9. Provider contact.
 10. Postcanary review.
 
@@ -607,8 +609,10 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   Session 13 Batch 3C-R independently reviewed the listing canary.
   Candidate-selection evidence is unavailable. Session 13 Batch 3D-P-R
   independently reviewed protected listing-observation evidence
-  requirements. A new listing request is not currently authorized.
-  Schema work waits on an encryption-policy checkpoint. Batch 4-P is
+  requirements. Session 13 Batch 3D-E defines encryption policy only
+  and does not encrypt or persist. Session 13 Batch 3D-E-R independently
+  reviewed that policy. A new listing request is not currently
+  authorized. Schema design may proceed. Batch 4-P is
   blocked.
 
 ## 19. Evidence retention and cleanup
@@ -619,8 +623,11 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   for a future separately authorized listing (`osv_protected_listing_observation_evidence_retention_v1`).
 - **Prerequisites:** Authorization DELETE forbidden. Lease projection
   DELETE forbidden. Frozen migrations remain unchanged. Prisma is
-  unchanged; no protected observation rows exist yet. Encryption-policy
-  checkpoint required before schema.
+  unchanged; no protected observation rows exist yet. Session 13
+  Batch 3D-E encryption policy is defined and was independently reviewed
+  in Batch 3D-E-R; schema design may proceed. Per-set cryptographic erasure is envelope redaction,
+  not shared-instance-key destruction. Ciphertext in backups remains
+  until those backups and required keys are independently destroyed.
 - **Trigger:** Operator wants to remove test rows or expired unused
   authorizations after review. Future protected-observation cleanup
   additionally requires independent review recorded, dependent
@@ -647,3 +654,4 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Closure criteria:** Production evidence retained. Test rehearsal
   cleanup, if any, does not contact a provider and does not alter the
   active catalog pointer. Batch 3D-P-R did not persist real observations.
+  Batch 3D-E did not encrypt, persist, or contact a provider.

@@ -1625,10 +1625,47 @@ are omitted. Duplicate-ambiguous sets cannot become candidate ready.
 Conflicts reject the complete set and cannot become review-accepted.
 WeakMap lifecycle is reference-drop only. Durable persistence remains
 required and cannot proceed with a plaintext protected-key column.
-Next checkpoint is an encryption-policy checkpoint before Session 13
-Batch 3D-S. Purge is a controlled redaction of one encrypted-envelope
+Session 13 Batch 3D-E now defines that encryption-policy contract.
+Next checkpoint is Session 13 Batch 3D-E-R. Purge is a controlled
+redaction of one encrypted-envelope
 column plus an append-only purge row. This review did not contact a
 provider, retrieve a body, or modify Prisma.
+
+## Session 13 Batch 3D-E implementation note
+
+Session 13 Batch 3D-E defines protected listing-evidence encryption
+policy (`osv_protected_listing_evidence_encryption_policy_v1`) required
+before protected evidence persistence schema can be designed. No real
+encryption occurred. No production keys exist. No plaintext protected
+persistence is permitted. Key material is operator-provided at runtime
+through a later `packages/config` boundary; process environment remains
+confined to that package. Associated data binds immutable evidence
+context so ciphertext transplantation fails by policy. Rotation and
+erasure are separately authorized. Cryptographic erasure of one evidence
+set is Model B envelope redaction and does not destroy unrelated
+evidence by destroying a shared instance key. Ciphertext may appear in
+database backups; deleting key material does not immediately remove
+ciphertext from those backups. Session 13 Batch 3D-E-R independently
+reviewed and hardened this policy. Schema design may proceed. No
+plaintext protected-key column. No encryption execution. No provider
+contact occurred. Batch 4-P remains blocked. Prisma, migrations, and
+lockfiles are unchanged.
+
+This note does not change the Accepted status of this ADR.
+
+## Session 13 Batch 3D-E-R implementation note
+
+Session 13 Batch 3D-E-R independently reviewed the uncommitted Batch
+3D-E encryption policy. Associated data binds envelope version, policy
+IDs, evidence identities, generation, declared size, and source-family
+classification. AEAD uses canonical encoded bytes rather than a digest.
+Unknown envelope versions fail closed. Opaque key aliases cannot select
+endpoints. Only `current` encrypts. Rotation verifies the new envelope
+before finalize. Stale instances cannot encrypt with retired keys.
+Purge evidence is authoritative after backup restore. Schema design may
+proceed without a plaintext protected-key column. Encryption execution,
+key-provider construction, and production composition remain absent.
+No provider contact occurred. Batch 4-P remains blocked.
 
 This note does not change the Accepted status of this ADR.
 
@@ -1679,7 +1716,11 @@ this review.
   Session 13 Batch 4-P remains blocked until a separately authorized
   future listing retains protected observation metadata. Session 13
   Batch 3D-P defines those protected evidence requirements and does not
-  authorize another provider request. Prisma remains unchanged.
+  authorize another provider request. Session 13 Batch 3D-E defines
+  the encryption policy required before schema and does not encrypt,
+  persist, or contact a provider. Session 13 Batch 3D-E-R independently
+  reviewed and hardened that policy. Prisma remains unchanged. Session 13
+  Batch 3D-S protected listing-evidence persistence schema is next.
 - Per-advisory license-inspection parse and duplicate-aware license
   classification before bounded-body. Do not reuse attach-then-parse as-is.
 - Duplicate-key detection or named exception with expiry before activation.

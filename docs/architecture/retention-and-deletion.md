@@ -22,7 +22,7 @@ Configurable knobs (for when operators opt in later in the same architecture):
 | SBOM objects + **SBOM** rows | Keep | Future job after `retainUntil`; still write `sbom.purged` audit **before** object delete, keeping hash in audit |
 | Findings and calculations | Keep | Future; never without policy |
 | Intelligence snapshots | Keep additive | Compact only identical hashes |
-| Protected OSV listing-observation evidence | Future durable store required; encryption-policy checkpoint blocks Session 13 Batch 3D-S schema | Keep until independent review and dependent authorizations are terminal; maximum 7,776,000 seconds is an overdue marker, not automatic delete; no TTL worker |
+| Protected OSV listing-observation evidence | Future durable store required; Session 13 Batch 3D-E-R accepted encryption policy; Batch 3D-S schema design is next | Keep until independent review and dependent authorizations are terminal; maximum 7,776,000 seconds is an overdue marker, not automatic delete; no TTL worker |
 | Sessions | Expire | Delete expired session rows (not evidence) |
 | Logs | Operator's collector | Outside the app |
 
@@ -55,17 +55,17 @@ When that job is built: it **lists** orphans for operators, and automatic delete
 
 ## Protected OSV listing-observation evidence
 
-Session 13 Batch 3D-P selects durable protected persistence for listing-observation metadata required by a future separately authorized listing. Session 13 Batch 3D-P-R independently reviewed that policy. Prisma is unchanged, so no rows exist yet. Schema work is blocked until an encryption-policy checkpoint closes the envelope. When persisted:
+Session 13 Batch 3D-P selects durable protected persistence for listing-observation metadata required by a future separately authorized listing. Session 13 Batch 3D-P-R independently reviewed that policy. Session 13 Batch 3D-E defines the encryption, envelope, associated-data, rotation, and cryptographic-erasure policy required before schema. Session 13 Batch 3D-E-R independently reviewed and hardened that policy. Prisma is unchanged, so no rows exist yet. Schema design may proceed around the closed authenticated envelope. When persisted:
 
 - Retention policy `osv_protected_listing_observation_evidence_retention_v1`.
 - Retention clock starts at database `captured_at`, not application `Date.now`.
 - Minimum retention lasts until independent review is recorded and dependent authorizations are terminal.
 - Maximum 7,776,000 seconds (90 days) is an overdue review marker. It does not authorize automatic delete.
 - No cleanup loop, TTL worker, or cascade delete.
-- Cleanup requires a distinct instance-operator cleanup grant, no legal hold, and a controlled redaction of the encrypted envelope column. Immutable evidence metadata remains. Deletion evidence is an append-only purge row without the raw object key or a bare key digest.
+- Cleanup requires a distinct instance-operator cleanup grant, no legal hold, and a controlled redaction of the encrypted envelope column. Immutable evidence metadata remains. Deletion evidence is an append-only purge row without the raw object key or a bare key digest. Session 13 Batch 3D-E keeps this Model B controlled-redaction purge. Per-set cryptographic erasure is envelope redaction, not destruction of the shared instance key, because destroying that key would render unrelated remaining envelopes unrecoverable.
 - Raw listing responses and continuation tokens remain prohibited and are not retained.
 - Plaintext protected-key columns are forbidden, including as a temporary migration step.
-- Backups that later include the encrypted envelope remain Restricted until redaction.
+- Backups that later include the encrypted envelope remain Restricted. Cryptographic erasure does not immediately remove ciphertext from backups. Restoring the database without the required key capability leaves protected values unavailable. Restoring old database state must not reactivate destroyed keys. Backup operators do not receive general decryption authority merely because they control database backups.
 
 This is not a legal hold product. Legal hold, if asserted, extends retention until released.
 
@@ -75,7 +75,7 @@ v0.1 has no self-service "delete my organization and all evidence" button. Insta
 
 ## Backups
 
-Restores can resurrect deleted sessions or purged orphans. Operators should encrypt backups and control access ([deployment](deployment-model.md), [OD-13](open-decisions.md)). Backup copies are **Restricted**.
+Restores can resurrect deleted sessions or purged orphans. Operators should encrypt backups and control access ([deployment](deployment-model.md), [OD-13](open-decisions.md)). Backup copies are **Restricted**. Future protected listing-evidence ciphertext may appear in PostgreSQL backups; raw encryption keys must not. Restoring those backups without the required key capability leaves protected object identities unavailable. Recovery testing must not expose plaintext.
 
 ## Related documents
 
