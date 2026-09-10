@@ -22,6 +22,7 @@ Configurable knobs (for when operators opt in later in the same architecture):
 | SBOM objects + **SBOM** rows | Keep | Future job after `retainUntil`; still write `sbom.purged` audit **before** object delete, keeping hash in audit |
 | Findings and calculations | Keep | Future; never without policy |
 | Intelligence snapshots | Keep additive | Compact only identical hashes |
+| Protected OSV listing-observation evidence | Future durable store required; encryption-policy checkpoint blocks Session 13 Batch 3D-S schema | Keep until independent review and dependent authorizations are terminal; maximum 7,776,000 seconds is an overdue marker, not automatic delete; no TTL worker |
 | Sessions | Expire | Delete expired session rows (not evidence) |
 | Logs | Operator's collector | Outside the app |
 
@@ -42,6 +43,7 @@ Expired **RiskAcceptance** is a **state** change, not deletion of the row.
 - **RiskCalculation** history
 - **FindingObservation** history
 - Membership rows (revoke instead)
+- Future protected OSV listing-observation evidence rows: DELETE forbidden; cleanup is a controlled redaction of one encrypted-envelope column then an append-only purged-state row after review and dependent-authorization closure
 
 ## Orphan object storage
 
@@ -50,6 +52,22 @@ If a put succeeded and the DB transaction failed, objects may lack a **SBOM** ro
 **No reconcile job exists yet.** `SBOM_ORPHAN_GRACE_SECONDS` (default 7 days, validated to exceed the idempotency TTL) is the policy floor a future job must honor; nothing reads it today, so orphans accumulate until an operator intervenes.
 
 When that job is built: it **lists** orphans for operators, and automatic delete is allowed only after the grace period **and** only when no DB row references the key. Log the object key template plus hash, not the key and not the bytes. See [SBOM ingestion](sbom-ingestion.md#orphan-reconciliation).
+
+## Protected OSV listing-observation evidence
+
+Session 13 Batch 3D-P selects durable protected persistence for listing-observation metadata required by a future separately authorized listing. Session 13 Batch 3D-P-R independently reviewed that policy. Prisma is unchanged, so no rows exist yet. Schema work is blocked until an encryption-policy checkpoint closes the envelope. When persisted:
+
+- Retention policy `osv_protected_listing_observation_evidence_retention_v1`.
+- Retention clock starts at database `captured_at`, not application `Date.now`.
+- Minimum retention lasts until independent review is recorded and dependent authorizations are terminal.
+- Maximum 7,776,000 seconds (90 days) is an overdue review marker. It does not authorize automatic delete.
+- No cleanup loop, TTL worker, or cascade delete.
+- Cleanup requires a distinct instance-operator cleanup grant, no legal hold, and a controlled redaction of the encrypted envelope column. Immutable evidence metadata remains. Deletion evidence is an append-only purge row without the raw object key or a bare key digest.
+- Raw listing responses and continuation tokens remain prohibited and are not retained.
+- Plaintext protected-key columns are forbidden, including as a temporary migration step.
+- Backups that later include the encrypted envelope remain Restricted until redaction.
+
+This is not a legal hold product. Legal hold, if asserted, extends retention until released.
 
 ## Tenant off-boarding
 

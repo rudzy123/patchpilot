@@ -11,7 +11,7 @@ Terms align with the [glossary](../product/glossary.md) and [privacy model](../s
 | **Public** | Safe to show without authentication | Product docs, CycloneDX spec URLs, PatchPilot license |
 | **Internal** | Shared catalog; not tenant-secret but not dumped to logs | Normalized **Vulnerability** summaries, KEV listed boolean, builtin policy definition |
 | **Confidential** | Tenant inventory and workflow | Asset names, finding lists, priorities, task notes, membership emails inside the org |
-| **Restricted** | Evidence and secrets | Original SBOM bytes, object keys with org ids, **ExternalCredential** plaintext (memory only), password hashes, session ids, full feed snapshots, backups |
+| **Restricted** | Evidence and secrets | Original SBOM bytes, object keys with org ids, **ExternalCredential** plaintext (memory only), password hashes, session ids, full feed snapshots, backups, protected OSV listing object keys |
 
 Untrusted SBOM fields (component names, versions) are **Confidential** once stored, and still **dangerous to render** (XSS). Classification does not make them trusted.
 
@@ -29,6 +29,8 @@ Untrusted SBOM fields (component names, versions) are **Confidential** once stor
 | Parsed components | Confidential | Tenant-owned |
 | Vulnerability catalog | Internal | |
 | VulnerabilitySourceRecord raw | Restricted | Full payload |
+| Protected OSV listing object key | Restricted | Exact provider object identity for later generation-bound retrieval; WeakMap-backed in Session 13 Batch 3D-P-R; never public JSON, logs, events, metrics, traces, or errors; bare SHA-256 of the raw key is also omitted from public surfaces |
+| Protected OSV listing evidence digest and bounded counts | Internal | Domain-separated evidence-set digest and counts only; not a bare object-key digest; not sufficient for retrieval |
 | Finding, observations | Confidential | |
 | RiskCalculation factors | Confidential | May include environment |
 | Remediation notes | Confidential | |
@@ -48,6 +50,8 @@ Untrusted SBOM fields (component names, versions) are **Confidential** once stor
 | Internal | Summaries; no full feeds | Low cardinality | Authenticated OK | Optional snapshots private | OK |
 | Confidential | Ids, hashes, counts | No package names | Authorized org only | n/a | Encrypted if possible |
 | Restricted | **Never** raw | **Never** | Never raw SBOM by default | Private, org-prefixed keys | Restricted |
+
+Protected OSV listing object keys follow Restricted handling even though they are instance-owned catalog metadata, not tenant inventory. Session 13 Batch 3D-P-R public evidence-set results expose domain-separated set digests and counts only. They do not expose a bare SHA-256 of the raw provider object key.
 
 Canonical redaction list always applies, even to Internal feed payloads.
 

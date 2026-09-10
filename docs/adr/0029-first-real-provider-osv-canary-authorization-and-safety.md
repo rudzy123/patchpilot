@@ -1584,6 +1584,54 @@ This note does not change the Accepted status of this ADR and does not
 authorize body retrieval, production enablement, scheduler registration,
 automatic retry, catalog activation, matching, or Finding writes.
 
+## Session 13 Batch 3D-P implementation note
+
+Session 13 Batch 3D-P defines protected listing-observation evidence
+policy (`osv_protected_listing_observation_evidence_policy_v1`) for a
+future separately authorized listing that can retain enough validated
+metadata to support deterministic body-canary candidate selection.
+Batch 3C-R remains closed and committed. Aggregate listing evidence
+cannot support candidate selection. A new provider request is not
+currently authorized. Batch 3D-P did not contact a provider, execute
+another listing request, retrieve a body, modify Prisma, or enable OSV.
+
+Protected evidence purpose is validated listing metadata for later
+deterministic candidate evaluation and review. It is not body
+authority, a catalog, inventory completeness, pagination permission, or
+permission to contact the provider again. Raw response retention remains
+prohibited. Raw continuation-token retention remains prohibited.
+Protected object identity is nonpublic (WeakMap-backed). Public
+surfaces omit the raw provider object key and the bare SHA-256 of that
+key. Exact positive decimal generation is mandatory.
+Declared size and listing-parser source-family classification are
+retained internally. Capacity is closed at 1000 observations and
+1,298,432 total evidence metadata bytes. Persistence decision: durable
+protected persistence is required because the Batch 3C-R ephemeral
+database discarded candidate metadata; Prisma and migrations are
+unchanged in this batch. Retention policy
+`osv_protected_listing_observation_evidence_retention_v1` (maximum
+7,776,000 seconds overdue marker; no automatic delete). Future
+listing-evidence acquisition authorization
+`osv_listing_observation_evidence_acquisition_authorization_v1` cannot
+reuse Batch 3C listing, provider-contact, confirmation, or permit
+authority. Candidate-selection eligibility is not body authority.
+Session 13 Batch 4-P remains blocked.
+
+## Session 13 Batch 3D-P-R implementation note
+
+Session 13 Batch 3D-P-R independently reviewed the uncommitted Batch
+3D-P policy. Public confirmation oracles from bare object-key digests
+are omitted. Duplicate-ambiguous sets cannot become candidate ready.
+Conflicts reject the complete set and cannot become review-accepted.
+WeakMap lifecycle is reference-drop only. Durable persistence remains
+required and cannot proceed with a plaintext protected-key column.
+Next checkpoint is an encryption-policy checkpoint before Session 13
+Batch 3D-S. Purge is a controlled redaction of one encrypted-envelope
+column plus an append-only purge row. This review did not contact a
+provider, retrieve a body, or modify Prisma.
+
+This note does not change the Accepted status of this ADR.
+
 Remaining Session 13 execution gates after this combined review:
 
 - Legal and provenance revalidation of listing contact and, separately, RustSec
@@ -1629,8 +1677,9 @@ this review.
 - Canary-ineligible catalog/inventory marker before bounded-body (Batch 4
   prerequisite; schema only if contracts cannot distinguish safely).
   Session 13 Batch 4-P remains blocked until a separately authorized
-  future listing retains protected observation metadata. This review does
-  not authorize another provider request.
+  future listing retains protected observation metadata. Session 13
+  Batch 3D-P defines those protected evidence requirements and does not
+  authorize another provider request. Prisma remains unchanged.
 - Per-advisory license-inspection parse and duplicate-aware license
   classification before bounded-body. Do not reuse attach-then-parse as-is.
 - Duplicate-key detection or named exception with expiry before activation.

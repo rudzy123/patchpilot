@@ -36,8 +36,13 @@ Distinguish these states; they are not interchangeable:
    (`listing_canary_one_page_classified` after Session 13 Batch 3C;
    Session 13 Batch 3C-R independently reviewed that evidence;
    candidate-selection evidence unavailable; Batch 4-P blocked; do not retry).
-8. Provider contact.
-9. Postcanary review.
+8. Protected listing-observation evidence policy
+   (`osv_protected_listing_observation_evidence_policy_v1` after Session 13
+   Batch 3D-P-R; provider-free; durable persistence required and not
+   implemented; encryption-policy checkpoint required before schema; a new
+   listing request is not authorized).
+9. Provider contact.
+10. Postcanary review.
 
 Batch 3B evaluates listing-only provider-contact prerequisites and fails
 closed with `persistence_required`. **Batch 3B does not authorize the operator to
@@ -600,28 +605,45 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   by the instance operator.
 - **Closure criteria:** Review recorded. Activation still prohibited.
   Session 13 Batch 3C-R independently reviewed the listing canary.
-  Candidate-selection evidence is unavailable. Batch 4-P is blocked.
+  Candidate-selection evidence is unavailable. Session 13 Batch 3D-P-R
+  independently reviewed protected listing-observation evidence
+  requirements. A new listing request is not currently authorized.
+  Schema work waits on an encryption-policy checkpoint. Batch 4-P is
+  blocked.
 
 ## 19. Evidence retention and cleanup
 
 - **Purpose:** Keep immutable canary evidence and bound cleanup so
-  fencing and single-use authority cannot reset.
+  fencing and single-use authority cannot reset. Session 13 Batch 3D-P-R
+  additionally requires durable protected listing-observation evidence
+  for a future separately authorized listing (`osv_protected_listing_observation_evidence_retention_v1`).
 - **Prerequisites:** Authorization DELETE forbidden. Lease projection
-  DELETE forbidden. Frozen migrations remain unchanged.
+  DELETE forbidden. Frozen migrations remain unchanged. Prisma is
+  unchanged; no protected observation rows exist yet. Encryption-policy
+  checkpoint required before schema.
 - **Trigger:** Operator wants to remove test rows or expired unused
-  authorizations after review.
+  authorizations after review. Future protected-observation cleanup
+  additionally requires independent review recorded, dependent
+  authorizations terminal, no legal hold, and a distinct cleanup grant.
 - **Immediate containment:** Do not edit frozen migrations. Do not
   reset fencing by recreating the lease row. Do not purge Findings
-  because none should exist from this preflight.
+  because none should exist from this preflight. Do not retain raw
+  listing responses or continuation tokens. Do not print protected
+  object keys.
 - **Evidence to collect:** Authorization state; lease presence;
-  object-storage locators omitted from notes; retention identifiers.
+  object-storage locators omitted from notes; retention identifiers;
+  public evidence-set digest and counts only.
 - **Forbidden actions:** Destructive database reset; migration edits;
   deleting lease rows; deleting consumed authorization rows to mint a
-  second use; copying provider responses.
+  second use; copying provider responses; treating candidate-selection
+  eligibility as body authority; reusing Batch 3C authorization.
 - **Recovery:** Leave production evidence durable. Remove only
   test-owned disposable database rows in FK-safe order after a test
-  rehearsal.
+  rehearsal. Future protected-identity erasure is a controlled redaction
+  of one encrypted-envelope column, then an append-only purge row without
+  the raw object key or a bare key digest. No
+  TTL worker and no automatic cleanup loop.
 - **Escalation role:** Instance operator.
 - **Closure criteria:** Production evidence retained. Test rehearsal
   cleanup, if any, does not contact a provider and does not alter the
-  active catalog pointer.
+  active catalog pointer. Batch 3D-P-R did not persist real observations.
