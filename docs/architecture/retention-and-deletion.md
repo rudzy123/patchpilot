@@ -22,7 +22,7 @@ Configurable knobs (for when operators opt in later in the same architecture):
 | SBOM objects + **SBOM** rows | Keep | Future job after `retainUntil`; still write `sbom.purged` audit **before** object delete, keeping hash in audit |
 | Findings and calculations | Keep | Future; never without policy |
 | Intelligence snapshots | Keep additive | Compact only identical hashes |
-| Protected OSV listing-observation evidence | Future durable store required; Session 13 Batch 3D-E-R accepted encryption policy; Batch 3D-S schema design is next | Keep until independent review and dependent authorizations are terminal; maximum 7,776,000 seconds is an overdue marker, not automatic delete; no TTL worker |
+| Protected OSV listing-observation evidence | Session 13 Batch 3D-S / 3D-S-R schema exists (`osv_listing_observation_evidence_set`, observation, envelope versions, append-only purge); legal hold blocks envelope erasure; overdue marker grants no purge authority; Session 13 Batch 3D-C can encrypt synthetic identities in process but does not persist envelopes; Session 13 Batch 3D-C-R independently reviewed that capability; no adapter; no TTL worker | Keep until independent review and dependent authorizations are terminal; maximum 7,776,000 seconds is an overdue marker, not automatic delete; Model B envelope redaction plus purge evidence; DELETE forbidden |
 | Sessions | Expire | Delete expired session rows (not evidence) |
 | Logs | Operator's collector | Outside the app |
 

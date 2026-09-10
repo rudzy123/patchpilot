@@ -55,7 +55,7 @@ Canonical rules: [security.mdc](../../.cursor/rules/security.mdc). Threats: [thr
 - `process.env` only in `packages/config`.
 - Encrypted **ExternalCredential** at rest; decrypt in adapter.
 - Development adapters unselectable in production.
-- Session 13 Batch 3D-E requires future protected listing-evidence keys to be operator-provided at runtime through `packages/config`. No default key. No plaintext protected-key column. Encryption execution is absent in this batch. Session 13 Batch 3D-E-R independently reviewed that boundary.
+- Session 13 Batch 3D-E requires future protected listing-evidence keys to be operator-provided at runtime through `packages/config`. No default key. No plaintext protected-key column. Session 13 Batch 3D-C implements that provisioning as `INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_MATERIAL` (64 lowercase hex bytes), an opaque alias, and a closed key state. `loadServerConfig` does not load the key. Session 13 Batch 3D-C-R independently reviewed that cryptographic capability. Session 13 Batch 3D-S stores opaque key aliases only, not raw keys. Session 13 Batch 3D-E-R independently reviewed that boundary. Session 13 Batch 3D-S-R independently reviewed the persistence schema.
 
 ### C9 SSRF and egress
 

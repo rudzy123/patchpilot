@@ -1719,8 +1719,15 @@ this review.
   authorize another provider request. Session 13 Batch 3D-E defines
   the encryption policy required before schema and does not encrypt,
   persist, or contact a provider. Session 13 Batch 3D-E-R independently
-  reviewed and hardened that policy. Prisma remains unchanged. Session 13
-  Batch 3D-S protected listing-evidence persistence schema is next.
+  reviewed and hardened that policy. Session 13 Batch 3D-S adds
+  schema-only protected listing-evidence persistence without encryption
+  execution or adapters. Prisma now includes the evidence tables.
+  Session 13 Batch 3D-S-R independently reviewed and hardened that
+  schema. Session 13 Batch 3D-C implements the uncomposed Node.js 24
+  AES-256-GCM capability with synthetic proof only and does not persist
+  envelopes or encrypt real provider identities. Session 13 Batch
+  3D-C-R independently reviewed and hardened that capability. Session 13
+  Batch 3D-A is next.
 - Per-advisory license-inspection parse and duplicate-aware license
   classification before bounded-body. Do not reuse attach-then-parse as-is.
 - Duplicate-key detection or named exception with expiry before activation.

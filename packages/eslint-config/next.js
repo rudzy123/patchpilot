@@ -44,7 +44,11 @@ export const nextConfig = [
           ],
           patterns: [
             {
-              group: ['@patchpilot/config/server', '@patchpilot/config/env'],
+              group: [
+                '@patchpilot/config/server',
+                '@patchpilot/config/env',
+                '@patchpilot/config/osv-listing-evidence-key',
+              ],
               message: 'Browser and Next.js client code may import public configuration only.',
             },
             {

@@ -226,6 +226,18 @@ export {
   type IntelligenceOsvAcquisitionHaltSource,
 } from './intelligence.js';
 export {
+  INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_ALIAS_NAME,
+  INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_ALIAS_PATTERN,
+  INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_BYTES,
+  INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_HEX_PATTERN,
+  INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_MATERIAL_NAME,
+  INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_STATE_NAME,
+  intelligenceOsvListingEvidenceKeyStates,
+  loadOsvProtectedListingEvidenceKeyProvisioningFrom,
+  type IntelligenceOsvListingEvidenceKeyState,
+  type OsvProtectedListingEvidenceKeyProvisioningHandle,
+} from './osv-listing-evidence-key.js';
+export {
   assertDestructiveDatabaseCommandAllowed,
   assertDevelopmentSeedAllowed,
   assertEphemeralTestDatabaseName,

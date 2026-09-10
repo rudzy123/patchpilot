@@ -41,8 +41,12 @@ Distinguish these states; they are not interchangeable:
    Batch 3D-P-R; provider-free; durable persistence required and not
    implemented; Session 13 Batch 3D-E defines encryption policy
    `osv_protected_listing_evidence_encryption_policy_v1`; Session 13
-   Batch 3D-E-R independently reviewed that policy; schema design may
-   proceed; a new listing request is not authorized).
+   Batch 3D-E-R independently reviewed that policy; Session 13 Batch 3D-S
+   adds schema-only persistence without encryption execution or adapters;
+   Session 13 Batch 3D-S-R independently reviewed that schema;
+   Session 13 Batch 3D-C implements uncomposed AES-256-GCM capability
+   with synthetic proof only; Session 13 Batch 3D-C-R independently
+   reviewed that capability; Batch 3D-A is next; a new listing request is not authorized).
 9. Provider contact.
 10. Postcanary review.
 
@@ -610,9 +614,13 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   Candidate-selection evidence is unavailable. Session 13 Batch 3D-P-R
   independently reviewed protected listing-observation evidence
   requirements. Session 13 Batch 3D-E defines encryption policy only
-  and does not encrypt or persist. Session 13 Batch 3D-E-R independently
-  reviewed that policy. A new listing request is not currently
-  authorized. Schema design may proceed. Batch 4-P is
+  and does not encrypt or persist adapters. Session 13 Batch 3D-E-R independently
+  reviewed that policy. Session 13 Batch 3D-S adds schema-only protected
+  evidence tables without encryption execution. Session 13 Batch 3D-S-R
+  independently reviewed that schema. Session 13 Batch 3D-C implements
+  uncomposed AES-256-GCM capability with synthetic proof only. Session 13 Batch
+  3D-C-R independently reviewed that capability. A new listing request is not
+  currently authorized. Batch 3D-A is next. Batch 4-P is
   blocked.
 
 ## 19. Evidence retention and cleanup
@@ -622,11 +630,12 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   additionally requires durable protected listing-observation evidence
   for a future separately authorized listing (`osv_protected_listing_observation_evidence_retention_v1`).
 - **Prerequisites:** Authorization DELETE forbidden. Lease projection
-  DELETE forbidden. Frozen migrations remain unchanged. Prisma is
-  unchanged; no protected observation rows exist yet. Session 13
-  Batch 3D-E encryption policy is defined and was independently reviewed
-  in Batch 3D-E-R; schema design may proceed. Per-set cryptographic erasure is envelope redaction,
-  not shared-instance-key destruction. Ciphertext in backups remains
+  DELETE forbidden. Frozen migrations remain unchanged except the new
+  Batch 3D-S forward-only migration. Protected observation schema exists;
+  no production adapter writes rows. Session 13 Batch 3D-E encryption
+  policy is defined and was independently reviewed in Batch 3D-E-R.
+  Per-set cryptographic erasure is envelope redaction, not
+  shared-instance-key destruction. Ciphertext in backups remains
   until those backups and required keys are independently destroyed.
 - **Trigger:** Operator wants to remove test rows or expired unused
   authorizations after review. Future protected-observation cleanup

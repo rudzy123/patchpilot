@@ -141,6 +141,14 @@ Values must be canonical integers (no `NaN`, `Infinity`, scientific notation, de
 
 Do not add OSV archive download limits, ZIP settings, or provider URL variables. Partial intelligence generations must never become current.
 
+Session 13 Batch 3D-C listing-evidence key provisioning is **not** part of `loadServerConfig`. Application startup does not read these variables, construct a key capability, generate a nonce, or encrypt. There is no default key and no sample key. Missing or malformed values fail closed when a later uncomposed factory loads them. Do not put a usable key in `.env.example`, documentation examples, logs, or committed files.
+
+| Variable | Purpose |
+| --- | --- |
+| `INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_MATERIAL` | Operator-supplied AES-256 key as exactly 64 lowercase hexadecimal characters (32 bytes). No default. All-zero material is rejected. Uppercase hex is rejected. Not loaded by `loadServerConfig`. |
+| `INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_ALIAS` | Opaque alias matching `osv.listing.evidence.k` plus 1–24 lowercase alphanumeric characters. Hostnames, URLs, filesystem paths, and KMS URIs are rejected. |
+| `INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_STATE` | Closed key state (`current`, `decrypt_only`, `rotation_required`, `retired`, `destroyed`, `unavailable`, `malformed`, `inconsistent`). Only `current` may encrypt. |
+
 ## Public (web)
 
 | Variable | Purpose |
