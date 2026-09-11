@@ -10,6 +10,8 @@
     "src/**/*.test.ts",
     "src/integration-database.ts",
     "src/osv-bounded-listing-canary-operator-main.ts",
-    "src/osv-bounded-listing-canary-authority-seed.ts"
+    "src/osv-bounded-listing-canary-authority-seed.ts",
+    "src/osv-protected-evidence-listing-canary-operator-main.ts",
+    "src/osv-protected-evidence-listing-canary-authority-seed.ts"
   ]
 }

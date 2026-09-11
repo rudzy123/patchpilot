@@ -1667,6 +1667,31 @@ proceed without a plaintext protected-key column. Encryption execution,
 key-provider construction, and production composition remain absent.
 No provider contact occurred. Batch 4-P remains blocked.
 
+## Session 13 Batch 3D-R review note
+
+Session 13 Batch 3D-R independently reviewed the uncommitted Batch 3D
+one-page protected-evidence listing canary. It did not contact
+`storage.googleapis.com` or `osv.dev`, rerun the operator command,
+request page two, retrieve a body, or select a candidate. Bounded
+machine evidence establishes exactly one listing HTTPS request to the
+committed GCS JSON Objects listing endpoint for prefix `crates.io/`,
+page one, no continuation-token input, HTTP 200, 320143 response bytes,
+1000 protected observations, 1000 current AES-256-GCM envelopes, and
+continuation-token presence recorded without retaining the raw token.
+No plaintext provider identity entered Prisma. Associated-data context
+is reconstructable from immutable columns. One complete `review_pending`
+evidence set exists with no orphan observations or envelopes. Public
+inspect omits envelope BYTEA and opaque key alias. Halt was restored.
+Deadline and heartbeat stopped. The lease was released. The active
+catalog pointer was unchanged. Zero Finding operations. Candidate
+readiness is `protected_evidence_sufficient_for_deterministic_candidate_evaluation`
+and is not body authority. Durable evidence remains `review_pending`
+with selection unauthorized. The process-local operator key used to
+encrypt the real set was not persisted and is unavailable for later
+reveal. That residual does not authorize another listing. Production
+composition does not construct the factory. `INTELLIGENCE_OSV_ENABLED=true`
+remains rejected. Session 13 Batch 4-P remains blocked.
+
 This note does not change the Accepted status of this ADR.
 
 Remaining Session 13 execution gates after this combined review:
@@ -1738,10 +1763,29 @@ this review.
   consumed Batch 3C provider-contact grants. Operator confirmation is a
   distinct ephemeral WeakMap kind. Cryptographic and persistence
   readiness are necessary but insufficient. Real provider transport
-  remains disconnected. No Prisma or migration change. No provider
-  contact occurred. No real protected evidence was persisted. Session 13
+  remains disconnected. No Prisma or migration change. Session 13
   Batch 3D-Auth-R independently reviewed and hardened that authorization.
-  Session 13 Batch 3D is next. Session 13 Batch 4-P remains blocked.
+  Session 13 Batch 3D implemented uncomposed
+  `createOsvProtectedEvidenceListingCanaryService` and, after synthetic
+  rehearsal and one explicit operator invocation, executed exactly one
+  listing HTTPS request for prefix `crates.io/`. Outcome
+  `protected_evidence_listing_canary_one_page_persisted`: one request,
+  HTTP 200, 320143 response bytes, 1000 protected observations,
+  continuation token present unused, AES-256-GCM encryption before
+  Prisma, one atomic `review_pending` evidence set, halt restored,
+  controllers stopped, lease released. No retry, pagination, body,
+  candidate, parser, activation, matching, or Finding work. Production
+  composition does not construct the factory. Session 13 Batch 3D-R
+  independently reviewed that protected evidence: one request, HTTP 200,
+  320143 response bytes, 1000 current AES-256-GCM envelopes, continuation
+  token present unused, no plaintext provider identity, public inspect
+  omits restricted envelope fields, halt restored, controllers stopped,
+  lease released. Candidate-readiness classification:
+  `protected_evidence_sufficient_for_deterministic_candidate_evaluation`.
+  That classification is not body authority and does not authorize
+  another request. Durable evidence remains `review_pending`. The
+  process-local operator key is unavailable for later reveal. Session 13
+  Batch 4-P remains blocked.
 - Per-advisory license-inspection parse and duplicate-aware license
   classification before bounded-body. Do not reuse attach-then-parse as-is.
 - Duplicate-key detection or named exception with expiry before activation.

@@ -7,6 +7,7 @@ export default [
       'coverage/**',
       'src/generated/**',
       'src/osv-bounded-listing-canary-operator-main.ts',
+      'src/osv-protected-evidence-listing-canary-operator-main.ts',
     ],
   },
   ...nodeConfig,

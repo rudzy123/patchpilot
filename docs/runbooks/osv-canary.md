@@ -36,23 +36,14 @@ Distinguish these states; they are not interchangeable:
    (`listing_canary_one_page_classified` after Session 13 Batch 3C;
    Session 13 Batch 3C-R independently reviewed that evidence;
    candidate-selection evidence unavailable; Batch 4-P blocked; do not retry).
-8. Protected listing-observation evidence policy
-   (`osv_protected_listing_observation_evidence_policy_v1` after Session 13
-   Batch 3D-P-R; provider-free; durable persistence required and not
-   implemented; Session 13 Batch 3D-E defines encryption policy
-   `osv_protected_listing_evidence_encryption_policy_v1`; Session 13
-   Batch 3D-E-R independently reviewed that policy; Session 13 Batch 3D-S
-   adds schema-only persistence without encryption execution or adapters;
-   Session 13 Batch 3D-S-R independently reviewed that schema;
-   Session 13 Batch 3D-C implements uncomposed AES-256-GCM capability
-   with synthetic proof only; Session 13 Batch 3D-C-R independently
-   reviewed that capability; Session 13 Batch 3D-A implements uncomposed
-   persistence adapters; Session 13 Batch 3D-A-R independently reviewed
-   those adapters; Session 13 Batch 3D-Auth implements uncomposed
-   evidence-retaining listing authorization and does not reuse Batch 3C
-   authority; Session 13 Batch 3D-Auth-R independently reviewed that
-   authorization; real provider transport remains disconnected; a new
-   listing request is not authorized).
+8. Protected listing-observation evidence canary
+   (`protected_evidence_listing_canary_one_page_persisted` after Session 13
+   Batch 3D; 1000 AES-256-GCM-protected observations atomically persisted
+   as one `review_pending` evidence set; continuation token present unused;
+   halt restored; lease released; Batch 3C authority unreusable; do not retry;
+   do not request a second page; Session 13 Batch 3D-R independently reviewed
+   this evidence as sufficient for deterministic candidate evaluation;
+   selection unauthorized; Batch 4-P blocked).
 9. Provider contact.
 10. Postcanary review.
 
@@ -629,11 +620,15 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   uncomposed persistence adapters. Session 13 Batch 3D-A-R independently
   reviewed those adapters. Session 13 Batch 3D-Auth implements uncomposed
   evidence-retaining listing authorization for a future page-one listing.
-  It does not reuse Batch 3C authority, contact a provider, or persist
-  real protected evidence. Real provider transport remains disconnected.
-  Session 13 Batch 3D-Auth-R independently reviewed that authorization.
-  A new listing request is not currently authorized. Session 13 Batch 3D
-  is next. Batch 4-P is
+  It does not reuse Batch 3C authority. Session 13 Batch 3D-Auth-R
+  independently reviewed that authorization.
+  Session 13 Batch 3D executed one operator-controlled one-page
+  protected-evidence listing (`protected_evidence_listing_canary_one_page_persisted`;
+  1000 encrypted observations; continuation token unused; halt restored;
+  lease released). Do not retry that request. Do not request a second page.
+  Session 13 Batch 3D-R independently reviewed this protected evidence
+  as sufficient for deterministic candidate evaluation. Candidate
+  selection remains unauthorized. Batch 4-P is
   blocked.
 
 ## 19. Evidence retention and cleanup
@@ -642,11 +637,11 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   fencing and single-use authority cannot reset. Session 13 Batch 3D-P-R
   additionally requires durable protected listing-observation evidence
   for a future separately authorized listing (`osv_protected_listing_observation_evidence_retention_v1`).
+  Session 13 Batch 3D persisted one `review_pending` evidence set of 1000
+  encrypted observations. Independent review is required before cleanup.
 - **Prerequisites:** Authorization DELETE forbidden. Lease projection
-  DELETE forbidden. Frozen migrations remain unchanged except the new
-  Batch 3D-S forward-only migration. Protected observation schema exists;
-  no production adapter writes rows. Session 13 Batch 3D-E encryption
-  policy is defined and was independently reviewed in Batch 3D-E-R.
+  DELETE forbidden. Frozen migrations remain unchanged. Protected
+  observation schema exists. One Batch 3D evidence set is `review_pending`.
   Per-set cryptographic erasure is envelope redaction, not
   shared-instance-key destruction. Ciphertext in backups remains
   until those backups and required keys are independently destroyed.
@@ -675,5 +670,7 @@ evidence deletion, catalog activation, matching, or Finding mutation.
 - **Escalation role:** Instance operator.
 - **Closure criteria:** Production evidence retained. Test rehearsal
   cleanup, if any, does not contact a provider and does not alter the
-  active catalog pointer. Batch 3D-P-R did not persist real observations.
-  Batch 3D-E did not encrypt, persist, or contact a provider.
+  active catalog pointer. Session 13 Batch 3D persisted one
+  `review_pending` evidence set; do not delete it. Session 13 Batch 3D-R
+  independently reviewed that evidence. Candidate selection remains
+  unauthorized.
