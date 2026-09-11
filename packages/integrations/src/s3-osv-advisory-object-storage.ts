@@ -307,6 +307,21 @@ export class S3OsvAdvisoryObjectStorage {
     this.client.destroy();
   }
 
+  public async inspectBucketReadiness(): Promise<{
+    readonly ready: boolean;
+    readonly mutated: false;
+  }> {
+    const abort = combineAbortSignals(undefined, this.operationTimeoutMs);
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }), {
+        abortSignal: abort.signal,
+      });
+      return { ready: true, mutated: false };
+    } catch {
+      return { ready: false, mutated: false };
+    }
+  }
+
   public async initializeDevelopmentBucket(input: {
     explicitlyAllowed: true;
     bucket: string;

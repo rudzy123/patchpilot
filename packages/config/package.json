@@ -13,6 +13,10 @@
     "./public": {
       "types": "./dist/public.d.ts",
       "import": "./dist/public.js"
+    },
+    "./osv-listing-evidence-key": {
+      "types": "./dist/osv-listing-evidence-key.d.ts",
+      "import": "./dist/osv-listing-evidence-key.js"
     }
   },
   "main": "./dist/index.js",

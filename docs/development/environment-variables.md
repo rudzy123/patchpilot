@@ -106,7 +106,7 @@ Values must be canonical integers (no `NaN`, `Infinity`, scientific notation, de
 | --- | --- |
 | `INTELLIGENCE_KEV_ENABLED` | Operator enablement for KEV scheduling. Default `true`. `false` stops new scheduler ticks and retry reconciliation; already queued pre-snapshot work fails `provider_disabled`. Configuration load does not contact CISA. |
 | `INTELLIGENCE_OSV_ENABLED` | OSV runtime synchronization. Default `false`. `false` is the only valid value. `true` is rejected. Halt false does not make `true` valid. |
-| `INTELLIGENCE_OSV_ACQUISITION_HALT` | OSV acquisition emergency halt. Default `true` (halted). Missing, empty, and whitespace-only values are halted. Own properties only; prototype values cannot supply the setting. Exact `true`/`false` after trim. Malformed values fail validation. Explicit `false` releases halt only and does not enable OSV, start a scheduler, or contact a provider. Refresh is a process snapshot; restart is required. |
+| `INTELLIGENCE_OSV_ACQUISITION_HALT` | OSV acquisition emergency halt. Default `true` (halted). Missing, empty, and whitespace-only values are halted. Own properties only; prototype values cannot supply the setting. Exact `true`/`false` after trim. Malformed values fail validation. Explicit `false` releases halt only and does not enable OSV, start a scheduler, or contact a provider. Refresh is a process snapshot; restart is required. Session 13 Batch 2-R confirms halt false is not a canary trigger: production worker/API remain halted; the one-shot command evaluates halt independently before request/run ensure and again immediately before consumption, and does not consume an issued authorization while halt is engaged; preflight requires `permitted_by_halt_control` and rechecks halt immediately before success; heartbeat and deadline controllers evaluate trusted halt before dispatch and do not start on import; authorization adapters, the command service, the controllers, and preflight are unused by production runtime. |
 | `INTELLIGENCE_KEV_SYNC_INTERVAL_SECONDS` | UTC schedule-window length used by the worker scheduler. Default `86400`. Floor `3600`, ceiling `604800`. PatchPilot operational default, not a CISA SLA. Distinct from the scheduler poll interval. |
 | `INTELLIGENCE_KEV_STALE_THRESHOLD_SECONDS` | Planned freshness alarm. Default `259200`. Floor `7200`, ceiling `1209600`. Must be strictly greater than the sync interval. |
 | `INTELLIGENCE_HTTP_CONNECT_TIMEOUT_MS` | TCP/TLS connect timeout for the restricted CISA adapter. Default `5000`. Floor `250`, ceiling `15000`. Must be strictly less than the total timeout. |
@@ -140,6 +140,14 @@ Values must be canonical integers (no `NaN`, `Infinity`, scientific notation, de
 | `INTELLIGENCE_RETRY_RECONCILE_MIN_AGE_MS` | Minimum age before an initial queued intelligence job is treated as lost and redispatched. Default `15000`. Floor `1000`, ceiling `120000`. Must be strictly less than `INTELLIGENCE_KEV_JOB_LEASE_MS`. |
 
 Do not add OSV archive download limits, ZIP settings, or provider URL variables. Partial intelligence generations must never become current.
+
+Session 13 Batch 3D-C listing-evidence key provisioning is **not** part of `loadServerConfig`. Application startup does not read these variables, construct a key capability, generate a nonce, or encrypt. There is no default key and no sample key. Missing or malformed values fail closed when a later uncomposed factory loads them. Do not put a usable key in `.env.example`, documentation examples, logs, or committed files.
+
+| Variable | Purpose |
+| --- | --- |
+| `INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_MATERIAL` | Operator-supplied AES-256 key as exactly 64 lowercase hexadecimal characters (32 bytes). No default. All-zero material is rejected. Uppercase hex is rejected. Not loaded by `loadServerConfig`. |
+| `INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_ALIAS` | Opaque alias matching `osv.listing.evidence.k` plus 1–24 lowercase alphanumeric characters. Hostnames, URLs, filesystem paths, and KMS URIs are rejected. |
+| `INTELLIGENCE_OSV_LISTING_EVIDENCE_KEY_STATE` | Closed key state (`current`, `decrypt_only`, `rotation_required`, `retired`, `destroyed`, `unavailable`, `malformed`, `inconsistent`). Only `current` may encrypt. |
 
 ## Public (web)
 

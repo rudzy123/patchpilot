@@ -5,5 +5,11 @@
     "rootDir": ".",
     "outDir": "dist"
   },
-  "include": ["src/**/*.ts", "vitest.config.ts", "vitest.integration.config.ts"]
+  "include": ["src/**/*.ts", "vitest.config.ts", "vitest.integration.config.ts"],
+  "exclude": [
+    "src/osv-canary-listing-execution.integration.test.ts",
+    "src/osv-canary-provider-contact-authorization.integration.test.ts",
+    "src/osv-bounded-listing-canary-operator-main.ts",
+    "src/osv-protected-evidence-listing-canary-operator-main.ts"
+  ]
 }

@@ -68,7 +68,7 @@ describe('OSV runtime coordination schema source boundary', () => {
   it('keeps runtime coordination models free of tenant and Finding columns', () => {
     const schema = readFileSync(path.join(packageRoot, 'prisma/schema.prisma'), 'utf8');
     const start = schema.indexOf('model OsvRuntimeSynchronizationRequest');
-    const end = schema.indexOf('\nmodel Integration {');
+    const end = schema.indexOf('\nmodel OsvListingObservationEvidenceSet {');
     expect(start).toBeGreaterThan(0);
     expect(end).toBeGreaterThan(start);
     const block = schema.slice(start, end);

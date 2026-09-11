@@ -55,6 +55,7 @@ Canonical rules: [security.mdc](../../.cursor/rules/security.mdc). Threats: [thr
 - `process.env` only in `packages/config`.
 - Encrypted **ExternalCredential** at rest; decrypt in adapter.
 - Development adapters unselectable in production.
+- Session 13 Batch 3D-E requires protected listing-evidence keys to be operator-provided at runtime through `packages/config`. No default key. No plaintext protected-key column. Session 13 Batch 3D used a process-local AES-256 key that was not loaded by `loadServerConfig` and was not written to disk. Session 13 Batch 3D-A persists opaque key aliases beside restricted envelopes. Production composition does not construct the factory. Session 13 Batch 3D-R independently reviewed that the process-local operator key is unavailable for later reveal and that public inspection omits envelope BYTEA and opaque key alias.
 
 ### C9 SSRF and egress
 
