@@ -1729,7 +1729,19 @@ this review.
   3D-C-R independently reviewed and hardened that capability. Session 13
   Batch 3D-A implements uncomposed persistence adapters. Session 13
   Batch 3D-A-R independently reviewed and hardened those adapters.
-  Session 13 Batch 3D-Auth is next.
+  Session 13 Batch 3D-Auth implements uncomposed evidence-retaining
+  listing authorization (`createOsvEvidenceRetainingListingAuthorizationService`)
+  for a future page-one listing that retains protected observation
+  evidence. Kind `osv_listing_observation_evidence_acquisition_authorization_v1`.
+  Purpose `one_page_listing_with_protected_observation_retention`. It
+  does not reuse Batch 3C `initial_listing_compatibility` authority or
+  consumed Batch 3C provider-contact grants. Operator confirmation is a
+  distinct ephemeral WeakMap kind. Cryptographic and persistence
+  readiness are necessary but insufficient. Real provider transport
+  remains disconnected. No Prisma or migration change. No provider
+  contact occurred. No real protected evidence was persisted. Session 13
+  Batch 3D-Auth-R independently reviewed and hardened that authorization.
+  Session 13 Batch 3D is next. Session 13 Batch 4-P remains blocked.
 - Per-advisory license-inspection parse and duplicate-aware license
   classification before bounded-body. Do not reuse attach-then-parse as-is.
 - Duplicate-key detection or named exception with expiry before activation.
