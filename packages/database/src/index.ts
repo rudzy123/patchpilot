@@ -36,6 +36,10 @@ export {
   type OsvListingProviderContactAuthorizationPersistenceAdapters,
 } from './osv-listing-provider-contact-authorization-persistence.js';
 export {
+  createOsvListingObservationEvidencePersistence,
+  type OsvListingObservationEvidencePersistenceAdapters,
+} from './osv-listing-observation-evidence-persistence.js';
+export {
   createOsvCanaryPreflightReadiness,
   type OsvCanaryPreflightReadinessAdapters,
 } from './osv-canary-preflight-readiness.js';

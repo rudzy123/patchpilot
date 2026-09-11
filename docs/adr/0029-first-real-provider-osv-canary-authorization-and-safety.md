@@ -1727,7 +1727,9 @@ this review.
   AES-256-GCM capability with synthetic proof only and does not persist
   envelopes or encrypt real provider identities. Session 13 Batch
   3D-C-R independently reviewed and hardened that capability. Session 13
-  Batch 3D-A is next.
+  Batch 3D-A implements uncomposed persistence adapters. Session 13
+  Batch 3D-A-R independently reviewed and hardened those adapters.
+  Session 13 Batch 3D-Auth is next.
 - Per-advisory license-inspection parse and duplicate-aware license
   classification before bounded-body. Do not reuse attach-then-parse as-is.
 - Duplicate-key detection or named exception with expiry before activation.

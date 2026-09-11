@@ -46,7 +46,9 @@ Distinguish these states; they are not interchangeable:
    Session 13 Batch 3D-S-R independently reviewed that schema;
    Session 13 Batch 3D-C implements uncomposed AES-256-GCM capability
    with synthetic proof only; Session 13 Batch 3D-C-R independently
-   reviewed that capability; Batch 3D-A is next; a new listing request is not authorized).
+   reviewed that capability; Session 13 Batch 3D-A implements uncomposed
+   persistence adapters; Session 13 Batch 3D-A-R independently reviewed
+   those adapters; Batch 3D-Auth is next; a new listing request is not authorized).
 9. Provider contact.
 10. Postcanary review.
 
@@ -619,8 +621,10 @@ evidence deletion, catalog activation, matching, or Finding mutation.
   evidence tables without encryption execution. Session 13 Batch 3D-S-R
   independently reviewed that schema. Session 13 Batch 3D-C implements
   uncomposed AES-256-GCM capability with synthetic proof only. Session 13 Batch
-  3D-C-R independently reviewed that capability. A new listing request is not
-  currently authorized. Batch 3D-A is next. Batch 4-P is
+  3D-C-R independently reviewed that capability. Session 13 Batch 3D-A implements
+  uncomposed persistence adapters. Session 13 Batch 3D-A-R independently
+  reviewed those adapters. A new listing request is not
+  currently authorized. Batch 3D-Auth is next. Batch 4-P is
   blocked.
 
 ## 19. Evidence retention and cleanup
