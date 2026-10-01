@@ -1006,6 +1006,7 @@ model Organization {
   outboxEvents          OutboxEvent[]
   backgroundJobs        BackgroundJob[]
   idempotencyRecords    IdempotencyRecord[]
+  matchEvaluationEvidence MatchEvaluationEvidence[]
 
   @@index([status], map: "organization_status_idx")
   @@map("organization")
@@ -1313,6 +1314,7 @@ model Sbom {
   dependencyEdges      DependencyRelationship[]
   observations         FindingObservation[]
   evidence             Evidence[]
+  matchEvaluationEvidence MatchEvaluationEvidence[]
 
   @@unique([organizationId, id], map: "sbom_org_id_key")
   @@unique([organizationId, id, assetId], map: "sbom_org_id_asset_key")
@@ -1354,6 +1356,7 @@ model SbomIngestion {
   dependencyEdges      DependencyRelationship[]
   observations         FindingObservation[]
   riskCalculations     RiskCalculation[]
+  matchEvaluationEvidence MatchEvaluationEvidence[]
 
   @@unique([organizationId, id], map: "sbom_ingestion_org_id_key")
   @@unique([organizationId, id, sbomId], map: "sbom_ingestion_org_id_sbom_key")
@@ -1378,6 +1381,7 @@ model Component {
   organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   occurrences  ComponentOccurrence[]
   findings     Finding[]
+  matchEvaluationEvidence MatchEvaluationEvidence[]
 
   @@unique([organizationId, id], map: "component_org_id_key")
   @@unique([organizationId, identityKey], map: "component_org_identity_key")
@@ -1408,6 +1412,7 @@ model ComponentOccurrence {
   incomingEdges DependencyRelationship[] @relation("DependencyTo")
   findings      Finding[]
   observations  FindingObservation[]
+  matchEvaluationEvidence MatchEvaluationEvidence[]
 
   @@unique([organizationId, id], map: "component_occurrence_org_id_key")
   @@unique([organizationId, id, sbomIngestionId], map: "component_occurrence_org_id_ingestion_key")
@@ -3187,4 +3192,147 @@ model IdempotencyRecord {
   @@unique([organizationId, scope, keyHash], map: "idempotency_record_org_scope_key")
   @@index([expiresAt], map: "idempotency_record_expires_idx")
   @@map("idempotency_record")
+}
+
+enum MatchEvaluationOutcome {
+  affected
+  unaffected
+  unknown
+
+  @@map("match_evaluation_outcome")
+}
+
+enum MatchEvaluationExplanationCode {
+  affected_within_introduced_fixed_range
+  affected_at_introduced_boundary
+  affected_within_last_affected_range
+  affected_explicit_version_equal
+  unaffected_before_introduced
+  unaffected_at_or_after_fixed_boundary
+  unaffected_after_last_affected
+  unaffected_outside_all_ranges
+  unknown_unsupported_ecosystem
+  unknown_invalid_package_identity
+  unknown_invalid_observed_version
+  unknown_unsupported_version_syntax
+  unknown_invalid_range
+  unknown_unsupported_range_type
+  unknown_unsupported_event
+  unknown_contradictory_events
+  unknown_incomplete_evidence
+  unknown_untrusted_advisory_evidence
+  unknown_kev_not_affectedness_authority
+  unknown_capacity_exceeded
+  unknown_policy_mismatch
+  unknown_evaluator_unavailable
+  unknown_comparator_not_implemented
+  unknown_range_order_not_verified
+  unknown_prerelease_membership_not_proven
+  unknown_withdrawn_advisory
+  unknown_internal_failure
+
+  @@map("match_evaluation_explanation_code")
+}
+
+enum MatchEvaluationAdvisorySource {
+  synthetic_fixture
+  cisa_kev
+  unrecognized
+
+  @@map("match_evaluation_advisory_source")
+}
+
+enum MatchEvaluationAdvisoryOrigin {
+  synthetic
+  untrusted_not_recorded
+
+  @@map("match_evaluation_advisory_origin")
+}
+
+enum MatchEvaluationVersionRetention {
+  retained
+  omitted_over_capacity
+
+  @@map("match_evaluation_version_retention")
+}
+
+enum MatchEvaluationVersionClassification {
+  valid_strict_semver
+  absent
+  malformed
+  unsupported
+  capacity_exceeded
+  not_classified
+
+  @@map("match_evaluation_version_classification")
+}
+
+/// Immutable tenant-owned evaluation of one stored component occurrence.
+/// Advisory evidence is an identifier and fingerprint, not a catalog foreign key.
+/// Affected evidence is not Finding authority.
+model MatchEvaluationEvidence {
+  id                              String                                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId                  String                                 @map("organization_id") @db.Uuid
+  componentOccurrenceId           String                                 @map("component_occurrence_id") @db.Uuid
+  assetId                         String                                 @map("asset_id") @db.Uuid
+  sbomId                          String                                 @map("sbom_id") @db.Uuid
+  sbomIngestionId                 String                                 @map("sbom_ingestion_id") @db.Uuid
+  componentId                     String                                 @map("component_id") @db.Uuid
+  sbomSha256                      String                                 @map("sbom_sha256") @db.Text
+  componentIdentityKey            String                                 @map("component_identity_key") @db.VarChar(2048)
+  versionKnown                    Boolean                                @map("version_known")
+  componentEvidenceFingerprint    String                                 @map("component_evidence_fingerprint") @db.Text
+  evidenceSchemaVersion           String                                 @map("evidence_schema_version") @db.VarChar(80)
+  evaluationId                    String                                 @unique(map: "match_evaluation_evidence_evaluation_uidx") @map("evaluation_id") @db.Uuid
+  evaluatorId                     String                                 @map("evaluator_id") @db.VarChar(80)
+  evaluatorVersion                String                                 @map("evaluator_version") @db.VarChar(64)
+  evaluatorImplementation         String                                 @map("evaluator_implementation") @db.VarChar(64)
+  policyId                        String                                 @map("policy_id") @db.VarChar(80)
+  ecosystem                       String                                 @db.VarChar(16)
+  packageNamespace                String?                                @map("package_namespace") @db.VarChar(214)
+  packageName                     String                                 @map("package_name") @db.VarChar(214)
+  packageIdentityKey              String                                 @map("package_identity_key") @db.VarChar(1024)
+  rawObservedVersion              String                                 @map("raw_observed_version") @db.VarChar(256)
+  rawObservedVersionSha256        String                                 @map("raw_observed_version_sha256") @db.Text
+  rawObservedVersionRetention     MatchEvaluationVersionRetention        @map("raw_observed_version_retention")
+  parsedVersionClassification     MatchEvaluationVersionClassification   @map("parsed_version_classification")
+  advisoryIdentity                String                                 @map("advisory_identity") @db.VarChar(512)
+  advisorySourceClassification    MatchEvaluationAdvisorySource          @map("advisory_source_classification")
+  advisoryEvidenceFingerprint     String                                 @map("advisory_evidence_fingerprint") @db.Text
+  advisoryEvidenceOrigin          MatchEvaluationAdvisoryOrigin          @map("advisory_evidence_origin")
+  rangeFingerprint                String                                 @map("range_fingerprint") @db.Text
+  outcome                         MatchEvaluationOutcome
+  replayFingerprint               String                                 @map("replay_fingerprint") @db.Text
+  findingCreation                 String                                 @map("finding_creation") @db.VarChar(32)
+  suppressionAuthority            Boolean                                @default(false) @map("suppression_authority")
+  evaluationTimestampClassification String                               @map("evaluation_timestamp_classification") @db.VarChar(16)
+  createdAt                       DateTime                               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  organization         Organization                  @relation(fields: [organizationId], references: [id], onDelete: Restrict, map: "match_evaluation_evidence_organization_fkey")
+  componentOccurrence  ComponentOccurrence           @relation(fields: [organizationId, componentOccurrenceId, assetId, componentId], references: [organizationId, id, assetId, componentId], onDelete: Restrict, map: "match_evaluation_evidence_occurrence_fkey")
+  component            Component                     @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict, map: "match_evaluation_evidence_component_fkey")
+  sbom                 Sbom                          @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict, map: "match_evaluation_evidence_sbom_fkey")
+  sbomIngestion        SbomIngestion                 @relation(fields: [organizationId, sbomIngestionId, sbomId], references: [organizationId, id, sbomId], onDelete: Restrict, map: "match_evaluation_evidence_ingestion_fkey")
+  explanations         MatchEvaluationExplanation[]
+
+  @@unique([organizationId, id], map: "match_evaluation_evidence_org_id_key")
+  @@unique([organizationId, componentOccurrenceId, replayFingerprint], map: "match_evaluation_evidence_occurrence_replay_uidx")
+  @@index([organizationId, componentOccurrenceId], map: "match_evaluation_evidence_org_occurrence_idx")
+  @@index([organizationId, advisoryIdentity], map: "match_evaluation_evidence_org_advisory_idx")
+  @@index([replayFingerprint], map: "match_evaluation_evidence_replay_idx")
+  @@map("match_evaluation_evidence")
+}
+
+model MatchEvaluationExplanation {
+  id                         String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId             String                           @map("organization_id") @db.Uuid
+  matchEvaluationEvidenceId  String                           @map("match_evaluation_evidence_id") @db.Uuid
+  ordinal                    Int                              @db.SmallInt
+  explanationCode            MatchEvaluationExplanationCode   @map("explanation_code")
+
+  evidence MatchEvaluationEvidence @relation(fields: [organizationId, matchEvaluationEvidenceId], references: [organizationId, id], onDelete: Restrict, map: "match_evaluation_explanation_evidence_fkey")
+
+  @@unique([matchEvaluationEvidenceId, ordinal], map: "match_evaluation_explanation_ordinal_uidx")
+  @@unique([matchEvaluationEvidenceId, explanationCode], map: "match_evaluation_explanation_code_uidx")
+  @@map("match_evaluation_explanation")
 }

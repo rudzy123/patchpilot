@@ -110,6 +110,7 @@ Tenant uniqueness always includes `organizationId`.
 | Export create | `Idempotency-Key` + org |
 | System intel refresh outbox | `eventType` + non-null `dedupeKey` (content SHA-256 of the source unit); unique on `(eventType, dedupeKey)` because `organizationId` is null. Do not treat unverified HTTP validators as the idempotency key. |
 | Audit | Do not duplicate on replay: unique `(organizationId, action, subjectId, correlationId)` for tenant events. System events require a non-null `correlationId` and unique `(action, subjectId, correlationId)` where `organizationId` IS NULL. |
+| Match-evaluation evidence | Evaluator replay fingerprint, unique per organization and component occurrence. The same fingerprint may be stored for another occurrence only when the immutable evaluation content agrees. Exact replay inserts nothing. Disagreement is `immutable_conflict` and does not update the prior row. |
 
 Replay of the same job twice produces one tenant-visible effect (required test).
 
@@ -187,12 +188,13 @@ These are **initial operational proposals**, not guarantees or contractual SLOs.
 | RPO | ≤ 24 hours for PostgreSQL + object storage together | Operator-controlled backups ([OD-13](open-decisions.md)) |
 | RTO | ≤ 8 hours to restore API/worker to accept uploads | Depends on operator runbooks |
 
-Restore both stores together. Degraded mode during provider outages: last intel snapshots, freshness visible, no fake "all clear." Protected listing-evidence ciphertext may appear in PostgreSQL backups. Raw encryption keys must not. Restoring the database without the required instance key capability leaves those protected values unavailable. Cryptographic erasure of one evidence set does not immediately remove ciphertext from backups. Session 13 Batch 3D persisted one `review_pending` evidence set of 1000 AES-256-GCM envelopes. Production composition does not construct the factory. Session 13 Batch 3D-R independently reviewed that set: public inspection omits restricted envelope fields; the process-local operator key is unavailable for later reveal.
+Restore both stores together. Degraded mode during provider outages: last intel snapshots, freshness visible, no fake "all clear." Protected listing-evidence ciphertext may appear in PostgreSQL backups. Raw encryption keys must not. Restoring the database without the required instance key capability leaves those protected values unavailable. Cryptographic erasure of one evidence set does not immediately remove ciphertext from backups. Session 13 Batch 3D persisted one `review_pending` evidence set of 1000 AES-256-GCM envelopes. Production composition does not construct the factory. Session 13 Batch 3D-R independently reviewed that set: public inspection omits restricted envelope fields; the process-local operator key is unavailable for later reveal. Session 14 Batch 2 evaluates npm affected versions in memory. Session 14 Batch 2-R reviewed that evaluator. That evaluation performs no database or provider call, persists nothing, and is not a production retry or job path.
 
 ## Related documents
 
 - [SBOM ingestion](sbom-ingestion.md)
 - [Vulnerability intelligence](vulnerability-intelligence.md)
+- [First ecosystem matching](ecosystem-matching.md)
 - [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)
 - [Observability](observability.md)
 - [Deployment model](deployment-model.md)

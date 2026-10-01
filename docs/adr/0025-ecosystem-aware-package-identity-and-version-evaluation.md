@@ -887,6 +887,11 @@ Identified npm risks:
 Those risks, plus the absence of an OSV range-type inventory in this repository, prevent selecting
 npm as the first implementation ecosystem now.
 
+Session 14 Batch 1 later records an architecture selection in
+[ADR 0030](0030-first-ecosystem-matching-architecture.md). That selection does not implement an
+evaluator, does not fill this ADR's implemented registry, and does not make npm currently
+supported. Catalog measurements remain absent there as well. Non-SEMVER ranges stay unsupported.
+
 npm is **not** implemented.
 
 ### 22. Provider-data activation boundary
@@ -959,7 +964,9 @@ Session 11 remains zero-Finding. This ADR prohibits:
 - automatic Finding close or reopen
 
 This ADR describes evaluator architecture only. The first actual evaluator implementation belongs to
-Session 12 and must also remain zero-Finding.
+Session 12 and must also remain zero-Finding. Session 14 Batch 2 later implements the uncomposed
+in-memory npm evaluator. Session 14 Batch 2-R reviewed that implementation. Session 14 Batch 3 persists that evidence and does not fill the implemented
+registry.
 
 Finding writes remain blocked until:
 

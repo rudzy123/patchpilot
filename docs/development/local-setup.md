@@ -109,7 +109,7 @@ Environment variables are documented in [environment-variables.md](environment-v
 
 ## Object storage (MinIO)
 
-`pnpm infrastructure:up` starts MinIO alongside PostgreSQL and Redis. It is the local stand-in for S3-compatible private object storage; nothing about it is production guidance.
+`pnpm infrastructure:up` starts MinIO alongside PostgreSQL and Redis. Compose uses `bitnamilegacy/minio` because Docker Hub removed `minio/minio`. It is the local stand-in for S3-compatible private object storage; nothing about it is production guidance. The API health check is `GET /minio/health/live`. This image publishes the console port and does not serve a console there.
 
 | Setting | Local value |
 | --- | --- |

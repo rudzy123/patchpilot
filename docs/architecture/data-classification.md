@@ -27,6 +27,7 @@ Untrusted SBOM fields (component names, versions) are **Confidential** once stor
 | SBOM original bytes | Restricted | |
 | SHA-256 of SBOM | Confidential | Hash is not the file but identifies it |
 | Parsed components | Confidential | Tenant-owned |
+| Match-evaluation evidence | Confidential | Tenant package name, raw version, advisory identity, and outcome; not metric labels; not Finding authority |
 | Vulnerability catalog | Internal | |
 | VulnerabilitySourceRecord raw | Restricted | Full payload |
 | Protected OSV listing object key | Restricted | Exact provider object identity for later generation-bound retrieval; WeakMap-backed in Session 13 Batch 3D-P-R; never public JSON, logs, events, metrics, traces, or errors; bare SHA-256 of the raw key is also omitted from public surfaces; plaintext is prohibited at rest, including in Session 13 Batch 3D-S columns |
