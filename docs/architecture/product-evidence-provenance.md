@@ -1,9 +1,10 @@
 # Product-evidence provenance
 
 Session 15 Batch 1 architecture. Policy `osv_product_evidence_provenance_architecture_v1`.
-Contract `osv_product_evidence_provenance_contract_v1`. Persistence is
-`not_implemented`. Production registration is `absent`. Finding creation remains
-unavailable.
+Contract `osv_product_evidence_provenance_contract_v1`. Batch 1 admission
+persistence remains `not_implemented`. Session 15 Batch 2 stores the immutable
+facts in uncomposed PostgreSQL tables and does not calculate eligibility.
+Production registration is `absent`. Finding creation remains unavailable.
 
 Session 14 is merged. Its npm evaluator and immutable match-evaluation evidence
 stay authoritative. This document does not change those semantics and does not
@@ -184,10 +185,13 @@ advisory is not catalog authority. Catalog membership is not active-catalog
 authority. Active-catalog status is not matching authority. Matching readiness
 is not Finding authority.
 
-Session 15 Batch 1 stops at
+Session 15 Batch 1 admission stops at
 `product_evidence_provenance_architecture_defined`, then
 `persistence_not_implemented`, `composition_unavailable`, and
-`finding_unavailable`.
+`finding_unavailable`. Session 15 Batch 2 persists advisory families,
+revisions, aliases, and one reviewed `Vulnerability.id` binding. It does not
+store caller product eligibility, an active catalog pointer, or Finding
+authority. Session 15 Batch 2-R reviewed that persistence. Synthetic revisions stay not withdrawn, not quarantined, and without supersession. Alias ordinals are contiguous. Product eligibility remains unstored. Batch 3 is next.
 
 There is no edge from `received` to `active_eligible`, from `synthetic` to
 `product_evidence_eligible`, from `withdrawn` to `product_evidence_eligible`,

@@ -4,7 +4,7 @@ PatchPilot v0.1 assumes **at-least-once** delivery of background work, **idempot
 
 Passing tests do not make a deployment production-ready. Each job type still needs an operational failure plan when implemented ([definition of done](../development/definition-of-done.md)).
 
-Session 15 Batch 1 provenance admission is synchronous and in memory. Exact replay is `already_applied` only when the full immutable tuple matches. Equal revision digests with different Vulnerability bindings, SPDX ids, or catalog claims are `immutable_conflict` and do not overwrite a prior revision. There is no queue, retry, or catalog mutation. Persistence is not implemented. Session 15 Batch 1-R keeps `eligible` unavailable while the registries are empty.
+Session 15 Batch 1 provenance admission is synchronous and in memory. Exact replay is `already_applied` only when the full immutable tuple matches. Equal revision digests with different Vulnerability bindings, SPDX ids, or catalog claims are `immutable_conflict` and do not overwrite a prior revision. There is no queue, retry, or catalog mutation. Session 15 Batch 1-R keeps `eligible` unavailable while the registries are empty. Session 15 Batch 2 persists those immutable facts. Session 15 Batch 2-R reviewed replay and append-only enforcement. Exact replay performs no insert, update, or delete. A conflicting replay does not overwrite the prior row. The adapter does not retry.
 
 ## Write path
 

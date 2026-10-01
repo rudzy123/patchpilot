@@ -104,5 +104,7 @@ registry blocks `eligible`. Unrecognized origin is not relabeled
 provider-derived. Replay requires the full immutable tuple, so a shared
 revision digest does not hide a different Vulnerability binding, SPDX id, or
 catalog claim. The SPDX identifier is part of revision identity. An active
-digest mismatch is `ineligible_catalog`, not supersession. Persistence, catalog
-activation, and Finding writes remain later gates. Batch 2 has not started.
+digest mismatch is `ineligible_catalog`, not supersession. Session 15 Batch 2
+persists immutable advisory families, revisions, aliases, and one reviewed
+`Vulnerability.id` binding. It does not store product eligibility, activate a
+catalog, or create Findings. Session 15 Batch 2-R reviewed that persistence. Synthetic revisions cannot be withdrawn, quarantined, or superseding. Alias ordinals are contiguous. This ADR remains Proposed. Batch 3 is next.
