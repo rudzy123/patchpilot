@@ -90,13 +90,13 @@ Service containers match the Session 3 Compose **image tags** and the hardcoded 
 
 - PostgreSQL `postgres:16-alpine` on host port `55432`
 - Redis `redis:7-alpine` on host port `16379`
-- MinIO `minio/minio:RELEASE.2025-09-07T16-13-09Z` on `127.0.0.1:19000`
+- MinIO `bitnamilegacy/minio:2025.7.23-debian-12-r3` on `127.0.0.1:19000`. Docker Hub removed `minio/minio`, so CI uses this anonymously pullable archive of the MinIO server.
 
-CI additionally pins those tags to Docker Hub **index digests** resolved on 2026-08-26 so GitHub-hosted jobs do not follow a rebuilt floating tag. `latest` is not used. Local Compose keeps the same version tags without digest pins so developer machines stay aligned with Session 3.
+CI pins PostgreSQL and Redis to Docker Hub index digests resolved on 2026-08-26, and pins MinIO to the Bitnami legacy digest above, so GitHub-hosted jobs do not follow a rebuilt floating tag. `latest` is not used. Local Compose pins that same MinIO digest and keeps PostgreSQL and Redis on version tags without digest pins.
 
-PostgreSQL and Redis use GitHub Actions service containers with health checks, published only on `127.0.0.1:55432` and `127.0.0.1:16379`. GitHub waits on those health checks before the job starts; an unhealthy service fails the job. MinIO cannot use a service container: the service-container schema does not support `command`, and this MinIO image requires `minio server /data`. CI therefore starts MinIO with `docker run`, publishes only `127.0.0.1:19000:9000` (loopback, no console port), and waits on `GET /minio/health/live` for at most 60 seconds (one-second poll, not an unbounded sleep). Container logs are not dumped on failure because MinIO may print root credentials. The job fails if MinIO never becomes healthy. A job `if: always()` step removes the container when it exists.
+PostgreSQL and Redis use GitHub Actions service containers with health checks, published only on `127.0.0.1:55432` and `127.0.0.1:16379`. GitHub waits on those health checks before the job starts; an unhealthy service fails the job. MinIO stays a `docker run` so the job can wait on `GET /minio/health/live` and remove the container afterward. The image's own entrypoint starts the server; CI does not pass `server /data`, because that path is not writable by the image user. The publish is only `127.0.0.1:19000:9000` (loopback, no console port). The wait is at most 60 seconds (one-second poll, not an unbounded sleep). Container logs are not dumped on failure because MinIO may print root credentials. The job fails if MinIO never becomes healthy. A job `if: always()` step removes the container when it exists.
 
-On GitHub-hosted `ubuntu-latest`, the job process and `docker run` share the runner VM, so `127.0.0.1` reaches published service-container ports and the MinIO publish. That is different from Compose on a laptop only in how MinIO is started (`docker run` vs Compose `command`); the test URLs stay the same.
+On GitHub-hosted `ubuntu-latest`, the job process and `docker run` share the runner VM, so `127.0.0.1` reaches published service-container ports and the MinIO publish. Local Compose starts the same image through its entrypoint. The test URLs stay the same.
 
 Credentials are the documented development placeholders. They are job-scoped environment values, not production secrets and not GitHub repository secrets.
 

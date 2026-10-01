@@ -72,12 +72,14 @@ jobs:
           MINIO_ROOT_USER: patchpilot-dev-access
           MINIO_ROOT_PASSWORD: patchpilot-dev-secret-not-for-production
         run: |
+          # Docker Hub deleted minio/minio. This Bitnami legacy tag is the same
+          # server family and remains anonymously pullable. Do not append
+          # `server /data`: that path is not writable by the image user.
           docker run -d --name patchpilot-minio \
             --publish 127.0.0.1:19000:9000 \
             --env MINIO_ROOT_USER \
             --env MINIO_ROOT_PASSWORD \
-            minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e \
-            server /data
+            bitnamilegacy/minio:2025.7.23-debian-12-r3@sha256:953d489a81cc4de7975f90e07202189c4325da39b0b92470b6a13c7ea99e36cd
           deadline=$((SECONDS + 60))
           until curl -fsS http://127.0.0.1:19000/minio/health/live >/dev/null; do
             if ((SECONDS >= deadline)); then
