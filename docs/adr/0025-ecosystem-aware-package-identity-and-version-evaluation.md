@@ -965,7 +965,7 @@ Session 11 remains zero-Finding. This ADR prohibits:
 
 This ADR describes evaluator architecture only. The first actual evaluator implementation belongs to
 Session 12 and must also remain zero-Finding. Session 14 Batch 2 later implements the uncomposed
-in-memory npm evaluator. Session 14 Batch 2-R reviewed that implementation. It remains zero-Finding and does not fill the implemented
+in-memory npm evaluator. Session 14 Batch 2-R reviewed that implementation. Session 14 Batch 3 persists that evidence and does not fill the implemented
 registry.
 
 Finding writes remain blocked until:

@@ -6,7 +6,7 @@ A **finding** is the tenant-owned link between an asset's observed component ide
 
 Session 8 ([ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md)) may mark an ingestion `completed` after evidence verification and graph persist **without** creating findings. `graphCompleteness` values `empty` and `no_dependencies` are not remediation evidence: `empty` does not mean the Asset contains no software, and `no_dependencies` does not prove the software has no dependencies. Future correlation is a separate additive workflow.
 
-This document is lifecycle **architecture**. Session 11 and Session 12 remain zero-Finding. No matcher, match-evaluation persistence, Finding ensure, observation ensure, or Finding-write runtime exists. Session 13 is the earliest candidate for writes and is not authorized by ADR acceptance.
+This document is lifecycle **architecture**. Session 11 and Session 12 remain zero-Finding. Session 14 Batch 3 persists uncomposed match-evaluation evidence and does not create Findings. No Finding ensure, observation ensure, or Finding-write runtime exists. Session 13 is not Finding-write authorization.
 
 ## Identity
 
@@ -151,7 +151,7 @@ When `risk_accepted` and evidence supports `resolved`, the finding becomes `reso
 
 Each **current eligible** completed SBOM ingestion for the asset may produce one observation per existing finding and, in a later authorized session, create findings for new `present` matches. A superseded completed ingestion must not create a Finding or change current occupancy. Historical evaluation or observation retention for that ingestion requires the later persistence review in [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md). Observations are never rewritten or deleted through ordinary application behavior. Replay ensures the existing row.
 
-A future append-only **VulnerabilityMatchEvaluation** (not implemented) records the deterministic evaluation of one occurrence against one pinned provider revision. Session 14 Batch 2 can return `affected` from the uncomposed in-memory npm evaluator. Session 14 Batch 2-R reviewed that result. It is not persisted and does not create a Finding. Only a later authorized `affected` evaluation may contribute to Finding creation. Negative evaluations do not create, reopen, or by themselves close a Finding.
+A future append-only **VulnerabilityMatchEvaluation** is represented by Session 14 Batch 3 `match_evaluation_evidence`. It records one reviewed npm evaluation of one stored component occurrence. It does not create a Finding. Affected evidence is not Finding authority. Unaffected evidence is not suppression authority. Unknown evidence is retained. Only a later authorized Finding-write gate may consume an `affected` row. Negative evaluations do not create, reopen, or by themselves close a Finding.
 
 **Current ingestion:** among ingestions in state `completed` for the asset, the one whose SBOM `receivedAt` is greatest (tie-break ingestion `createdAt`, then ingestion `id`), stored as `Asset.lastSuccessfulSbomIngestionId`. Completing an **older** upload still persists that ingestion's graph and may retain historical evaluations or observations; it must **not** update `lastSuccessfulSbomIngestionId`, `lastObservedAt`, or finding state. "Latest completed" never means last worker to finish. Failed, quarantined, or partial ingestions cannot create observations that change current Finding state. Session 13 must apply this existing pointer before Finding writes; do not invent timestamp-only authority.
 

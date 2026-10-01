@@ -23,6 +23,7 @@ import {
   SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
   SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
   SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+  SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
   applyMigrationSqlAndResolve,
   applySession3Schema,
   applyThroughAuditActorAnonymous,
@@ -39,6 +40,7 @@ import {
   applyThroughSession12Batch6,
   applyThroughSession13Batch2B,
   applyThroughSession13Batch3BP,
+  applyThroughSession13Batch3DS,
   createEphemeralDatabase,
   deployMigrations,
   dropEphemeralDatabase,
@@ -120,6 +122,8 @@ const PRISMA_TABLES = [
   'osv_listing_observation_evidence',
   'osv_listing_observation_evidence_envelope',
   'osv_listing_observation_evidence_purge',
+  'match_evaluation_evidence',
+  'match_evaluation_explanation',
 ] as const;
 
 const PRISMA_FOREIGN_KEYS = [
@@ -152,6 +156,12 @@ const PRISMA_FOREIGN_KEYS = [
   'osv_runtime_lease_projection_run_id_fkey',
   'osv_runtime_stage_attempt_run_id_fkey',
   'osv_canary_authorization_operator_identity_id_fkey',
+  'match_evaluation_evidence_organization_fkey',
+  'match_evaluation_evidence_occurrence_fkey',
+  'match_evaluation_evidence_component_fkey',
+  'match_evaluation_evidence_sbom_fkey',
+  'match_evaluation_evidence_ingestion_fkey',
+  'match_evaluation_explanation_evidence_fkey',
   'osv_canary_authorization_revoked_by_operator_identity_id_fkey',
   'osv_canary_authorization_listing_authorization_id_fkey',
   'osv_canary_authorization_listing_request_id_fkey',
@@ -449,6 +459,11 @@ const SQL_ONLY_TRIGGERS = [
   'osv_listing_observation_evidence_purge_insert',
   'osv_listing_observation_evidence_purge_delete_forbidden',
   'osv_listing_observation_evidence_purge_immutable',
+  'match_evaluation_evidence_append_only',
+  'match_evaluation_explanation_append_only',
+  'match_evaluation_evidence_bind_parents',
+  'match_evaluation_evidence_explanations_complete',
+  'match_evaluation_explanation_same_transaction',
 ] as const;
 
 const SQL_ONLY_FUNCTIONS = [
@@ -481,6 +496,10 @@ const SQL_ONLY_FUNCTIONS = [
   'patchpilot_osv_listing_observation_evidence_envelope_insert',
   'patchpilot_protect_osv_listing_observation_evidence_envelope',
   'patchpilot_osv_listing_observation_evidence_purge_insert',
+  'patchpilot_match_evaluation_code_outcome',
+  'patchpilot_match_evaluation_evidence_bind_parents',
+  'patchpilot_match_evaluation_explanations_complete',
+  'patchpilot_match_evaluation_explanation_same_transaction',
 ] as const;
 
 async function names(client: PrismaClient, sql: string): Promise<string[]> {
@@ -503,6 +522,11 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
     `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
   );
   expect(applied).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
+
+  const matchEvaluationRows = await client.$queryRaw<Array<{ evidence: bigint | number | string }>>`
+    SELECT COUNT(*)::bigint AS evidence FROM "match_evaluation_evidence"
+  `;
+  expect(Number(matchEvaluationRows[0]?.evidence)).toBe(0);
 
   const policyColumns = await names(
     client,
@@ -1157,8 +1181,8 @@ async function assertOsvAcquisitionCatalog(client: PrismaClient): Promise<void> 
 
 describe('frozen migrations', () => {
   it('keeps Session 3 through Session 13 Batch 3D-S SQL byte-stable', async () => {
-    expect(FROZEN_MIGRATIONS).toHaveLength(17);
-    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(17);
+    expect(FROZEN_MIGRATIONS).toHaveLength(18);
+    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(18);
     expect(FROZEN_MIGRATIONS.map((item) => item.directory)).toEqual([
       ...EXPECTED_APPLIED_MIGRATIONS,
     ]);
@@ -1206,21 +1230,24 @@ describe('frozen migrations', () => {
       ),
     ).toEqual([SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE]);
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-1)).toBe(
-      SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+      SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
     );
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-2)).toBe(
-      SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
+      SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
     );
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-3)).toBe(
-      SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
+      SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
     );
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-4)).toBe(
-      SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
+      SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
     );
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-5)).toBe(
-      SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+      SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
     );
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-6)).toBe(
+      SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+    );
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-7)).toBe(
       SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
     );
     expect(
@@ -1312,6 +1339,19 @@ describe('frozen migrations', () => {
     expect(
       existsSync(frozenMigrationFile(SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE)),
     ).toBe(true);
+    expect(
+      FROZEN_MIGRATIONS.filter(
+        (item) => item.directory === SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+      ),
+    ).toEqual([
+      {
+        directory: SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        sha256: '9df1146eee813cd3359e1d043475b49df8a083e397aa750373feef039ee8b63e',
+      },
+    ]);
+    expect(existsSync(frozenMigrationFile(SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE))).toBe(
+      true,
+    );
   });
 });
 
@@ -1647,6 +1687,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
 
@@ -1727,6 +1768,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1864,6 +1906,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -1924,6 +1967,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1973,6 +2017,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2020,6 +2065,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2069,6 +2115,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2117,6 +2164,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2156,6 +2204,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       const afterDef = await names(
         client,
@@ -2196,6 +2245,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2235,6 +2285,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2275,6 +2326,7 @@ describe('migrations', { timeout: 90_000 }, () => {
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2283,7 +2335,7 @@ describe('migrations', { timeout: 90_000 }, () => {
     }
   });
 
-  it('upgrades a Session 13 Batch 3B-P database by applying only Session 13 Batch 3D-S', async () => {
+  it('upgrades a Session 13 Batch 3B-P database through Batch 3D-S and match-evaluation persistence', async () => {
     const ephemeral = await createEphemeralDatabase('migrate');
     const client = new PrismaClient({
       datasources: { db: { url: ephemeral.databaseUrl } },
@@ -2316,6 +2368,7 @@ describe('migrations', { timeout: 90_000 }, () => {
       );
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
       const evidenceCounts = await client.$queryRaw<
@@ -2336,6 +2389,43 @@ describe('migrations', { timeout: 90_000 }, () => {
       expect(Number(evidenceCounts[0]?.observations)).toBe(0);
       expect(Number(evidenceCounts[0]?.envelopes)).toBe(0);
       expect(Number(evidenceCounts[0]?.purges)).toBe(0);
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades a Session 13 Batch 3D-S database by applying only match-evaluation persistence', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughSession13Batch3DS(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore.at(-1)).toBe(SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE);
+      expect(appliedBefore).not.toContain(SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE);
+      const tablesBefore = await names(
+        client,
+        `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'`,
+      );
+      expect(tablesBefore).toContain('osv_listing_observation_evidence_set');
+      expect(tablesBefore).not.toContain('match_evaluation_evidence');
+      expect(tablesBefore).not.toContain('match_evaluation_explanation');
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+      ]);
+      await assertFinalMigratedSchema(client);
     } finally {
       await client.$disconnect();
       await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
@@ -2394,6 +2484,10 @@ describe('migrations', { timeout: 90_000 }, () => {
       await applyMigrationSqlAndResolve(
         ephemeral.databaseUrl,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+      );
+      await applyMigrationSqlAndResolve(
+        ephemeral.databaseUrl,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       );
       await assertFinalMigratedSchema(client);
 
@@ -2488,6 +2582,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+        SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
       ]);
       await assertFinalMigratedSchema(client);
 

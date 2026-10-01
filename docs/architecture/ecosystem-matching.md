@@ -2,15 +2,17 @@
 
 Session 14 Batch 1 selects **npm**. Session 14 Batch 1-R reviewed that architecture and is
 committed. Session 14 Batch 2 implements one in-memory affected-version evaluator for npm.
-Match evaluations are not persisted. Finding creation remains unavailable. The evaluator is not
-composed into API, worker, or scheduler startup. Production OSV acquisition remains disabled.
-Acquisition halt remains engaged.
+Session 14 Batch 2-R reviewed that evaluator and is committed. Session 14 Batch 3 persists the
+reviewed evidence in tenant-owned append-only rows. Finding creation remains unavailable. The
+evaluator and persistence adapter are not composed into API, worker, or scheduler startup.
+Production OSV acquisition remains disabled. Acquisition halt remains engaged.
 
 Authority: [ADR 0030](../adr/0030-first-ecosystem-matching-architecture.md), which remains Proposed.
 [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) still keeps the
 implemented registry empty. `ecosystemIsImplemented('npm')` remains false. npm is not a supported
-production matching ecosystem. Session 14 Batch 2-R reviewed the evaluator. Next checkpoint, after
-that review is committed, is Session 14 Batch 3 immutable match-evaluation persistence.
+production matching ecosystem. Session 14 Batch 3 stores immutable evidence for one component
+occurrence. Session 14 Batch 3-R reviewed that persistence. Next checkpoint is Session 14
+branch-closure review.
 
 ## Selection
 
@@ -76,13 +78,16 @@ outcome, catalog-ordered explanation codes, and replay fingerprint. A non-synthe
 not recorded as synthetic. The raw observed version is retained on the evidence record when it is
 within 256 UTF-8 bytes.
 
+Session 14 Batch 3 stores that evidence on `match_evaluation_evidence` and ordered
+`match_evaluation_explanation` rows. Session 14 Batch 3-R keeps the evaluator fingerprint unique
+per component occurrence. Affected evidence grants no Finding authority. Unaffected evidence grants
+no suppression authority. Unknown evidence is retained. The persistence adapter does not call the
+evaluator. Neither factory is production-composed.
+
 ## What this batch does not do
 
-- No production composition of the evaluator
-- No persisted match evidence
+- No production composition of the evaluator or the persistence adapter
 - No Finding, FindingObservation, tenant Evidence, or RiskCalculation
 - No `finding.recalculate`
 - No provider contact
-- No Prisma or migration change
-- No dependency or lockfile change
 - No second ecosystem and no universal comparator export

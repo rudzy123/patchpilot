@@ -6,6 +6,10 @@ In scope: the ten security-sensitive areas in [AGENTS.md](../../AGENTS.md). Out 
 
 Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). Do not publish exploit payloads here.
 
+## Session 14 match-evidence notes
+
+Session 14 Batch 3 stores reviewed npm evaluation evidence. The rows are tenant-scoped through the stored component occurrence. Cross-tenant inspection returns not found. Affected evidence does not create a Finding. Unaffected evidence does not suppress a Finding. The persistence adapter does not contact a provider and is not composed into API or worker startup.
+
 ## Session 8 status notes
 
 [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md) records graph-complete ingestion. Typed limits live in `@patchpilot/config`. Session 8 is now implemented end to end: HTTP upload, private object storage, outbox relay, worker-thread parser, and the ingestion processor.

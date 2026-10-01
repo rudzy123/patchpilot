@@ -501,7 +501,7 @@ Each derived component stores the `sbomId`. Correlation (future) stores match me
 - `parserVersion` is a semver-like identifier of the PatchPilot parser, not the CycloneDX spec version.
 - Reprocessing with a newer parser: new **SBOMIngestion**, same object key, new occurrence/relationship rows for that ingestion, new outbox job. Do not overwrite a previous ingestion's graph.
 - Previous derived graphs remain unless a retention job explicitly replaces **derived** data; originals are never replaced.
-- Findings and observations are future correlation work. Finding state will follow the **current** completed ingestion only after that workflow exists. Session 8 `completed` rows are not rewritten when correlation is added.
+- Findings and observations are future correlation work. Finding state will follow the **current** completed ingestion only after that workflow exists. Session 8 `completed` rows are not rewritten when correlation is added. Session 14 Batch 3 can persist an immutable evaluation of one stored occurrence and does not run that correlation or create a Finding.
 
 ## Related documents
 

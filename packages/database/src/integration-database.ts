@@ -90,6 +90,10 @@ export const FROZEN_MIGRATIONS = [
     directory: '20260910120000_osv_listing_observation_evidence_persistence',
     sha256: 'fd08f644fa58dc0459c43668445a7c28d5ea63e9da7fb2919f9f78055b21f654',
   },
+  {
+    directory: '20261001120000_match_evaluation_evidence_persistence',
+    sha256: '9df1146eee813cd3359e1d043475b49df8a083e397aa750373feef039ee8b63e',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
@@ -121,6 +125,9 @@ export const SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE =
 export const SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE =
   '20260910120000_osv_listing_observation_evidence_persistence' as const;
 
+export const SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE =
+  '20261001120000_match_evaluation_evidence_persistence' as const;
+
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
   '20260827120000_tenant_model',
@@ -139,6 +146,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
   SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
   SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+  SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
@@ -356,5 +364,13 @@ export async function applyThroughSession13Batch3BP(databaseUrl: string): Promis
   await applyMigrationSqlAndResolve(
     databaseUrl,
     SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
+  );
+}
+
+export async function applyThroughSession13Batch3DS(databaseUrl: string): Promise<void> {
+  await applyThroughSession13Batch3BP(databaseUrl);
+  await applyMigrationSqlAndResolve(
+    databaseUrl,
+    SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
   );
 }

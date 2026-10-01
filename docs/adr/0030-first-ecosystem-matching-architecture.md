@@ -193,5 +193,23 @@ Session 14 Batch 2-R reviewed that evaluator. A `limit` that removes an otherwis
 version is not an exclusion proof, so `unaffected` still requires every accepted range to exclude
 the version. Range fingerprints are length-prefixed. Oversized and hostile requests return
 `unknown` or a strict request rejection. Comparator failure returns `unknown` and does not create
-a Finding. Next checkpoint, after this review is committed, is Session 14 Batch 3 immutable
-match-evaluation persistence.
+a Finding. Batch 2 and Batch 2-R are committed.
+
+Session 14 Batch 3 persists that reviewed evidence. The durable model is
+`match_evaluation_evidence` plus ordered `match_evaluation_explanation` rows in
+`20261001120000_match_evaluation_evidence_persistence` (frozen SHA-256
+`9df1146eee813cd3359e1d043475b49df8a083e397aa750373feef039ee8b63e`). Each row binds one tenant
+component occurrence and copies advisory identity, source, origin, and fingerprints. There is no
+advisory-body foreign key. The adapter does not recalculate affectedness. Affected rows grant no
+Finding authority. Unaffected rows grant no suppression authority. Unknown rows are retained.
+Production composition does not construct the adapter.
+
+Session 14 Batch 3-R reviewed that persistence. The evaluator replay fingerprint does not include
+tenant or occurrence identity, so uniqueness is `(organization_id, component_occurrence_id,
+replay_fingerprint)`. Another occurrence may store the same fingerprint only when package identity,
+raw version, advisory identity, fingerprints, outcome, and explanation codes agree. Disagreement is
+`immutable_conflict` and does not overwrite the prior row. `cisa_kev` evidence can be stored only
+as `unknown` with `unknown_kev_not_affectedness_authority`. Affected and unaffected evidence require
+synthetic fixture origin. Parent version, name, and namespace comparisons use UTF-8 bytes.
+Explanation inserts require the parent row to belong to the current transaction. Next checkpoint
+is Session 14 branch-closure review.
