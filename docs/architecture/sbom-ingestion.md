@@ -494,7 +494,7 @@ Each SBOM stores:
 - Object key
 - Parser version on each **SBOMIngestion**
 
-Each derived component stores the `sbomId`. Correlation (future) stores match method and intelligence record id. Session 8 does not insert **Evidence** rows for the original bytes; the **SBOM** row is the evidence pointer.
+Each derived component stores the `sbomId`. Correlation (future) stores match method and intelligence record id. Session 8 inventory identity is not the Session 14 matching identity. [ADR 0030](../adr/0030-first-ecosystem-matching-architecture.md) selects npm for a future evaluator and preserves the raw occurrence version separately from the versionless package identity. Session 8 does not insert **Evidence** rows for the original bytes; the **SBOM** row is the evidence pointer.
 
 ## Parser-version retention and reprocessing
 
@@ -509,3 +509,4 @@ Each derived component stores the `sbomId`. Correlation (future) stores match me
 - [Finding lifecycle](finding-lifecycle.md)
 - [Threat model](../security/threat-model.md) (malicious SBOMs, oversized JSON, dependency explosion)
 - [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md)
+- [First ecosystem matching](ecosystem-matching.md)

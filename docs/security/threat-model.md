@@ -529,6 +529,10 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 | Open registration | Instance | Unauthenticated org create | Abuse | No public registration (ADR 0019) | Auth metrics | Disable signup | Authn tests | OD-17 lockout | Authn |
 | AI leakage (later) | Restricted | Model API | Exfil | Disabled; ADR 0017 | — | Disable | — | If enabled later | Future |
 
+## Session 14 Batch 1 matching notes
+
+[ADR 0030](../adr/0030-first-ecosystem-matching-architecture.md) selects npm as the first ecosystem architecture. Session 14 Batch 1-R reviewed it. The comparator is not implemented. Structurally valid input returns `unknown`, not `affected` or `unaffected`. Malformed versions, unsupported ranges, contradictory timelines, and missing evidence also return `unknown`. One invalid range poisons the advisory. `limit` is not a fix. KEV membership is not package affectedness. Non-synthetic requests are not recorded as synthetic. Package identity and raw versions are tenant-sensitive when bound to an observation and are not metric labels. No production API, worker, or scheduler path invokes the contracts. Finding creation remains unavailable. Production OSV acquisition remains disabled.
+
 ## Related documents
 
 - [Security controls](security-controls.md)

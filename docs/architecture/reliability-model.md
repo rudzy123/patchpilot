@@ -193,6 +193,7 @@ Restore both stores together. Degraded mode during provider outages: last intel 
 
 - [SBOM ingestion](sbom-ingestion.md)
 - [Vulnerability intelligence](vulnerability-intelligence.md)
+- [First ecosystem matching](ecosystem-matching.md)
 - [ADR 0021](../adr/0021-vulnerability-intelligence-import-foundation.md)
 - [Observability](observability.md)
 - [Deployment model](deployment-model.md)

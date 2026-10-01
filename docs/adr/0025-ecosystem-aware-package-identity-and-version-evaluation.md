@@ -887,6 +887,11 @@ Identified npm risks:
 Those risks, plus the absence of an OSV range-type inventory in this repository, prevent selecting
 npm as the first implementation ecosystem now.
 
+Session 14 Batch 1 later records an architecture selection in
+[ADR 0030](0030-first-ecosystem-matching-architecture.md). That selection does not implement an
+evaluator, does not fill this ADR's implemented registry, and does not make npm currently
+supported. Catalog measurements remain absent there as well. Non-SEMVER ranges stay unsupported.
+
 npm is **not** implemented.
 
 ### 22. Provider-data activation boundary
