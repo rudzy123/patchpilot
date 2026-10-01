@@ -159,9 +159,9 @@ PURL evidence is npm.
 
 ## Consequences
 
-Session 14 Batch 2 may implement the npm comparator only after dependency review if a library is
-required. Match persistence and Findings remain later gates. Production OSV acquisition stays
-disabled.
+Session 14 Batch 2 implements the npm comparator in memory. Dependency review closed without a
+library (`closed_no_library_strict_semver_2_0_0_comparator`). Match persistence and Findings remain
+later gates. Production OSV acquisition stays disabled.
 
 ## Security and tenancy
 
@@ -172,13 +172,26 @@ policy.
 
 ## Operational failure plan
 
-There is no production operation. A future evaluator that cannot prove inclusion or exclusion
-returns `unknown` and creates no Finding. Comparator absence is that state today.
+There is no production operation. The in-memory evaluator returns `unknown` when it cannot prove
+inclusion or exclusion, and it creates no Finding.
 
 ## Follow-up
 
 Session 14 Batch 1-R adversarially reviewed this architecture and corrected timeline validation,
 limit semantics, the multiple-range poison rule, SemVer precedence rules, provenance labeling, and
-over-limit version classification. Comparator implementation, dependency review, match-evaluation
-persistence, and Finding writes are not part of this ADR. Batch 2 follows only after this review
-is committed.
+over-limit version classification. Batch 1 and Batch 1-R are committed.
+
+Session 14 Batch 2 implements `evaluateSelectedEcosystemAffectedVersion` for npm. Accepted range
+type remains `SEMVER`. Accepted events remain `introduced`, `fixed`, `last_affected`, and `limit`.
+`introduced` and `last_affected` are inclusive. `fixed` is exclusive. `limit` is an exclusive
+applicability bound and does not by itself prove `unaffected`. Prerelease identifiers use SemVer
+2.0.0 precedence. Build metadata is ignored for precedence and retained on the raw version.
+Evaluation evidence stays in memory. Finding creation remains unavailable. The evaluator is
+production-uncomposed. Match-evaluation persistence and Finding writes remain later gates.
+
+Session 14 Batch 2-R reviewed that evaluator. A `limit` that removes an otherwise included
+version is not an exclusion proof, so `unaffected` still requires every accepted range to exclude
+the version. Range fingerprints are length-prefixed. Oversized and hostile requests return
+`unknown` or a strict request rejection. Comparator failure returns `unknown` and does not create
+a Finding. Next checkpoint, after this review is committed, is Session 14 Batch 3 immutable
+match-evaluation persistence.

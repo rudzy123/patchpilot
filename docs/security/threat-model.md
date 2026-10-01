@@ -81,7 +81,7 @@ Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). D
 | Source-license revalidation | Immutable `osv_source_license_registry_v1` with Batch 3A-P evidence; ADR 0028 pins revalidation points; ADR 0029 treats registry `approved` as insufficient for canary legal authorization | Listing-only Batch 3C used committed listing-metadata legal approval; body-permission legal revalidation remains outstanding |
 | Rollback and kill switch | ADR 0028 defines halt independent from enablement and rollback as a new activation record. Session 12 Batch 9 adds typed `INTELLIGENCE_OSV_ACQUISITION_HALT` defaulting halted. Session 12 Batch 9-R reviewed that halt remains observation-plus-block, not enablement. Rollback remains a later activation record | Halt variable exists; production composition and rollback remain later |
 
-[ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) records fail-closed package identity and evaluation architecture. No comparator or evaluator exists.
+[ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) records fail-closed package identity and evaluation architecture. Session 14 Batch 2 implements the uncomposed in-memory npm evaluator. Session 14 Batch 2-R reviewed that evaluator. It is not a production matching path.
 
 - There is no generic name matcher, lexical version comparator, or universal semver implementation.
 - The implemented ecosystem set is empty. Unsupported ecosystems, GIT ranges, unknown versions, and malformed provider data must not become `not_affected`.
@@ -531,7 +531,7 @@ For each row: preventive / detective / recovery / test / residual / owner. Text 
 
 ## Session 14 Batch 1 matching notes
 
-[ADR 0030](../adr/0030-first-ecosystem-matching-architecture.md) selects npm as the first ecosystem architecture. Session 14 Batch 1-R reviewed it. The comparator is not implemented. Structurally valid input returns `unknown`, not `affected` or `unaffected`. Malformed versions, unsupported ranges, contradictory timelines, and missing evidence also return `unknown`. One invalid range poisons the advisory. `limit` is not a fix. KEV membership is not package affectedness. Non-synthetic requests are not recorded as synthetic. Package identity and raw versions are tenant-sensitive when bound to an observation and are not metric labels. No production API, worker, or scheduler path invokes the contracts. Finding creation remains unavailable. Production OSV acquisition remains disabled.
+[ADR 0030](../adr/0030-first-ecosystem-matching-architecture.md) selects npm as the first ecosystem. Session 14 Batch 1-R reviewed that architecture. Session 14 Batch 2 evaluates npm versions in memory with SemVer 2.0.0 precedence. `affected` requires positive inclusion. `unaffected` requires every accepted range to exclude the version. Malformed versions, unsupported ranges, contradictory timelines, and missing evidence return `unknown`. One invalid range poisons the advisory. `limit` is not a fix, and a limit that removes an otherwise included version is not exclusion. KEV membership is not package affectedness. Non-synthetic requests are not recorded as synthetic. Package identity and raw versions are tenant-sensitive when bound to an observation and are not metric labels. No production API, worker, or scheduler path invokes the evaluator. Evaluation evidence is not persisted. Finding creation remains unavailable. Production OSV acquisition remains disabled.
 
 ## Related documents
 
