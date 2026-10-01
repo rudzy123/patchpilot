@@ -6,6 +6,10 @@ In scope: the ten security-sensitive areas in [AGENTS.md](../../AGENTS.md). Out 
 
 Report product vulnerabilities privately per [SECURITY.md](../../SECURITY.md). Do not publish exploit payloads here.
 
+## Session 15 provenance notes
+
+Session 15 Batch 1 defines product-evidence provenance and does not persist it. Session 15 Batch 1-R reviewed that contract. Synthetic evidence cannot be relabeled provider-derived. Unrecognized origin stays unrecognized. Withdrawal cannot be inferred from listing absence. A withdrawn revision cannot become product eligible. Supersession does not overwrite a prior revision. The active catalog pointer is not evidence identity and does not classify a revision as superseded. String similarity and KEV membership cannot bind `Vulnerability.id`. Multiple CVE aliases cannot collapse into one Vulnerability. An empty registry blocks `eligible`. Product eligibility is a derived classification and is not Finding authority. Production startup does not admit provenance.
+
 ## Session 14 match-evidence notes
 
 Session 14 Batch 3 stores reviewed npm evaluation evidence. The rows are tenant-scoped through the stored component occurrence. Cross-tenant inspection returns not found. Affected evidence does not create a Finding. Unaffected evidence does not suppress a Finding. The persistence adapter does not contact a provider and is not composed into API or worker startup.

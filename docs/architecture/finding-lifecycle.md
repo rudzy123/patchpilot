@@ -212,9 +212,14 @@ Finding reads and mutations require organization scope. Recalculation jobs, if a
 
 Due dates on the Finding row are tenant workflow data. CISA KEV `dueDate` / `requiredAction` and OSV provider dates must never populate or modify `Finding.dueAt` automatically.
 
+## Session 15 provenance boundary
+
+Product-eligible affected match evidence, once a later batch can persist it, is necessary and insufficient for Finding creation. Session 15 Batch 1 defines that boundary. Session 15 Batch 1-R does not return `eligible` while the ecosystem and evaluator registries are empty. This batch does not implement a Finding write gate, FindingObservation, risk, assignment, suppression, remediation, or verification. Finding creation remains unavailable. Synthetic Session 14 evidence cannot be relabeled into that prerequisite.
+
 ## Related documents
 
 - [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md)
+- [Product-evidence provenance](product-evidence-provenance.md)
 - [Remediation lifecycle](remediation-lifecycle.md)
 - [Risk policy](risk-policy.md)
 - [SBOM ingestion](sbom-ingestion.md)

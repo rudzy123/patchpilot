@@ -84,6 +84,8 @@ per component occurrence. Affected evidence grants no Finding authority. Unaffec
 no suppression authority. Unknown evidence is retained. The persistence adapter does not call the
 evaluator. Neither factory is production-composed.
 
+Session 15 Batch 1 defines the provenance required before any of that evidence can be product eligible. Session 15 Batch 1-R reviewed it. See [product-evidence provenance](product-evidence-provenance.md). Synthetic Session 14 rows stay synthetic. The active registries stay empty, and admission does not return `eligible`. Finding creation remains unavailable.
+
 ## What this batch does not do
 
 - No production composition of the evaluator or the persistence adapter
