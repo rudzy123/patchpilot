@@ -61,7 +61,11 @@ describe('session 13 Batch 2F worker preflight rehearsal', { timeout: 60_000 }, 
       expect(source, relative).not.toContain('createOsvCanaryPreflightReadiness');
       expect(source, relative).not.toContain('createOsvGcsListingHttpsAdapter');
     }
-    expect(readFileSync(join(workspaceRoot, 'AGENTS.md'), 'utf8')).toContain('Session 13 Batch 2F');
+    const currentState = readFileSync(join(workspaceRoot, 'docs/project/current-state.md'), 'utf8');
+    expect(currentState).toContain('Production OSV acquisition: disabled');
+    expect(readFileSync(join(workspaceRoot, 'AGENTS.md'), 'utf8')).toContain(
+      'docs/project/current-state.md',
+    );
   });
 
   it('checks local object storage with HeadBucket only', async () => {

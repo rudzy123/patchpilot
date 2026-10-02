@@ -6,6 +6,17 @@
 - Supersedes: none
 - Superseded by: none
 
+## Implementation status
+
+Status remains **Proposed**. This note does not accept the ADR. Current checkpoint: [current-state.md](../project/current-state.md).
+
+- Immutable advisory revisions and reviewed Vulnerability bindings: implemented, production uncomposed
+- Product-evidence eligibility composition: implemented, production uncomposed. It produces no eligible record, invokes no product evaluator in the accepted zero-eligibility state, and writes no product match row. Composition is not product matching.
+- Real product-eligible evaluation count: 0
+- Finding creation: unavailable
+
+The opening statement that this ADR does not persist product-eligible match evidence remains accurate. Session 15 Batch 2 does persist advisory facts. Those facts are not a product-eligible evaluation.
+
 Session 15 Batch 1 defines how a future reviewed advisory revision can become
 product-eligible match-evaluation evidence. It does **not** persist that
 evidence, accept [ADR 0027](0027-osv-acquisition-persistence-and-catalog-activation.md),
@@ -107,4 +118,4 @@ catalog claim. The SPDX identifier is part of revision identity. An active
 digest mismatch is `ineligible_catalog`, not supersession. Session 15 Batch 2
 persists immutable advisory families, revisions, aliases, and one reviewed
 `Vulnerability.id` binding. It does not store product eligibility, activate a
-catalog, or create Findings. Session 15 Batch 2-R reviewed that persistence. Synthetic revisions cannot be withdrawn, quarantined, or superseding. Alias ordinals are contiguous. This ADR remains Proposed. Session 15 Batch 3 composes eligibility from the stored facts. It does not return `eligible` while the registries are empty, does not activate a catalog, and does not persist a product-eligible evaluation. Session 15 Batch 3-R reviewed that composition. Caller eligibility, synthetic promotion, source substitution, fingerprint mismatch, binding substitution, catalog forgery, and cross-tenant component substitution fail closed. The evaluator is not invoked. Real product-eligible evaluation count remains 0. Session 15 branch-closure review passed. Next recommended branch is `chore/architecture-alignment`.
+catalog, or create Findings. Session 15 Batch 2-R reviewed that persistence. Synthetic revisions cannot be withdrawn, quarantined, or superseding. Alias ordinals are contiguous. This ADR remains Proposed. Session 15 Batch 3 composes eligibility from the stored facts. It does not return `eligible` while the registries are empty, does not activate a catalog, and does not persist a product-eligible evaluation. Session 15 Batch 3-R reviewed that composition. Caller eligibility, synthetic promotion, source substitution, fingerprint mismatch, binding substitution, catalog forgery, and cross-tenant component substitution fail closed. The evaluator is not invoked. Real product-eligible evaluation count remains 0. Session 15 branch-closure review passed and the session is merged. Current checkpoint: [current-state.md](../project/current-state.md).
