@@ -1463,6 +1463,7 @@ model Vulnerability {
   findings                      Finding[]
   cveIdentityLinks              VulnerabilityCveIdentityLink[]
   advisoryVulnerabilityBindings AdvisoryVulnerabilityBinding[]
+  maintainerReviewedAdvisoryApprovals MaintainerReviewedAdvisoryApproval[]
 
   @@index([cveId], map: "vulnerability_cve_idx")
   @@map("vulnerability")
@@ -3350,6 +3351,7 @@ enum AdvisoryEvidenceSource {
   echo_advisory_database
   synthetic_fixture
   unrecognized
+  maintainer_reviewed_advisory
 
   @@map("advisory_evidence_source")
 }
@@ -3358,6 +3360,7 @@ enum AdvisoryEvidenceOrigin {
   synthetic_fixture
   provider_derived
   unrecognized
+  maintainer_reviewed_advisory
 
   @@map("advisory_evidence_origin")
 }
@@ -3398,6 +3401,7 @@ enum AdvisoryQuarantineClassification {
 enum AdvisoryRetrievalClassification {
   synthetic_not_retrieved
   recorded_reference
+  local_not_retrieved
 
   @@map("advisory_retrieval_classification")
 }
@@ -3435,6 +3439,7 @@ model AdvisoryFamily {
   createdAt              DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
 
   revisions AdvisoryRevision[]
+  approvals MaintainerReviewedAdvisoryApproval[]
 
   @@unique([source, advisoryId], map: "advisory_family_source_advisory_uidx")
   @@map("advisory_family")
@@ -3456,7 +3461,8 @@ model AdvisoryRevision {
   productRangeFingerprint       String                            @map("product_range_fingerprint") @db.Text
   parserId                      String                            @map("parser_id") @db.VarChar(80)
   parserResourcePolicy          String                            @map("parser_resource_policy") @db.VarChar(80)
-  advisorySchemaVersion         String                            @map("advisory_schema_version") @db.VarChar(32)
+  advisorySchemaVersion         String                            @map("advisory_schema_version") @db.VarChar(80)
+  authorIdentity                String?                           @map("author_identity") @db.VarChar(128)
   advisorySchemaCommit          String                            @map("advisory_schema_commit") @db.VarChar(40)
   sourceLicenseRegistryVersion  String                            @map("source_license_registry_version") @db.VarChar(80)
   sourceLicensePolicyVersion    String                            @map("source_license_policy_version") @db.VarChar(80)
@@ -3488,6 +3494,7 @@ model AdvisoryRevision {
   successors        AdvisoryRevision[]                @relation("AdvisoryRevisionSupersession")
   aliases           AdvisoryRevisionAlias[]
   binding           AdvisoryVulnerabilityBinding?
+  approval          MaintainerReviewedAdvisoryApproval?
 
   @@index([advisoryFamilyId], map: "advisory_revision_family_idx")
   @@index([supersedesAdvisoryRevisionId], map: "advisory_revision_supersedes_idx")
@@ -3533,7 +3540,46 @@ model AdvisoryVulnerabilityBinding {
 
   revision      AdvisoryRevision @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_vulnerability_binding_revision_fkey")
   vulnerability Vulnerability    @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "advisory_vulnerability_binding_vulnerability_fkey")
+  approval      MaintainerReviewedAdvisoryApproval?
 
   @@index([vulnerabilityId], map: "advisory_vulnerability_binding_vulnerability_idx")
   @@map("advisory_vulnerability_binding")
+}
+
+/// Immutable maintainer-reviewed approval of one advisory revision.
+/// Existence of a valid row is the approval. There is no status Boolean.
+/// The row is not evaluation authority, Finding authority, or tenant data.
+model MaintainerReviewedAdvisoryApproval {
+  id                            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  approvalSchemaVersion         String   @map("approval_schema_version") @db.VarChar(80)
+  advisoryRevisionId            String   @unique(map: "maintainer_reviewed_advisory_approval_revision_uidx") @map("advisory_revision_id") @db.Uuid
+  advisoryFamilyId              String   @map("advisory_family_id") @db.Uuid
+  familyDigest                  String   @map("family_digest") @db.Text
+  approvalPolicyId              String   @map("approval_policy_id") @db.VarChar(80)
+  approvalPolicyVersion         Int      @map("approval_policy_version") @db.SmallInt
+  approvalPurpose               String   @map("approval_purpose") @db.VarChar(80)
+  sourceClassification          String   @map("source_classification") @db.VarChar(64)
+  authorIdentity                String   @map("author_identity") @db.VarChar(128)
+  reviewerIdentity              String   @map("reviewer_identity") @db.VarChar(128)
+  reviewerClassification        String   @map("reviewer_classification") @db.VarChar(64)
+  contentFingerprint            String   @map("content_fingerprint") @db.Text
+  rangeFingerprint              String   @map("range_fingerprint") @db.Text
+  packageIdentityKey            String   @map("package_identity_key") @db.VarChar(1024)
+  vulnerabilityId               String   @map("vulnerability_id") @db.Uuid
+  advisoryVulnerabilityBindingId String  @unique(map: "maintainer_reviewed_advisory_approval_binding_uidx") @map("advisory_vulnerability_binding_id") @db.Uuid
+  sourceLicensePolicyId         String   @map("source_license_policy_id") @db.VarChar(80)
+  sourceLicensePolicyVersion    Int      @map("source_license_policy_version") @db.SmallInt
+  approvedLicenseClassification String   @map("approved_license_classification") @db.VarChar(32)
+  licenseDecisionCanonical      String   @map("license_decision_canonical") @db.Text
+  replayFingerprint             String   @unique(map: "maintainer_reviewed_advisory_approval_replay_uidx") @map("replay_fingerprint") @db.Text
+  createdAt                     DateTime @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  revision      AdvisoryRevision             @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_revision_fkey")
+  family        AdvisoryFamily               @relation(fields: [advisoryFamilyId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_family_fkey")
+  vulnerability Vulnerability                @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_vulnerability_fkey")
+  binding       AdvisoryVulnerabilityBinding @relation(fields: [advisoryVulnerabilityBindingId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_binding_fkey")
+
+  @@index([advisoryFamilyId], map: "maintainer_reviewed_advisory_approval_family_idx")
+  @@index([vulnerabilityId], map: "maintainer_reviewed_advisory_approval_vulnerability_idx")
+  @@map("maintainer_reviewed_advisory_approval")
 }

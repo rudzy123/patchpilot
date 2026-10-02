@@ -219,9 +219,13 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   provenance. Apache-2.0 and MIT are not product-matching authority.
 - **Eligibility:** Not returned. Registries remain empty. Approval does not
   invoke the evaluator or create a Finding.
-- **Invariants:** No maintainer-reviewed advisory is approved in the product
-  store. Approval persistence does not exist. Real product-eligible evaluation
-  count remains 0. Finding creation remains unavailable.
+- **Invariants:** Batch 2 persists an immutable approval and does not evaluate
+  it. Author and reviewer identities are exact and distinct. The purpose is
+  `approve_maintainer_reviewed_advisory_for_product_evaluation`. Replay of the
+  same decision does not change the database timestamp. A conflicting decision
+  does not overwrite the row. Synthetic origin cannot be approved. Real
+  product-eligible evaluation count remains 0. Finding creation remains
+  unavailable. Production startup does not construct the adapter.
 
 ## Failure and capacity
 

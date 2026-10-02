@@ -47,3 +47,9 @@ npm was selected. An in-memory SemVer 2.0.0 evaluator and immutable synthetic ma
 Current checkpoint authority: [current-state.md](current-state.md).
 
 Immutable advisory families, revisions, aliases, and one reviewed Vulnerability binding were implemented and left production uncomposed. Provider-free eligibility composition was implemented and left production uncomposed. It does not return `eligible` while the registries are empty, does not invoke the product evaluator in that state, and writes no product match row. Real product-eligible evaluation count remained 0. Historical catalog size after the advisory-revision migration: nineteen finished migrations. ADR 0031 stayed Proposed. The session merged after branch-closure review.
+
+## Product Match Evidence — reviewed advisory authority
+
+Current checkpoint authority: [current-state.md](current-state.md).
+
+Product Match Evidence Batch 1 and Batch 1-R are committed on `feat/product-match-evidence`. Batch 2 adds uncommitted immutable approval persistence in `20261002120000_maintainer_reviewed_advisory_approval`. The working catalog size is twenty migrations. The approval binds one maintainer-reviewed revision, fingerprints, npm package identity, `Vulnerability.id`, distinct author and reviewer identities, the closed approval purpose, and the accepted `CC-BY-4.0` decision. It does not evaluate, write product match evidence, or create a Finding. Real product-eligible evaluation count remains 0. Batch 2-R keeps `maintainer_reviewed_advisory` out of the provider-derived source branch. Batch 3 is next only after commit. ADR 0032 stays Proposed.

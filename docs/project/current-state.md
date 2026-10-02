@@ -6,7 +6,7 @@ Read this file before treating `AGENTS.md`, an ADR body, or an architecture narr
 
 ## Facts
 
-- Frozen migrations: 19
+- Frozen migrations: 20
 - Real product-eligible evaluation count: 0
 - Production OSV acquisition: disabled
 - Finding creation from match evidence: unavailable
@@ -49,12 +49,13 @@ Present in packages and tests, and not constructed by API, worker, web, seed, or
 - Reviewed Vulnerability bindings
 - Product-evidence eligibility composition
 - Maintainer-reviewed advisory authority architecture contracts
+- Immutable maintainer-reviewed advisory approval persistence
 - Canonical CVE identity persistence
 - Read-only active-catalog KEV membership derivation
 
 OSV implementation foundation: implemented but production uncomposed. Historical canary tools are operator only and unregistered. They are not production startup and they are not a second OSV runtime.
 
-Synthetic match-evaluation evidence persistence is implemented, immutable, and production uncomposed. Affected and unaffected rows in that schema require synthetic origin. Immutable advisory revisions and Vulnerability bindings are implemented and production uncomposed. Real product-eligible match evidence is unavailable. Maintainer-reviewed advisory authority is architecture only: no advisory is approved, approval is not persisted, and the contracts do not return `eligible`.
+Synthetic match-evaluation evidence persistence is implemented, immutable, and production uncomposed. Affected and unaffected rows in that schema require synthetic origin. Immutable advisory revisions and Vulnerability bindings are implemented and production uncomposed. Real product-eligible match evidence is unavailable. Maintainer-reviewed advisory approval persistence is implemented and production uncomposed (`20261002120000_maintainer_reviewed_advisory_approval`, SHA-256 `9f4ae2a6402952ff0ecca27a88cb15859a2164d89591fe2afe64e7e9ddbfb380`). An approval binds one immutable maintainer-reviewed revision, its content and Session 14 range fingerprints, the npm package identity, one `Vulnerability.id`, the author, a distinct reviewer, the approval purpose `approve_maintainer_reviewed_advisory_for_product_evaluation`, and the accepted `CC-BY-4.0` source-license decision. Exact replay does not insert or change the database timestamp. A conflicting replay does not overwrite the row. Update and delete are rejected. Parent deletion is restricted. Approval does not run evaluation, write product match evidence, or create a Finding. The contracts do not return `eligible`. No approval is seeded.
 
 ## Test only
 
@@ -96,8 +97,8 @@ A signed-in user can select an organization and use the asset inventory. SBOM up
 This document does not start the milestone.
 
 - Preferred product goal: one legitimate non-synthetic affected evaluation
-- Unresolved authority decision: a reviewed local advisory versus one separately authorized provider-body retrieval. Either choice needs an explicit provenance ADR. A local document can become synthetic evidence under another label, so this page does not authorize a product-approved local advisory.
-- Mandatory prerequisite: a forward-only match-evidence shape that binds an advisory revision and `Vulnerability.id` without laundering synthetic evidence
+- Product Match Evidence Batch 1 and Batch 1-R are committed. Batch 2 persists immutable approval evidence and does not evaluate. Batch 2-R is in this working tree. Batch 3 is next only after this persistence is committed.
+- The Session 14 match-evaluation row still cannot store a legal non-synthetic affected record. That shape was not extended here because the mutually exclusive product-backed constraints are not settled. Approval is not a user-facing workflow.
 
 Exit intent for a later branch, after that ADR: exactly one legal affected evaluation, `finding_creation` unavailable, and zero Findings. Production OSV acquisition stays disabled.
 

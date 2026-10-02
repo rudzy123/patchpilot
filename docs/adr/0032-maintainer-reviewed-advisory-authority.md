@@ -11,12 +11,12 @@
 Status is **Proposed**. This note records the architecture decision for Product Match Evidence Batch 1. Current checkpoint: [current-state.md](../project/current-state.md).
 
 - Maintainer-reviewed advisory authority architecture: defined as pure contracts, policies, invariants, and tests; production uncomposed.
+- Batch 2 persistence: one forward-only migration `20261002120000_maintainer_reviewed_advisory_approval`, SHA-256 `9f4ae2a6402952ff0ecca27a88cb15859a2164d89591fe2afe64e7e9ddbfb380`. The adapter is production uncomposed. No approval is seeded.
 - Real product-eligible evaluation count: 0
 - Production OSV acquisition: disabled
 - Finding creation: unavailable
-- Prisma and migrations: unchanged
 
-This ADR defines how a local advisory document can become a legitimate, non-synthetic, maintainer-reviewed product evidence source. It does **not** persist advisory records, modify Prisma or database migrations, run evaluations, create product match evidence, or create Findings.
+This ADR defines how a local advisory document can become a legitimate, non-synthetic, maintainer-reviewed product evidence source. Batch 2 records an immutable approval for an already stored maintainer-reviewed revision. It does not run evaluations, create product match evidence, or create Findings. Approval is not an operational user workflow.
 
 ## Context
 
@@ -104,6 +104,6 @@ PatchPilot establishes a **Maintainer-Reviewed Advisory Authority Architecture**
 
 ## Follow-up
 
-- Batch 1-R corrected caller-origin, caller-built authority, license allowlist, fingerprint, and eligibility defects. The contracts remain uncommitted until this review is accepted.
-- Batch 2 begins only after commit: one forward-only migration for immutable approval evidence. No SQL is frozen here.
-- Product matching composition remains a later batch. No maintainer-reviewed advisory is approved.
+- Batch 1 and Batch 1-R are committed. Batch 1-R corrected caller-origin, caller-built authority, license allowlist, fingerprint, and eligibility defects.
+- Batch 2 records immutable approval evidence. Exact replay does not change the row. A conflicting replay does not overwrite it. Author and reviewer identities stay distinct. Synthetic origin cannot be approved. The Session 14 match-evaluation shape was not extended.
+- Batch 2-R reviewed the uncommitted persistence. A provider-derived revision cannot carry source `maintainer_reviewed_advisory`. Batch 3 is next only after commit. An approval does not authorize evaluation. There is no user-facing approval workflow.
