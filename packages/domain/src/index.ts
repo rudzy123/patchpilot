@@ -185,7 +185,6 @@ export type {
   ClearActiveOrganizationInput,
   CreateAssetInput,
   CreateEnvironmentInput,
-  CreateFindingInput,
   CreateMembershipInput,
   CreateOrganizationInput,
   CreateOrganizationRiskPolicyInput,

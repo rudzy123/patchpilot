@@ -4,7 +4,6 @@ import type {
   AuditAppendRepository,
   ClearActiveOrganizationInput,
   CreateEnvironmentInput,
-  CreateFindingInput,
   CreateMembershipInput,
   CreateOrganizationInput,
   CreateOutboxEventInput,
@@ -604,29 +603,6 @@ class PrismaSbomMetadataRepository implements SbomMetadataRepository {
 
 class PrismaFindingRepository implements FindingRepository {
   public constructor(private readonly client: PrismaClientLike) {}
-
-  public async create(input: CreateFindingInput) {
-    const row = await this.client.finding.create({
-      data: {
-        organizationId: input.organizationId,
-        assetId: input.assetId,
-        vulnerabilityId: input.vulnerabilityId,
-        componentId: input.componentId,
-        firstObservedAt: input.firstObservedAt,
-        lastObservedAt: input.lastObservedAt,
-        ...(input.state === undefined ? {} : { state: input.state }),
-        ...(input.componentOccurrenceId === undefined
-          ? {}
-          : { componentOccurrenceId: input.componentOccurrenceId }),
-        ...(input.assignedMembershipId === undefined
-          ? {}
-          : { assignedMembershipId: input.assignedMembershipId }),
-        ...(input.assignedTeamId === undefined ? {} : { assignedTeamId: input.assignedTeamId }),
-        ...(input.dueAt === undefined ? {} : { dueAt: input.dueAt }),
-      },
-    });
-    return mapFinding(row);
-  }
 
   public async findById(organizationId: string, id: string) {
     const row = await this.client.finding.findFirst({
