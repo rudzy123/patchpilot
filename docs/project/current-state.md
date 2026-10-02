@@ -48,12 +48,13 @@ Present in packages and tests, and not constructed by API, worker, web, seed, or
 - Immutable advisory revisions
 - Reviewed Vulnerability bindings
 - Product-evidence eligibility composition
+- Maintainer-reviewed advisory authority architecture contracts
 - Canonical CVE identity persistence
 - Read-only active-catalog KEV membership derivation
 
 OSV implementation foundation: implemented but production uncomposed. Historical canary tools are operator only and unregistered. They are not production startup and they are not a second OSV runtime.
 
-Synthetic match-evaluation evidence persistence is implemented, immutable, and production uncomposed. Affected and unaffected rows in that schema require synthetic origin. Immutable advisory revisions and Vulnerability bindings are implemented and production uncomposed. Real product-eligible match evidence is unavailable.
+Synthetic match-evaluation evidence persistence is implemented, immutable, and production uncomposed. Affected and unaffected rows in that schema require synthetic origin. Immutable advisory revisions and Vulnerability bindings are implemented and production uncomposed. Real product-eligible match evidence is unavailable. Maintainer-reviewed advisory authority is architecture only: no advisory is approved, approval is not persisted, and the contracts do not return `eligible`.
 
 ## Test only
 
@@ -111,4 +112,4 @@ Recorded here and not implemented in architecture alignment:
 
 ## ADR posture
 
-Accepted: ADR 0001–0026 and ADR 0028–0029. Proposed, and unchanged by this reconciliation: ADR 0027, ADR 0030, and ADR 0031. Proposed does not mean the related code is absent. It means the ADR is not accepted. Implementation notes live on those ADR pages and in the sections above.
+Accepted: ADR 0001–0026 and ADR 0028–0029. Proposed, and unchanged by this reconciliation: ADR 0027, ADR 0030, ADR 0031, and ADR 0032. Proposed does not mean the related code is absent. It means the ADR is not accepted. Implementation notes live on those ADR pages and in the sections above.

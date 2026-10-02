@@ -197,6 +197,32 @@ There is no edge from `received` to `active_eligible`, from `synthetic` to
 `product_evidence_eligible`, from `withdrawn` to `product_evidence_eligible`,
 or from `product_evidence_eligible` to `finding`.
 
+## Maintainer-reviewed advisory authority (ADR 0032)
+
+Product Match Evidence Batch 1 defines the maintainer-reviewed local advisory
+architecture (`maintainer_reviewed_advisory_architecture_v1`).
+
+- **Conceptual source:** `maintainer_reviewed_advisory`, permanently distinct
+  from `synthetic_fixture`, `provider_derived`, and `unrecognized`. Caller-supplied
+  origin is rejected. No transition from `synthetic_fixture` exists.
+- **Submission:** Untrusted input; successful parse yields `ineligible_unapproved`.
+  Schema validation, canonicalization, and fingerprints do not approve.
+- **Reviewer authority:** An issued capability bound to one revision, both
+  fingerprints, `Vulnerability.id`, the npm identity key, and the license
+  decision. The public entry does not export an issuer. Generic admin, commit
+  authorship, file ownership, and status inspection grant no authority.
+- **Separation of duties:** Exact distinct author and reviewer identities.
+  Case-only and confusable differences fail closed as `ineligible_self_approved`.
+- **Approval purpose:** `approve_maintainer_reviewed_advisory_for_product_evaluation`.
+- **License policy:** Explicit decision. Product use follows the committed
+  product-evidence SPDX `CC-BY-4.0` with a required notice and maintainer-original
+  provenance. Apache-2.0 and MIT are not product-matching authority.
+- **Eligibility:** Not returned. Registries remain empty. Approval does not
+  invoke the evaluator or create a Finding.
+- **Invariants:** No maintainer-reviewed advisory is approved in the product
+  store. Approval persistence does not exist. Real product-eligible evaluation
+  count remains 0. Finding creation remains unavailable.
+
 ## Failure and capacity
 
 Closed failures include invalid request, unsupported source, unrecognized

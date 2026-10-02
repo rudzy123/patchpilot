@@ -77,6 +77,7 @@ Closer implementation notes may add detail. They must not silently weaken accept
 | [0027](0027-osv-acquisition-persistence-and-catalog-activation.md) | OSV acquisition persistence and catalog activation | Proposed |
 | [0030](0030-first-ecosystem-matching-architecture.md) | First ecosystem matching architecture (npm selected; in-memory evaluator uncomposed) | Proposed |
 | [0031](0031-product-evidence-provenance-architecture.md) | Product-evidence provenance architecture | Proposed |
+| [0032](0032-maintainer-reviewed-advisory-authority.md) | Maintainer-reviewed advisory authority architecture | Proposed |
 
 ## Implementation status
 
