@@ -68,7 +68,7 @@ Simulated fixtures are not real product evidence.
 - Finding and FindingObservation product infrastructure
 - Risk, remediation, and related models
 
-The Finding schema is placeholder infrastructure. It is not an implemented Finding workflow. `PrismaFindingRepository.create` is a latent generic create path and is unreachable from application startup. This alignment does not modify, remove, export, or gate that method.
+The Finding schema is placeholder infrastructure. It is not an implemented Finding workflow. The composed Finding repository is read-only (`findById`, `listForOrganization`). The generic `PrismaFindingRepository.create` path and its `CreateFindingInput` type have been removed, so production composition cannot create a Finding through the repository bundle. A future Finding write must be a purpose-specific reviewed command under [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md). Direct Prisma Finding writes exist only in tests and test fixtures.
 
 `packages/policy-engine` has no scoring implementation. There is no export product model.
 
@@ -106,7 +106,6 @@ Recorded here and not implemented in architecture alignment:
 
 | Branch | Purpose |
 | --- | --- |
-| `fix/finding-write-authority` | Remove, privatize, or hard-gate `PrismaFindingRepository.create` so a future route cannot bypass [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md). Preserve zero-Finding production behavior. High severity and latent, because apps do not call it today. |
 | `feat/product-match-evidence` | Carry the prerequisite above. Preserve `finding_creation = unavailable`. Admit only the reviewed npm evaluator. Do not choose local versus provider provenance until an ADR does. |
 | `chore/dependency-security-baseline` | Re-run the dependency audit, replace the 2026-08-29 advisory snapshot, and assess the transitive `deepmerge-ts` advisory. Keep that work out of architecture reconciliation. |
 

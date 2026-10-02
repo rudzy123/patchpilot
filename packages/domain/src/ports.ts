@@ -41,7 +41,6 @@ import type {
   AuditRetentionCategory,
   BusinessCriticality,
   EnvironmentSensitivityClass,
-  FindingState,
   IdempotencyRecordStatus,
   InternetExposure,
   MembershipRole,
@@ -115,20 +114,6 @@ export type CreateSbomInput = {
   uploadedByMembershipId?: string;
   capturedAt?: Date;
   receivedAt?: Date;
-};
-
-export type CreateFindingInput = {
-  organizationId: string;
-  assetId: string;
-  vulnerabilityId: string;
-  componentId: string;
-  componentOccurrenceId?: string;
-  state?: FindingState;
-  firstObservedAt: Date;
-  lastObservedAt: Date;
-  assignedMembershipId?: string;
-  assignedTeamId?: string;
-  dueAt?: Date;
 };
 
 export type CreateBuiltinRiskPolicyInput = {
@@ -402,8 +387,12 @@ export type SbomMetadataRepository = {
   listForOrganization(organizationId: string, page?: PageRequest): Promise<Page<SbomRecord>>;
 };
 
+/**
+ * Read-only Finding port. Finding creation from match evidence is unavailable.
+ * A future write must be a purpose-specific reviewed command under ADR 0026,
+ * not a generic create on this port.
+ */
 export type FindingRepository = {
-  create(input: CreateFindingInput): Promise<FindingRecord>;
   findById(organizationId: string, id: string): Promise<FindingRecord | undefined>;
   listForOrganization(organizationId: string, page?: PageRequest): Promise<Page<FindingRecord>>;
 };
