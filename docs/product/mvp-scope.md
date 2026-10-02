@@ -6,7 +6,9 @@ Future ideas belong in [non-goals](non-goals.md) or in an explicitly labeled fut
 
 ## Supported journey
 
-1. Create an organization.
+The steps below are the target MVP journey. They are not a claim that every step is operational. The current checkpoint is [current-state.md](../project/current-state.md).
+
+1. Create an organization. Public organization registration is not implemented. Operators select an existing organization after login.
 2. Register an asset.
 3. Upload a CycloneDX JSON SBOM.
 4. Validate and securely store the original SBOM.
@@ -32,7 +34,7 @@ Future ideas belong in [non-goals](non-goals.md) or in an explicitly labeled fut
 - Recording of remediation activity, risk acceptance, and compensating controls as explicit records plus append-only audit events.
 - Re-processing a newer SBOM for the same asset and comparing prior findings (still present, absent, or inconclusive).
 - Exports suitable for operators and executives, labeled as PatchPilot outputs rather than compliance certificates.
-- Local development topology: Docker Compose, PostgreSQL, Redis/BullMQ, MinIO, and the modular monolith apps (`web`, `api`, `worker`) once they are scaffolded.
+- Local development topology: Docker Compose, PostgreSQL, Redis/BullMQ, MinIO, and the modular monolith apps (`web`, `api`, and `worker`).
 
 ## Explicitly not in this MVP
 
@@ -54,4 +56,4 @@ Label these as future work if mentioned in code or docs:
 
 A slice is not done when the UI renders. It is done when it meets [definition of done](../development/definition-of-done.md): tests, error handling, logs, metrics, documentation, and an operational failure plan appropriate to the change.
 
-Current status: Session 14 npm evaluation and synthetic match evidence are merged and uncomposed. Session 15 Batch 1 defines product-evidence provenance. Session 15 Batch 1-R keeps that admission from returning `eligible` while the registries are empty. Session 15 Batch 2 persists immutable advisory revisions and reviewed Vulnerability bindings. Session 15 Batch 2-R reviewed that persistence. Session 15 Batch 3 composes eligibility and does not calculate a product-eligible evaluation while the registries are empty. Session 15 Batch 3-R reviewed that composition. Real product-eligible evaluation count remains 0. Steps that persist product-eligible evaluations, Findings, risk scores, assignments, or remediation are not implemented.
+Current status: production-composed authentication, asset inventory, SBOM ingestion, KEV synchronization when enabled, and sanitized provider status. The npm evaluator, synthetic match-evaluation persistence, advisory revisions, and eligibility composition are production uncomposed. Eligibility composition is not product matching and stores no product-eligible evaluation. Real product-eligible evaluation count remains 0. Steps that create Findings, risk scores, assignments, remediation, verification, or exports are not operational. See [current state](../project/current-state.md).

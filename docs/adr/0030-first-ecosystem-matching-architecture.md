@@ -6,6 +6,17 @@
 - Supersedes: none
 - Superseded by: none
 
+## Implementation status
+
+Status remains **Proposed**. This note does not accept the ADR. Current checkpoint: [current-state.md](../project/current-state.md).
+
+- npm evaluator: implemented, production uncomposed
+- Synthetic match-evaluation evidence persistence: implemented, immutable, production uncomposed
+- Real product-eligible match evidence: unavailable
+- Finding creation: unavailable
+
+Sentences below that say evaluation evidence is not persisted, or that match persistence remains a later gate, record the Batch 1 and Batch 2 decision text. The follow-up section records Session 14 Batch 3 persistence. Affected and unaffected rows in that schema require synthetic origin.
+
 Session 14 Batch 1 selects the first ecosystem and defines the matching architecture. It does
 **not** implement a comparator or evaluator, persist match evaluations, create Findings, contact a
 provider, or change Prisma, migrations, or dependencies. [ADR 0025](0025-ecosystem-aware-package-identity-and-version-evaluation.md)
@@ -211,5 +222,4 @@ raw version, advisory identity, fingerprints, outcome, and explanation codes agr
 `immutable_conflict` and does not overwrite the prior row. `cisa_kev` evidence can be stored only
 as `unknown` with `unknown_kev_not_affectedness_authority`. Affected and unaffected evidence require
 synthetic fixture origin. Parent version, name, and namespace comparisons use UTF-8 bytes.
-Explanation inserts require the parent row to belong to the current transaction. Next checkpoint
-is Session 14 branch-closure review.
+Explanation inserts require the parent row to belong to the current transaction. Session 14 branch-closure review passed and the session is merged. Current checkpoint: [current-state.md](../project/current-state.md).

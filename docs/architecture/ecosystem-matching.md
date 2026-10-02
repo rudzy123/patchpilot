@@ -11,8 +11,7 @@ Authority: [ADR 0030](../adr/0030-first-ecosystem-matching-architecture.md), whi
 [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) still keeps the
 implemented registry empty. `ecosystemIsImplemented('npm')` remains false. npm is not a supported
 production matching ecosystem. Session 14 Batch 3 stores immutable evidence for one component
-occurrence. Session 14 Batch 3-R reviewed that persistence. Next checkpoint is Session 14
-branch-closure review.
+occurrence. Session 14 Batch 3-R reviewed that persistence. Session 14 branch-closure review passed and the session is merged. Current checkpoint: [current-state.md](../project/current-state.md).
 
 ## Selection
 

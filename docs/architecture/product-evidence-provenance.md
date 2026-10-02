@@ -2,9 +2,9 @@
 
 Session 15 Batch 1 architecture. Policy `osv_product_evidence_provenance_architecture_v1`.
 Contract `osv_product_evidence_provenance_contract_v1`. Batch 1 admission
-persistence remains `not_implemented`. Session 15 Batch 2 stores the immutable
+persistence remains `not_implemented` for that Batch 1 admission API. Later batches persist advisory facts and compose eligibility in memory. Those later steps do not store a product-eligible evaluation. Session 15 Batch 2 stores the immutable
 facts in uncomposed PostgreSQL tables and does not calculate eligibility.
-Production registration is `absent`. Finding creation remains unavailable.
+Production registration is `absent`. Finding creation remains unavailable. Product-evidence eligibility composition, described below, is production uncomposed and is not product matching.
 
 Session 14 is merged. Its npm evaluator and immutable match-evaluation evidence
 stay authoritative. This document does not change those semantics and does not
@@ -185,13 +185,13 @@ advisory is not catalog authority. Catalog membership is not active-catalog
 authority. Active-catalog status is not matching authority. Matching readiness
 is not Finding authority.
 
-Session 15 Batch 1 admission stops at
+Session 15 Batch 1 admission, at that checkpoint, stopped at
 `product_evidence_provenance_architecture_defined`, then
 `persistence_not_implemented`, `composition_unavailable`, and
 `finding_unavailable`. Session 15 Batch 2 persists advisory families,
 revisions, aliases, and one reviewed `Vulnerability.id` binding. It does not
 store caller product eligibility, an active catalog pointer, or Finding
-authority. Session 15 Batch 2-R reviewed that persistence. Synthetic revisions stay not withdrawn, not quarantined, and without supersession. Alias ordinals are contiguous. Product eligibility remains unstored. Session 15 Batch 3 composes that conjunction in memory. An empty registry still blocks `eligible`. Catalog membership and an active-catalog snapshot are necessary and insufficient. The snapshot does not activate a catalog. The Session 14 match-evidence schema cannot store provider-derived product evaluations, so composition writes nothing and does not invoke the evaluator. Simulated test fixtures are not real product evidence. Finding authority remains unavailable. Session 15 Batch 3-R reviewed that composition. Product range fingerprint and revision digest are request pins. Stored component identity must agree. KEV, multi-CVE, mixed synthetic, and forged catalog inputs fail closed. The evaluator is not invoked. Real product-eligible evaluation count remains 0. Session 15 branch-closure review passed. Next recommended branch is `chore/architecture-alignment`.
+authority. Session 15 Batch 2-R reviewed that persistence. Synthetic revisions stay not withdrawn, not quarantined, and without supersession. Alias ordinals are contiguous. Product eligibility remains unstored. Session 15 Batch 3 composes that conjunction in memory. An empty registry still blocks `eligible`. Catalog membership and an active-catalog snapshot are necessary and insufficient. The snapshot does not activate a catalog. The Session 14 match-evidence schema cannot store provider-derived product evaluations, so composition writes nothing and does not invoke the evaluator. Simulated test fixtures are not real product evidence. Finding authority remains unavailable. Session 15 Batch 3-R reviewed that composition. Product range fingerprint and revision digest are request pins. Stored component identity must agree. KEV, multi-CVE, mixed synthetic, and forged catalog inputs fail closed. The evaluator is not invoked. Real product-eligible evaluation count remains 0. Session 15 branch-closure review passed and the session is merged. Current checkpoint: [current-state.md](../project/current-state.md).
 
 There is no edge from `received` to `active_eligible`, from `synthetic` to
 `product_evidence_eligible`, from `withdrawn` to `product_evidence_eligible`,

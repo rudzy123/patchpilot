@@ -1,6 +1,6 @@
 # Local development setup
 
-This is the local **development foundation** through Session 9 Batch 9B (schema, API auth routes, minimal web login, the SBOM upload-to-graph pipeline, and KEV catalog import when enabled). It is not a production deployment. It does not include vulnerability correlation, Findings from intelligence, scoring, remediation, an SBOM web UI, or a vulnerability dashboard.
+This is the local development setup. It is not a production deployment. Production-composed capabilities and the capabilities that remain uncomposed or unavailable are listed in [current state](../project/current-state.md). Local setup does not include Findings, scoring, remediation, an SBOM web UI, or a vulnerability dashboard.
 
 ## Prerequisites
 
