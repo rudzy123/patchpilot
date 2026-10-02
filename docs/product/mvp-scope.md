@@ -53,3 +53,5 @@ Label these as future work if mentioned in code or docs:
 ## Definition of a usable slice
 
 A slice is not done when the UI renders. It is done when it meets [definition of done](../development/definition-of-done.md): tests, error handling, logs, metrics, documentation, and an operational failure plan appropriate to the change.
+
+Current status: Session 14 npm evaluation and synthetic match evidence are merged and uncomposed. Session 15 Batch 1 defines product-evidence provenance. Session 15 Batch 1-R keeps that admission from returning `eligible` while the registries are empty. Session 15 Batch 2 persists immutable advisory revisions and reviewed Vulnerability bindings. Session 15 Batch 2-R reviewed that persistence. Session 15 Batch 3 composes eligibility and does not calculate a product-eligible evaluation while the registries are empty. Session 15 Batch 3-R reviewed that composition. Real product-eligible evaluation count remains 0. Steps that persist product-eligible evaluations, Findings, risk scores, assignments, or remediation are not implemented.

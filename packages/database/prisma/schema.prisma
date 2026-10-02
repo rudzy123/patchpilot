@@ -1458,10 +1458,11 @@ model Vulnerability {
   createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  aliases          VulnerabilityAlias[]
-  sourceRecords    VulnerabilitySourceRecord[]
-  findings         Finding[]
-  cveIdentityLinks VulnerabilityCveIdentityLink[]
+  aliases                       VulnerabilityAlias[]
+  sourceRecords                 VulnerabilitySourceRecord[]
+  findings                      Finding[]
+  cveIdentityLinks              VulnerabilityCveIdentityLink[]
+  advisoryVulnerabilityBindings AdvisoryVulnerabilityBinding[]
 
   @@index([cveId], map: "vulnerability_cve_idx")
   @@map("vulnerability")
@@ -3335,4 +3336,204 @@ model MatchEvaluationExplanation {
   @@unique([matchEvaluationEvidenceId, ordinal], map: "match_evaluation_explanation_ordinal_uidx")
   @@unique([matchEvaluationEvidenceId, explanationCode], map: "match_evaluation_explanation_code_uidx")
   @@map("match_evaluation_explanation")
+}
+
+enum AdvisoryEvidenceSource {
+  ossf_malicious_packages
+  github_advisory_database
+  pypa_advisory_database
+  go_vulnerability_database
+  rustsec_advisory_database
+  global_security_database
+  erlang_ecosystem_foundation_cna
+  osv_ambiguous_origin
+  echo_advisory_database
+  synthetic_fixture
+  unrecognized
+
+  @@map("advisory_evidence_source")
+}
+
+enum AdvisoryEvidenceOrigin {
+  synthetic_fixture
+  provider_derived
+  unrecognized
+
+  @@map("advisory_evidence_origin")
+}
+
+enum AdvisoryEvidenceTrust {
+  not_applicable_synthetic
+  unreviewed
+  reviewed
+
+  @@map("advisory_evidence_trust")
+}
+
+enum AdvisoryRevisionDisposition {
+  synthetic
+  withdrawn
+  quarantined
+  superseding
+  recorded
+  unrecognized
+
+  @@map("advisory_revision_disposition")
+}
+
+enum AdvisoryWithdrawalClassification {
+  not_withdrawn
+  withdrawn
+
+  @@map("advisory_withdrawal_classification")
+}
+
+enum AdvisoryQuarantineClassification {
+  not_quarantined
+  quarantined
+
+  @@map("advisory_quarantine_classification")
+}
+
+enum AdvisoryRetrievalClassification {
+  synthetic_not_retrieved
+  recorded_reference
+
+  @@map("advisory_retrieval_classification")
+}
+
+enum AdvisoryAliasType {
+  canonical_cve
+  provider_native
+
+  @@map("advisory_alias_type")
+}
+
+enum AdvisoryAliasReview {
+  unreviewed
+  reviewed
+
+  @@map("advisory_alias_review")
+}
+
+enum AdvisoryBindingClassification {
+  one_cve_alias_evidence
+  provider_native_without_cve
+
+  @@map("advisory_binding_classification")
+}
+
+/// Global instance-owned advisory family. Source plus provider-native id.
+/// No active revision pointer, tenant, or Finding state.
+model AdvisoryFamily {
+  id                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  familySchemaVersion    String                 @map("family_schema_version") @db.VarChar(80)
+  source                 AdvisoryEvidenceSource
+  advisoryId             String                 @map("advisory_id") @db.VarChar(512)
+  familyDigest           String                 @unique(map: "advisory_family_digest_uidx") @map("family_digest") @db.Text
+  sourceRegistryVersion  String                 @map("source_registry_version") @db.VarChar(80)
+  createdAt              DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  revisions AdvisoryRevision[]
+
+  @@unique([source, advisoryId], map: "advisory_family_source_advisory_uidx")
+  @@map("advisory_family")
+}
+
+/// Immutable advisory revision. Identity is the revision digest, not the family id.
+/// Product eligibility is not stored.
+model AdvisoryRevision {
+  id                            String                            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  revisionSchemaVersion         String                            @map("revision_schema_version") @db.VarChar(80)
+  advisoryFamilyId              String                            @map("advisory_family_id") @db.Uuid
+  source                        AdvisoryEvidenceSource
+  advisoryId                    String                            @map("advisory_id") @db.VarChar(512)
+  familyDigest                  String                            @map("family_digest") @db.Text
+  revisionDigest                String                            @unique(map: "advisory_revision_digest_uidx") @map("revision_digest") @db.Text
+  providerGeneration            String                            @map("provider_generation") @db.VarChar(64)
+  contentFingerprint            String                            @map("content_fingerprint") @db.Text
+  session14RangeFingerprint     String                            @map("session14_range_fingerprint") @db.Text
+  productRangeFingerprint       String                            @map("product_range_fingerprint") @db.Text
+  parserId                      String                            @map("parser_id") @db.VarChar(80)
+  parserResourcePolicy          String                            @map("parser_resource_policy") @db.VarChar(80)
+  advisorySchemaVersion         String                            @map("advisory_schema_version") @db.VarChar(32)
+  advisorySchemaCommit          String                            @map("advisory_schema_commit") @db.VarChar(40)
+  sourceLicenseRegistryVersion  String                            @map("source_license_registry_version") @db.VarChar(80)
+  sourceLicensePolicyVersion    String                            @map("source_license_policy_version") @db.VarChar(80)
+  spdxLicenseId                 String?                           @map("spdx_license_id") @db.VarChar(32)
+  origin                        AdvisoryEvidenceOrigin
+  trustClassification           AdvisoryEvidenceTrust             @map("trust_classification")
+  revisionDisposition           AdvisoryRevisionDisposition       @map("revision_disposition")
+  withdrawalClassification      AdvisoryWithdrawalClassification  @map("withdrawal_classification")
+  quarantineClassification      AdvisoryQuarantineClassification  @map("quarantine_classification")
+  supersedesRevisionDigest      String                            @map("supersedes_revision_digest") @db.VarChar(64)
+  supersedesAdvisoryRevisionId  String?                           @map("supersedes_advisory_revision_id") @db.Uuid
+  retrievalClassification       AdvisoryRetrievalClassification   @map("retrieval_classification")
+  retrievalEvidenceId           String                            @map("retrieval_evidence_id") @db.VarChar(64)
+  retrievalPolicyId             String                            @map("retrieval_policy_id") @db.VarChar(80)
+  ecosystem                     String                            @db.VarChar(16)
+  packageNamespace              String?                           @map("package_namespace") @db.VarChar(214)
+  packageName                   String                            @map("package_name") @db.VarChar(214)
+  packageIdentityKey            String                            @map("package_identity_key") @db.VarChar(1024)
+  evaluatorVersion              String                            @map("evaluator_version") @db.VarChar(64)
+  matchingPolicyId              String                            @map("matching_policy_id") @db.VarChar(80)
+  aliasCount                    Int                               @map("alias_count") @db.SmallInt
+  cveAliasCount                 Int                               @map("cve_alias_count") @db.SmallInt
+  aliasSetDigest                String                            @map("alias_set_digest") @db.Text
+  replayFingerprint             String                            @unique(map: "advisory_revision_replay_uidx") @map("replay_fingerprint") @db.Text
+  createdAt                     DateTime                          @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  family            AdvisoryFamily                    @relation(fields: [advisoryFamilyId], references: [id], onDelete: Restrict, map: "advisory_revision_family_fkey")
+  supersedes        AdvisoryRevision?                 @relation("AdvisoryRevisionSupersession", fields: [supersedesAdvisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_revision_supersedes_fkey")
+  successors        AdvisoryRevision[]                @relation("AdvisoryRevisionSupersession")
+  aliases           AdvisoryRevisionAlias[]
+  binding           AdvisoryVulnerabilityBinding?
+
+  @@index([advisoryFamilyId], map: "advisory_revision_family_idx")
+  @@index([supersedesAdvisoryRevisionId], map: "advisory_revision_supersedes_idx")
+  @@map("advisory_revision")
+}
+
+/// Immutable alias evidence for one revision. Presence is not affectedness.
+model AdvisoryRevisionAlias {
+  id                       String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  advisoryRevisionId       String                 @map("advisory_revision_id") @db.Uuid
+  ordinal                  Int                    @db.SmallInt
+  aliasType                AdvisoryAliasType      @map("alias_type")
+  aliasValue               String                 @map("alias_value") @db.VarChar(512)
+  aliasPolicyVersion       String                 @map("alias_policy_version") @db.VarChar(80)
+  sourceClassification     AdvisoryEvidenceOrigin @map("source_classification")
+  reviewClassification     AdvisoryAliasReview    @map("review_classification")
+  replayFingerprint        String                 @unique(map: "advisory_revision_alias_replay_uidx") @map("replay_fingerprint") @db.Text
+  createdAt                DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  revision AdvisoryRevision @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_revision_alias_revision_fkey")
+
+  @@unique([advisoryRevisionId, ordinal], map: "advisory_revision_alias_ordinal_uidx")
+  @@unique([advisoryRevisionId, aliasValue], map: "advisory_revision_alias_value_uidx")
+  @@map("advisory_revision_alias")
+}
+
+/// One reviewed binding from an immutable revision to one global Vulnerability.
+/// Aliases do not create this row. KEV is not authority.
+model AdvisoryVulnerabilityBinding {
+  id                          String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bindingSchemaVersion        String                         @map("binding_schema_version") @db.VarChar(80)
+  advisoryRevisionId          String                         @unique(map: "advisory_vulnerability_binding_revision_uidx") @map("advisory_revision_id") @db.Uuid
+  vulnerabilityId             String                         @map("vulnerability_id") @db.Uuid
+  mappingPolicyId             String                         @map("mapping_policy_id") @db.VarChar(80)
+  mappingMethod               String                         @map("mapping_method") @db.VarChar(64)
+  mappingEvidenceFingerprint  String                         @map("mapping_evidence_fingerprint") @db.Text
+  mappingReviewState          String                         @map("mapping_review_state") @db.VarChar(32)
+  mappingSourceClassification String                         @map("mapping_source_classification") @db.VarChar(64)
+  conflictClassification      String                         @map("conflict_classification") @db.VarChar(32)
+  bindingClassification       AdvisoryBindingClassification  @map("binding_classification")
+  replayFingerprint           String                         @unique(map: "advisory_vulnerability_binding_replay_uidx") @map("replay_fingerprint") @db.Text
+  createdAt                   DateTime                       @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  revision      AdvisoryRevision @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_vulnerability_binding_revision_fkey")
+  vulnerability Vulnerability    @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "advisory_vulnerability_binding_vulnerability_fkey")
+
+  @@index([vulnerabilityId], map: "advisory_vulnerability_binding_vulnerability_idx")
+  @@map("advisory_vulnerability_binding")
 }

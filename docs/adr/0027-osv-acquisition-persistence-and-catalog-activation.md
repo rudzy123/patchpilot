@@ -16,7 +16,13 @@ Implementation status (not an acceptance): Session 11 later implemented
 persistence, object storage, and retrieval adapters. Session 12 implemented the
 disabled runtime-enablement foundation. Catalog activation remains uninvoked.
 This ADR remains **Proposed** and does not authorize runtime enablement,
-activation, matching, or Finding writes.
+activation, matching, or Finding writes. Session 15 Batch 1 does not accept
+this ADR. Session 15 Batch 2 persists immutable advisory revisions and reviewed
+Vulnerability bindings. Session 15 Batch 2-R reviewed that persistence. Neither
+batch activates a catalog or accepts this ADR. Session 15 Batch 3 composition
+also leaves the active pointer unchanged and does not accept this ADR.
+Session 15 Batch 3-R reviewed that composition and still does not accept this ADR.
+Product-evidence provenance architecture is [ADR 0031](0031-product-evidence-provenance-architecture.md).
 
 ## Context
 

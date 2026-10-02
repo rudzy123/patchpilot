@@ -84,6 +84,8 @@ per component occurrence. Affected evidence grants no Finding authority. Unaffec
 no suppression authority. Unknown evidence is retained. The persistence adapter does not call the
 evaluator. Neither factory is production-composed.
 
+Session 15 Batch 1 defines the provenance required before any of that evidence can be product eligible. Session 15 Batch 1-R reviewed it. Session 15 Batch 2 persists immutable advisory revisions and one reviewed Vulnerability binding. Session 15 Batch 2-R reviewed that persistence. Product eligibility is not stored and matching does not run. Session 15 Batch 3 composes eligibility from those facts and still does not return `eligible` while the registries are empty. Session 15 Batch 3-R reviewed that composition. It does not invoke the npm evaluator and does not persist a product row. Real product-eligible evaluation count remains 0. See [product-evidence provenance](product-evidence-provenance.md). Synthetic Session 14 rows stay synthetic. Finding creation remains unavailable.
+
 ## What this batch does not do
 
 - No production composition of the evaluator or the persistence adapter

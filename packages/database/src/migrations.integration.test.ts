@@ -24,7 +24,9 @@ import {
   SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
   SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
   SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+  SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
   applyMigrationSqlAndResolve,
+  applyThroughSession14,
   applySession3Schema,
   applyThroughAuditActorAnonymous,
   applyThroughPolicyCreatorMembership,
@@ -124,6 +126,10 @@ const PRISMA_TABLES = [
   'osv_listing_observation_evidence_purge',
   'match_evaluation_evidence',
   'match_evaluation_explanation',
+  'advisory_family',
+  'advisory_revision',
+  'advisory_revision_alias',
+  'advisory_vulnerability_binding',
 ] as const;
 
 const PRISMA_FOREIGN_KEYS = [
@@ -188,6 +194,11 @@ const PRISMA_FOREIGN_KEYS = [
   'osv_listing_observation_evidence_envelope_observation_fkey',
   'osv_listing_observation_evidence_envelope_set_fkey',
   'osv_listing_observation_evidence_purge_set_fkey',
+  'advisory_revision_family_fkey',
+  'advisory_revision_supersedes_fkey',
+  'advisory_revision_alias_revision_fkey',
+  'advisory_vulnerability_binding_revision_fkey',
+  'advisory_vulnerability_binding_vulnerability_fkey',
 ] as const;
 
 const SQL_ONLY_CHECKS = [
@@ -356,6 +367,14 @@ const SQL_ONLY_CHECKS = [
   'osv_listing_observation_evidence_envelope_policy_chk',
   'osv_listing_observation_evidence_purge_uuid_v4_chk',
   'osv_listing_observation_evidence_purge_policy_chk',
+  'advisory_family_identity_chk',
+  'advisory_revision_pin_chk',
+  'advisory_revision_fingerprint_chk',
+  'advisory_revision_supersession_shape_chk',
+  'advisory_revision_classification_chk',
+  'advisory_revision_license_chk',
+  'advisory_revision_alias_shape_chk',
+  'advisory_vulnerability_binding_shape_chk',
 ] as const;
 
 const SQL_ONLY_INDEXES = [
@@ -406,6 +425,18 @@ const SQL_ONLY_INDEXES = [
   'osv_listing_observation_evidence_envelope_current_uidx',
   'osv_listing_observation_evidence_envelope_pending_uidx',
   'osv_listing_observation_evidence_purge_success_uidx',
+  'advisory_family_digest_uidx',
+  'advisory_family_source_advisory_uidx',
+  'advisory_revision_digest_uidx',
+  'advisory_revision_replay_uidx',
+  'advisory_revision_family_idx',
+  'advisory_revision_supersedes_idx',
+  'advisory_revision_alias_replay_uidx',
+  'advisory_revision_alias_ordinal_uidx',
+  'advisory_revision_alias_value_uidx',
+  'advisory_vulnerability_binding_revision_uidx',
+  'advisory_vulnerability_binding_replay_uidx',
+  'advisory_vulnerability_binding_vulnerability_idx',
 ] as const;
 
 const SQL_ONLY_TRIGGERS = [
@@ -464,6 +495,15 @@ const SQL_ONLY_TRIGGERS = [
   'match_evaluation_evidence_bind_parents',
   'match_evaluation_evidence_explanations_complete',
   'match_evaluation_explanation_same_transaction',
+  'advisory_family_append_only',
+  'advisory_revision_append_only',
+  'advisory_revision_alias_append_only',
+  'advisory_vulnerability_binding_append_only',
+  'advisory_revision_bind_family',
+  'advisory_revision_supersession',
+  'advisory_revision_alias_same_transaction',
+  'advisory_revision_aliases_complete',
+  'advisory_vulnerability_binding_guard',
 ] as const;
 
 const SQL_ONLY_FUNCTIONS = [
@@ -500,6 +540,11 @@ const SQL_ONLY_FUNCTIONS = [
   'patchpilot_match_evaluation_evidence_bind_parents',
   'patchpilot_match_evaluation_explanations_complete',
   'patchpilot_match_evaluation_explanation_same_transaction',
+  'patchpilot_advisory_revision_bind_family',
+  'patchpilot_advisory_revision_supersession',
+  'patchpilot_advisory_revision_aliases_complete',
+  'patchpilot_advisory_revision_alias_same_transaction',
+  'patchpilot_advisory_vulnerability_binding_guard',
 ] as const;
 
 async function names(client: PrismaClient, sql: string): Promise<string[]> {
@@ -527,6 +572,22 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
     SELECT COUNT(*)::bigint AS evidence FROM "match_evaluation_evidence"
   `;
   expect(Number(matchEvaluationRows[0]?.evidence)).toBe(0);
+
+  const advisoryRows = await client.$queryRaw<
+    Array<{
+      families: bigint | number | string;
+      revisions: bigint | number | string;
+      bindings: bigint | number | string;
+    }>
+  >`
+    SELECT
+      (SELECT COUNT(*) FROM "advisory_family")::bigint AS families,
+      (SELECT COUNT(*) FROM "advisory_revision")::bigint AS revisions,
+      (SELECT COUNT(*) FROM "advisory_vulnerability_binding")::bigint AS bindings
+  `;
+  expect(Number(advisoryRows[0]?.families)).toBe(0);
+  expect(Number(advisoryRows[0]?.revisions)).toBe(0);
+  expect(Number(advisoryRows[0]?.bindings)).toBe(0);
 
   const policyColumns = await names(
     client,
@@ -1181,8 +1242,8 @@ async function assertOsvAcquisitionCatalog(client: PrismaClient): Promise<void> 
 
 describe('frozen migrations', () => {
   it('keeps Session 3 through Session 13 Batch 3D-S SQL byte-stable', async () => {
-    expect(FROZEN_MIGRATIONS).toHaveLength(18);
-    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(18);
+    expect(FROZEN_MIGRATIONS).toHaveLength(19);
+    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(19);
     expect(FROZEN_MIGRATIONS.map((item) => item.directory)).toEqual([
       ...EXPECTED_APPLIED_MIGRATIONS,
     ]);
@@ -1230,24 +1291,27 @@ describe('frozen migrations', () => {
       ),
     ).toEqual([SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE]);
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-1)).toBe(
-      SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+      SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
     );
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-2)).toBe(
-      SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
+      SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
     );
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-3)).toBe(
-      SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
+      SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
     );
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-4)).toBe(
-      SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
+      SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
     );
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-5)).toBe(
-      SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
+      SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
     );
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-6)).toBe(
-      SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+      SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
     );
     expect(EXPECTED_APPLIED_MIGRATIONS.at(-7)).toBe(
+      SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
+    );
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-8)).toBe(
       SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
     );
     expect(
@@ -1352,6 +1416,19 @@ describe('frozen migrations', () => {
     expect(existsSync(frozenMigrationFile(SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE))).toBe(
       true,
     );
+    expect(
+      FROZEN_MIGRATIONS.filter(
+        (item) => item.directory === SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
+      ),
+    ).toEqual([
+      {
+        directory: SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
+        sha256: '3c69e0693747af6eac4c6df55dc06e9e1d185d93f0ac0dbf07fdb80222783dc1',
+      },
+    ]);
+    expect(
+      existsSync(frozenMigrationFile(SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING)),
+    ).toBe(true);
   });
 });
 
@@ -1688,6 +1765,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
 
@@ -1769,6 +1847,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -1907,6 +1986,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -1968,6 +2048,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2018,6 +2099,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2066,6 +2148,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2116,6 +2199,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2165,6 +2249,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2205,6 +2290,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       const afterDef = await names(
         client,
@@ -2246,6 +2332,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2286,6 +2373,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2327,6 +2415,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2369,6 +2458,7 @@ describe('migrations', { timeout: 90_000 }, () => {
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
       const evidenceCounts = await client.$queryRaw<
@@ -2395,7 +2485,7 @@ describe('migrations', { timeout: 90_000 }, () => {
     }
   });
 
-  it('upgrades a Session 13 Batch 3D-S database by applying only match-evaluation persistence', async () => {
+  it('upgrades a Session 13 Batch 3D-S database through match evaluation and advisory revisions', async () => {
     const ephemeral = await createEphemeralDatabase('migrate');
     const client = new PrismaClient({
       datasources: { db: { url: ephemeral.databaseUrl } },
@@ -2424,8 +2514,57 @@ describe('migrations', { timeout: 90_000 }, () => {
       );
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades a Session 14 database by applying only advisory revision persistence', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughSession14(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore.at(-1)).toBe(SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE);
+      expect(appliedBefore).not.toContain(SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING);
+      const tablesBefore = await names(
+        client,
+        `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'`,
+      );
+      expect(tablesBefore).toContain('match_evaluation_evidence');
+      expect(tablesBefore).not.toContain('advisory_revision');
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
+      ]);
+      await assertFinalMigratedSchema(client);
+
+      const appliedTwice = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedThird = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedThird).toEqual(appliedTwice);
+      expect(appliedThird).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
     } finally {
       await client.$disconnect();
       await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
@@ -2488,6 +2627,10 @@ describe('migrations', { timeout: 90_000 }, () => {
       await applyMigrationSqlAndResolve(
         ephemeral.databaseUrl,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+      );
+      await applyMigrationSqlAndResolve(
+        ephemeral.databaseUrl,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       );
       await assertFinalMigratedSchema(client);
 
@@ -2583,6 +2726,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
         SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
         SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
+        SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
       ]);
       await assertFinalMigratedSchema(client);
 

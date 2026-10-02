@@ -40,6 +40,8 @@ export {
   type OsvListingObservationEvidencePersistenceAdapters,
 } from './osv-listing-observation-evidence-persistence.js';
 export { createMatchEvaluationEvidencePersistence } from './match-evaluation-evidence-persistence.js';
+export { createAdvisoryRevisionPersistence } from './advisory-revision-persistence.js';
+export { createProductEvidenceComponentInspection } from './product-evidence-component-inspection.js';
 export {
   createOsvCanaryPreflightReadiness,
   type OsvCanaryPreflightReadinessAdapters,
