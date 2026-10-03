@@ -223,9 +223,14 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   it. Author and reviewer identities are exact and distinct. The purpose is
   `approve_maintainer_reviewed_advisory_for_product_evaluation`. Replay of the
   same decision does not change the database timestamp. A conflicting decision
-  does not overwrite the row. Synthetic origin cannot be approved. Real
-  product-eligible evaluation count remains 0. Finding creation remains
-  unavailable. Production startup does not construct the adapter.
+  does not overwrite the row. Synthetic origin cannot be approved. Batch 3
+  evaluates one approved npm revision through an explicit command. The stored
+  row binds the revision, approval, `Vulnerability.id`, component occurrence,
+  evaluator version, and matching-policy version. Exact replay inserts nothing.
+  A conflicting replay overwrites nothing. Synthetic origin and KEV membership
+  fail closed. Real product-eligible evaluation count remains 0 because the
+  row is not seeded. Finding creation remains unavailable. Suppression
+  authority remains false. Production startup does not construct the adapter.
 
 ## Failure and capacity
 
