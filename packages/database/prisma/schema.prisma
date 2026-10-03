@@ -1007,6 +1007,7 @@ model Organization {
   backgroundJobs        BackgroundJob[]
   idempotencyRecords    IdempotencyRecord[]
   matchEvaluationEvidence MatchEvaluationEvidence[]
+  productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@index([status], map: "organization_status_idx")
   @@map("organization")
@@ -1315,6 +1316,7 @@ model Sbom {
   observations         FindingObservation[]
   evidence             Evidence[]
   matchEvaluationEvidence MatchEvaluationEvidence[]
+  productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@unique([organizationId, id], map: "sbom_org_id_key")
   @@unique([organizationId, id, assetId], map: "sbom_org_id_asset_key")
@@ -1357,6 +1359,7 @@ model SbomIngestion {
   observations         FindingObservation[]
   riskCalculations     RiskCalculation[]
   matchEvaluationEvidence MatchEvaluationEvidence[]
+  productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@unique([organizationId, id], map: "sbom_ingestion_org_id_key")
   @@unique([organizationId, id, sbomId], map: "sbom_ingestion_org_id_sbom_key")
@@ -1382,6 +1385,7 @@ model Component {
   occurrences  ComponentOccurrence[]
   findings     Finding[]
   matchEvaluationEvidence MatchEvaluationEvidence[]
+  productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@unique([organizationId, id], map: "component_org_id_key")
   @@unique([organizationId, identityKey], map: "component_org_identity_key")
@@ -1413,6 +1417,7 @@ model ComponentOccurrence {
   findings      Finding[]
   observations  FindingObservation[]
   matchEvaluationEvidence MatchEvaluationEvidence[]
+  productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@unique([organizationId, id], map: "component_occurrence_org_id_key")
   @@unique([organizationId, id, sbomIngestionId], map: "component_occurrence_org_id_ingestion_key")
@@ -1463,6 +1468,8 @@ model Vulnerability {
   findings                      Finding[]
   cveIdentityLinks              VulnerabilityCveIdentityLink[]
   advisoryVulnerabilityBindings AdvisoryVulnerabilityBinding[]
+  maintainerReviewedAdvisoryApprovals MaintainerReviewedAdvisoryApproval[]
+  productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@index([cveId], map: "vulnerability_cve_idx")
   @@map("vulnerability")
@@ -3350,6 +3357,7 @@ enum AdvisoryEvidenceSource {
   echo_advisory_database
   synthetic_fixture
   unrecognized
+  maintainer_reviewed_advisory
 
   @@map("advisory_evidence_source")
 }
@@ -3358,6 +3366,7 @@ enum AdvisoryEvidenceOrigin {
   synthetic_fixture
   provider_derived
   unrecognized
+  maintainer_reviewed_advisory
 
   @@map("advisory_evidence_origin")
 }
@@ -3398,6 +3407,7 @@ enum AdvisoryQuarantineClassification {
 enum AdvisoryRetrievalClassification {
   synthetic_not_retrieved
   recorded_reference
+  local_not_retrieved
 
   @@map("advisory_retrieval_classification")
 }
@@ -3435,6 +3445,8 @@ model AdvisoryFamily {
   createdAt              DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
 
   revisions AdvisoryRevision[]
+  approvals MaintainerReviewedAdvisoryApproval[]
+  productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@unique([source, advisoryId], map: "advisory_family_source_advisory_uidx")
   @@map("advisory_family")
@@ -3456,7 +3468,8 @@ model AdvisoryRevision {
   productRangeFingerprint       String                            @map("product_range_fingerprint") @db.Text
   parserId                      String                            @map("parser_id") @db.VarChar(80)
   parserResourcePolicy          String                            @map("parser_resource_policy") @db.VarChar(80)
-  advisorySchemaVersion         String                            @map("advisory_schema_version") @db.VarChar(32)
+  advisorySchemaVersion         String                            @map("advisory_schema_version") @db.VarChar(80)
+  authorIdentity                String?                           @map("author_identity") @db.VarChar(128)
   advisorySchemaCommit          String                            @map("advisory_schema_commit") @db.VarChar(40)
   sourceLicenseRegistryVersion  String                            @map("source_license_registry_version") @db.VarChar(80)
   sourceLicensePolicyVersion    String                            @map("source_license_policy_version") @db.VarChar(80)
@@ -3488,6 +3501,9 @@ model AdvisoryRevision {
   successors        AdvisoryRevision[]                @relation("AdvisoryRevisionSupersession")
   aliases           AdvisoryRevisionAlias[]
   binding           AdvisoryVulnerabilityBinding?
+  approval          MaintainerReviewedAdvisoryApproval?
+  rangeEvents       AdvisoryRevisionRangeEvent[]
+  productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@index([advisoryFamilyId], map: "advisory_revision_family_idx")
   @@index([supersedesAdvisoryRevisionId], map: "advisory_revision_supersedes_idx")
@@ -3533,7 +3549,133 @@ model AdvisoryVulnerabilityBinding {
 
   revision      AdvisoryRevision @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_vulnerability_binding_revision_fkey")
   vulnerability Vulnerability    @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "advisory_vulnerability_binding_vulnerability_fkey")
+  approval      MaintainerReviewedAdvisoryApproval?
 
   @@index([vulnerabilityId], map: "advisory_vulnerability_binding_vulnerability_idx")
   @@map("advisory_vulnerability_binding")
+}
+
+/// Immutable maintainer-reviewed approval of one advisory revision.
+/// Existence of a valid row is the approval. There is no status Boolean.
+/// The row is not evaluation authority, Finding authority, or tenant data.
+model MaintainerReviewedAdvisoryApproval {
+  id                            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  approvalSchemaVersion         String   @map("approval_schema_version") @db.VarChar(80)
+  advisoryRevisionId            String   @unique(map: "maintainer_reviewed_advisory_approval_revision_uidx") @map("advisory_revision_id") @db.Uuid
+  advisoryFamilyId              String   @map("advisory_family_id") @db.Uuid
+  familyDigest                  String   @map("family_digest") @db.Text
+  approvalPolicyId              String   @map("approval_policy_id") @db.VarChar(80)
+  approvalPolicyVersion         Int      @map("approval_policy_version") @db.SmallInt
+  approvalPurpose               String   @map("approval_purpose") @db.VarChar(80)
+  sourceClassification          String   @map("source_classification") @db.VarChar(64)
+  authorIdentity                String   @map("author_identity") @db.VarChar(128)
+  reviewerIdentity              String   @map("reviewer_identity") @db.VarChar(128)
+  reviewerClassification        String   @map("reviewer_classification") @db.VarChar(64)
+  contentFingerprint            String   @map("content_fingerprint") @db.Text
+  rangeFingerprint              String   @map("range_fingerprint") @db.Text
+  packageIdentityKey            String   @map("package_identity_key") @db.VarChar(1024)
+  vulnerabilityId               String   @map("vulnerability_id") @db.Uuid
+  advisoryVulnerabilityBindingId String  @unique(map: "maintainer_reviewed_advisory_approval_binding_uidx") @map("advisory_vulnerability_binding_id") @db.Uuid
+  sourceLicensePolicyId         String   @map("source_license_policy_id") @db.VarChar(80)
+  sourceLicensePolicyVersion    Int      @map("source_license_policy_version") @db.SmallInt
+  approvedLicenseClassification String   @map("approved_license_classification") @db.VarChar(32)
+  licenseDecisionCanonical      String   @map("license_decision_canonical") @db.Text
+  replayFingerprint             String   @unique(map: "maintainer_reviewed_advisory_approval_replay_uidx") @map("replay_fingerprint") @db.Text
+  createdAt                     DateTime @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  revision      AdvisoryRevision             @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_revision_fkey")
+  family        AdvisoryFamily               @relation(fields: [advisoryFamilyId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_family_fkey")
+  vulnerability Vulnerability                @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_vulnerability_fkey")
+  binding       AdvisoryVulnerabilityBinding @relation(fields: [advisoryVulnerabilityBindingId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_binding_fkey")
+  productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
+
+  @@index([advisoryFamilyId], map: "maintainer_reviewed_advisory_approval_family_idx")
+  @@index([vulnerabilityId], map: "maintainer_reviewed_advisory_approval_vulnerability_idx")
+  @@map("maintainer_reviewed_advisory_approval")
+}
+
+/// Immutable SEMVER events for one advisory revision.
+/// The row set is the range evidence. It is not a Finding and not a catalog.
+model AdvisoryRevisionRangeEvent {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  advisoryRevisionId String   @map("advisory_revision_id") @db.Uuid
+  rangeOrdinal       Int      @map("range_ordinal") @db.SmallInt
+  eventOrdinal       Int      @map("event_ordinal") @db.SmallInt
+  eventName          String   @map("event_name") @db.VarChar(16)
+  eventValue         String   @map("event_value") @db.VarChar(256)
+  createdAt          DateTime @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  revision AdvisoryRevision @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_revision_range_event_revision_fkey")
+
+  @@unique([advisoryRevisionId, rangeOrdinal, eventOrdinal], map: "advisory_revision_range_event_ordinal_uidx")
+  @@index([advisoryRevisionId], map: "advisory_revision_range_event_revision_idx")
+  @@map("advisory_revision_range_event")
+}
+
+/// Tenant-owned immutable product match evidence.
+/// Affected evidence is not Finding authority. Suppression authority is false.
+model ProductMatchEvaluationEvidence {
+  id                           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId               String                 @map("organization_id") @db.Uuid
+  componentOccurrenceId        String                 @map("component_occurrence_id") @db.Uuid
+  assetId                      String                 @map("asset_id") @db.Uuid
+  sbomId                       String                 @map("sbom_id") @db.Uuid
+  sbomIngestionId              String                 @map("sbom_ingestion_id") @db.Uuid
+  componentId                  String                 @map("component_id") @db.Uuid
+  sbomSha256                   String                 @map("sbom_sha256") @db.Text
+  componentIdentityKey         String                 @map("component_identity_key") @db.VarChar(2048)
+  componentEvidenceFingerprint String                 @map("component_evidence_fingerprint") @db.Text
+  evidenceSchemaVersion        String                 @map("evidence_schema_version") @db.VarChar(80)
+  packageIdentityKey           String                 @map("package_identity_key") @db.VarChar(1024)
+  rawObservedVersion           String                 @map("raw_observed_version") @db.VarChar(256)
+  rawObservedVersionSha256     String                 @map("raw_observed_version_sha256") @db.Text
+  advisoryFamilyId             String                 @map("advisory_family_id") @db.Uuid
+  advisoryRevisionId           String                 @map("advisory_revision_id") @db.Uuid
+  approvalId                   String                 @map("approval_id") @db.Uuid
+  contentFingerprint           String                 @map("content_fingerprint") @db.Text
+  rangeFingerprint             String                 @map("range_fingerprint") @db.Text
+  vulnerabilityId              String                 @map("vulnerability_id") @db.Uuid
+  evaluatorId                  String                 @map("evaluator_id") @db.VarChar(80)
+  evaluatorVersion             String                 @map("evaluator_version") @db.VarChar(64)
+  matchingPolicyId             String                 @map("matching_policy_id") @db.VarChar(80)
+  matchingPolicyVersion        String                 @map("matching_policy_version") @db.VarChar(80)
+  productEvidencePolicyId      String                 @map("product_evidence_policy_id") @db.VarChar(80)
+  productEvidencePolicyVersion Int                    @map("product_evidence_policy_version") @db.SmallInt
+  outcome                      MatchEvaluationOutcome
+  productOrigin                String                 @map("product_origin") @db.VarChar(64)
+  replayFingerprint            String                 @unique(map: "product_match_evaluation_evidence_replay_uidx") @map("replay_fingerprint") @db.Text
+  findingCreation              String                 @map("finding_creation") @db.VarChar(32)
+  suppressionAuthority         Boolean                @default(false) @map("suppression_authority")
+  createdAt                    DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  organization        Organization                         @relation(fields: [organizationId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_organization_fkey")
+  componentOccurrence ComponentOccurrence                  @relation(fields: [organizationId, componentOccurrenceId, assetId, componentId], references: [organizationId, id, assetId, componentId], onDelete: Restrict, map: "product_match_evaluation_evidence_occurrence_fkey")
+  component           Component                            @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict, map: "product_match_evaluation_evidence_component_fkey")
+  sbom                Sbom                                 @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict, map: "product_match_evaluation_evidence_sbom_fkey")
+  sbomIngestion       SbomIngestion                        @relation(fields: [organizationId, sbomIngestionId, sbomId], references: [organizationId, id, sbomId], onDelete: Restrict, map: "product_match_evaluation_evidence_ingestion_fkey")
+  family              AdvisoryFamily                       @relation(fields: [advisoryFamilyId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_family_fkey")
+  revision            AdvisoryRevision                     @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_revision_fkey")
+  approval            MaintainerReviewedAdvisoryApproval   @relation(fields: [approvalId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_approval_fkey")
+  vulnerability       Vulnerability                        @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_vulnerability_fkey")
+  explanations        ProductMatchEvaluationExplanation[]
+
+  @@unique([organizationId, id], map: "product_match_evaluation_evidence_org_id_key")
+  @@unique([organizationId, componentOccurrenceId], map: "product_match_evaluation_evidence_occurrence_uidx")
+  @@unique([organizationId, advisoryRevisionId], map: "product_match_evaluation_evidence_revision_uidx")
+  @@index([organizationId], map: "product_match_evaluation_evidence_org_idx")
+  @@map("product_match_evaluation_evidence")
+}
+
+model ProductMatchEvaluationExplanation {
+  id                              String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId                  String                         @map("organization_id") @db.Uuid
+  productMatchEvaluationEvidenceId String                        @map("product_match_evaluation_evidence_id") @db.Uuid
+  ordinal                         Int                            @db.SmallInt
+  explanationCode                 MatchEvaluationExplanationCode @map("explanation_code")
+
+  evidence ProductMatchEvaluationEvidence @relation(fields: [organizationId, productMatchEvaluationEvidenceId], references: [organizationId, id], onDelete: Restrict, map: "product_match_evaluation_explanation_evidence_fkey")
+
+  @@unique([productMatchEvaluationEvidenceId, ordinal], map: "product_match_evaluation_explanation_ordinal_uidx")
+  @@unique([productMatchEvaluationEvidenceId, explanationCode], map: "product_match_evaluation_explanation_code_uidx")
+  @@map("product_match_evaluation_explanation")
 }

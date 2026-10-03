@@ -172,9 +172,37 @@ function rejectedBinding(code: AdvisoryRevisionRejectionCode): PersistAdvisoryBi
   return { kind: 'rejected', code, counts: ADVISORY_REVISION_ZERO_COUNTS };
 }
 
+function session15Origin(
+  origin: RevisionRow['origin'],
+): Exclude<RevisionRow['origin'], 'maintainer_reviewed_advisory'> {
+  if (origin === 'maintainer_reviewed_advisory') {
+    throw new AdvisoryRevisionRowError();
+  }
+  return origin;
+}
+
+function session15Source(
+  source: RevisionRow['source'],
+): Exclude<RevisionRow['source'], 'maintainer_reviewed_advisory'> {
+  if (source === 'maintainer_reviewed_advisory') {
+    throw new AdvisoryRevisionRowError();
+  }
+  return source;
+}
+
+function session15Retrieval(
+  retrieval: RevisionRow['retrievalClassification'],
+): Exclude<RevisionRow['retrievalClassification'], 'local_not_retrieved'> {
+  if (retrieval === 'local_not_retrieved') {
+    throw new AdvisoryRevisionRowError();
+  }
+  return retrieval;
+}
+
 function assertRevisionLifecycle(row: RevisionRow): void {
+  const origin = session15Origin(row.origin);
   const derived = deriveRevisionDisposition({
-    origin: row.origin,
+    origin,
     withdrawalClassification: row.withdrawalClassification,
     quarantineClassification: row.quarantineClassification,
     supersedesRevisionDigest: row.supersedesRevisionDigest,
@@ -183,7 +211,7 @@ function assertRevisionLifecycle(row: RevisionRow): void {
     derived === null ||
     derived !== row.revisionDisposition ||
     !trustMatchesDisposition({
-      origin: row.origin,
+      origin,
       trustClassification: row.trustClassification,
       revisionDisposition: row.revisionDisposition,
     })
@@ -223,8 +251,11 @@ function identityFromRow(row: RevisionRow): AdvisoryRevisionIdentityFields & {
     throw new AdvisoryRevisionRowError();
   }
   assertRevisionLifecycle(row);
+  const source = session15Source(row.source);
+  const origin = session15Origin(row.origin);
+  const retrievalClassification = session15Retrieval(row.retrievalClassification);
   return {
-    source: row.source,
+    source,
     advisoryId: row.advisoryId,
     providerGeneration: row.providerGeneration,
     contentFingerprint: row.contentFingerprint,
@@ -237,13 +268,13 @@ function identityFromRow(row: RevisionRow): AdvisoryRevisionIdentityFields & {
     sourceLicenseRegistryVersion: row.sourceLicenseRegistryVersion,
     sourceLicensePolicyVersion: row.sourceLicensePolicyVersion,
     spdxLicenseId: row.spdxLicenseId,
-    origin: row.origin,
+    origin,
     trustClassification: row.trustClassification,
     revisionDisposition: row.revisionDisposition,
     withdrawalClassification: row.withdrawalClassification,
     quarantineClassification: row.quarantineClassification,
     supersedesRevisionDigest: row.supersedesRevisionDigest,
-    retrievalClassification: row.retrievalClassification,
+    retrievalClassification,
     retrievalEvidenceId: row.retrievalEvidenceId,
     ecosystem: 'npm',
     packageIdentityKey: row.packageIdentityKey,
@@ -254,7 +285,7 @@ function identityFromRow(row: RevisionRow): AdvisoryRevisionIdentityFields & {
       aliasType: alias.aliasType,
       aliasValue: alias.aliasValue,
       reviewClassification: alias.reviewClassification,
-      sourceClassification: alias.sourceClassification,
+      sourceClassification: session15Origin(alias.sourceClassification),
       replayFingerprint: alias.replayFingerprint,
     })),
     familyDigest: row.familyDigest,
@@ -268,7 +299,7 @@ function projectRevision(row: RevisionRow): AdvisoryRevisionProjection {
     throw new AdvisoryRevisionRowError();
   }
   const identity = identityFromRow(row);
-  if (advisoryFamilyDigest(row.source, row.advisoryId) !== row.familyDigest) {
+  if (advisoryFamilyDigest(identity.source, row.advisoryId) !== row.familyDigest) {
     throw new AdvisoryRevisionRowError();
   }
   if (
@@ -319,7 +350,7 @@ function projectRevision(row: RevisionRow): AdvisoryRevisionProjection {
         aliasType: alias.aliasType,
         aliasValue: alias.aliasValue,
         reviewClassification: alias.reviewClassification,
-        sourceClassification: alias.sourceClassification,
+        sourceClassification: session15Origin(alias.sourceClassification),
       })
     ) {
       throw new AdvisoryRevisionRowError();
@@ -333,11 +364,14 @@ function projectRevision(row: RevisionRow): AdvisoryRevisionProjection {
     throw new AdvisoryRevisionRowError();
   }
   const mappingCount = row.binding === null ? 0 : 1;
+  const source = session15Source(row.source);
+  const origin = session15Origin(row.origin);
+  const retrievalClassification = session15Retrieval(row.retrievalClassification);
   return {
     inspectionSchemaVersion: ADVISORY_REVISION_INSPECTION_SCHEMA_VERSION,
     revisionId: row.id,
     familyId: row.advisoryFamilyId,
-    source: row.source,
+    source,
     advisoryId: row.advisoryId,
     familyDigest: row.familyDigest,
     revisionDigest: row.revisionDigest,
@@ -351,13 +385,13 @@ function projectRevision(row: RevisionRow): AdvisoryRevisionProjection {
     sourceLicenseRegistryVersion: row.sourceLicenseRegistryVersion,
     sourceLicensePolicyVersion: row.sourceLicensePolicyVersion,
     spdxLicenseId: row.spdxLicenseId,
-    origin: row.origin,
+    origin,
     trustClassification: row.trustClassification,
     revisionDisposition: row.revisionDisposition,
     withdrawalClassification: row.withdrawalClassification,
     quarantineClassification: row.quarantineClassification,
     supersedesRevisionDigest: row.supersedesRevisionDigest,
-    retrievalClassification: row.retrievalClassification,
+    retrievalClassification,
     ecosystem: 'npm',
     packageNamespace: row.packageNamespace,
     packageName: row.packageName,
@@ -800,7 +834,7 @@ class PrismaAdvisoryRevisionPersistence implements AdvisoryRevisionPersistencePo
               aliasType: alias.aliasType,
               aliasValue: alias.aliasValue,
               aliasPolicyVersion: command.aliasPolicyVersion,
-              sourceClassification: alias.sourceClassification,
+              sourceClassification: session15Origin(alias.sourceClassification),
               reviewClassification: alias.reviewClassification,
               replayFingerprint: alias.replayFingerprint,
             })),

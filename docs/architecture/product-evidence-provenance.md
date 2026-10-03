@@ -197,6 +197,41 @@ There is no edge from `received` to `active_eligible`, from `synthetic` to
 `product_evidence_eligible`, from `withdrawn` to `product_evidence_eligible`,
 or from `product_evidence_eligible` to `finding`.
 
+## Maintainer-reviewed advisory authority (ADR 0032)
+
+Product Match Evidence Batch 1 defines the maintainer-reviewed local advisory
+architecture (`maintainer_reviewed_advisory_architecture_v1`).
+
+- **Conceptual source:** `maintainer_reviewed_advisory`, permanently distinct
+  from `synthetic_fixture`, `provider_derived`, and `unrecognized`. Caller-supplied
+  origin is rejected. No transition from `synthetic_fixture` exists.
+- **Submission:** Untrusted input; successful parse yields `ineligible_unapproved`.
+  Schema validation, canonicalization, and fingerprints do not approve.
+- **Reviewer authority:** An issued capability bound to one revision, both
+  fingerprints, `Vulnerability.id`, the npm identity key, and the license
+  decision. The public entry does not export an issuer. Generic admin, commit
+  authorship, file ownership, and status inspection grant no authority.
+- **Separation of duties:** Exact distinct author and reviewer identities.
+  Case-only and confusable differences fail closed as `ineligible_self_approved`.
+- **Approval purpose:** `approve_maintainer_reviewed_advisory_for_product_evaluation`.
+- **License policy:** Explicit decision. Product use follows the committed
+  product-evidence SPDX `CC-BY-4.0` with a required notice and maintainer-original
+  provenance. Apache-2.0 and MIT are not product-matching authority.
+- **Eligibility:** Not returned. Registries remain empty. Approval does not
+  invoke the evaluator or create a Finding.
+- **Invariants:** Batch 2 persists an immutable approval and does not evaluate
+  it. Author and reviewer identities are exact and distinct. The purpose is
+  `approve_maintainer_reviewed_advisory_for_product_evaluation`. Replay of the
+  same decision does not change the database timestamp. A conflicting decision
+  does not overwrite the row. Synthetic origin cannot be approved. Batch 3
+  evaluates one approved npm revision through an explicit command. The stored
+  row binds the revision, approval, `Vulnerability.id`, component occurrence,
+  evaluator version, and matching-policy version. Exact replay inserts nothing.
+  A conflicting replay overwrites nothing. Synthetic origin and KEV membership
+  fail closed. Real product-eligible evaluation count remains 0 because the
+  row is not seeded. Finding creation remains unavailable. Suppression
+  authority remains false. Production startup does not construct the adapter.
+
 ## Failure and capacity
 
 Closed failures include invalid request, unsupported source, unrecognized

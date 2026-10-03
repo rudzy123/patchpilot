@@ -98,6 +98,14 @@ export const FROZEN_MIGRATIONS = [
     directory: '20261001180000_advisory_revision_vulnerability_binding',
     sha256: '3c69e0693747af6eac4c6df55dc06e9e1d185d93f0ac0dbf07fdb80222783dc1',
   },
+  {
+    directory: '20261002120000_maintainer_reviewed_advisory_approval',
+    sha256: '9f4ae2a6402952ff0ecca27a88cb15859a2164d89591fe2afe64e7e9ddbfb380',
+  },
+  {
+    directory: '20261002180000_product_match_evaluation_evidence',
+    sha256: '5a9736ae9ee5dc2b3ecb65325eeaebe98704ef00dffcb34d549a62cfe6cfcb6b',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
@@ -135,6 +143,12 @@ export const SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE =
 export const SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING =
   '20261001180000_advisory_revision_vulnerability_binding' as const;
 
+export const PRODUCT_MATCH_EVIDENCE_BATCH_2_APPROVAL =
+  '20261002120000_maintainer_reviewed_advisory_approval' as const;
+
+export const PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION =
+  '20261002180000_product_match_evaluation_evidence' as const;
+
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
   '20260827120000_tenant_model',
@@ -155,6 +169,8 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
   SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
   SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
+  PRODUCT_MATCH_EVIDENCE_BATCH_2_APPROVAL,
+  PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
@@ -386,4 +402,12 @@ export async function applyThroughSession13Batch3DS(databaseUrl: string): Promis
 export async function applyThroughSession14(databaseUrl: string): Promise<void> {
   await applyThroughSession13Batch3DS(databaseUrl);
   await applyMigrationSqlAndResolve(databaseUrl, SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE);
+}
+
+export async function applyThroughSession15(databaseUrl: string): Promise<void> {
+  await applyThroughSession14(databaseUrl);
+  await applyMigrationSqlAndResolve(
+    databaseUrl,
+    SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
+  );
 }
