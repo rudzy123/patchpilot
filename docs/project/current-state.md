@@ -1,12 +1,12 @@
 # Current state
 
-This document is the checkpoint authority for what PatchPilot implements, composes, and still withholds. It describes the repository after post-merge reconciliation PR #52 (merge commit `f822814`) and Reviewer Approval Capability Batch 1 architecture contracts. Historical session narrative lives in [checkpoint-ledger.md](checkpoint-ledger.md) and is not an authority source.
+This document is the checkpoint authority for what PatchPilot implements, composes, and still withholds. It describes the repository after post-merge reconciliation PR #52 (merge commit `f822814`), committed Reviewer Approval Capability Batch 1 and Batch 1-R architecture, and Batch 2 durable issuance. Historical session narrative lives in [checkpoint-ledger.md](checkpoint-ledger.md) and is not an authority source.
 
 Read this file before treating `AGENTS.md`, an ADR body, or an architecture narrative as the current capability list.
 
 ## Facts
 
-- Frozen migrations: 21. Frozen hashes match `FROZEN_MIGRATIONS`. The development database has all 21 applied.
+- Frozen migrations: 22. Frozen hashes match `FROZEN_MIGRATIONS`. Disposable PostgreSQL verifies clean deployment, upgrade from the prior frozen head, and a repeated no-op for `20261003120000_reviewer_capability_issuance` (SHA-256 `08f18ce42ba19165f6d0a1bf872e5973bf74e26888e7f052c70c53779656dfbd`). The persistent development database was not reset.
 - Persistent product-eligible evaluation count: 0
 - Real product-eligible evaluation count: 0
 - Persistent Finding count: 0
@@ -62,6 +62,7 @@ Present in packages and tests, and not constructed by API, worker, web, seed, or
 - Immutable maintainer-reviewed advisory approval persistence
 - Product Match Evidence composition for one reviewed npm evaluation command
 - Reviewer approval capability architecture contracts (`reviewer_approval_capability_policy_v1`)
+- Durable reviewer-capability issuance and atomic approval consumption (`20261003120000_reviewer_capability_issuance`)
 - Canonical CVE identity persistence
 - Read-only active-catalog KEV membership derivation
 
@@ -106,7 +107,7 @@ The active ecosystem and evaluator registries that would admit `eligible` are em
 
 [ADR 0032](../adr/0032-maintainer-reviewed-advisory-authority.md) remains Proposed. Decision 3 requires an issued reviewer capability. Reviewer Approval Capability Batch 1 defines that architecture: one sealed issuer-authority boundary, an opaque process-local presentation handle, exact approval-target binding, separation of duties, and closed expiration, revocation, cancellation, and consumption classifications. Caller-supplied reviewer identity and `reviewerAuthorityClassification` remain insufficient. Reviewer identity alone is not authority. Administrator, owner, maintainer, Git author, code owner, CI actor, and other ambient role strings do not grant approval authority.
 
-Batch 1-R independently reviewed that architecture. The saved approval command and PostgreSQL adapter are unchanged. Caller-supplied reviewer identity and authority classification remain insufficient. No capability is wired into approval persistence. The process-local handle is not a durable store. Its consumption is not atomic with PostgreSQL. The architecture commit witness is not a database commit. The process-local target claim is not a durable uniqueness constraint. Durable issuance and transactionally atomic consumption remain Batch 2: one immutable issuance row and one append-only terminal observation. This review does not create that migration. No production capability issuer exists. Production startup does not issue or consume a reviewer capability. The capability grants no evaluator or Finding authority. No product evaluation runs from this architecture. No Finding is created. The saved-path defect is not resolved. Prisma and migrations are unchanged. ADR 0032 remains Proposed.
+Batch 1 and Batch 1-R are committed. Batch 2 adds durable issuance on `reviewer_capability_issuance` and one append-only terminal observation on `reviewer_capability_lifecycle_observation`. The natural identity is the approval-claim fingerprint. Correlation is request binding and does not mint a second capability. Issuance and expiration use PostgreSQL `clock_timestamp()`. Validity is half-open for 900000 milliseconds: valid while database time is before `expires_at`, expired when database time is greater than or equal to `expires_at`. The process-local secret handle is not a column. The persisted issuer proof is the authorization UUID and decision fingerprint. `recordMaintainerReviewedAdvisoryApproval` parses and then returns `capability_authority_required` with zero writes. The PostgreSQL writer is `persistMaintainerReviewedAdvisoryApprovalWithCapability`, which inserts the approval and the consumed observation in one transaction. Exact approval replay returns `already_applied` before capability presentation, inserts nothing, and does not change timestamps or renew authority. An immutable conflict overwrites nothing. Revocation and cancellation append one terminal observation and block unused presentation. A consumed capability stays consumed. Revocation or cancellation does not alter a committed approval. Update and delete are rejected. Parent deletion is `ON DELETE RESTRICT`. Public inspection returns `reusableAuthority: false` and omits handles, authorization ids, fingerprints, and identities. Issuer and lifecycle seals are not package exports. A consumed observation must match the stored approval target. Production startup does not construct the adapter. Evaluator calls, product-match writes, Finding writes, and provider calls remain zero. User-facing reviewer approval is not operational. ADR 0032 remains Proposed. Batch 2-R independently reviewed this uncommitted persistence.
 
 ## Open decision: product-match cardinality
 
@@ -118,7 +119,7 @@ A signed-in user can select an organization and use the asset inventory. SBOM up
 
 ## Next
 
-Reviewer Approval Capability Batch 1-R has reviewed the uncommitted architecture. It is production uncomposed. Batch 2 durable issuance and atomic approval-consumption design is next only after this architecture is committed. This document does not start Finding implementation and does not authorize wiring the capability into approval persistence.
+Reviewer Approval Capability Batch 2 durable issuance and atomic approval consumption is implemented and production uncomposed. Batch 2-R independently reviewed that persistence. Branch closure is next after commit. This document does not start Finding implementation and does not make reviewer approval a user-facing workflow.
 
 Generalized product matching is not live. Finding creation remains unavailable. Production OSV acquisition stays disabled.
 
@@ -128,7 +129,7 @@ Recorded here and not implemented in this checkpoint.
 
 ### High priority
 
-1. Reviewer-authority capability gap. Batch 1-R reviewed the issued-capability architecture and does not wire it into saved approval persistence. The saved command still accepts caller-supplied reviewer identity and authority classification. A caller-assembled approval object cannot produce `already_applied`; that outcome requires a sealed architecture witness and is not database proof. Batch 2 is one issuance row plus one terminal observation, in the same transaction as the approval insert, using database time. Do not treat this review as closing the gap.
+1. Reviewer-authority capability review. Batch 2 persists issued capability authority and consumes it atomically with approval insertion. Batch 2-R independently reviewed durable issuance, database time, and atomic consumption. Caller role strings do not issue or persist an approval. The path is production uncomposed. Branch closure is next after commit. Do not treat this as a user-facing approval workflow or Finding authority.
 2. Main CI verification. If a later main Quality rerun fails on the keyboard-focus test, suggested branch: `test/web-keyboard-focus-hermeticity`.
 
 ### Before Finding implementation

@@ -29,7 +29,7 @@ import {
 } from '@patchpilot/vulnerability-intelligence';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createMaintainerReviewedAdvisoryApprovalPersistence } from './maintainer-reviewed-advisory-approval-persistence.js';
+import { createApprovalCapabilityHarness } from './reviewer-capability-approval-harness.js';
 import {
   createEphemeralDatabase,
   deployMigrations,
@@ -232,9 +232,7 @@ describe('product match evaluation PostgreSQL persistence', () => {
       approvedLicenseClassification: MAINTAINER_REVIEWED_APPROVAL_PINS.licenseClassification,
       licenseDecisionCanonical: MAINTAINER_REVIEWED_APPROVAL_PINS.licenseCanonical,
     });
-    const approval = await createMaintainerReviewedAdvisoryApprovalPersistence(
-      prisma,
-    ).recordMaintainerReviewedAdvisoryApproval({
+    const approval = await createApprovalCapabilityHarness(prisma).approve({
       ...approvalCommand,
       approvalReplayFingerprint,
     });

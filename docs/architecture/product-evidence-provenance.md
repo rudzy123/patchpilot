@@ -215,13 +215,12 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   binding, and closed lifecycle classifications. Batch 1-R reviewed that
   contract. The public entry does not export an issuer. Generic admin, commit
   authorship, file ownership, and status inspection grant no authority. The
-  saved approval path is unchanged and still validates caller-supplied reviewer
-  identity and authority classification. Process-local consumption is not
-  atomic with PostgreSQL. The architecture commit witness is not a database
-  commit. Durable issuance remains Batch 2 and is not a migration in this
-  review. The capability grants no evaluator or Finding authority. Decision 3
-  is not implemented as persistence. ADR 0032 remains Proposed. Resolve the
-  saved-path discrepancy before a Finding gate relies on the approval.
+  saved approval command returns `capability_authority_required` and writes
+  nothing. Batch 2 persists issuance and consumes the capability in the same
+  transaction as the approval insert. Database time sets the 900000-millisecond
+  half-open expiration. The adapter is production uncomposed. The capability
+  grants no evaluator or Finding authority. ADR 0032 remains Proposed.
+  User-facing reviewer approval is not operational. Batch 2-R independently reviewed that persistence. Branch closure is next after commit.
 - **Separation of duties:** Exact distinct author and reviewer identities.
   Case-only and confusable differences fail closed as `ineligible_self_approved`.
 - **Approval purpose:** `approve_maintainer_reviewed_advisory_for_product_evaluation`.

@@ -12,7 +12,7 @@ import {
   MAINTAINER_REVIEWED_APPROVAL_INSPECTION_SCHEMA_VERSION,
   MAINTAINER_REVIEWED_APPROVAL_PINS,
   MAINTAINER_REVIEWED_APPROVAL_SCHEMA_VERSION,
-  MAINTAINER_REVIEWED_APPROVAL_ZERO_EFFECTS,
+  DURABLE_REVIEWER_CAPABILITY_ZERO_EFFECTS,
   MAINTAINER_REVIEWED_BINDING_SCHEMA_VERSION,
   MAINTAINER_REVIEWED_FAMILY_SCHEMA_VERSION,
   MAINTAINER_REVIEWED_REVISION_SCHEMA_VERSION,
@@ -20,7 +20,6 @@ import {
   VULNERABILITY_MAPPING_POLICY_ID,
   classifyNpmPackageIdentityFromParts,
   maintainerReviewedApprovalReplayFingerprint,
-  type MaintainerReviewedApprovalPersistenceResult,
 } from '@patchpilot/vulnerability-intelligence';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -30,6 +29,8 @@ import {
   dropEphemeralDatabase,
 } from './integration-database.js';
 import { createAdvisoryRevisionPersistence } from './advisory-revision-persistence.js';
+import { createApprovalCapabilityHarness } from './reviewer-capability-approval-harness.js';
+import { createDurableReviewerApprovalCapabilityPersistence } from './reviewer-capability-persistence.js';
 import { createMaintainerReviewedAdvisoryApprovalPersistence } from './maintainer-reviewed-advisory-approval-persistence.js';
 
 const PACKAGE_NAME = 'synth-maint-pkg';
@@ -125,6 +126,7 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
   let admin: Awaited<ReturnType<typeof createEphemeralDatabase>>['admin'];
   let prisma: PrismaClient;
   let port: ReturnType<typeof createMaintainerReviewedAdvisoryApprovalPersistence>;
+  let harness: ReturnType<typeof createApprovalCapabilityHarness>;
   let findingCount = 0;
   let matchCount = 0;
 
@@ -136,6 +138,7 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
     await deployMigrations(databaseUrl);
     prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
     port = createMaintainerReviewedAdvisoryApprovalPersistence(prisma);
+    harness = createApprovalCapabilityHarness(prisma);
     findingCount = await prisma.finding.count();
     matchCount = await prisma.matchEvaluationEvidence.count();
     expect(await prisma.maintainerReviewedAdvisoryApproval.count()).toBe(0);
@@ -253,12 +256,12 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
     const parent = await insertParent();
     const beforeMatches = await prisma.matchEvaluationEvidence.count();
     const beforeFindings = await prisma.finding.count();
-    const first = await port.recordMaintainerReviewedAdvisoryApproval(approvalCommand(parent));
+    const first = await harness.approve(approvalCommand(parent));
     expect(first.kind).toBe('recorded');
     if (first.kind !== 'recorded') {
       return;
     }
-    expect(first.effects.inserts).toBe(1);
+    expect(first.effects.inserts).toBe(2);
     expect(first.effects.updates).toBe(0);
     expect(first.effects.deletes).toBe(0);
     expect(first.effects.timestampChanges).toBe(0);
@@ -271,12 +274,12 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
     expect(JSON.stringify(first)).not.toContain(parent.authorIdentity);
     expect(JSON.stringify(first)).not.toContain('reviewer.two');
     expect(JSON.stringify(first)).not.toContain(parent.contentFingerprint);
-    const second = await port.recordMaintainerReviewedAdvisoryApproval(approvalCommand(parent));
+    const second = await harness.approve(approvalCommand(parent));
     expect(second.kind).toBe('already_applied');
     if (second.kind !== 'already_applied') {
       return;
     }
-    expect(second.effects).toEqual(MAINTAINER_REVIEWED_APPROVAL_ZERO_EFFECTS);
+    expect(second.effects).toEqual(DURABLE_REVIEWER_CAPABILITY_ZERO_EFFECTS);
     expect(second.projection.createdAt).toBe(first.projection.createdAt);
     expect(second.projection.approvalId).toBe(first.projection.approvalId);
     const row = await prisma.maintainerReviewedAdvisoryApproval.findUniqueOrThrow({
@@ -310,43 +313,43 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
 
   it('rejects conflicts, self-approval, and parent mismatches without overwrite', async () => {
     const parent = await insertParent();
-    const recorded = await port.recordMaintainerReviewedAdvisoryApproval(approvalCommand(parent));
+    const recorded = await harness.approve(approvalCommand(parent));
     expect(recorded.kind).toBe('recorded');
     const createdAt =
       recorded.kind === 'recorded' || recorded.kind === 'already_applied'
         ? recorded.projection.createdAt
         : '';
-    const conflict = await port.recordMaintainerReviewedAdvisoryApproval(
+    const conflict = await harness.approve(
       approvalCommand(parent, { reviewerIdentity: 'reviewer.three' }),
     );
     expect(conflict.kind).toBe('immutable_conflict');
     if (conflict.kind === 'immutable_conflict') {
-      expect(conflict.effects).toEqual(MAINTAINER_REVIEWED_APPROVAL_ZERO_EFFECTS);
+      expect(conflict.effects).toEqual(DURABLE_REVIEWER_CAPABILITY_ZERO_EFFECTS);
     }
     const stored = await prisma.maintainerReviewedAdvisoryApproval.findUniqueOrThrow({
       where: { advisoryRevisionId: parent.revisionId },
     });
     expect(stored.reviewerIdentity).toBe('reviewer.two');
     expect(stored.createdAt.toISOString()).toBe(createdAt);
-    const self = await port.recordMaintainerReviewedAdvisoryApproval(
+    const self = await harness.approve(
       approvalCommand(await insertParent(), { reviewerIdentity: 'author.one' }),
     );
     expect(self).toMatchObject({ kind: 'rejected', code: 'self_approval' });
-    const folded = await port.recordMaintainerReviewedAdvisoryApproval(
+    const folded = await harness.approve(
       approvalCommand(await insertParent(), { reviewerIdentity: 'Author.One' }),
     );
     expect(folded).toMatchObject({ kind: 'rejected', code: 'self_approval' });
-    const wrongFamily = await port.recordMaintainerReviewedAdvisoryApproval(
+    const wrongFamily = await harness.approve(
       approvalCommand(parent, { expectedAdvisoryFamilyIdentity: digest('other-family') }),
     );
-    expect(wrongFamily).toMatchObject({ kind: 'rejected', code: 'revision_mismatch' });
-    const wrongContent = await port.recordMaintainerReviewedAdvisoryApproval(
+    expect(wrongFamily).toMatchObject({ kind: 'immutable_conflict' });
+    const wrongContent = await harness.approve(
       approvalCommand(await insertParent(), {
         expectedContentFingerprint: digest('wrong-content'),
       }),
     );
     expect(wrongContent).toMatchObject({ kind: 'rejected', code: 'content_fingerprint_mismatch' });
-    const wrongRange = await port.recordMaintainerReviewedAdvisoryApproval(
+    const wrongRange = await harness.approve(
       approvalCommand(await insertParent(), { expectedRangeFingerprint: digest('wrong-range') }),
     );
     expect(wrongRange).toMatchObject({ kind: 'rejected', code: 'range_fingerprint_mismatch' });
@@ -359,17 +362,21 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
     if (otherPackage.classification !== 'valid') {
       throw new Error('package');
     }
-    const wrongPackage = await port.recordMaintainerReviewedAdvisoryApproval(
+    const wrongPackage = await harness.approve(
       approvalCommand(await insertParent(), {
         expectedNpmPackageIdentity: otherPackage.identityKey,
       }),
     );
     expect(wrongPackage).toMatchObject({ kind: 'rejected', code: 'package_mismatch' });
-    const wrongVulnerability = await port.recordMaintainerReviewedAdvisoryApproval(
-      approvalCommand(await insertParent(), { expectedVulnerabilityId: randomUUID() }),
+    const extraVulnerability = await prisma.vulnerability.create({
+      data: { osvId: `SYNTHETIC-extra-${randomUUID()}` },
+      select: { id: true },
+    });
+    const wrongVulnerability = await harness.approve(
+      approvalCommand(await insertParent(), { expectedVulnerabilityId: extraVulnerability.id }),
     );
     expect(wrongVulnerability).toMatchObject({ kind: 'rejected', code: 'vulnerability_mismatch' });
-    const license = await port.recordMaintainerReviewedAdvisoryApproval(
+    const license = await harness.approve(
       approvalCommand(await insertParent(), { approvedLicenseClassification: 'MIT' }),
     );
     expect(license).toMatchObject({ kind: 'rejected', code: 'license_rejected' });
@@ -377,13 +384,9 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
   });
 
   it('rejects withdrawn, quarantined, superseded, and synthetic parents', async () => {
-    const withdrawn = await port.recordMaintainerReviewedAdvisoryApproval(
-      approvalCommand(await insertParent('withdrawn')),
-    );
+    const withdrawn = await harness.approve(approvalCommand(await insertParent('withdrawn')));
     expect(withdrawn).toMatchObject({ kind: 'rejected', code: 'withdrawn_revision' });
-    const quarantined = await port.recordMaintainerReviewedAdvisoryApproval(
-      approvalCommand(await insertParent('quarantined')),
-    );
+    const quarantined = await harness.approve(approvalCommand(await insertParent('quarantined')));
     expect(quarantined).toMatchObject({ kind: 'rejected', code: 'quarantined_revision' });
     const prior = await insertParent();
     await prisma.advisoryRevision.create({
@@ -432,7 +435,7 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
         authorIdentity: prior.authorIdentity,
       },
     });
-    const superseded = await port.recordMaintainerReviewedAdvisoryApproval(approvalCommand(prior));
+    const superseded = await harness.approve(approvalCommand(prior));
     expect(superseded).toMatchObject({ kind: 'rejected', code: 'superseded_revision' });
     const syntheticFamily = await prisma.advisoryFamily.create({
       data: {
@@ -483,7 +486,7 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
       },
       select: { id: true },
     });
-    const launder = await port.recordMaintainerReviewedAdvisoryApproval(
+    const launder = await harness.approve(
       approvalCommand({
         ...(await insertParent()),
         revisionId: synthetic.id,
@@ -499,7 +502,7 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
 
   it('rejects update, delete, and parent cascade, and rolls back a failed insert', async () => {
     const parent = await insertParent();
-    const recorded = await port.recordMaintainerReviewedAdvisoryApproval(approvalCommand(parent));
+    const recorded = await harness.approve(approvalCommand(parent));
     expect(recorded.kind).toBe('recorded');
     if (recorded.kind !== 'recorded') {
       return;
@@ -570,11 +573,17 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
     const parent = await insertParent();
     const command = approvalCommand(parent);
     const other = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
-    const otherPort = createMaintainerReviewedAdvisoryApprovalPersistence(other);
+    const durable = createDurableReviewerApprovalCapabilityPersistence(prisma);
+    const otherDurable = createDurableReviewerApprovalCapabilityPersistence(other);
     try {
+      const prepared = await harness.issueConsumption(command);
+      expect(prepared.accepted).toBe(true);
+      if (!prepared.accepted) {
+        return;
+      }
       const raced = await Promise.all([
-        port.recordMaintainerReviewedAdvisoryApproval(command),
-        otherPort.recordMaintainerReviewedAdvisoryApproval(command),
+        durable.persistMaintainerReviewedAdvisoryApprovalWithCapability(prepared.command),
+        otherDurable.persistMaintainerReviewedAdvisoryApprovalWithCapability(prepared.command),
       ]);
       const kinds = raced.map((result) => result.kind).sort();
       expect(kinds).toEqual(['already_applied', 'recorded']);
@@ -593,9 +602,16 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
       const conflictParent = await insertParent();
       const left = approvalCommand(conflictParent, { reviewerIdentity: 'reviewer.left' });
       const right = approvalCommand(conflictParent, { reviewerIdentity: 'reviewer.right' });
+      const leftPrepared = await harness.issueConsumption(left);
+      const rightPrepared = await harness.issueConsumption(right);
+      expect(leftPrepared.accepted).toBe(true);
+      expect(rightPrepared.accepted).toBe(true);
+      if (!leftPrepared.accepted || !rightPrepared.accepted) {
+        return;
+      }
       const conflicted = await Promise.all([
-        port.recordMaintainerReviewedAdvisoryApproval(left),
-        otherPort.recordMaintainerReviewedAdvisoryApproval(right),
+        durable.persistMaintainerReviewedAdvisoryApprovalWithCapability(leftPrepared.command),
+        otherDurable.persistMaintainerReviewedAdvisoryApprovalWithCapability(rightPrepared.command),
       ]);
       expect(conflicted.some((result) => result.kind === 'recorded')).toBe(true);
       expect(conflicted.some((result) => result.kind === 'immutable_conflict')).toBe(true);
@@ -610,10 +626,8 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
       expect(['reviewer.left', 'reviewer.right']).toContain(winner.reviewerIdentity);
       const selfParent = await insertParent();
       const [valid, denied] = await Promise.all([
-        port.recordMaintainerReviewedAdvisoryApproval(approvalCommand(selfParent)),
-        otherPort.recordMaintainerReviewedAdvisoryApproval(
-          approvalCommand(selfParent, { reviewerIdentity: 'author.one' }),
-        ),
+        harness.approve(approvalCommand(selfParent)),
+        harness.approve(approvalCommand(selfParent, { reviewerIdentity: 'author.one' })),
       ]);
       expect(valid.kind).toBe('recorded');
       expect(denied).toMatchObject({ kind: 'rejected', code: 'self_approval' });
@@ -681,15 +695,21 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
     broken.port = '1';
     const unreachable = new PrismaClient({ datasources: { db: { url: broken.toString() } } });
     try {
-      const isolated = createMaintainerReviewedAdvisoryApprovalPersistence(unreachable);
-      const result: MaintainerReviewedApprovalPersistenceResult =
-        await isolated.recordMaintainerReviewedAdvisoryApproval(
-          approvalCommand(await insertParent()),
-        );
+      const unreachableParent = await insertParent();
+      const unreachableCommand = approvalCommand(unreachableParent);
+      const prepared = await harness.issueConsumption(unreachableCommand);
+      expect(prepared.accepted).toBe(true);
+      if (!prepared.accepted) {
+        return;
+      }
+      const isolated = createDurableReviewerApprovalCapabilityPersistence(unreachable);
+      const result = await isolated.persistMaintainerReviewedAdvisoryApprovalWithCapability(
+        prepared.command,
+      );
       expect(result.kind).toBe('rejected');
       if (result.kind === 'rejected') {
         expect(result.code).toBe('database_unavailable');
-        expect(result.effects).toEqual(MAINTAINER_REVIEWED_APPROVAL_ZERO_EFFECTS);
+        expect(result.effects).toEqual(DURABLE_REVIEWER_CAPABILITY_ZERO_EFFECTS);
         expect(JSON.stringify(result)).not.toContain(databaseUrl);
       }
     } finally {
@@ -717,7 +737,7 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
       where: { id: parent.revisionId },
       select: { authorIdentity: true, origin: true, contentFingerprint: true },
     });
-    const recorded = await port.recordMaintainerReviewedAdvisoryApproval(approvalCommand(parent));
+    const recorded = await harness.approve(approvalCommand(parent));
     expect(recorded.kind).toBe('recorded');
     if (recorded.kind !== 'recorded') {
       return;
@@ -727,27 +747,27 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
       select: { authorIdentity: true, origin: true, contentFingerprint: true },
     });
     expect(revisionAfter).toEqual(revisionBefore);
-    const ambient = await port.recordMaintainerReviewedAdvisoryApproval(
+    const ambient = await harness.approve(
       approvalCommand(await insertParent(), {
         reviewerAuthorityClassification: 'administrator',
       }),
     );
     expect(ambient).toMatchObject({ kind: 'rejected', code: 'reviewer_authority_mismatch' });
-    const owner = await port.recordMaintainerReviewedAdvisoryApproval(
+    const owner = await harness.approve(
       approvalCommand(await insertParent(), {
         reviewerAuthorityClassification: 'repository_owner',
       }),
     );
     expect(owner).toMatchObject({ kind: 'rejected', code: 'reviewer_authority_mismatch' });
-    const gitAuthor = await port.recordMaintainerReviewedAdvisoryApproval(
+    const gitAuthor = await harness.approve(
       approvalCommand(await insertParent(), { reviewerAuthorityClassification: 'git_author' }),
     );
     expect(gitAuthor).toMatchObject({ kind: 'rejected', code: 'reviewer_authority_mismatch' });
-    const purpose = await port.recordMaintainerReviewedAdvisoryApproval(
+    const purpose = await harness.approve(
       approvalCommand(await insertParent(), { approvalPurpose: 'approve' }),
     );
     expect(purpose).toMatchObject({ kind: 'rejected', code: 'purpose_mismatch' });
-    const missingReviewer = await port.recordMaintainerReviewedAdvisoryApproval(
+    const missingReviewer = await harness.approve(
       approvalCommand(await insertParent(), { reviewerIdentity: '' }),
     );
     expect(missingReviewer).toMatchObject({ kind: 'rejected', code: 'invalid_command' });
@@ -887,9 +907,7 @@ describe('maintainer-reviewed advisory approval PostgreSQL persistence', () => {
       },
       select: { id: true, origin: true },
     });
-    const copied = await port.recordMaintainerReviewedAdvisoryApproval(
-      approvalCommand({ ...parent, revisionId: renamed.id }),
-    );
+    const copied = await harness.approve(approvalCommand({ ...parent, revisionId: renamed.id }));
     expect(copied).toMatchObject({ kind: 'rejected', code: 'source_mismatch' });
     expect(copied.kind === 'rejected' ? copied.effects.inserts : 1).toBe(0);
     await expect(

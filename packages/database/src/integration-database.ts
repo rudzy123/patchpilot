@@ -106,6 +106,10 @@ export const FROZEN_MIGRATIONS = [
     directory: '20261002180000_product_match_evaluation_evidence',
     sha256: '5a9736ae9ee5dc2b3ecb65325eeaebe98704ef00dffcb34d549a62cfe6cfcb6b',
   },
+  {
+    directory: '20261003120000_reviewer_capability_issuance',
+    sha256: '08f18ce42ba19165f6d0a1bf872e5973bf74e26888e7f052c70c53779656dfbd',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
@@ -149,6 +153,8 @@ export const PRODUCT_MATCH_EVIDENCE_BATCH_2_APPROVAL =
 export const PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION =
   '20261002180000_product_match_evaluation_evidence' as const;
 
+export const REVIEWER_CAPABILITY_ISSUANCE = '20261003120000_reviewer_capability_issuance' as const;
+
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
   '20260827120000_tenant_model',
@@ -171,6 +177,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
   PRODUCT_MATCH_EVIDENCE_BATCH_2_APPROVAL,
   PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
+  REVIEWER_CAPABILITY_ISSUANCE,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
@@ -410,4 +417,10 @@ export async function applyThroughSession15(databaseUrl: string): Promise<void> 
     databaseUrl,
     SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
   );
+}
+
+export async function applyThroughProductMatchEvaluation(databaseUrl: string): Promise<void> {
+  await applyThroughSession15(databaseUrl);
+  await applyMigrationSqlAndResolve(databaseUrl, PRODUCT_MATCH_EVIDENCE_BATCH_2_APPROVAL);
+  await applyMigrationSqlAndResolve(databaseUrl, PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION);
 }

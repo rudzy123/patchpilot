@@ -10,6 +10,8 @@
     "src/**/*.test.ts",
     "src/integration-database.ts",
     "src/intelligence-test-fixture.ts",
+    "src/reviewer-capability-approval-harness.ts",
+    "src/reviewer-capability-test-seam.ts",
     "src/osv-bounded-listing-canary-operator-main.ts",
     "src/osv-bounded-listing-canary-authority-seed.ts",
     "src/osv-protected-evidence-listing-canary-operator-main.ts",
