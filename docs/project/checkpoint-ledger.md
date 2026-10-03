@@ -73,3 +73,15 @@ Current checkpoint authority: [current-state.md](current-state.md).
 Product Match Evidence merged through PR #51 at merge commit `433ea88`. Batches 1 through 3-R are complete. Product Match Evidence branch closure is complete. The legal non-synthetic affected evaluation path is verified in disposable PostgreSQL. Persistent product-eligible evaluation count remains zero. Finding creation remains unavailable. Provider calls remain zero. Production automatic matching remains unavailable. Reviewer-authority capability issuance and consumption remain deferred. ADR 0032 stays Proposed.
 
 Earlier entries in this ledger that say occurrence lookup is organization-scoped record the query predicate used at that review. Organization scope does not authorize a tenant-facing path to expose a cross-tenant existence distinction. Foreign and missing occurrence results remain a deferred indistinguishability prerequisite. This ledger is not the current repository authority.
+
+## Reviewer Approval Capability Batch 1 — issued-authority architecture
+
+Current checkpoint authority: [current-state.md](current-state.md).
+
+Post-merge reconciliation PR #52 is in the branch ancestry at `f822814`. This entry records architecture contracts for an issued reviewer capability under `reviewer_approval_capability_policy_v1`. The issuer is not a public export. The handle is process-local and unforgeable by an ordinary object. It binds one exact approval target. Caller-supplied reviewer classification is not authority. The saved approval command and PostgreSQL adapter are unchanged. No migration was added. No capability, approval, product-match row, or Finding is written by this batch. Production startup does not construct the issuer. ADR 0032 stays Proposed. The saved-path discrepancy remains open. Batch 1-R is next. This ledger is not the current repository authority.
+
+## Reviewer Approval Capability Batch 1-R — issued-authority architecture review
+
+Current checkpoint authority: [current-state.md](current-state.md).
+
+Batch 1-R reviewed the uncommitted Batch 1 architecture on `fix/reviewer-approval-capability` at `f822814`. Reentrant clock callbacks fail closed and do not settle a second lifecycle transition. A different correlation ID does not mint a second capability for the same approval claim. Terminal targets are not reissued inside the process. The saved approval path is unchanged and still accepts caller-supplied reviewer claims. Process-local consumption is not atomic with PostgreSQL. The architecture commit witness is not a database commit. Batch 2 remains one immutable issuance row plus one append-only terminal observation, and only after this architecture is committed. No Prisma change, migration, evaluator call, product-match write, or Finding write was added. Production runtime does not construct the issuer. ADR 0032 stays Proposed. The saved-path discrepancy remains open. This ledger is not the current repository authority.

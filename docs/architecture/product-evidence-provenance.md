@@ -209,12 +209,19 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   Schema validation, canonicalization, and fingerprints do not approve.
 - **Reviewer authority:** ADR 0032 Decision 3 requires an issued capability
   bound to one revision, both fingerprints, `Vulnerability.id`, the npm
-  identity key, and the license decision. The public entry does not export an
-  issuer. Generic admin, commit authorship, file ownership, and status
-  inspection grant no authority. That issued capability is not wired into the
-  saved approval path. The saved command validates caller-supplied reviewer
-  identity and authority classification. Resolve that discrepancy before a
-  Finding gate relies on the approval. Decision 3 is not implemented.
+  identity key, and the license decision. Reviewer Approval Capability Batch 1
+  defines that contract under `reviewer_approval_capability_policy_v1`: a sealed
+  reviewed-issuer authority, an opaque process-local handle, exact target
+  binding, and closed lifecycle classifications. Batch 1-R reviewed that
+  contract. The public entry does not export an issuer. Generic admin, commit
+  authorship, file ownership, and status inspection grant no authority. The
+  saved approval path is unchanged and still validates caller-supplied reviewer
+  identity and authority classification. Process-local consumption is not
+  atomic with PostgreSQL. The architecture commit witness is not a database
+  commit. Durable issuance remains Batch 2 and is not a migration in this
+  review. The capability grants no evaluator or Finding authority. Decision 3
+  is not implemented as persistence. ADR 0032 remains Proposed. Resolve the
+  saved-path discrepancy before a Finding gate relies on the approval.
 - **Separation of duties:** Exact distinct author and reviewer identities.
   Case-only and confusable differences fail closed as `ineligible_self_approved`.
 - **Approval purpose:** `approve_maintainer_reviewed_advisory_for_product_evaluation`.
