@@ -1469,6 +1469,7 @@ model Vulnerability {
   cveIdentityLinks              VulnerabilityCveIdentityLink[]
   advisoryVulnerabilityBindings AdvisoryVulnerabilityBinding[]
   maintainerReviewedAdvisoryApprovals MaintainerReviewedAdvisoryApproval[]
+  reviewerCapabilityIssuances ReviewerCapabilityIssuance[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@index([cveId], map: "vulnerability_cve_idx")
@@ -3502,6 +3503,7 @@ model AdvisoryRevision {
   aliases           AdvisoryRevisionAlias[]
   binding           AdvisoryVulnerabilityBinding?
   approval          MaintainerReviewedAdvisoryApproval?
+  reviewerCapabilityIssuances ReviewerCapabilityIssuance[]
   rangeEvents       AdvisoryRevisionRangeEvent[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
@@ -3587,11 +3589,68 @@ model MaintainerReviewedAdvisoryApproval {
   family        AdvisoryFamily               @relation(fields: [advisoryFamilyId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_family_fkey")
   vulnerability Vulnerability                @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_vulnerability_fkey")
   binding       AdvisoryVulnerabilityBinding @relation(fields: [advisoryVulnerabilityBindingId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_binding_fkey")
+  reviewerCapabilityLifecycleObservations ReviewerCapabilityLifecycleObservation[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@index([advisoryFamilyId], map: "maintainer_reviewed_advisory_approval_family_idx")
   @@index([vulnerabilityId], map: "maintainer_reviewed_advisory_approval_vulnerability_idx")
   @@map("maintainer_reviewed_advisory_approval")
+}
+
+/// Immutable reviewer-capability issuance. Status is not stored.
+/// One terminal observation is the only lifecycle write. No secret material.
+model ReviewerCapabilityIssuance {
+  id                          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  issuanceSchemaVersion       String   @map("issuance_schema_version") @db.VarChar(80)
+  capabilityPolicyId          String   @map("capability_policy_id") @db.VarChar(80)
+  capabilityPolicyVersion     Int      @map("capability_policy_version") @db.SmallInt
+  approvalPolicyId            String   @map("approval_policy_id") @db.VarChar(80)
+  approvalPolicyVersion       Int      @map("approval_policy_version") @db.SmallInt
+  approvalPurpose             String   @map("approval_purpose") @db.VarChar(80)
+  issuerAuthorizationId       String   @unique(map: "reviewer_capability_issuance_authorization_uidx") @map("issuer_authorization_id") @db.Uuid
+  issuerDecisionFingerprint   String   @map("issuer_decision_fingerprint") @db.Text
+  approvalClaimFingerprint    String   @unique(map: "reviewer_capability_issuance_claim_uidx") @map("approval_claim_fingerprint") @db.Text
+  advisoryFamilyIdentity      String   @map("advisory_family_identity") @db.Text
+  advisoryRevisionId          String   @map("advisory_revision_id") @db.Uuid
+  contentFingerprint          String   @map("content_fingerprint") @db.Text
+  affectedRangeFingerprint    String   @map("affected_range_fingerprint") @db.Text
+  npmPackageIdentity          String   @map("npm_package_identity") @db.VarChar(1024)
+  vulnerabilityId             String   @map("vulnerability_id") @db.Uuid
+  sourceLicensePolicyId       String   @map("source_license_policy_id") @db.VarChar(80)
+  sourceLicensePolicyVersion  Int      @map("source_license_policy_version") @db.SmallInt
+  approvedLicenseClassification String @map("approved_license_classification") @db.VarChar(32)
+  licenseDecisionCanonical    String   @map("license_decision_canonical") @db.Text
+  sourceClassification        String   @map("source_classification") @db.VarChar(64)
+  authorIdentity              String   @map("author_identity") @db.VarChar(128)
+  reviewerIdentity            String   @map("reviewer_identity") @db.VarChar(128)
+  correlationId               String   @map("correlation_id") @db.Uuid
+  issuedAt                    DateTime @default(dbgenerated("clock_timestamp()")) @map("issued_at") @db.Timestamptz(6)
+  expiresAt                   DateTime @default(dbgenerated("clock_timestamp()")) @map("expires_at") @db.Timestamptz(6)
+
+  revision      AdvisoryRevision @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "reviewer_capability_issuance_revision_fkey")
+  vulnerability Vulnerability    @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "reviewer_capability_issuance_vulnerability_fkey")
+  observation   ReviewerCapabilityLifecycleObservation?
+
+  @@index([advisoryRevisionId], map: "reviewer_capability_issuance_revision_idx")
+  @@index([vulnerabilityId], map: "reviewer_capability_issuance_vulnerability_idx")
+  @@map("reviewer_capability_issuance")
+}
+
+/// One append-only terminal observation: consumed, revoked, or cancelled.
+/// Presentation is not stored. Expired is derived from database time.
+model ReviewerCapabilityLifecycleObservation {
+  id                        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  capabilityIssuanceId      String   @unique(map: "reviewer_capability_lifecycle_observation_capability_uidx") @map("capability_issuance_id") @db.Uuid
+  observationClassification String   @map("observation_classification") @db.VarChar(16)
+  lifecycleAuthorizationId  String?  @map("lifecycle_authorization_id") @db.Uuid
+  decisionFingerprint       String?  @map("decision_fingerprint") @db.Text
+  approvalId                String?  @unique(map: "reviewer_capability_lifecycle_observation_approval_uidx") @map("approval_id") @db.Uuid
+  observedAt                DateTime @default(dbgenerated("clock_timestamp()")) @map("observed_at") @db.Timestamptz(6)
+
+  capability ReviewerCapabilityIssuance          @relation(fields: [capabilityIssuanceId], references: [id], onDelete: Restrict, map: "reviewer_capability_lifecycle_observation_capability_fkey")
+  approval   MaintainerReviewedAdvisoryApproval? @relation(fields: [approvalId], references: [id], onDelete: Restrict, map: "reviewer_capability_lifecycle_observation_approval_fkey")
+
+  @@map("reviewer_capability_lifecycle_observation")
 }
 
 /// Immutable SEMVER events for one advisory revision.

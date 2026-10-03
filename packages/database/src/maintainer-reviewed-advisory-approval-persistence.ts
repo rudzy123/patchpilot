@@ -13,6 +13,7 @@ import {
   MAINTAINER_REVIEWED_ORIGIN,
   VULNERABILITY_MAPPING_POLICY_ID,
   classifyStoredMaintainerReviewedApproval,
+  maintainerReviewedApprovalReplayFingerprint,
   parseMaintainerReviewedAdvisoryApprovalCommand,
   parseMaintainerReviewedAdvisoryApprovalInspection,
   projectInspectedMaintainerReviewedApproval,
@@ -26,10 +27,7 @@ import {
 } from '@patchpilot/vulnerability-intelligence';
 
 import { isRootPrismaClient } from './guards.js';
-import {
-  isMaintainerReviewedApprovalUniqueViolation,
-  translateMaintainerReviewedApprovalFailure,
-} from './maintainer-reviewed-advisory-approval-persistence-errors.js';
+import { translateMaintainerReviewedApprovalFailure } from './maintainer-reviewed-advisory-approval-persistence-errors.js';
 
 const ROOT_CLIENT_REQUIRED =
   'Maintainer-reviewed approval persistence requires the root database client.';
@@ -194,7 +192,7 @@ export function createMaintainerReviewedAdvisoryApprovalPersistence(
   return new PrismaMaintainerReviewedAdvisoryApprovalPersistence(client);
 }
 
-class PrismaMaintainerReviewedAdvisoryApprovalPersistence implements MaintainerReviewedAdvisoryApprovalPersistencePort {
+export class PrismaMaintainerReviewedAdvisoryApprovalPersistence implements MaintainerReviewedAdvisoryApprovalPersistencePort {
   public constructor(private readonly client: PrismaClient) {}
 
   public async recordMaintainerReviewedAdvisoryApproval(
@@ -204,17 +202,14 @@ class PrismaMaintainerReviewedAdvisoryApprovalPersistence implements MaintainerR
     if (!parsed.accepted) {
       return rejected(parsed.code);
     }
-    try {
-      return await this.client.$transaction((tx) => this.recordInTransaction(tx, parsed.command));
-    } catch (error) {
-      if (error instanceof ApprovalRowIntegrityFailure) {
-        return rejected('malformed_persisted_state');
-      }
-      if (isMaintainerReviewedApprovalUniqueViolation(error)) {
-        return this.reloadOnce(parsed.command);
-      }
-      return rejected(translateMaintainerReviewedApprovalFailure(error));
-    }
+    return rejected('capability_authority_required');
+  }
+
+  public async insertParsedMaintainerReviewedAdvisoryApproval(
+    tx: Prisma.TransactionClient,
+    command: ParsedMaintainerReviewedAdvisoryApprovalCommand,
+  ): Promise<MaintainerReviewedApprovalPersistenceResult> {
+    return this.recordInTransaction(tx, command);
   }
 
   public async inspectMaintainerReviewedAdvisoryApproval(
@@ -270,6 +265,29 @@ class PrismaMaintainerReviewedAdvisoryApprovalPersistence implements MaintainerR
     tx: Prisma.TransactionClient,
     command: ParsedMaintainerReviewedAdvisoryApprovalCommand,
   ): Promise<MaintainerReviewedApprovalPersistenceResult> {
+    if (
+      maintainerReviewedApprovalReplayFingerprint({
+        advisoryRevisionId: command.advisoryRevisionId,
+        familyDigest: command.expectedAdvisoryFamilyIdentity,
+        approvalPolicyId: command.approvalPolicyId,
+        approvalPolicyVersion: command.approvalPolicyVersion,
+        approvalPurpose: command.approvalPurpose,
+        sourceClassification: command.expectedSourceClassification,
+        authorIdentity: command.authorIdentity,
+        reviewerIdentity: command.reviewerIdentity,
+        reviewerClassification: command.reviewerAuthorityClassification,
+        contentFingerprint: command.expectedContentFingerprint,
+        rangeFingerprint: command.expectedRangeFingerprint,
+        packageIdentityKey: command.expectedNpmPackageIdentity,
+        vulnerabilityId: command.expectedVulnerabilityId,
+        sourceLicensePolicyId: command.sourceLicensePolicyId,
+        sourceLicensePolicyVersion: command.sourceLicensePolicyVersion,
+        approvedLicenseClassification: command.approvedLicenseClassification,
+        licenseDecisionCanonical: command.licenseDecisionCanonical,
+      }) !== command.approvalReplayFingerprint
+    ) {
+      return rejected('invalid_command');
+    }
     await tx.$executeRaw`LOCK TABLE "advisory_revision" IN SHARE ROW EXCLUSIVE MODE`;
     const revision = await tx.advisoryRevision.findUnique({
       where: { id: command.advisoryRevisionId },
@@ -413,22 +431,6 @@ class PrismaMaintainerReviewedAdvisoryApprovalPersistence implements MaintainerR
       throw new ApprovalRowIntegrityFailure();
     }
     return { kind: 'recorded', projection, effects: recordedEffects() };
-  }
-
-  private async reloadOnce(
-    command: ParsedMaintainerReviewedAdvisoryApprovalCommand,
-  ): Promise<MaintainerReviewedApprovalPersistenceResult> {
-    const existing = await this.findStored(this.client, command);
-    if (existing.length !== 1) {
-      return existing.length > 1
-        ? { kind: 'immutable_conflict', effects: MAINTAINER_REVIEWED_APPROVAL_ZERO_EFFECTS }
-        : rejected('unique_violation');
-    }
-    const stored = existing[0];
-    if (stored === undefined) {
-      return rejected('unique_violation');
-    }
-    return classifyRow(stored, command);
   }
 
   private async findStored(

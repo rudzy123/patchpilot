@@ -79,6 +79,8 @@ v0.1 has no self-service "delete my organization and all evidence" button. Insta
 
 Restores can resurrect deleted sessions or purged orphans. Operators should encrypt backups and control access ([deployment](deployment-model.md), [OD-13](open-decisions.md)). Backup copies are **Restricted**. Future protected listing-evidence ciphertext may appear in PostgreSQL backups; raw encryption keys must not. Restoring those backups without the required key capability leaves protected object identities unavailable. Recovery testing must not expose plaintext.
 
+Reviewer-capability issuance and lifecycle observations are append-only evidence. Update and delete are rejected. Advisory revision, Vulnerability, and approval deletion cannot cascade them away. Expiration does not delete the row. No capability or approval row is seeded.
+
 ## Related documents
 
 - [Data classification](data-classification.md)

@@ -42,6 +42,7 @@ export {
 export { createMatchEvaluationEvidencePersistence } from './match-evaluation-evidence-persistence.js';
 export { createAdvisoryRevisionPersistence } from './advisory-revision-persistence.js';
 export { createMaintainerReviewedAdvisoryApprovalPersistence } from './maintainer-reviewed-advisory-approval-persistence.js';
+export { createDurableReviewerApprovalCapabilityPersistence } from './reviewer-capability-persistence.js';
 export { createProductEvidenceComponentInspection } from './product-evidence-component-inspection.js';
 export { createProductMatchEvaluationPersistence } from './product-match-evaluation-persistence.js';
 export {

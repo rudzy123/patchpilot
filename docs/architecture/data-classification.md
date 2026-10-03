@@ -61,6 +61,8 @@ Protected OSV listing object keys follow Restricted handling even though they ar
 
 Canonical redaction list always applies, even to Internal feed payloads.
 
+Reviewer-capability issuance rows store authorization UUIDs, decision fingerprints, and exact approval-target fields. Those rows are Confidential. Public inspection omits them and returns no reusable authority. The process-local issuer secret is not persisted.
+
 ## Derived data
 
 Parsed graphs and **priority** values are Confidential **derived** data. They do not replace Restricted originals. Exports are Confidential PatchPilot outputs, not certificates.

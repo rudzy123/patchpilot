@@ -37,8 +37,8 @@ test('current frozen migration count agrees with the registry and migration dire
     .sort();
 
   assert.deepEqual([...registeredDirectories].sort(), directoriesOnDisk);
-  assert.match(readRepositoryFile(currentStatePath), /Frozen migrations:\s*21\b/);
-  assert.equal(registeredDirectories.length, 21);
+  assert.match(readRepositoryFile(currentStatePath), /Frozen migrations:\s*22\b/);
+  assert.equal(registeredDirectories.length, 22);
 });
 
 test('checkpoint documents do not enable production OSV, Findings, or real product eligibility', () => {
