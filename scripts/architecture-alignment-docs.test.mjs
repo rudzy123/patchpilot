@@ -49,11 +49,25 @@ test('checkpoint documents do not enable production OSV, Findings, or real produ
   assert.match(currentState, /Production OSV acquisition:\s*disabled/);
   assert.match(currentState, /Finding creation from match evidence:\s*unavailable/);
   assert.match(currentState, /Real product-eligible evaluation count:\s*0\b/);
+  assert.match(currentState, /Persistent product-eligible evaluation count:\s*0\b/);
+  assert.match(currentState, /Persistent Finding count:\s*0\b/);
+  assert.match(currentState, /ADR 0032 remains Proposed/);
+  assert.match(
+    readRepositoryFile('docs/adr/0032-maintainer-reviewed-advisory-authority.md'),
+    /^- Status: Proposed$/m,
+  );
+  assert.doesNotMatch(
+    readRepositoryFile('docs/adr/0032-maintainer-reviewed-advisory-authority.md'),
+    /^- Status: Accepted$/m,
+  );
 
   for (const text of [currentState, readme, agents]) {
     assert.doesNotMatch(text, /Production OSV acquisition:\s*enabled/);
     assert.doesNotMatch(text, /Finding creation from match evidence:\s*operational/);
+    assert.doesNotMatch(text, /automatic matching is operational/i);
     assert.doesNotMatch(text, /Real product-eligible evaluation count:\s*[1-9]/);
+    assert.doesNotMatch(text, /Persistent product-eligible evaluation count:\s*[1-9]/);
     assert.doesNotMatch(text, /INTELLIGENCE_OSV_ENABLED=true`?\s+is accepted/);
+    assert.doesNotMatch(text, /ADR 0032 remains Accepted/);
   }
 });

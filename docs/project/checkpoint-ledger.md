@@ -65,3 +65,11 @@ Batch 3 adds `20261002180000_product_match_evaluation_evidence` because the Sess
 Current checkpoint authority: [current-state.md](current-state.md).
 
 Batch 3-R reviewed the uncommitted Batch 3 command on disposable PostgreSQL. The reviewed path persists one maintainer-reviewed, non-synthetic npm affected evaluation bound to the tenant component occurrence, advisory revision, independent approval, `Vulnerability.id`, reviewed evaluator, and matching policy. Exact replay inserts nothing and does not invoke the evaluator again. A conflicting replay does not overwrite the row. A stored replay fingerprint that does not match the stored immutable fields fails closed. Synthetic origin, KEV membership, self-approval, and a non-maintainer reviewer classification stay ineligible. Occurrence lookup is organization-scoped. The composition does not accept a replacement evaluator. Finding creation remains unavailable. Suppression authority remains false. Provider calls remain zero. Production startup does not invoke the command. The row is not seeded. Real product-eligible evaluation count remains 0. Generalized product matching is not live. Branch-closure review is next. ADR 0032 stays Proposed.
+
+## Product Match Evidence — merged
+
+Current checkpoint authority: [current-state.md](current-state.md).
+
+Product Match Evidence merged through PR #51 at merge commit `433ea88`. Batches 1 through 3-R are complete. Product Match Evidence branch closure is complete. The legal non-synthetic affected evaluation path is verified in disposable PostgreSQL. Persistent product-eligible evaluation count remains zero. Finding creation remains unavailable. Provider calls remain zero. Production automatic matching remains unavailable. Reviewer-authority capability issuance and consumption remain deferred. ADR 0032 stays Proposed.
+
+Earlier entries in this ledger that say occurrence lookup is organization-scoped record the query predicate used at that review. Organization scope does not authorize a tenant-facing path to expose a cross-tenant existence distinction. Foreign and missing occurrence results remain a deferred indistinguishability prerequisite. This ledger is not the current repository authority.
