@@ -8,16 +8,20 @@
 
 ## Implementation status
 
-Status is **Proposed**. This note records the architecture decision for Product Match Evidence Batch 1. Current checkpoint: [current-state.md](../project/current-state.md).
+Status is **Proposed**. This note records implementation progress. It does not accept the ADR. Current checkpoint: [current-state.md](../project/current-state.md).
 
-- Maintainer-reviewed advisory authority architecture: defined as pure contracts, policies, invariants, and tests; production uncomposed.
-- Batch 2 persistence: one forward-only migration `20261002120000_maintainer_reviewed_advisory_approval`, SHA-256 `9f4ae2a6402952ff0ecca27a88cb15859a2164d89591fe2afe64e7e9ddbfb380`. The adapter is production uncomposed. No approval is seeded.
-- Batch 3 evaluation: one explicit command, production uncomposed. Disposable PostgreSQL tests persist one affected row bound to the approval, revision, `Vulnerability.id`, and tenant component occurrence. The row is not seeded. Batch 3-R reviewed that path. Branch-closure review is next.
+- Architecture contracts exist and remain production uncomposed.
+- Immutable approval persistence exists (`20261002120000_maintainer_reviewed_advisory_approval`, SHA-256 `9f4ae2a6402952ff0ecca27a88cb15859a2164d89591fe2afe64e7e9ddbfb380`). The adapter is production uncomposed. No approval is seeded.
+- Author and reviewer separation exists. Exact distinct identities are required. Self-approval fails closed.
+- An approval binds the exact revision, content and range fingerprints, npm package identity, one `Vulnerability.id`, the approval purpose `approve_maintainer_reviewed_advisory_for_product_evaluation`, the approval policy, and the accepted `CC-BY-4.0` license evidence.
+- Product Match Evidence evaluation is one explicit command, implemented and production uncomposed. The provider-free product-evidence path is implemented and verified in disposable PostgreSQL. Persistent product-eligible evaluation count: 0.
+- Production composition remains absent. Production startup does not submit, approve, or evaluate these advisories.
+- Decision 3's issued reviewer capability is not wired into the saved approval path. The saved command accepts validated caller-supplied reviewer identity and authority classification. That discrepancy must be resolved before a Finding gate can rely on the approval. Decision 3 is not implemented.
 - Real product-eligible evaluation count: 0
 - Production OSV acquisition: disabled
 - Finding creation: unavailable
 
-This ADR defines how a local advisory document can become a legitimate, non-synthetic, maintainer-reviewed product evidence source. Batch 2 records an immutable approval for an already stored maintainer-reviewed revision. Batch 3 uses that approval in one explicit evaluation command. The command is not an operational user workflow and does not create Findings. Approval is not an operational user workflow.
+This ADR defines how a local advisory document can become a legitimate, non-synthetic, maintainer-reviewed product evidence source. Batch 2 records an immutable approval for an already stored maintainer-reviewed revision. Batch 3 uses that approval in one explicit evaluation command. The command is not an operational user workflow and does not create Findings. Approval is not an operational user workflow. Decision 3 remains the architectural requirement for issued reviewer capability. This note does not redesign that capability and does not weaken it.
 
 ## Context
 

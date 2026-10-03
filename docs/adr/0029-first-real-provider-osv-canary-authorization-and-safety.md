@@ -1146,7 +1146,7 @@ with disposable PostgreSQL and direct SQL. It did not contact
 `20260908120000_osv_canary_authorization_persistence` was corrected and
 frozen (SHA-256
 `321ac38a02090470aa5f09661cb0e29562327c16c9e341b44bc99516bd7fbd99`).
-Fifteen frozen migrations. All fourteen prior migrations remain
+Historical catalog size at that checkpoint: fifteen finished migrations. All fourteen prior migrations remain
 byte-for-byte unchanged. Later SQL corrections require another forward-only
 migration.
 
@@ -1394,7 +1394,7 @@ listing-only OSV provider-contact authorization. Existing
 `20260909120000_osv_listing_provider_contact_authorization_persistence`
 (frozen SHA-256
 `8e9a462e329733660b970adca64fcadce0431d65f342d15dbaecf08b91a80bbc`).
-Sixteen frozen migrations. All fifteen prior migrations remain
+Historical catalog size at that checkpoint: sixteen finished migrations. All fifteen prior migrations remain
 byte-for-byte unchanged. Tables `osv_canary_provider_free_preflight_attestation`
 and `osv_listing_provider_contact_authorization` are global and instance
 owned. One provider-contact authorization binds one consumed listing-only
@@ -1423,7 +1423,7 @@ schema with disposable PostgreSQL and direct SQL. It did not contact
 `20260909120000_osv_listing_provider_contact_authorization_persistence`
 (frozen SHA-256 after review
 `8e9a462e329733660b970adca64fcadce0431d65f342d15dbaecf08b91a80bbc`).
-Sixteen frozen migrations. Concrete corrections: future `issued_at` is
+Historical catalog size at that checkpoint: sixteen finished migrations. Concrete corrections: future `issued_at` is
 rejected; `issued_at` cannot precede preflight `captured_at`; future
 preflight timestamps and future `consumed_at` are rejected; consumption
 rechecks an active operator, a still-consumed source canary authorization,

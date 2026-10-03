@@ -207,10 +207,14 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   origin is rejected. No transition from `synthetic_fixture` exists.
 - **Submission:** Untrusted input; successful parse yields `ineligible_unapproved`.
   Schema validation, canonicalization, and fingerprints do not approve.
-- **Reviewer authority:** An issued capability bound to one revision, both
-  fingerprints, `Vulnerability.id`, the npm identity key, and the license
-  decision. The public entry does not export an issuer. Generic admin, commit
-  authorship, file ownership, and status inspection grant no authority.
+- **Reviewer authority:** ADR 0032 Decision 3 requires an issued capability
+  bound to one revision, both fingerprints, `Vulnerability.id`, the npm
+  identity key, and the license decision. The public entry does not export an
+  issuer. Generic admin, commit authorship, file ownership, and status
+  inspection grant no authority. That issued capability is not wired into the
+  saved approval path. The saved command validates caller-supplied reviewer
+  identity and authority classification. Resolve that discrepancy before a
+  Finding gate relies on the approval. Decision 3 is not implemented.
 - **Separation of duties:** Exact distinct author and reviewer identities.
   Case-only and confusable differences fail closed as `ineligible_self_approved`.
 - **Approval purpose:** `approve_maintainer_reviewed_advisory_for_product_evaluation`.
@@ -228,9 +232,11 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   row binds the revision, approval, `Vulnerability.id`, component occurrence,
   evaluator version, and matching-policy version. Exact replay inserts nothing.
   A conflicting replay overwrites nothing. Synthetic origin and KEV membership
-  fail closed. Real product-eligible evaluation count remains 0 because the
-  row is not seeded. Finding creation remains unavailable. Suppression
-  authority remains false. Production startup does not construct the adapter.
+  fail closed. The provider-free product-evidence path is implemented and
+  verified in disposable PostgreSQL. Persistent product-eligible evaluation
+  count: 0. Finding creation remains unavailable. Suppression authority
+  remains false. Production startup does not construct the adapter. Product
+  Match Evidence is implemented and production uncomposed.
 
 ## Failure and capacity
 
