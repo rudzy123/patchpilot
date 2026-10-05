@@ -18,7 +18,7 @@ Accepted as the product-match evidence grain. Merge to `main` remains subject to
 
 Product Match Evidence is append-only evidence of one exact evaluation of one component occurrence against one advisory revision under one reviewed approval, evaluator identity and version, matching-policy identity and version, and product-evidence policy identity and version.
 
-The organization-scoped unique key is that evaluation identity. Outcome, explanation codes, and other derived facts do not mint a second row for the same identity. Exact replay returns the existing row. If that identity agrees and any immutable bound fact differs, the result is `immutable_conflict` and nothing is modified. A changed authoritative identity may append a new immutable row.
+The organization-scoped unique key is that evaluation identity. Outcome, explanation codes, and other derived facts do not mint a second row for the same identity. Exact replay and reevaluation are different operations. Exact replay returns the existing row and changes no timestamp. Reevaluation under a changed authoritative identity may append a new immutable row. If the same identity agrees and any immutable bound fact differs, the result is `immutable_conflict` and nothing is modified.
 
 Bound facts that remain part of semantic comparison are the component-evidence fingerprint, package identity, observed version, advisory content fingerprint, affected-range fingerprint, `Vulnerability.id`, license decision through the approved authority, origin, outcome, and explanation codes. Fingerprint equality does not replace that comparison. A uniqueness race reloads the stored row and compares it. A uniqueness violation that is not that identity is not automatically `immutable_conflict`.
 
