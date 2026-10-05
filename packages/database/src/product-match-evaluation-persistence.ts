@@ -140,7 +140,10 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
     }
     try {
       const occurrence = await this.client.componentOccurrence.findFirst({
-        where: { id: query.componentOccurrenceId },
+        where: {
+          organizationId: query.organizationId,
+          id: query.componentOccurrenceId,
+        },
         select: {
           id: true,
           organizationId: true,
@@ -152,11 +155,8 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
           versionKnown: true,
         },
       });
-      if (occurrence === null) {
+      if (occurrence === null || occurrence.organizationId !== query.organizationId) {
         return { kind: 'not_found' as const };
-      }
-      if (occurrence.organizationId !== query.organizationId) {
-        return { kind: 'other_tenant' as const };
       }
       const component = await this.client.component.findFirst({
         where: { organizationId: occurrence.organizationId, id: occurrence.componentId },
@@ -407,14 +407,7 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
           };
         }
         if (locked.length !== 1) {
-          const foreign = await tx.componentOccurrence.findFirst({
-            where: { id: input.command.componentOccurrenceId },
-            select: { id: true },
-          });
-          return rejectedResult(
-            foreign === null ? 'component_occurrence_missing' : 'tenant_mismatch',
-            0,
-          );
+          return rejectedResult('component_occurrence_missing', 0);
         }
         const component = await this.inspectComponent({
           organizationId: input.command.organizationId,
@@ -563,11 +556,8 @@ function replayBody(
 }
 
 function componentRejection(
-  kind: 'not_found' | 'other_tenant' | 'malformed' | 'unavailable',
+  kind: 'not_found' | 'malformed' | 'unavailable',
 ): ProductMatchEvaluationRejectionCode {
-  if (kind === 'other_tenant') {
-    return 'tenant_mismatch';
-  }
   if (kind === 'not_found') {
     return 'component_occurrence_missing';
   }

@@ -14,6 +14,8 @@ Session 15 Batch 1 defines product-evidence provenance. Session 15 Batch 1-R rev
 
 Session 14 Batch 3 stores reviewed npm evaluation evidence. The rows are tenant-scoped through the stored component occurrence. Cross-tenant inspection returns not found. Affected evidence does not create a Finding. Unaffected evidence does not suppress a Finding. The persistence adapter does not contact a provider and is not composed into API or worker startup.
 
+Product-match occurrence and evidence inspection are organization-scoped at the persistence boundary. A foreign row and an absent row produce the same public not-found result. The adapter does not query by resource identity alone in order to disclose that the row belongs to another organization. Logs, metrics, and traces on that path do not carry a foreign organization or resource identity. Authorized inspection of the caller's own occurrence remains available. Product-match evidence stays production uncomposed. Automatic matching stays unavailable. Finding creation stays unavailable. Suppression authority stays false.
+
 ## Session 8 status notes
 
 [ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md) records graph-complete ingestion. Typed limits live in `@patchpilot/config`. Session 8 is now implemented end to end: HTTP upload, private object storage, outbox relay, worker-thread parser, and the ingestion processor.
