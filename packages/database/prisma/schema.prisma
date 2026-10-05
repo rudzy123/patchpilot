@@ -3672,7 +3672,10 @@ model AdvisoryRevisionRangeEvent {
 }
 
 /// Tenant-owned immutable product match evidence.
-/// Affected evidence is not Finding authority. Suppression authority is false.
+/// One row is one exact evaluation of one occurrence against one advisory
+/// revision under one reviewed approval, evaluator, and policy binding.
+/// Current applicability is derived at query time. Affected evidence is not
+/// Finding authority. Suppression authority is false.
 model ProductMatchEvaluationEvidence {
   id                           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId               String                 @map("organization_id") @db.Uuid
@@ -3702,7 +3705,7 @@ model ProductMatchEvaluationEvidence {
   productEvidencePolicyVersion Int                    @map("product_evidence_policy_version") @db.SmallInt
   outcome                      MatchEvaluationOutcome
   productOrigin                String                 @map("product_origin") @db.VarChar(64)
-  replayFingerprint            String                 @unique(map: "product_match_evaluation_evidence_replay_uidx") @map("replay_fingerprint") @db.Text
+  replayFingerprint            String                 @map("replay_fingerprint") @db.Text
   findingCreation              String                 @map("finding_creation") @db.VarChar(32)
   suppressionAuthority         Boolean                @default(false) @map("suppression_authority")
   createdAt                    DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
@@ -3719,8 +3722,10 @@ model ProductMatchEvaluationEvidence {
   explanations        ProductMatchEvaluationExplanation[]
 
   @@unique([organizationId, id], map: "product_match_evaluation_evidence_org_id_key")
-  @@unique([organizationId, componentOccurrenceId], map: "product_match_evaluation_evidence_occurrence_uidx")
-  @@unique([organizationId, advisoryRevisionId], map: "product_match_evaluation_evidence_revision_uidx")
+  @@unique([organizationId, replayFingerprint], map: "product_match_evaluation_evidence_org_replay_uidx")
+  @@unique([organizationId, componentOccurrenceId, advisoryRevisionId, approvalId, evaluatorId, evaluatorVersion, matchingPolicyId, matchingPolicyVersion, productEvidencePolicyId, productEvidencePolicyVersion], map: "product_match_evaluation_evidence_evaluation_uidx")
+  @@index([organizationId, componentOccurrenceId], map: "product_match_evaluation_evidence_occurrence_idx")
+  @@index([organizationId, advisoryRevisionId], map: "product_match_evaluation_evidence_revision_idx")
   @@index([organizationId], map: "product_match_evaluation_evidence_org_idx")
   @@map("product_match_evaluation_evidence")
 }

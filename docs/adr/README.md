@@ -69,6 +69,7 @@ Closer implementation notes may add detail. They must not silently weaken accept
 | [0026](0026-authoritative-match-evidence-and-finding-lifecycle.md) | Authoritative match evidence and Finding lifecycle | Accepted |
 | [0028](0028-osv-runtime-enablement-architecture-and-safety.md) | OSV runtime enablement architecture and safety controls | Accepted |
 | [0029](0029-first-real-provider-osv-canary-authorization-and-safety.md) | First real-provider OSV canary authorization and safety controls | Accepted |
+| [0033](0033-product-match-evidence-cardinality.md) | Product Match Evidence cardinality | Accepted |
 
 **Proposed:**
 

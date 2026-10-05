@@ -20,7 +20,10 @@ jobs:
   integration:
     name: Integration
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Ephemeral migration deploys in the database suite exceed 20 minutes on
+    # GitHub-hosted runners. The last main run finished in about 13 minutes;
+    # this branch was cancelled at the limit with that suite still running.
+    timeout-minutes: 35
     env:
       PATCHPILOT_DEPLOYMENT_ENVIRONMENT: test
       PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS: 'true'
