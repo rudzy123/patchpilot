@@ -252,8 +252,9 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   evidence remains after a successor revision. Finding identity stays
   organization, asset, versionless component, and vulnerability. Automatic
   matching remains unavailable. Finding creation remains unavailable.
-  Suppression authority remains false. Multiple-version SBOM normalization
-  remains a separate open decision.
+  Suppression authority remains false. New graphs use normalization version
+  `2` and preserve distinct observed versions. Historical version `1` graphs
+  are not reprocessed.
 
 ## Failure and capacity
 

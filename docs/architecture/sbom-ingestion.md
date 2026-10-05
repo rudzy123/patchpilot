@@ -342,7 +342,7 @@ If the diagram is not rendered, the sentence above is complete.
 
 HTTP upload does not wait for graph persistence. Session 8 has no web upload UI.
 
-Duplicate **components** (same bom-ref): reject. Duplicate identity (same **versionless** identity + version) in one ingestion: persist one **ComponentOccurrence** and record a parse warning; do not explode rows.
+Duplicate **components** (same bom-ref): reject. Distinct observed versions of one versionless Component in one ingestion persist as distinct **ComponentOccurrence** rows. Repeated paths and agreeing same-version representations alias to one occurrence and record `duplicate_identity_collapsed`. Disagreeing CycloneDX and PURL versions reject with `component_version_conflict`. Disagreeing SHA-256 evidence rejects with `component_hash_conflict`. Neither rejection persists a graph. A missing hash does not conflict with a present hash. The stored display name and canonical bom-ref are the lexicographically earliest values among agreeing representations. See [ADR 0034](../adr/0034-multi-version-component-occurrence-normalization.md).
 
 ## Processing leases
 
@@ -431,6 +431,9 @@ Each code has a **category** (what kind of thing went wrong) and an **outcome** 
 | `duplicate_bom_ref` | validation | rejected | The same `bom-ref` appears twice in one document |
 | `unresolved_dependency_ref` | validation | rejected | A `dependsOn` target is not a declared `bom-ref` |
 | `invalid_purl` | validation | rejected | PURL cannot be parsed or normalized |
+| `component_version_conflict` | validation | rejected | CycloneDX version and PURL version disagree, or same-version representations disagree on a present versioned PURL |
+| `component_hash_conflict` | validation | rejected | SHA-256 evidence for one Component and observed version disagrees |
+| `unsupported_normalization_version` | validation | rejected | The requested normalization label is not the current normalizer label `2` |
 | `normalized_output_too_large` | limit | rejected | Normalized result exceeds the bounded output budget |
 | `prototype_pollution` | poison | quarantined | `__proto__`, `constructor`, or `prototype` used as a JSON object key |
 | `parser_timeout` | timeout | quarantined | Worker thread terminated at `SBOM_PARSER_TIMEOUT_MS` |
@@ -499,6 +502,7 @@ Each derived component stores the `sbomId`. Correlation (future) stores match me
 ## Parser-version retention and reprocessing
 
 - `parserVersion` is a semver-like identifier of the PatchPilot parser, not the CycloneDX spec version.
+- `normalizationVersion` `2` is the current CycloneDX occurrence normalizer. Newly accepted ingestions persist that label. The normalizer rejects any other label and writes no graph. Completed ingestions labeled `1` remain labeled `1`. Nothing rewrites their graphs or schedules reprocessing.
 - Reprocessing with a newer parser: new **SBOMIngestion**, same object key, new occurrence/relationship rows for that ingestion, new outbox job. Do not overwrite a previous ingestion's graph.
 - Previous derived graphs remain unless a retention job explicitly replaces **derived** data; originals are never replaced.
 - Findings and observations are future correlation work. Finding state will follow the **current** completed ingestion only after that workflow exists. Session 8 `completed` rows are not rewritten when correlation is added. Session 14 Batch 3 can persist an immutable evaluation of one stored occurrence and does not run that correlation or create a Finding.

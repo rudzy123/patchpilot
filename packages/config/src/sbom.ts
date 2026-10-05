@@ -100,7 +100,7 @@ export const SBOM_ORPHAN_GRACE_SECONDS_MIN = 7_200;
 export const SBOM_ORPHAN_GRACE_SECONDS_MAX = 2_592_000;
 
 export const SBOM_PARSER_VERSION_DEFAULT = '0.1.0';
-export const SBOM_NORMALIZATION_VERSION_DEFAULT = '1';
+export const SBOM_NORMALIZATION_VERSION_DEFAULT = '2';
 export const SBOM_VERSION_LABEL_MAX_LENGTH = 64;
 
 /** Safe labels for VARCHAR(64) parser/normalization versions. No path separators. */

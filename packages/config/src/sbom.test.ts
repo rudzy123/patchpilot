@@ -337,6 +337,7 @@ describe('SBOM ingestion configuration', () => {
       parserVersion: SBOM_PARSER_VERSION_DEFAULT,
       normalizationVersion: SBOM_NORMALIZATION_VERSION_DEFAULT,
     });
+    expect(SBOM_NORMALIZATION_VERSION_DEFAULT).toBe('2');
     expect(config.requestBodyLimitBytes).toBe(1_048_576);
     expect(config.objectStorage.region).toBe(OBJECT_STORAGE_REGION_DEFAULT);
     expect(config.objectStorage.connectionTimeoutMs).toBe(

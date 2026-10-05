@@ -25,7 +25,7 @@ Every ingestion failure carries one code from the closed catalog in [sbom-ingest
 
 | Outcome | Codes | Response |
 | --- | --- | --- |
-| Rejected | `payload_too_large`, `content_type`, `utf8`, `json_syntax`, `json_depth`, `json_nodes`, `json_string_length`, `not_cyclonedx`, `unsupported_spec_version`, `schema_invalid`, `component_limit`, `edge_limit`, `identifier_length`, `tool_limit`, `reference_limit`, `property_limit`, `duplicate_bom_ref`, `unresolved_dependency_ref`, `invalid_purl`, `normalized_output_too_large` | The user must fix and re-upload. Do not requeue. Raising a limit is a **validated** configuration change, not an incident workaround. |
+| Rejected | `payload_too_large`, `content_type`, `utf8`, `json_syntax`, `json_depth`, `json_nodes`, `json_string_length`, `not_cyclonedx`, `unsupported_spec_version`, `schema_invalid`, `component_limit`, `edge_limit`, `identifier_length`, `tool_limit`, `reference_limit`, `property_limit`, `duplicate_bom_ref`, `unresolved_dependency_ref`, `invalid_purl`, `component_version_conflict`, `component_hash_conflict`, `unsupported_normalization_version`, `normalized_output_too_large` | The user must fix and re-upload. Do not requeue. Raising a limit is a **validated** configuration change, not an incident workaround. `unsupported_normalization_version` means the stored label is not the current normalizer label `2`. |
 | Quarantined | `prototype_pollution`, `parser_timeout`, `parser_crash`, `hash_mismatch` | Human review. Never auto-release. |
 | Retryable | `object_missing`, `storage_timeout`, `queue_unavailable` | Fix the infrastructure, then replay. |
 | Terminal internal | `processing_failed` | A bug, a misconfiguration, missing state, or **objectKey** scope mismatch after reload. Investigate before replaying. |
@@ -33,6 +33,10 @@ Every ingestion failure carries one code from the closed catalog in [sbom-ingest
 `hash_mismatch` is the one to escalate. It means stored bytes no longer verify against the recorded digest, which is corruption or tampering, not a transient fault.
 
 ## Recovery
+
+### In-flight normalization label
+
+An ingestion that is still `accepted`, `queued`, or `processing` with `normalization_version` other than `2` fails with `unsupported_normalization_version` when the current normalizer runs. No graph is written, and the stored label is not changed to `2`. Do not edit that column and replay the job. Ask for a new upload so the new ingestion is labeled `2`. A completed ingestion labeled `1` stays labeled `1`; do not reprocess it.
 
 ### Rejected at the API
 

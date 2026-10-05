@@ -26,7 +26,7 @@ describe('safe failure taxonomy', () => {
       'retryable_infrastructure',
       'terminal_internal',
     ]);
-    expect(safeFailureCodes).toHaveLength(28);
+    expect(safeFailureCodes).toHaveLength(31);
     expect(Object.keys(safeFailureCatalog).sort()).toEqual([...safeFailureCodes].sort());
   });
 

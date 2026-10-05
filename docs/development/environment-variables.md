@@ -63,7 +63,7 @@ Required. These are reviewed **initial defaults**, not production performance gu
 | `SBOM_UPLOAD_RATE_LIMIT_WINDOW_SECONDS` | Upload limiter window for both limiters. Default `900`. Floor `60`, ceiling `3600`. |
 | `SBOM_ORPHAN_GRACE_SECONDS` | Policy floor for a future unreferenced-object cleanup job. Default `604800`. Floor `7200`, ceiling `2592000`. Must be greater than `SBOM_IDEMPOTENCY_TTL_SECONDS`. **No code reads this yet**; orphan cleanup is not implemented. |
 | `SBOM_PARSER_VERSION` | Safe VARCHAR(64) parser label. Default `0.1.0`. |
-| `SBOM_NORMALIZATION_VERSION` | Safe VARCHAR(64) normalization label. Default `1`. |
+| `SBOM_NORMALIZATION_VERSION` | Safe VARCHAR(64) normalization label. Default `2`. The current CycloneDX normalizer accepts only `2`. Completed ingestions labeled `1` stay labeled `1` and are not reprocessed. |
 
 Test configuration may inject smaller limits only through typed test configuration, and only within these floors. Do not add object-storage access keys or endpoints to this SBOM object.
 

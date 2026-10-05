@@ -26,7 +26,7 @@ Replay uniqueness is `(organization_id, replay_fingerprint)`. Occurrence and rev
 
 A new evaluation is admitted only for the current reviewed tip: not withdrawn, not quarantined, valid under the committed reviewed-approval policy, and not itself superseded. A successor may be evaluated after it becomes that tip. Historical evidence for the previous revision stays unchanged. Current applicability is derived at query time from organization, occurrence, advisory family, revision, vulnerability, evaluator, and policy. It is not stored on the evidence row.
 
-Multiple versions of one component on one SBOM remain separate occurrences. Collapsing those versions is a separate open decision.
+Multiple versions of one component on one SBOM remain separate occurrences. [ADR 0034](0034-multi-version-component-occurrence-normalization.md) preserves that grain during CycloneDX normalization.
 
 ## Alternatives considered
 
@@ -46,4 +46,4 @@ An exact replay inserts nothing and does not change timestamps. An immutable con
 
 ## Follow-up
 
-Multiple-version SBOM normalization remains open. Automatic matching remains unavailable. Finding creation remains unavailable. Suppression authority remains false.
+Multiple-version SBOM normalization is accepted by [ADR 0034](0034-multi-version-component-occurrence-normalization.md). Automatic matching remains unavailable. Finding creation remains unavailable. Suppression authority remains false.

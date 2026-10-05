@@ -56,3 +56,10 @@ export const SBOM_FINAL_OBJECT_KEY_PATTERN =
  * not add a PostgreSQL sentinel ban.
  */
 export const FORBIDDEN_KNOWN_VERSION_STRINGS = ['*', 'latest', 'unknown'] as const;
+
+/**
+ * Rule label written by the current CycloneDX occurrence normalizer.
+ * Historical completed graphs remain labeled `1` and are not rewritten.
+ */
+export const CURRENT_SBOM_NORMALIZATION_VERSION = '2';
+export const HISTORICAL_SBOM_NORMALIZATION_VERSION = '1';

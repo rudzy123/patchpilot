@@ -70,7 +70,7 @@ Asynchronous worker work:
 2. Worker reloads SBOM by id **and** `organizationId`.
 3. Get a **copy** of object bytes and re-verify length and SHA-256. Do not fetch `externalReferences`, license URLs, or bom-links.
 4. Schema, depth, node, component, and edge limits. Failures become `rejected` or `quarantined` as defined in ingestion design.
-5. Persist **Component**, **ComponentOccurrence**, **DependencyRelationship** keyed by **this** `sbomIngestionId`.
+5. Persist **Component**, **ComponentOccurrence**, **DependencyRelationship** keyed by **this** `sbomIngestionId`. Distinct observed versions of one Component are distinct occurrences. Dependency paths are edges.
 6. Ingestion stages are `validate`, `parse`, and `persist_graph` only. State becomes `completed` after those Session 8 steps succeed. `completed` does not imply exhaustive coverage. `correlate`, `enrich`, and `score` remain unused.
 
 ## 5b. Import shared vulnerability intelligence (Session 9 Batch 8B scheduled KEV)
