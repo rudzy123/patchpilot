@@ -218,7 +218,21 @@ describe('product-evidence component inspection', () => {
       organizationId: other.id,
       componentOccurrenceId: occurrence.id,
     });
-    expect(hidden.kind).toBe('not_found');
+    const absent = await reader.inspectTenantOccurrence({
+      organizationId: org.id,
+      componentOccurrenceId: randomUUID(),
+    });
+    const malformedOccurrence = await reader.inspectTenantOccurrence({
+      organizationId: org.id,
+      componentOccurrenceId: 'not-a-uuid',
+    });
+    expect(hidden).toEqual({ kind: 'not_found' });
+    expect(absent).toEqual(hidden);
+    expect(malformedOccurrence).toEqual({ kind: 'rejected', code: 'malformed_persisted_state' });
+    expect(malformedOccurrence).not.toEqual(hidden);
+    expect(JSON.stringify(hidden)).not.toContain(occurrence.id);
+    expect(JSON.stringify(hidden)).not.toContain(org.id);
+    expect(JSON.stringify(hidden)).not.toContain(other.id);
 
     const fingerprint = componentEvidenceFingerprint({
       organizationId: org.id,
@@ -340,8 +354,17 @@ describe('product-evidence component inspection', () => {
     expect(await prisma.finding.count()).toBe(0);
 
     const cross = await service.compose({ ...input, organizationId: other.id });
+    const absentCommand = await service.compose({
+      ...input,
+      componentOccurrenceId: randomUUID(),
+    });
     expect(cross.eligibility).toBe('ineligible_component');
+    expect(cross.failureCode).toBe('component_missing');
+    expect(cross).toEqual(absentCommand);
     expect(cross.calls.revisionInspections).toBe(0);
+    expect(JSON.stringify(cross)).not.toContain(occurrence.id);
+    expect(JSON.stringify(cross)).not.toContain(org.id);
+    expect(JSON.stringify(cross)).not.toContain(other.id);
     expect(await prisma.matchEvaluationEvidence.count()).toBe(before);
     expect(JSON.stringify(composed)).not.toContain('left-pad');
     expect(JSON.stringify(composed)).not.toContain('SYNTHETICADV1');
@@ -763,7 +786,153 @@ describe('product-evidence component inspection', () => {
     `;
     expect(Number(pointer[0]?.count)).toBe(0);
   });
+
+  it('keeps foreign, absent, and deleted occurrences on the same public result', async () => {
+    const org = await createOrg(prisma, `indist-${randomUUID().slice(0, 8)}`);
+    const other = await createOrg(prisma, `indist-other-${randomUUID().slice(0, 8)}`);
+    const asset = await createAsset(prisma, org.id, 'asset-indist');
+    const sbom = await createSbom(prisma, {
+      organizationId: org.id,
+      assetId: asset.id,
+      sha256: SHA_A,
+      receivedAt: new Date('2026-10-02T12:00:00.000Z'),
+    });
+    const ingestion = await createProcessingIngestion(prisma, {
+      organizationId: org.id,
+      sbomId: sbom.id,
+      assetId: asset.id,
+    });
+    const componentInput = resolvedComponent({
+      name: 'left-pad',
+      bomRef: 'component-indist',
+      version: '1.2.3',
+    });
+    const component = await prisma.component.create({
+      data: {
+        organizationId: org.id,
+        identityKey: componentInput.identityKey,
+        purl: componentInput.versionlessPurl,
+        ecosystem: 'npm',
+        namespace: null,
+        name: 'left-pad',
+        identityState: 'resolved',
+      },
+    });
+    const occurrence = await prisma.componentOccurrence.create({
+      data: {
+        organizationId: org.id,
+        assetId: asset.id,
+        sbomId: sbom.id,
+        sbomIngestionId: ingestion.id,
+        componentId: component.id,
+        bomRef: 'component-indist',
+        version: '1.2.3',
+        versionKnown: true,
+      },
+    });
+    const queries: string[] = [];
+    const logging = new PrismaClient({
+      datasources: { db: { url: databaseUrl } },
+      log: [{ emit: 'event', level: 'query' }],
+    });
+    logging.$on('query', (event) => {
+      queries.push(event.query);
+    });
+    const reader = createProductEvidenceComponentInspection(logging);
+    let release: (() => void) | undefined;
+    let markEntered: (() => void) | undefined;
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    let holderFailed = false;
+    const holder = prisma
+      .$transaction(
+        async (tx) => {
+          await tx.$queryRaw`
+            SELECT "id" FROM "component_occurrence"
+            WHERE "id" = ${occurrence.id}::uuid
+            FOR UPDATE
+          `;
+          markEntered?.();
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        },
+        { maxWait: 5_000, timeout: 20_000 },
+      )
+      .catch((error: unknown) => {
+        holderFailed = true;
+        markEntered?.();
+        throw error;
+      });
+    await entered;
+    expect(holderFailed).toBe(false);
+    try {
+      await logging.$queryRaw`SELECT 1`;
+      queries.length = 0;
+      const foreign = await reader.inspectTenantOccurrence({
+        organizationId: other.id,
+        componentOccurrenceId: occurrence.id,
+      });
+      const foreignSql = occurrenceQueries(queries);
+      queries.length = 0;
+      const absent = await reader.inspectTenantOccurrence({
+        organizationId: other.id,
+        componentOccurrenceId: randomUUID(),
+      });
+      const absentSql = occurrenceQueries(queries);
+      expect(foreign).toEqual({ kind: 'not_found' });
+      expect(absent).toEqual(foreign);
+      expect(foreignSql).toEqual(absentSql);
+      expect(foreignSql.length).toBeGreaterThan(0);
+      expect(foreignSql.every(scopedOccurrenceWhere)).toBe(true);
+      expect(JSON.stringify(foreign)).not.toContain(occurrence.id);
+      expect(JSON.stringify(foreign)).not.toContain(org.id);
+      expect(JSON.stringify(foreign)).not.toContain(other.id);
+      const authorized = await reader.inspectTenantOccurrence({
+        organizationId: org.id,
+        componentOccurrenceId: occurrence.id,
+      });
+      expect(authorized.kind).toBe('found');
+    } finally {
+      release?.();
+      await holder.catch(() => undefined);
+      await logging.$disconnect();
+    }
+
+    await prisma.componentOccurrence.delete({ where: { id: occurrence.id } });
+    const durable = createProductEvidenceComponentInspection(prisma);
+    const deleted = await durable.inspectTenantOccurrence({
+      organizationId: org.id,
+      componentOccurrenceId: occurrence.id,
+    });
+    const deletedForeign = await durable.inspectTenantOccurrence({
+      organizationId: other.id,
+      componentOccurrenceId: occurrence.id,
+    });
+    const neverCreated = await durable.inspectTenantOccurrence({
+      organizationId: other.id,
+      componentOccurrenceId: randomUUID(),
+    });
+    expect(deleted).toEqual({ kind: 'not_found' });
+    expect(deletedForeign).toEqual(deleted);
+    expect(neverCreated).toEqual(deleted);
+  });
 });
+
+function occurrenceQueries(queries: readonly string[]): string[] {
+  return queries.filter((query) => query.toLowerCase().includes('component_occurrence'));
+}
+
+function scopedOccurrenceWhere(query: string): boolean {
+  const normalized = query.toLowerCase().replace(/\s+/g, ' ');
+  const index = normalized.lastIndexOf(' where ');
+  if (index === -1) {
+    return false;
+  }
+  const where = normalized.slice(index);
+  return where.includes('organization_id') && where.includes('"id"');
+}
 
 function compositionRequest(input: {
   readonly organizationId: string;

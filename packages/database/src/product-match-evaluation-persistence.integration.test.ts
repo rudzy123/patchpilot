@@ -24,6 +24,7 @@ import {
   classifyNpmPackageIdentityFromParts,
   componentEvidenceFingerprint,
   createProductMatchEvaluationComposition,
+  parseProductMatchEvaluationCommand,
   maintainerReviewedApprovalReplayFingerprint,
   session14RangeFingerprint,
 } from '@patchpilot/vulnerability-intelligence';
@@ -58,6 +59,33 @@ const RANGES = [
 
 function digest(label: string): string {
   return createHash('sha256').update(label).digest('hex');
+}
+
+function occurrenceReads(queries: readonly string[]): string[] {
+  return queries.filter((query) => /from\s+(?:"public"\.)?"component_occurrence"/i.test(query));
+}
+
+function whereClause(query: string): string {
+  const normalized = query.toLowerCase().replace(/\s+/g, ' ');
+  const index = normalized.lastIndexOf(' where ');
+  return index === -1 ? '' : normalized.slice(index);
+}
+
+function scopedByOrganization(query: string): boolean {
+  const where = whereClause(query);
+  return where.includes('organization_id') && where.includes('"id"');
+}
+
+function closedRejection() {
+  return {
+    kind: 'rejected' as const,
+    code: 'component_occurrence_missing' as const,
+    evaluatorCalls: 0 as const,
+    providerCalls: 0 as const,
+    parserCalls: 0 as const,
+    findingWrites: 0 as const,
+    inserts: 0 as const,
+  };
 }
 
 function packageIdentity(): string {
@@ -386,7 +414,40 @@ describe('product match evaluation PostgreSQL persistence', () => {
       organizationId: otherOrg.id,
       evidenceId: first.projection.matchEvidenceId,
     });
-    expect(hidden.kind).toBe('not_found');
+    const absentEvidence = await composition.inspect({
+      organizationId: seeded.organizationId,
+      evidenceId: randomUUID(),
+    });
+    const malformedEvidence = await composition.inspect({
+      organizationId: seeded.organizationId,
+      evidenceId: 'not-a-uuid',
+    });
+    const sameRequesterAbsent = await composition.inspect({
+      organizationId: otherOrg.id,
+      evidenceId: randomUUID(),
+    });
+    expect(hidden).toEqual({ kind: 'not_found' });
+    expect(absentEvidence).toEqual(hidden);
+    expect(sameRequesterAbsent).toEqual(hidden);
+    const foreignEvaluation = await composition.execute({
+      ...seeded.evaluationCommand,
+      organizationId: otherOrg.id,
+      correlationId: randomUUID(),
+    });
+    const absentEvaluation = await composition.execute({
+      ...seeded.evaluationCommand,
+      organizationId: otherOrg.id,
+      componentOccurrenceId: randomUUID(),
+      correlationId: randomUUID(),
+    });
+    expect(foreignEvaluation).toEqual(closedRejection());
+    expect(absentEvaluation).toEqual(foreignEvaluation);
+    expect(JSON.stringify(foreignEvaluation)).not.toContain(first.projection.matchEvidenceId);
+    expect(malformedEvidence).toEqual({ kind: 'rejected', code: 'invalid_command' });
+    expect(malformedEvidence).not.toEqual(hidden);
+    expect(JSON.stringify(hidden)).not.toContain(first.projection.matchEvidenceId);
+    expect(JSON.stringify(hidden)).not.toContain(otherOrg.id);
+    expect(JSON.stringify(hidden)).not.toContain(seeded.organizationId);
     const visible = await composition.inspect({
       organizationId: seeded.organizationId,
       evidenceId: first.projection.matchEvidenceId,
@@ -396,24 +457,156 @@ describe('product match evaluation PostgreSQL persistence', () => {
     expect(await prisma.matchEvaluationEvidence.count()).toBe(syntheticMatchesBefore);
   });
 
-  it('rejects another tenant occurrence before evaluation or persistence', async () => {
+  it('keeps foreign and absent tenant resources publicly indistinguishable', async () => {
     const seeded = await seedLegal('tenant');
     const other = await createOrg(prisma, `cross-${randomUUID().slice(0, 8)}`);
     const before = await prisma.productMatchEvaluationEvidence.count();
     const findingsBefore = await prisma.finding.count();
+    const absentOccurrenceId = randomUUID();
+    const port = createProductMatchEvaluationPersistence(prisma);
+    const authorized = await port.inspectComponent({
+      organizationId: seeded.organizationId,
+      componentOccurrenceId: seeded.evaluationCommand.componentOccurrenceId,
+    });
+    expect(authorized.kind).toBe('found');
+    if (authorized.kind === 'found') {
+      expect(authorized.snapshot.organizationId).toBe(seeded.organizationId);
+      expect(authorized.snapshot.componentOccurrenceId).toBe(
+        seeded.evaluationCommand.componentOccurrenceId,
+      );
+    }
+    const foreign = await port.inspectComponent({
+      organizationId: other.id,
+      componentOccurrenceId: seeded.evaluationCommand.componentOccurrenceId,
+    });
+    const absent = await port.inspectComponent({
+      organizationId: seeded.organizationId,
+      componentOccurrenceId: absentOccurrenceId,
+    });
+    expect(foreign).toEqual({ kind: 'not_found' });
+    expect(absent).toEqual(foreign);
+    expect(JSON.stringify(foreign)).not.toContain(other.id);
+    expect(JSON.stringify(foreign)).not.toContain(seeded.organizationId);
+    expect(JSON.stringify(foreign)).not.toContain(seeded.evaluationCommand.componentOccurrenceId);
+    const malformed = await port.inspectComponent({
+      organizationId: seeded.organizationId,
+      componentOccurrenceId: 'not-a-uuid',
+    });
+    expect(malformed).toEqual({ kind: 'malformed' });
+    expect(malformed).not.toEqual(foreign);
+
+    const closed = closedRejection();
     const composition = service();
-    const result = await composition.execute({
+    const foreignCommand = await composition.execute({
       ...seeded.evaluationCommand,
       organizationId: other.id,
       correlationId: randomUUID(),
     });
-    expect(result.kind).toBe('rejected');
-    if (result.kind === 'rejected') {
-      expect(result.code).toBe('tenant_mismatch');
-      expect(result.evaluatorCalls).toBe(0);
-      expect(result.inserts).toBe(0);
-      expect(result.findingWrites).toBe(0);
+    const absentCommand = await composition.execute({
+      ...seeded.evaluationCommand,
+      componentOccurrenceId: absentOccurrenceId,
+      correlationId: randomUUID(),
+    });
+    expect(foreignCommand).toEqual(closed);
+    expect(absentCommand).toEqual(closed);
+    expect(JSON.stringify(foreignCommand)).not.toContain(other.id);
+    expect(JSON.stringify(foreignCommand)).not.toContain(
+      seeded.evaluationCommand.componentOccurrenceId,
+    );
+
+    const parsedForeign = parseProductMatchEvaluationCommand({
+      ...seeded.evaluationCommand,
+      organizationId: other.id,
+      correlationId: randomUUID(),
+    });
+    const parsedAbsent = parseProductMatchEvaluationCommand({
+      ...seeded.evaluationCommand,
+      componentOccurrenceId: randomUUID(),
+      correlationId: randomUUID(),
+    });
+    expect(parsedForeign.accepted).toBe(true);
+    expect(parsedAbsent.accepted).toBe(true);
+    if (!parsedForeign.accepted || !parsedAbsent.accepted) {
+      return;
     }
+    expect(await port.commit({ command: parsedForeign.command })).toEqual(closed);
+    expect(await port.commit({ command: parsedAbsent.command })).toEqual(closed);
+
+    const queries: string[] = [];
+    const logging = new PrismaClient({
+      datasources: { db: { url: databaseUrl } },
+      log: [{ emit: 'event', level: 'query' }],
+    });
+    logging.$on('query', (event) => {
+      queries.push(event.query);
+    });
+    const loggingPort = createProductMatchEvaluationPersistence(logging);
+    try {
+      queries.length = 0;
+      expect(
+        await loggingPort.inspectComponent({
+          organizationId: seeded.organizationId,
+          componentOccurrenceId: 'not-a-uuid',
+        }),
+      ).toEqual({ kind: 'malformed' });
+      expect(queries).toEqual([]);
+
+      queries.length = 0;
+      expect(
+        await loggingPort.inspectComponent({
+          organizationId: other.id,
+          componentOccurrenceId: seeded.evaluationCommand.componentOccurrenceId,
+        }),
+      ).toEqual({ kind: 'not_found' });
+      const foreignReads = occurrenceReads(queries);
+      expect(foreignReads.length).toBe(1);
+      expect(foreignReads.every(scopedByOrganization)).toBe(true);
+
+      queries.length = 0;
+      expect(
+        await loggingPort.inspectComponent({
+          organizationId: seeded.organizationId,
+          componentOccurrenceId: randomUUID(),
+        }),
+      ).toEqual({ kind: 'not_found' });
+      const absentReads = occurrenceReads(queries);
+      expect(absentReads.length).toBe(1);
+      expect(absentReads.every(scopedByOrganization)).toBe(true);
+
+      queries.length = 0;
+      expect(await loggingPort.commit({ command: parsedForeign.command })).toEqual(closed);
+      const commitReads = occurrenceReads(queries);
+      expect(commitReads.length).toBe(1);
+      expect(commitReads.every(scopedByOrganization)).toBe(true);
+
+      queries.length = 0;
+      const absentEvidence = await loggingPort.inspect({
+        organizationId: seeded.organizationId,
+        evidenceId: randomUUID(),
+      });
+      const foreignEvidence = await loggingPort.inspect({
+        organizationId: other.id,
+        evidenceId: randomUUID(),
+      });
+      expect(absentEvidence).toEqual({ kind: 'not_found' });
+      expect(foreignEvidence).toEqual(absentEvidence);
+      const evidenceReads = queries.filter((query) =>
+        query.toLowerCase().includes('product_match_evaluation_evidence'),
+      );
+      expect(evidenceReads.length).toBe(2);
+      expect(evidenceReads.every(scopedByOrganization)).toBe(true);
+      const queriesBeforeMalformedEvidence = queries.length;
+      expect(
+        await loggingPort.inspect({
+          organizationId: 'not-a-uuid',
+          evidenceId: randomUUID(),
+        }),
+      ).toEqual({ kind: 'rejected', code: 'invalid_command' });
+      expect(queries.length).toBe(queriesBeforeMalformedEvidence);
+    } finally {
+      await logging.$disconnect();
+    }
+
     expect(await prisma.productMatchEvaluationEvidence.count()).toBe(before);
     expect(await prisma.finding.count()).toBe(findingsBefore);
   });
@@ -468,5 +661,160 @@ describe('product match evaluation PostgreSQL persistence', () => {
       true,
     );
     expect(await prisma.productMatchEvaluationEvidence.count()).toBe(before);
+  });
+
+  it('keeps a locked or deleted foreign occurrence indistinguishable from absence', async () => {
+    const seeded = await seedLegal('locked-foreign');
+    const attacker = await createOrg(prisma, `locked-${randomUUID().slice(0, 8)}`);
+    const occurrenceId = seeded.evaluationCommand.componentOccurrenceId;
+    const absentOccurrenceId = randomUUID();
+    const queries: string[] = [];
+    const logging = new PrismaClient({
+      datasources: { db: { url: databaseUrl } },
+      log: [{ emit: 'event', level: 'query' }],
+    });
+    logging.$on('query', (event) => {
+      queries.push(event.query);
+    });
+    const port = createProductMatchEvaluationPersistence(logging);
+    let release: (() => void) | undefined;
+    let markEntered: (() => void) | undefined;
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    let holderFailed = false;
+    const holder = prisma
+      .$transaction(
+        async (tx) => {
+          await tx.$queryRaw`
+            SELECT "id" FROM "component_occurrence"
+            WHERE "id" = ${occurrenceId}::uuid
+            FOR UPDATE
+          `;
+          markEntered?.();
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        },
+        { maxWait: 5_000, timeout: 20_000 },
+      )
+      .catch((error: unknown) => {
+        holderFailed = true;
+        markEntered?.();
+        throw error;
+      });
+    await entered;
+    expect(holderFailed).toBe(false);
+    let commitTimer: ReturnType<typeof setTimeout> | undefined;
+    let foreignCommitPromise: Promise<unknown> = Promise.resolve();
+    try {
+      await logging.$queryRaw`SELECT 1`;
+      queries.length = 0;
+      const foreign = await port.inspectComponent({
+        organizationId: attacker.id,
+        componentOccurrenceId: occurrenceId,
+      });
+      const foreignReads = occurrenceReads(queries);
+      queries.length = 0;
+      const absent = await port.inspectComponent({
+        organizationId: attacker.id,
+        componentOccurrenceId: absentOccurrenceId,
+      });
+      const absentReads = occurrenceReads(queries);
+      expect(foreign).toEqual({ kind: 'not_found' });
+      expect(absent).toEqual(foreign);
+      expect(foreignReads).toEqual(absentReads);
+      expect(foreignReads).toHaveLength(1);
+      expect(foreignReads.every(scopedByOrganization)).toBe(true);
+      expect(foreignReads.join('\n')).not.toContain(occurrenceId);
+      expect(foreignReads.join('\n')).not.toContain(attacker.id);
+
+      const parsedForeign = parseProductMatchEvaluationCommand({
+        ...seeded.evaluationCommand,
+        organizationId: attacker.id,
+        correlationId: randomUUID(),
+      });
+      const parsedAbsent = parseProductMatchEvaluationCommand({
+        ...seeded.evaluationCommand,
+        organizationId: attacker.id,
+        componentOccurrenceId: absentOccurrenceId,
+        correlationId: randomUUID(),
+      });
+      expect(parsedForeign.accepted).toBe(true);
+      expect(parsedAbsent.accepted).toBe(true);
+      if (!parsedForeign.accepted || !parsedAbsent.accepted) {
+        return;
+      }
+      queries.length = 0;
+      foreignCommitPromise = port.commit({ command: parsedForeign.command });
+      const foreignCommit = await Promise.race([
+        foreignCommitPromise,
+        new Promise<never>((_resolve, reject) => {
+          commitTimer = setTimeout(() => {
+            reject(new Error('foreign commit waited on the owner lock'));
+          }, 5_000);
+        }),
+      ]);
+      const foreignCommitReads = occurrenceReads(queries);
+      queries.length = 0;
+      const absentCommit = await port.commit({ command: parsedAbsent.command });
+      const absentCommitReads = occurrenceReads(queries);
+      expect(foreignCommit).toEqual(closedRejection());
+      expect(absentCommit).toEqual(foreignCommit);
+      expect(foreignCommitReads).toEqual(absentCommitReads);
+      expect(foreignCommitReads.every(scopedByOrganization)).toBe(true);
+      expect(JSON.stringify(foreignCommit)).not.toContain(occurrenceId);
+      expect(JSON.stringify(foreignCommit)).not.toContain(seeded.organizationId);
+      expect(JSON.stringify(foreignCommit)).not.toContain(attacker.id);
+    } finally {
+      if (commitTimer !== undefined) {
+        clearTimeout(commitTimer);
+      }
+      release?.();
+      await holder.catch(() => undefined);
+      await foreignCommitPromise.catch(() => undefined);
+      await logging.$disconnect();
+    }
+
+    const current = await prisma.componentOccurrence.findFirstOrThrow({
+      where: { id: occurrenceId, organizationId: seeded.organizationId },
+    });
+    const deletedId = randomUUID();
+    await prisma.componentOccurrence.create({
+      data: {
+        id: deletedId,
+        organizationId: current.organizationId,
+        assetId: current.assetId,
+        sbomId: current.sbomId,
+        sbomIngestionId: current.sbomIngestionId,
+        componentId: current.componentId,
+        bomRef: `deleted-${deletedId.slice(0, 8)}`,
+        version: '9.9.9',
+        versionKnown: true,
+        isDirect: false,
+      },
+    });
+    await prisma.componentOccurrence.delete({ where: { id: deletedId } });
+    const ownerPort = createProductMatchEvaluationPersistence(prisma);
+    const deletedForOwner = await ownerPort.inspectComponent({
+      organizationId: seeded.organizationId,
+      componentOccurrenceId: deletedId,
+    });
+    const deletedForAttacker = await ownerPort.inspectComponent({
+      organizationId: attacker.id,
+      componentOccurrenceId: deletedId,
+    });
+    const neverCreated = await ownerPort.inspectComponent({
+      organizationId: attacker.id,
+      componentOccurrenceId: randomUUID(),
+    });
+    expect(deletedForOwner).toEqual({ kind: 'not_found' });
+    expect(deletedForAttacker).toEqual(deletedForOwner);
+    expect(neverCreated).toEqual(deletedForOwner);
+    const authorized = await ownerPort.inspectComponent({
+      organizationId: seeded.organizationId,
+      componentOccurrenceId: occurrenceId,
+    });
+    expect(authorized.kind).toBe('found');
   });
 });

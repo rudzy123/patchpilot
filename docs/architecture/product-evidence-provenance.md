@@ -242,7 +242,11 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   verified in disposable PostgreSQL. Persistent product-eligible evaluation
   count: 0. Finding creation remains unavailable. Suppression authority
   remains false. Production startup does not construct the adapter. Product
-  Match Evidence is implemented and production uncomposed.
+  Match Evidence is implemented and production uncomposed. A foreign component
+  occurrence and an absent component occurrence are publicly indistinguishable.
+  The persistence lookup is organization-scoped. Bounded diagnostics do not
+  record a foreign organization or resource identity. Product-match cardinality
+  remains a separate architecture decision.
 
 ## Failure and capacity
 
