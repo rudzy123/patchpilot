@@ -15,21 +15,26 @@ import {
   PRODUCT_MATCH_FINDING_CREATION,
   PRODUCT_MATCH_SUPPRESSION_AUTHORITY,
   assessProductMatchEligibility,
+  classifyProductMatchEvidenceApplicability,
   classifyStoredProductMatchReplay,
   evaluateReviewedNpmRange,
   isFirstEcosystemExplanationCode,
+  productMatchReplayBodiesAgree,
   productMatchReplayFingerprint,
   type ProductMatchAdvisoryBundle,
+  type ProductMatchApplicabilityScope,
   type ProductMatchComponentSnapshot,
+  type ProductMatchEvaluationLookup,
   type ProductMatchEvaluationPort,
   type ProductMatchEvaluationProjection,
   type ProductMatchEvaluationRejectionCode,
   type ProductMatchEvaluationResult,
   type ProductMatchReplayBody,
+  type ProductMatchRevisionTip,
   type StoredProductMatchRecord,
 } from '@patchpilot/vulnerability-intelligence';
 
-import { isRootPrismaClient } from './guards.js';
+import { isRootPrismaClient, type PrismaClientLike } from './guards.js';
 import {
   isProductMatchUniqueViolation,
   translateProductMatchFailure,
@@ -92,11 +97,7 @@ export function createProductMatchEvaluationPersistence(
 class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationPort {
   public constructor(private readonly client: PrismaClient) {}
 
-  public async findExisting(query: {
-    readonly organizationId: string;
-    readonly componentOccurrenceId: string;
-    readonly advisoryRevisionId: string;
-  }): Promise<
+  public async findExisting(query: ProductMatchEvaluationLookup): Promise<
     | { readonly kind: 'none' }
     | { readonly kind: 'row'; readonly row: StoredProductMatchRecord }
     | {
@@ -106,13 +107,7 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
   > {
     try {
       const row = await this.client.productMatchEvaluationEvidence.findFirst({
-        where: {
-          organizationId: query.organizationId,
-          OR: [
-            { componentOccurrenceId: query.componentOccurrenceId },
-            { advisoryRevisionId: query.advisoryRevisionId },
-          ],
-        },
+        where: evaluationIdentityWhere(query),
         select: EVIDENCE_SELECT,
       });
       if (row === null) {
@@ -131,15 +126,25 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
     }
   }
 
-  public async inspectComponent(query: {
+  public inspectComponent(query: {
     readonly organizationId: string;
     readonly componentOccurrenceId: string;
   }) {
+    return this.readComponent(this.client, query);
+  }
+
+  private async readComponent(
+    client: PrismaClientLike,
+    query: {
+      readonly organizationId: string;
+      readonly componentOccurrenceId: string;
+    },
+  ) {
     if (!UUID_V4.test(query.organizationId) || !UUID_V4.test(query.componentOccurrenceId)) {
       return { kind: 'malformed' as const };
     }
     try {
-      const occurrence = await this.client.componentOccurrence.findFirst({
+      const occurrence = await client.componentOccurrence.findFirst({
         where: {
           organizationId: query.organizationId,
           id: query.componentOccurrenceId,
@@ -158,7 +163,7 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
       if (occurrence === null || occurrence.organizationId !== query.organizationId) {
         return { kind: 'not_found' as const };
       }
-      const component = await this.client.component.findFirst({
+      const component = await client.component.findFirst({
         where: { organizationId: occurrence.organizationId, id: occurrence.componentId },
         select: {
           identityKey: true,
@@ -169,7 +174,7 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
           identityState: true,
         },
       });
-      const sbom = await this.client.sbom.findFirst({
+      const sbom = await client.sbom.findFirst({
         where: {
           organizationId: occurrence.organizationId,
           id: occurrence.sbomId,
@@ -211,15 +216,25 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
     }
   }
 
-  public async inspectAdvisory(query: {
+  public inspectAdvisory(query: {
     readonly advisoryRevisionId: string;
     readonly approvalEvidenceId: string;
   }) {
+    return this.readAdvisory(this.client, query);
+  }
+
+  private async readAdvisory(
+    client: PrismaClientLike,
+    query: {
+      readonly advisoryRevisionId: string;
+      readonly approvalEvidenceId: string;
+    },
+  ) {
     if (!UUID_V4.test(query.advisoryRevisionId) || !UUID_V4.test(query.approvalEvidenceId)) {
       return { kind: 'malformed' as const };
     }
     try {
-      const revision = await this.client.advisoryRevision.findFirst({
+      const revision = await client.advisoryRevision.findFirst({
         where: { id: query.advisoryRevisionId },
         select: {
           id: true,
@@ -246,7 +261,7 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
       if (revision === null) {
         return { kind: 'revision_missing' as const };
       }
-      const approval = await this.client.maintainerReviewedAdvisoryApproval.findFirst({
+      const approval = await client.maintainerReviewedAdvisoryApproval.findFirst({
         where: { id: query.approvalEvidenceId },
         select: {
           id: true,
@@ -273,7 +288,7 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
       if (approval === null) {
         return { kind: 'approval_missing' as const };
       }
-      const binding = await this.client.advisoryVulnerabilityBinding.findFirst({
+      const binding = await client.advisoryVulnerabilityBinding.findFirst({
         where: { advisoryRevisionId: revision.id },
         select: {
           id: true,
@@ -288,7 +303,7 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
       if (binding === null) {
         return { kind: 'binding_missing' as const };
       }
-      const events = await this.client.advisoryRevisionRangeEvent.findMany({
+      const events = await client.advisoryRevisionRangeEvent.findMany({
         where: { advisoryRevisionId: revision.id },
         select: {
           rangeOrdinal: true,
@@ -369,6 +384,7 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
     input: Parameters<ProductMatchEvaluationPort['commit']>[0],
   ): Promise<ProductMatchEvaluationResult> {
     let evaluatorCalls: 0 | 1 = 0;
+    let pendingBody: ProductMatchReplayBody | null = null;
     try {
       return await this.client.$transaction(async (tx) => {
         const locked = await tx.$queryRaw<Array<{ id: string }>>`
@@ -379,19 +395,13 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
           FOR UPDATE
         `;
         const existing = await tx.productMatchEvaluationEvidence.findFirst({
-          where: {
-            organizationId: input.command.organizationId,
-            OR: [
-              { componentOccurrenceId: input.command.componentOccurrenceId },
-              { advisoryRevisionId: input.command.advisoryRevisionId },
-            ],
-          },
+          where: evaluationIdentityWhere(lookupFromCommand(input.command)),
           select: EVIDENCE_SELECT,
         });
         if (existing !== null) {
           const stored = storedFrom(existing);
           const disposition = classifyStoredProductMatchReplay(stored, input.command);
-          if (disposition === 'malformed') {
+          if (disposition === 'malformed' || disposition === 'distinct') {
             throw new ProductMatchRowError();
           }
           if (disposition === 'applied') {
@@ -409,14 +419,14 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
         if (locked.length !== 1) {
           return rejectedResult('component_occurrence_missing', 0);
         }
-        const component = await this.inspectComponent({
+        const component = await this.readComponent(tx, {
           organizationId: input.command.organizationId,
           componentOccurrenceId: input.command.componentOccurrenceId,
         });
         if (component.kind !== 'found') {
           return rejectedResult(componentRejection(component.kind), 0);
         }
-        const advisory = await this.inspectAdvisory({
+        const advisory = await this.readAdvisory(tx, {
           advisoryRevisionId: input.command.advisoryRevisionId,
           approvalEvidenceId: input.command.approvalEvidenceId,
         });
@@ -439,6 +449,7 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
         });
         evaluatorCalls = 1;
         const body = replayBody(input.command, component.snapshot, decision);
+        pendingBody = body;
         const created = await tx.productMatchEvaluationEvidence.create({
           data: {
             organizationId: component.snapshot.organizationId,
@@ -486,18 +497,187 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
       if (error instanceof ProductMatchRowError) {
         return rejectedResult('malformed_persisted_state', evaluatorCalls);
       }
-      if (isProductMatchUniqueViolation(error)) {
-        return {
-          kind: 'immutable_conflict',
-          evaluatorCalls,
-          providerCalls: 0,
-          parserCalls: 0,
-          findingWrites: 0,
-          inserts: 0,
-        };
+      if (isProductMatchUniqueViolation(error) && pendingBody !== null) {
+        return this.reconcileUniqueViolation(pendingBody);
       }
       return rejectedResult(translateProductMatchFailure(error), evaluatorCalls);
     }
+  }
+
+  public async readCurrentApplicability(scope: ProductMatchApplicabilityScope) {
+    if (!applicabilityScopeIsUuid(scope)) {
+      return { kind: 'rejected' as const, code: 'invalid_command' as const };
+    }
+    try {
+      const evidence = await this.client.productMatchEvaluationEvidence.findMany({
+        where: {
+          organizationId: scope.organizationId,
+          componentOccurrenceId: scope.componentOccurrenceId,
+          advisoryFamilyId: scope.advisoryFamilyId,
+          vulnerabilityId: scope.vulnerabilityId,
+          evaluatorId: scope.evaluatorId,
+          evaluatorVersion: scope.evaluatorVersion,
+          matchingPolicyId: scope.matchingPolicyId,
+          matchingPolicyVersion: scope.matchingPolicyVersion,
+          productEvidencePolicyId: scope.productEvidencePolicyId,
+          productEvidencePolicyVersion: Number(scope.productEvidencePolicyVersion),
+        },
+        select: {
+          id: true,
+          organizationId: true,
+          componentOccurrenceId: true,
+          advisoryFamilyId: true,
+          advisoryRevisionId: true,
+          vulnerabilityId: true,
+          evaluatorId: true,
+          evaluatorVersion: true,
+          matchingPolicyId: true,
+          matchingPolicyVersion: true,
+          productEvidencePolicyId: true,
+          productEvidencePolicyVersion: true,
+        },
+      });
+      if (evidence.length === 0) {
+        return {
+          kind: 'classified' as const,
+          currentEvidenceId: null,
+          historicalEvidenceIds: [],
+        };
+      }
+      const tip = await this.currentRevisionTip(scope.advisoryFamilyId, scope.vulnerabilityId);
+      const historicalEvidenceIds: string[] = [];
+      let currentEvidenceId: string | null = null;
+      for (const row of evidence) {
+        const classification = classifyProductMatchEvidenceApplicability(
+          {
+            matchEvidenceId: row.id,
+            organizationId: row.organizationId,
+            componentOccurrenceId: row.componentOccurrenceId,
+            advisoryFamilyId: row.advisoryFamilyId,
+            advisoryRevisionId: row.advisoryRevisionId,
+            vulnerabilityId: row.vulnerabilityId,
+            evaluatorId: row.evaluatorId,
+            evaluatorVersion: row.evaluatorVersion,
+            matchingPolicyId: row.matchingPolicyId,
+            matchingPolicyVersion: row.matchingPolicyVersion,
+            productEvidencePolicyId: row.productEvidencePolicyId,
+            productEvidencePolicyVersion: String(row.productEvidencePolicyVersion),
+          },
+          scope,
+          tip,
+        );
+        if (classification === 'current') {
+          if (currentEvidenceId !== null) {
+            return { kind: 'rejected' as const, code: 'malformed_persisted_state' as const };
+          }
+          currentEvidenceId = row.id;
+        } else if (classification === 'historical') {
+          historicalEvidenceIds.push(row.id);
+        }
+      }
+      return {
+        kind: 'classified' as const,
+        currentEvidenceId,
+        historicalEvidenceIds,
+      };
+    } catch (error) {
+      if (error instanceof ProductMatchRowError) {
+        return { kind: 'rejected' as const, code: 'malformed_persisted_state' as const };
+      }
+      return { kind: 'rejected' as const, code: 'database_unavailable' as const };
+    }
+  }
+
+  private async currentRevisionTip(
+    advisoryFamilyId: string,
+    vulnerabilityId: string,
+  ): Promise<ProductMatchRevisionTip | null> {
+    const revisions = await this.client.advisoryRevision.findMany({
+      where: {
+        advisoryFamilyId,
+        withdrawalClassification: 'not_withdrawn',
+        quarantineClassification: 'not_quarantined',
+        successors: { none: {} },
+        binding: { vulnerabilityId },
+      },
+      select: {
+        id: true,
+        advisoryFamilyId: true,
+        withdrawalClassification: true,
+        quarantineClassification: true,
+        binding: { select: { vulnerabilityId: true } },
+      },
+    });
+    const tips = revisions.filter(
+      (revision) => revision.binding?.vulnerabilityId === vulnerabilityId,
+    );
+    if (tips.length > 1) {
+      throw new ProductMatchRowError();
+    }
+    const tip = tips[0];
+    if (tip === undefined) {
+      return null;
+    }
+    return {
+      advisoryRevisionId: tip.id,
+      advisoryFamilyId: tip.advisoryFamilyId,
+      vulnerabilityId,
+      withdrawalClassification: tip.withdrawalClassification,
+      quarantineClassification: tip.quarantineClassification,
+      hasSuccessor: false,
+    };
+  }
+
+  private async reconcileUniqueViolation(
+    body: ProductMatchReplayBody,
+  ): Promise<ProductMatchEvaluationResult> {
+    const byIdentity = await this.client.productMatchEvaluationEvidence.findFirst({
+      where: evaluationIdentityWhere(lookupFromBody(body)),
+      select: EVIDENCE_SELECT,
+    });
+    const row =
+      byIdentity ??
+      (await this.client.productMatchEvaluationEvidence.findFirst({
+        where: {
+          organizationId: body.organizationId,
+          replayFingerprint: productMatchReplayFingerprint(body),
+        },
+        select: EVIDENCE_SELECT,
+      }));
+    if (row === null) {
+      return rejectedResult('transaction_aborted', 0);
+    }
+    let stored: StoredProductMatchRecord;
+    try {
+      stored = storedFrom(row);
+    } catch {
+      return rejectedResult('malformed_persisted_state', 0);
+    }
+    if (
+      stored.organizationId !== body.organizationId ||
+      stored.componentOccurrenceId !== body.componentOccurrenceId ||
+      stored.advisoryRevisionId !== body.advisoryRevisionId ||
+      stored.approvalEvidenceId !== body.approvalEvidenceId ||
+      stored.evaluatorId !== body.evaluatorId ||
+      stored.evaluatorVersion !== body.evaluatorVersion ||
+      stored.matchingPolicyId !== body.matchingPolicyId ||
+      stored.matchingPolicyVersion !== body.matchingPolicyVersion ||
+      stored.productEvidencePolicyId !== body.productEvidencePolicyId ||
+      stored.productEvidencePolicyVersion !== body.productEvidencePolicyVersion
+    ) {
+      return rejectedResult('internal_failure', 0);
+    }
+    if (productMatchReplayBodiesAgree(stored, body)) {
+      return applied(projectFrom(stored), 0, 0);
+    }
+    return {
+      kind: 'immutable_conflict',
+      evaluatorCalls: 0,
+      providerCalls: 0,
+      parserCalls: 0,
+      findingWrites: 0,
+      inserts: 0,
+    };
   }
 
   public async inspect(query: { readonly organizationId: string; readonly evidenceId: string }) {
@@ -525,6 +705,72 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
       return { kind: 'rejected' as const, code: 'database_unavailable' as const };
     }
   }
+}
+
+function lookupFromCommand(
+  command: Parameters<ProductMatchEvaluationPort['commit']>[0]['command'],
+): ProductMatchEvaluationLookup {
+  return {
+    organizationId: command.organizationId,
+    componentOccurrenceId: command.componentOccurrenceId,
+    advisoryRevisionId: command.advisoryRevisionId,
+    approvalEvidenceId: command.approvalEvidenceId,
+    evaluatorId: command.evaluatorId,
+    evaluatorVersion: command.evaluatorVersion,
+    matchingPolicyId: command.matchingPolicyId,
+    matchingPolicyVersion: command.matchingPolicyVersion,
+    productEvidencePolicyId: command.productEvidencePolicyId,
+    productEvidencePolicyVersion: command.productEvidencePolicyVersion,
+  };
+}
+
+function lookupFromBody(body: ProductMatchReplayBody): ProductMatchEvaluationLookup {
+  const version = Number(body.productEvidencePolicyVersion);
+  if (!Number.isInteger(version) || version < 0 || version > 32767) {
+    throw new ProductMatchRowError();
+  }
+  return {
+    organizationId: body.organizationId,
+    componentOccurrenceId: body.componentOccurrenceId,
+    advisoryRevisionId: body.advisoryRevisionId,
+    approvalEvidenceId: body.approvalEvidenceId,
+    evaluatorId: body.evaluatorId,
+    evaluatorVersion: body.evaluatorVersion,
+    matchingPolicyId: body.matchingPolicyId,
+    matchingPolicyVersion: body.matchingPolicyVersion,
+    productEvidencePolicyId: body.productEvidencePolicyId,
+    productEvidencePolicyVersion: version,
+  };
+}
+
+function evaluationIdentityWhere(query: ProductMatchEvaluationLookup) {
+  return {
+    organizationId: query.organizationId,
+    componentOccurrenceId: query.componentOccurrenceId,
+    advisoryRevisionId: query.advisoryRevisionId,
+    approvalId: query.approvalEvidenceId,
+    evaluatorId: query.evaluatorId,
+    evaluatorVersion: query.evaluatorVersion,
+    matchingPolicyId: query.matchingPolicyId,
+    matchingPolicyVersion: query.matchingPolicyVersion,
+    productEvidencePolicyId: query.productEvidencePolicyId,
+    productEvidencePolicyVersion: query.productEvidencePolicyVersion,
+  };
+}
+
+function applicabilityScopeIsUuid(scope: ProductMatchApplicabilityScope): boolean {
+  return (
+    UUID_V4.test(scope.organizationId) &&
+    UUID_V4.test(scope.componentOccurrenceId) &&
+    UUID_V4.test(scope.advisoryFamilyId) &&
+    UUID_V4.test(scope.vulnerabilityId) &&
+    /^[A-Za-z0-9_.:-]{1,80}$/.test(scope.evaluatorId) &&
+    /^[A-Za-z0-9_.:-]{1,80}$/.test(scope.evaluatorVersion) &&
+    /^[A-Za-z0-9_.:-]{1,80}$/.test(scope.matchingPolicyId) &&
+    /^[A-Za-z0-9_.:-]{1,80}$/.test(scope.matchingPolicyVersion) &&
+    /^[A-Za-z0-9_.:-]{1,80}$/.test(scope.productEvidencePolicyId) &&
+    /^[0-9]{1,5}$/.test(scope.productEvidencePolicyVersion)
+  );
 }
 
 function replayBody(

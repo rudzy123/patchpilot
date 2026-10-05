@@ -42,6 +42,7 @@ import {
   dropEphemeralDatabase,
   EXPECTED_APPLIED_MIGRATIONS,
   PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
+  PRODUCT_MATCH_EVIDENCE_CARDINALITY,
   REVIEWER_CAPABILITY_ISSUANCE,
 } from './integration-database.js';
 import { createDurableReviewerApprovalCapabilityPersistence } from './reviewer-capability-persistence.js';
@@ -718,7 +719,7 @@ describe('durable reviewer capability PostgreSQL persistence', () => {
     }
   });
 
-  it('upgrades the prior frozen head once and repeats without changes', async () => {
+  it('upgrades the product-match head through the current frozen head and repeats without changes', async () => {
     const ephemeral = await createEphemeralDatabase('it');
     const client = new PrismaClient({ datasources: { db: { url: ephemeral.databaseUrl } } });
     try {
@@ -729,8 +730,10 @@ describe('durable reviewer capability PostgreSQL persistence', () => {
       const beforeNames = appliedBefore.map((row) => row.name);
       expect(beforeNames.at(-1)).toBe(PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION);
       expect(beforeNames).not.toContain(REVIEWER_CAPABILITY_ISSUANCE);
+      expect(beforeNames).not.toContain(PRODUCT_MATCH_EVIDENCE_CARDINALITY);
       expect(EXPECTED_APPLIED_MIGRATIONS.filter((name) => !beforeNames.includes(name))).toEqual([
         REVIEWER_CAPABILITY_ISSUANCE,
+        PRODUCT_MATCH_EVIDENCE_CARDINALITY,
       ]);
       await deployMigrations(ephemeral.databaseUrl);
       const appliedAfter = await client.$queryRaw<Array<{ name: string }>>`

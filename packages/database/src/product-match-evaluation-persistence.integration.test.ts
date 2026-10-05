@@ -65,6 +65,21 @@ function occurrenceReads(queries: readonly string[]): string[] {
   return queries.filter((query) => /from\s+(?:"public"\.)?"component_occurrence"/i.test(query));
 }
 
+async function settledOccurrenceReads(
+  queries: readonly string[],
+  expectedCount: number,
+): Promise<string[]> {
+  const deadline = Date.now() + 2_000;
+  let reads = occurrenceReads(queries);
+  while (reads.length < expectedCount && Date.now() < deadline) {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
+    reads = occurrenceReads(queries);
+  }
+  return reads;
+}
+
 function whereClause(query: string): string {
   const normalized = query.toLowerCase().replace(/\s+/g, ' ');
   const index = normalized.lastIndexOf(' where ');
@@ -344,7 +359,214 @@ describe('product match evaluation PostgreSQL persistence', () => {
       productEvidencePolicyVersion: PRODUCT_MATCH_EVALUATION_POLICY_VERSION,
       correlationId: randomUUID(),
     };
-    return { evaluationCommand, organizationId: org.id };
+    return {
+      evaluationCommand,
+      organizationId: org.id,
+      assetId: asset.id,
+      componentId: component.id,
+      componentIdentityKey: component.identityKey,
+      familyId: family.id,
+      familyDigest,
+      revisionId: revision.id,
+      revisionDigest,
+      vulnerabilityId: vulnerability.id,
+      approvalId: approval.projection.approvalId,
+      contentFingerprint,
+      rangeFingerprint,
+      advisoryId,
+      authorIdentity,
+      packageIdentityKey: packageIdentity(),
+    };
+  }
+
+  async function occurrenceOnAsset(
+    seeded: Awaited<ReturnType<typeof seedLegal>>,
+    label: string,
+    assetId: string,
+    bomRef: string,
+  ) {
+    const sbomSha = digest(`sbom:${label}:${randomUUID()}`);
+    const sbom = await createSbom(prisma, {
+      organizationId: seeded.organizationId,
+      assetId,
+      sha256: sbomSha,
+      receivedAt: new Date('2026-10-05T12:00:00.000Z'),
+    });
+    const ingestion = await createProcessingIngestion(prisma, {
+      organizationId: seeded.organizationId,
+      sbomId: sbom.id,
+      assetId,
+    });
+    const occurrence = await prisma.componentOccurrence.create({
+      data: {
+        organizationId: seeded.organizationId,
+        assetId,
+        sbomId: sbom.id,
+        sbomIngestionId: ingestion.id,
+        componentId: seeded.componentId,
+        bomRef,
+        version: OBSERVED_VERSION,
+        versionKnown: true,
+        isDirect: true,
+      },
+    });
+    return {
+      ...seeded.evaluationCommand,
+      componentOccurrenceId: occurrence.id,
+      expectedComponentEvidenceFingerprint: componentEvidenceFingerprint({
+        organizationId: seeded.organizationId,
+        componentOccurrenceId: occurrence.id,
+        assetId,
+        sbomId: sbom.id,
+        sbomIngestionId: ingestion.id,
+        componentId: seeded.componentId,
+        componentIdentityKey: seeded.componentIdentityKey,
+        ecosystem: 'npm',
+        namespace: null,
+        name: PACKAGE_NAME,
+        rawObservedVersion: OBSERVED_VERSION,
+        versionKnown: true,
+        sbomSha256: sbomSha,
+      }),
+      correlationId: randomUUID(),
+    };
+  }
+
+  async function approveSuccessor(seeded: Awaited<ReturnType<typeof seedLegal>>) {
+    const contentFingerprint = digest(`successor-content:${randomUUID()}`);
+    const revisionDigest = digest(`successor-revision:${randomUUID()}`);
+    const successor = await prisma.advisoryRevision.create({
+      data: {
+        revisionSchemaVersion: MAINTAINER_REVIEWED_REVISION_SCHEMA_VERSION,
+        advisoryFamilyId: seeded.familyId,
+        source: 'maintainer_reviewed_advisory',
+        advisoryId: seeded.advisoryId,
+        familyDigest: seeded.familyDigest,
+        revisionDigest,
+        providerGeneration: MAINTAINER_REVIEWED_APPROVAL_PINS.providerGeneration,
+        contentFingerprint,
+        session14RangeFingerprint: seeded.rangeFingerprint,
+        productRangeFingerprint: seeded.rangeFingerprint,
+        parserId: MAINTAINER_REVIEWED_APPROVAL_PINS.documentSchema,
+        parserResourcePolicy: MAINTAINER_REVIEWED_APPROVAL_PINS.canonicalization,
+        advisorySchemaVersion: MAINTAINER_REVIEWED_APPROVAL_PINS.documentSchema,
+        advisorySchemaCommit: MAINTAINER_REVIEWED_APPROVAL_PINS.schemaCommit,
+        sourceLicenseRegistryVersion: MAINTAINER_REVIEWED_APPROVAL_PINS.licensePolicyId,
+        sourceLicensePolicyVersion: '1',
+        spdxLicenseId: 'CC-BY-4.0',
+        origin: 'maintainer_reviewed_advisory',
+        trustClassification: 'unreviewed',
+        revisionDisposition: 'superseding',
+        withdrawalClassification: 'not_withdrawn',
+        quarantineClassification: 'not_quarantined',
+        supersedesRevisionDigest: seeded.revisionDigest,
+        supersedesAdvisoryRevisionId: seeded.revisionId,
+        retrievalClassification: MAINTAINER_REVIEWED_APPROVAL_PINS.retrieval,
+        retrievalEvidenceId: MAINTAINER_REVIEWED_APPROVAL_PINS.retrievalEvidence,
+        retrievalPolicyId: MAINTAINER_REVIEWED_APPROVAL_PINS.retrievalPolicy,
+        ecosystem: 'npm',
+        packageName: PACKAGE_NAME,
+        packageIdentityKey: seeded.packageIdentityKey,
+        evaluatorVersion: PRODUCT_MATCH_EVALUATOR_VERSION,
+        matchingPolicyId: PRODUCT_MATCH_MATCHING_POLICY_ID,
+        aliasCount: 0,
+        cveAliasCount: 0,
+        aliasSetDigest: digest(`successor-aliases:${randomUUID()}`),
+        replayFingerprint: digest(`successor-replay:${randomUUID()}`),
+        authorIdentity: seeded.authorIdentity,
+      },
+      select: { id: true },
+    });
+    await prisma.advisoryRevisionRangeEvent.createMany({
+      data: [
+        {
+          advisoryRevisionId: successor.id,
+          rangeOrdinal: 0,
+          eventOrdinal: 0,
+          eventName: 'introduced',
+          eventValue: '1.0.0',
+        },
+        {
+          advisoryRevisionId: successor.id,
+          rangeOrdinal: 0,
+          eventOrdinal: 1,
+          eventName: 'fixed',
+          eventValue: '2.0.0',
+        },
+      ],
+    });
+    const binding = await prisma.advisoryVulnerabilityBinding.create({
+      data: {
+        bindingSchemaVersion: MAINTAINER_REVIEWED_BINDING_SCHEMA_VERSION,
+        advisoryRevisionId: successor.id,
+        vulnerabilityId: seeded.vulnerabilityId,
+        mappingPolicyId: VULNERABILITY_MAPPING_POLICY_ID,
+        mappingMethod: EXACT_MAPPING_METHOD,
+        mappingEvidenceFingerprint: digest(`successor-mapping:${randomUUID()}`),
+        mappingReviewState: 'reviewed',
+        mappingSourceClassification: 'explicit_reviewed_binding',
+        conflictClassification: 'none',
+        bindingClassification: 'provider_native_without_cve',
+        replayFingerprint: digest(`successor-binding:${randomUUID()}`),
+      },
+      select: { id: true },
+    });
+    const approvalReplayFingerprint = maintainerReviewedApprovalReplayFingerprint({
+      advisoryRevisionId: successor.id,
+      familyDigest: seeded.familyDigest,
+      approvalPolicyId: MAINTAINER_REVIEWED_APPROVAL_PINS.approvalPolicyId,
+      approvalPolicyVersion: MAINTAINER_REVIEWED_APPROVAL_PINS.approvalPolicyVersion,
+      approvalPurpose: MAINTAINER_REVIEWED_APPROVAL_PINS.approvalPurpose,
+      sourceClassification: MAINTAINER_REVIEWED_APPROVAL_PINS.origin,
+      authorIdentity: seeded.authorIdentity,
+      reviewerIdentity: 'reviewer.two',
+      reviewerClassification: MAINTAINER_REVIEWED_APPROVAL_PINS.reviewerClassification,
+      contentFingerprint,
+      rangeFingerprint: seeded.rangeFingerprint,
+      packageIdentityKey: seeded.packageIdentityKey,
+      vulnerabilityId: seeded.vulnerabilityId,
+      sourceLicensePolicyId: MAINTAINER_REVIEWED_APPROVAL_PINS.licensePolicyId,
+      sourceLicensePolicyVersion: MAINTAINER_REVIEWED_APPROVAL_PINS.licensePolicyVersion,
+      approvedLicenseClassification: MAINTAINER_REVIEWED_APPROVAL_PINS.licenseClassification,
+      licenseDecisionCanonical: MAINTAINER_REVIEWED_APPROVAL_PINS.licenseCanonical,
+    });
+    const approval = await createApprovalCapabilityHarness(prisma).approve({
+      commandSchemaVersion: MAINTAINER_REVIEWED_APPROVAL_COMMAND_SCHEMA_VERSION,
+      advisoryRevisionId: successor.id,
+      expectedAdvisoryFamilyIdentity: seeded.familyDigest,
+      expectedSourceClassification: MAINTAINER_REVIEWED_APPROVAL_PINS.origin,
+      expectedContentFingerprint: contentFingerprint,
+      expectedRangeFingerprint: seeded.rangeFingerprint,
+      expectedNpmPackageIdentity: seeded.packageIdentityKey,
+      expectedVulnerabilityId: seeded.vulnerabilityId,
+      authorIdentity: seeded.authorIdentity,
+      reviewerIdentity: 'reviewer.two',
+      reviewerAuthorityClassification: MAINTAINER_REVIEWED_APPROVAL_PINS.reviewerClassification,
+      approvalPolicyId: MAINTAINER_REVIEWED_APPROVAL_PINS.approvalPolicyId,
+      approvalPolicyVersion: MAINTAINER_REVIEWED_APPROVAL_PINS.approvalPolicyVersion,
+      approvalPurpose: MAINTAINER_REVIEWED_APPROVAL_PINS.approvalPurpose,
+      sourceLicensePolicyId: MAINTAINER_REVIEWED_APPROVAL_PINS.licensePolicyId,
+      sourceLicensePolicyVersion: MAINTAINER_REVIEWED_APPROVAL_PINS.licensePolicyVersion,
+      approvedLicenseClassification: MAINTAINER_REVIEWED_APPROVAL_PINS.licenseClassification,
+      approvalReplayFingerprint,
+      correlationId: randomUUID(),
+    });
+    if (approval.kind !== 'recorded') {
+      throw new Error(`successor approval was ${approval.kind}`);
+    }
+    return {
+      revisionId: successor.id,
+      approvalId: approval.projection.approvalId,
+      contentFingerprint,
+      bindingId: binding.id,
+      evaluationCommand: {
+        ...seeded.evaluationCommand,
+        advisoryRevisionId: successor.id,
+        approvalEvidenceId: approval.projection.approvalId,
+        expectedContentFingerprint: contentFingerprint,
+        correlationId: randomUUID(),
+      },
+    };
   }
 
   function service() {
@@ -558,7 +780,7 @@ describe('product match evaluation PostgreSQL persistence', () => {
           componentOccurrenceId: seeded.evaluationCommand.componentOccurrenceId,
         }),
       ).toEqual({ kind: 'not_found' });
-      const foreignReads = occurrenceReads(queries);
+      const foreignReads = await settledOccurrenceReads(queries, 1);
       expect(foreignReads.length).toBe(1);
       expect(foreignReads.every(scopedByOrganization)).toBe(true);
 
@@ -569,13 +791,13 @@ describe('product match evaluation PostgreSQL persistence', () => {
           componentOccurrenceId: randomUUID(),
         }),
       ).toEqual({ kind: 'not_found' });
-      const absentReads = occurrenceReads(queries);
+      const absentReads = await settledOccurrenceReads(queries, 1);
       expect(absentReads.length).toBe(1);
       expect(absentReads.every(scopedByOrganization)).toBe(true);
 
       queries.length = 0;
       expect(await loggingPort.commit({ command: parsedForeign.command })).toEqual(closed);
-      const commitReads = occurrenceReads(queries);
+      const commitReads = await settledOccurrenceReads(queries, 1);
       expect(commitReads.length).toBe(1);
       expect(commitReads.every(scopedByOrganization)).toBe(true);
 
@@ -614,19 +836,29 @@ describe('product match evaluation PostgreSQL persistence', () => {
   it('lets one concurrent duplicate win and keeps one row', async () => {
     const seeded = await seedLegal('race');
     const before = await prisma.productMatchEvaluationEvidence.count();
+    const limitedUrl = `${databaseUrl}${databaseUrl.includes('?') ? '&' : '?'}connection_limit=2`;
+    const limited = new PrismaClient({ datasources: { db: { url: limitedUrl } } });
+    const limitedService = createProductMatchEvaluationComposition({
+      port: createProductMatchEvaluationPersistence(limited),
+    });
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
     const pending = [0, 1].map(async () => {
       await gate;
-      return service().execute({
+      return limitedService.execute({
         ...seeded.evaluationCommand,
         correlationId: randomUUID(),
       });
     });
     release();
-    const results = await Promise.all(pending);
+    let results: Awaited<ReturnType<typeof limitedService.execute>>[];
+    try {
+      results = await Promise.all(pending);
+    } finally {
+      await limited.$disconnect();
+    }
     const recorded = results.filter((result) => result.kind === 'recorded');
     const replayed = results.filter((result) => result.kind === 'already_applied');
     expect(recorded).toHaveLength(1);
@@ -714,13 +946,13 @@ describe('product match evaluation PostgreSQL persistence', () => {
         organizationId: attacker.id,
         componentOccurrenceId: occurrenceId,
       });
-      const foreignReads = occurrenceReads(queries);
+      const foreignReads = await settledOccurrenceReads(queries, 1);
       queries.length = 0;
       const absent = await port.inspectComponent({
         organizationId: attacker.id,
         componentOccurrenceId: absentOccurrenceId,
       });
-      const absentReads = occurrenceReads(queries);
+      const absentReads = await settledOccurrenceReads(queries, 1);
       expect(foreign).toEqual({ kind: 'not_found' });
       expect(absent).toEqual(foreign);
       expect(foreignReads).toEqual(absentReads);
@@ -755,10 +987,10 @@ describe('product match evaluation PostgreSQL persistence', () => {
           }, 5_000);
         }),
       ]);
-      const foreignCommitReads = occurrenceReads(queries);
+      const foreignCommitReads = await settledOccurrenceReads(queries, 1);
       queries.length = 0;
       const absentCommit = await port.commit({ command: parsedAbsent.command });
-      const absentCommitReads = occurrenceReads(queries);
+      const absentCommitReads = await settledOccurrenceReads(queries, 1);
       expect(foreignCommit).toEqual(closedRejection());
       expect(absentCommit).toEqual(foreignCommit);
       expect(foreignCommitReads).toEqual(absentCommitReads);
@@ -817,4 +1049,344 @@ describe('product match evaluation PostgreSQL persistence', () => {
     });
     expect(authorized.kind).toBe('found');
   });
+
+  it('keeps separate evidence for many occurrences, revisions, and assets', async () => {
+    const findingsBefore = await prisma.finding.count();
+    const seeded = await seedLegal('cardinality');
+    const composition = service();
+    const first = await composition.execute(seeded.evaluationCommand);
+    expect(first.kind).toBe('recorded');
+    if (first.kind !== 'recorded') {
+      return;
+    }
+    const stored = await prisma.productMatchEvaluationEvidence.findFirstOrThrow({
+      where: { id: first.projection.matchEvidenceId, organizationId: seeded.organizationId },
+      select: { createdAt: true, outcome: true, advisoryRevisionId: true, assetId: true },
+    });
+    const explanationsBefore = await prisma.productMatchEvaluationExplanation.count({
+      where: { productMatchEvaluationEvidenceId: first.projection.matchEvidenceId },
+    });
+    expect(explanationsBefore).toBeGreaterThan(0);
+
+    const secondAsset = await createAsset(
+      prisma,
+      seeded.organizationId,
+      `asset-two-${randomUUID()}`,
+    );
+    const secondCommand = await occurrenceOnAsset(
+      seeded,
+      'second-asset',
+      secondAsset.id,
+      'component-2',
+    );
+    const second = await composition.execute(secondCommand);
+    expect(second.kind).toBe('recorded');
+    if (second.kind !== 'recorded') {
+      return;
+    }
+    expect(second.projection.matchEvidenceId).not.toBe(first.projection.matchEvidenceId);
+    expect(second.providerCalls).toBe(0);
+    expect(second.findingWrites).toBe(0);
+    const secondRow = await prisma.productMatchEvaluationEvidence.findFirstOrThrow({
+      where: { id: second.projection.matchEvidenceId, organizationId: seeded.organizationId },
+      select: { assetId: true, advisoryRevisionId: true, componentOccurrenceId: true },
+    });
+    expect(secondRow.assetId).toBe(secondAsset.id);
+    expect(secondRow.assetId).not.toBe(stored.assetId);
+    expect(secondRow.advisoryRevisionId).toBe(stored.advisoryRevisionId);
+    expect(secondRow.componentOccurrenceId).not.toBe(
+      seeded.evaluationCommand.componentOccurrenceId,
+    );
+
+    const sameAssetCommand = await occurrenceOnAsset(
+      seeded,
+      'same-asset',
+      seeded.assetId,
+      'component-3',
+    );
+    const third = await composition.execute(sameAssetCommand);
+    expect(third.kind).toBe('recorded');
+
+    const successor = await approveSuccessor(seeded);
+    const historicalReplay = await composition.execute({
+      ...seeded.evaluationCommand,
+      correlationId: randomUUID(),
+    });
+    expect(historicalReplay.kind).toBe('already_applied');
+    if (historicalReplay.kind === 'already_applied') {
+      expect(historicalReplay.evaluatorCalls).toBe(0);
+      expect(historicalReplay.inserts).toBe(0);
+      expect(historicalReplay.projection.createdAt).toBe(stored.createdAt.toISOString());
+    }
+    const supersededAttempt = await composition.execute(successor.evaluationCommand);
+    expect(
+      supersededAttempt.kind === 'rejected' ? supersededAttempt.code : supersededAttempt.kind,
+    ).toBe('recorded');
+    if (supersededAttempt.kind !== 'recorded') {
+      return;
+    }
+    const afterSuccessor = await prisma.productMatchEvaluationEvidence.findFirstOrThrow({
+      where: { id: first.projection.matchEvidenceId, organizationId: seeded.organizationId },
+      select: { createdAt: true, outcome: true, advisoryRevisionId: true },
+    });
+    expect(afterSuccessor.createdAt.toISOString()).toBe(stored.createdAt.toISOString());
+    expect(afterSuccessor.outcome).toBe(stored.outcome);
+    expect(afterSuccessor.advisoryRevisionId).toBe(stored.advisoryRevisionId);
+    expect(
+      await prisma.productMatchEvaluationExplanation.count({
+        where: { productMatchEvaluationEvidenceId: first.projection.matchEvidenceId },
+      }),
+    ).toBe(explanationsBefore);
+    await expect(
+      prisma.productMatchEvaluationEvidence.update({
+        where: { id: first.projection.matchEvidenceId },
+        data: { outcome: 'unknown' },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      prisma.productMatchEvaluationEvidence.delete({
+        where: { id: first.projection.matchEvidenceId },
+      }),
+    ).rejects.toThrow();
+
+    const fresh = await occurrenceOnAsset(seeded, 'after-successor', seeded.assetId, 'component-4');
+    const rejectedHistorical = await composition.execute({
+      ...fresh,
+      advisoryRevisionId: seeded.revisionId,
+      approvalEvidenceId: seeded.approvalId,
+      expectedContentFingerprint: seeded.contentFingerprint,
+      correlationId: randomUUID(),
+    });
+    expect(rejectedHistorical.kind).toBe('rejected');
+    if (rejectedHistorical.kind === 'rejected') {
+      expect(rejectedHistorical.code).toBe('superseded_revision');
+      expect(rejectedHistorical.inserts).toBe(0);
+    }
+
+    const applicability = await createProductMatchEvaluationPersistence(
+      prisma,
+    ).readCurrentApplicability({
+      organizationId: seeded.organizationId,
+      componentOccurrenceId: seeded.evaluationCommand.componentOccurrenceId,
+      advisoryFamilyId: seeded.familyId,
+      vulnerabilityId: seeded.vulnerabilityId,
+      evaluatorId: seeded.evaluationCommand.evaluatorId,
+      evaluatorVersion: seeded.evaluationCommand.evaluatorVersion,
+      matchingPolicyId: seeded.evaluationCommand.matchingPolicyId,
+      matchingPolicyVersion: seeded.evaluationCommand.matchingPolicyVersion,
+      productEvidencePolicyId: seeded.evaluationCommand.productEvidencePolicyId,
+      productEvidencePolicyVersion: String(seeded.evaluationCommand.productEvidencePolicyVersion),
+    });
+    expect(applicability.kind).toBe('classified');
+    if (applicability.kind === 'classified') {
+      expect(applicability.currentEvidenceId).toBe(supersededAttempt.projection.matchEvidenceId);
+      expect(applicability.historicalEvidenceIds).toEqual([first.projection.matchEvidenceId]);
+    }
+    const foreignApplicability = await createProductMatchEvaluationPersistence(
+      prisma,
+    ).readCurrentApplicability({
+      organizationId: (await createOrg(prisma, `foreign-app-${randomUUID().slice(0, 8)}`)).id,
+      componentOccurrenceId: seeded.evaluationCommand.componentOccurrenceId,
+      advisoryFamilyId: seeded.familyId,
+      vulnerabilityId: seeded.vulnerabilityId,
+      evaluatorId: seeded.evaluationCommand.evaluatorId,
+      evaluatorVersion: seeded.evaluationCommand.evaluatorVersion,
+      matchingPolicyId: seeded.evaluationCommand.matchingPolicyId,
+      matchingPolicyVersion: seeded.evaluationCommand.matchingPolicyVersion,
+      productEvidencePolicyId: seeded.evaluationCommand.productEvidencePolicyId,
+      productEvidencePolicyVersion: String(seeded.evaluationCommand.productEvidencePolicyVersion),
+    });
+    const absentApplicability = await createProductMatchEvaluationPersistence(
+      prisma,
+    ).readCurrentApplicability({
+      organizationId: seeded.organizationId,
+      componentOccurrenceId: randomUUID(),
+      advisoryFamilyId: seeded.familyId,
+      vulnerabilityId: seeded.vulnerabilityId,
+      evaluatorId: seeded.evaluationCommand.evaluatorId,
+      evaluatorVersion: seeded.evaluationCommand.evaluatorVersion,
+      matchingPolicyId: seeded.evaluationCommand.matchingPolicyId,
+      matchingPolicyVersion: seeded.evaluationCommand.matchingPolicyVersion,
+      productEvidencePolicyId: seeded.evaluationCommand.productEvidencePolicyId,
+      productEvidencePolicyVersion: String(seeded.evaluationCommand.productEvidencePolicyVersion),
+    });
+    expect(foreignApplicability).toEqual({
+      kind: 'classified',
+      currentEvidenceId: null,
+      historicalEvidenceIds: [],
+    });
+    expect(absentApplicability).toEqual(foreignApplicability);
+    expect(await prisma.finding.count()).toBe(findingsBefore);
+    expect(third.kind).toBe('recorded');
+  });
+
+  it('scopes replay uniqueness to the organization', async () => {
+    const indexes = await prisma.$queryRaw<Array<{ index_name: string; index_def: string }>>`
+      SELECT i.relname AS index_name, pg_get_indexdef(ix.indexrelid) AS index_def
+      FROM pg_index ix
+      JOIN pg_class i ON i.oid = ix.indexrelid
+      JOIN pg_class t ON t.oid = ix.indrelid
+      WHERE t.relname = 'product_match_evaluation_evidence'
+    `;
+    const names = indexes.map((index) => index.index_name);
+    expect(names).not.toContain('product_match_evaluation_evidence_occurrence_uidx');
+    expect(names).not.toContain('product_match_evaluation_evidence_revision_uidx');
+    expect(names).not.toContain('product_match_evaluation_evidence_replay_uidx');
+    expect(names).toContain('product_match_evaluation_evidence_occurrence_idx');
+    expect(names).toContain('product_match_evaluation_evidence_revision_idx');
+    const replay = indexes.find(
+      (index) => index.index_name === 'product_match_evaluation_evidence_org_replay_uidx',
+    );
+    const evaluation = indexes.find(
+      (index) => index.index_name === 'product_match_evaluation_evidence_evaluation_uidx',
+    );
+    expect(replay?.index_def).toContain('UNIQUE');
+    expect(replay?.index_def).toContain('organization_id');
+    expect(replay?.index_def).toContain('replay_fingerprint');
+    expect(evaluation?.index_def).toContain('component_occurrence_id');
+    expect(evaluation?.index_def).toContain('advisory_revision_id');
+    expect(evaluation?.index_def).toContain('approval_id');
+    expect(evaluation?.index_def).toContain('evaluator_id');
+    expect(evaluation?.index_def).toContain('evaluator_version');
+    expect(evaluation?.index_def).toContain('matching_policy_id');
+    expect(evaluation?.index_def).toContain('matching_policy_version');
+    expect(evaluation?.index_def).toContain('product_evidence_policy_id');
+    expect(evaluation?.index_def).toContain('product_evidence_policy_version');
+
+    const owner = await seedLegal('replay-owner');
+    const other = await seedLegal('replay-other');
+    const composition = service();
+    const owned = await composition.execute(owner.evaluationCommand);
+    const foreign = await composition.execute(other.evaluationCommand);
+    expect(owned.kind).toBe('recorded');
+    expect(foreign.kind).toBe('recorded');
+    if (owned.kind !== 'recorded' || foreign.kind !== 'recorded') {
+      return;
+    }
+    const ownedRow = await prisma.productMatchEvaluationEvidence.findFirstOrThrow({
+      where: { id: owned.projection.matchEvidenceId },
+    });
+    const otherOccurrence = await occurrenceOnAsset(
+      other,
+      'replay-probe',
+      other.assetId,
+      'component-probe',
+    );
+    const before = await prisma.productMatchEvaluationEvidence.count();
+    const findingsBefore = await prisma.finding.count();
+    const sameOrganization = await probeReplayFingerprint(prisma, {
+      sourceEvidenceId: owned.projection.matchEvidenceId,
+      organizationId: owner.organizationId,
+      componentOccurrenceId: (
+        await occurrenceOnAsset(owner, 'replay-owner-probe', owner.assetId, 'component-probe')
+      ).componentOccurrenceId,
+      assetId: owner.assetId,
+      replayFingerprint: ownedRow.replayFingerprint,
+    });
+    expect(sameOrganization).toBe('unique_violation');
+    const otherOccurrenceRow = await prisma.componentOccurrence.findFirstOrThrow({
+      where: { id: otherOccurrence.componentOccurrenceId, organizationId: other.organizationId },
+    });
+    const crossOrganization = await probeReplayFingerprint(prisma, {
+      sourceEvidenceId: owned.projection.matchEvidenceId,
+      organizationId: other.organizationId,
+      componentOccurrenceId: otherOccurrenceRow.id,
+      assetId: otherOccurrenceRow.assetId,
+      sbomId: otherOccurrenceRow.sbomId,
+      sbomIngestionId: otherOccurrenceRow.sbomIngestionId,
+      componentId: otherOccurrenceRow.componentId,
+      replayFingerprint: ownedRow.replayFingerprint,
+    });
+    expect(crossOrganization).toBe('rolled_back');
+    expect(await prisma.productMatchEvaluationEvidence.count()).toBe(before);
+    expect(await prisma.finding.count()).toBe(findingsBefore);
+  });
 });
+
+function assertProbeUuid(value: string): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)) {
+    throw new Error('probe identity was not a uuid');
+  }
+  return value;
+}
+
+async function probeReplayFingerprint(
+  client: PrismaClient,
+  input: {
+    readonly sourceEvidenceId: string;
+    readonly organizationId: string;
+    readonly componentOccurrenceId: string;
+    readonly assetId: string;
+    readonly sbomId?: string;
+    readonly sbomIngestionId?: string;
+    readonly componentId?: string;
+    readonly replayFingerprint: string;
+  },
+): Promise<'unique_violation' | 'rolled_back'> {
+  const sourceEvidenceId = assertProbeUuid(input.sourceEvidenceId);
+  const organizationId = assertProbeUuid(input.organizationId);
+  const componentOccurrenceId = assertProbeUuid(input.componentOccurrenceId);
+  const assetId = assertProbeUuid(input.assetId);
+  if (!/^[a-f0-9]{64}$/.test(input.replayFingerprint)) {
+    throw new Error('probe fingerprint was not a digest');
+  }
+  const occurrence = await client.componentOccurrence.findFirstOrThrow({
+    where: { id: componentOccurrenceId, organizationId },
+  });
+  const sbomId = assertProbeUuid(input.sbomId ?? occurrence.sbomId);
+  const sbomIngestionId = assertProbeUuid(input.sbomIngestionId ?? occurrence.sbomIngestionId);
+  const componentId = assertProbeUuid(input.componentId ?? occurrence.componentId);
+  const sql = `
+    DO $probe$
+    DECLARE
+      new_id uuid := '${randomUUID()}';
+    BEGIN
+      INSERT INTO "product_match_evaluation_evidence" (
+        "id", "organization_id", "component_occurrence_id", "asset_id", "sbom_id",
+        "sbom_ingestion_id", "component_id", "sbom_sha256", "component_identity_key",
+        "component_evidence_fingerprint", "evidence_schema_version", "package_identity_key",
+        "raw_observed_version", "raw_observed_version_sha256", "advisory_family_id",
+        "advisory_revision_id", "approval_id", "content_fingerprint", "range_fingerprint",
+        "vulnerability_id", "evaluator_id", "evaluator_version", "matching_policy_id",
+        "matching_policy_version", "product_evidence_policy_id", "product_evidence_policy_version",
+        "outcome", "product_origin", "replay_fingerprint", "finding_creation", "suppression_authority"
+      )
+      SELECT
+        new_id, '${organizationId}'::uuid, '${componentOccurrenceId}'::uuid, '${assetId}'::uuid,
+        '${sbomId}'::uuid, '${sbomIngestionId}'::uuid, '${componentId}'::uuid,
+        "sbom_sha256", "component_identity_key", "component_evidence_fingerprint",
+        "evidence_schema_version", "package_identity_key", "raw_observed_version",
+        "raw_observed_version_sha256", "advisory_family_id", "advisory_revision_id", "approval_id",
+        "content_fingerprint", "range_fingerprint", "vulnerability_id", "evaluator_id",
+        "evaluator_version", "matching_policy_id", "matching_policy_version",
+        "product_evidence_policy_id", "product_evidence_policy_version", "outcome",
+        "product_origin", '${input.replayFingerprint}', "finding_creation", "suppression_authority"
+      FROM "product_match_evaluation_evidence"
+      WHERE "id" = '${sourceEvidenceId}'::uuid;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'cardinality_probe_missing';
+      END IF;
+      INSERT INTO "product_match_evaluation_explanation" (
+        "id", "organization_id", "product_match_evaluation_evidence_id", "ordinal", "explanation_code"
+      )
+      SELECT gen_random_uuid(), '${organizationId}'::uuid, new_id, "ordinal", "explanation_code"
+      FROM "product_match_evaluation_explanation"
+      WHERE "product_match_evaluation_evidence_id" = '${sourceEvidenceId}'::uuid;
+      RAISE EXCEPTION 'cardinality_probe_rollback';
+    END
+    $probe$;
+  `;
+  try {
+    await client.$executeRawUnsafe(sql);
+    throw new Error('probe insert committed');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('cardinality_probe_rollback')) {
+      return 'rolled_back';
+    }
+    if (message.includes('23505') || message.toLowerCase().includes('unique')) {
+      return 'unique_violation';
+    }
+    throw error;
+  }
+}

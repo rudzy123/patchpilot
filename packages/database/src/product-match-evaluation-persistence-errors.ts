@@ -43,7 +43,7 @@ export function isProductMatchUniqueViolation(error: unknown): boolean {
 export function translateProductMatchFailure(error: unknown): ProductMatchEvaluationRejectionCode {
   const state = sqlState(error);
   if (state === '23505') {
-    return 'immutable_conflict';
+    return 'internal_failure';
   }
   if (state === '23503') {
     return 'foreign_key_failure';
@@ -64,7 +64,7 @@ export function translateProductMatchFailure(error: unknown): ProductMatchEvalua
     return 'internal_failure';
   }
   if (error.code === 'P2002') {
-    return 'immutable_conflict';
+    return 'internal_failure';
   }
   if (UNAVAILABLE_CODES.has(error.code)) {
     return 'database_unavailable';

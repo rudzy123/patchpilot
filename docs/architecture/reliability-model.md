@@ -113,6 +113,7 @@ Tenant uniqueness always includes `organizationId`.
 | System intel refresh outbox | `eventType` + non-null `dedupeKey` (content SHA-256 of the source unit); unique on `(eventType, dedupeKey)` because `organizationId` is null. Do not treat unverified HTTP validators as the idempotency key. |
 | Audit | Do not duplicate on replay: unique `(organizationId, action, subjectId, correlationId)` for tenant events. System events require a non-null `correlationId` and unique `(action, subjectId, correlationId)` where `organizationId` IS NULL. |
 | Match-evaluation evidence | Evaluator replay fingerprint, unique per organization and component occurrence. The same fingerprint may be stored for another occurrence only when the immutable evaluation content agrees. Exact replay inserts nothing. Disagreement is `immutable_conflict` and does not update the prior row. |
+| Product Match Evidence | Organization-scoped evaluation identity: occurrence, advisory revision, reviewed approval, evaluator, matching policy, and product-evidence policy. Replay uniqueness is `(organization_id, replay_fingerprint)`. Exact replay returns the existing row and does not change its timestamp. A bound-fact conflict is `immutable_conflict`. A new authoritative identity may append a row. Current applicability is not stored. |
 
 Replay of the same job twice produces one tenant-visible effect (required test).
 

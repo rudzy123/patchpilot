@@ -245,8 +245,15 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   Match Evidence is implemented and production uncomposed. A foreign component
   occurrence and an absent component occurrence are publicly indistinguishable.
   The persistence lookup is organization-scoped. Bounded diagnostics do not
-  record a foreign organization or resource identity. Product-match cardinality
-  remains a separate architecture decision.
+  record a foreign organization or resource identity. Product Match Evidence cardinality is accepted in
+  [ADR 0033](../adr/0033-product-match-evidence-cardinality.md). Exact replay
+  returns the existing row. A new evaluator or policy identity may append
+  another immutable row. Current applicability is query-time. Historical
+  evidence remains after a successor revision. Finding identity stays
+  organization, asset, versionless component, and vulnerability. Automatic
+  matching remains unavailable. Finding creation remains unavailable.
+  Suppression authority remains false. Multiple-version SBOM normalization
+  remains a separate open decision.
 
 ## Failure and capacity
 
