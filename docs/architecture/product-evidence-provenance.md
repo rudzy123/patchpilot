@@ -223,7 +223,7 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   not grant Finding authority. User-facing reviewer approval is not operational.
   Batches 1, 1-R, 2, and 2-R are committed. Branch-closure review is complete.
   [ADR 0035](../adr/0035-controlled-finding-creation.md) accepts creation-only
-  Finding architecture and does not implement it.
+  Finding architecture. Session 1 implements its contracts and process-local authorization. Persistence is not implemented. No Finding can be created.
 - **Separation of duties:** Exact distinct author and reviewer identities.
   Case-only and confusable differences fail closed as `ineligible_self_approved`.
 - **Approval purpose:** `approve_maintainer_reviewed_advisory_for_product_evaluation`.

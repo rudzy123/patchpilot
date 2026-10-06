@@ -388,9 +388,9 @@ export type SbomMetadataRepository = {
 };
 
 /**
- * Read-only Finding port. Finding creation from match evidence is unavailable.
- * A future write must be a purpose-specific reviewed command under ADR 0026,
- * not a generic create on this port.
+ * Read-only Finding port. Controlled creation contracts exist and are
+ * production uncomposed. This port does not create a Finding. A future write
+ * must be the purpose-specific command under ADR 0035, not a generic create.
  */
 export type FindingRepository = {
   findById(organizationId: string, id: string): Promise<FindingRecord | undefined>;

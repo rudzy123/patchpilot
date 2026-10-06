@@ -1,6 +1,6 @@
 # Current state
 
-This document is the checkpoint authority for what PatchPilot implements, composes, and still withholds. It describes the repository after controlled Finding architecture governance. [ADR 0032](../adr/0032-maintainer-reviewed-advisory-authority.md) is Accepted for production-uncomposed reviewer authority. [ADR 0035](../adr/0035-controlled-finding-creation.md) is Accepted for creation-only Finding architecture. Finding creation remains unavailable. Historical session narrative lives in [checkpoint-ledger.md](checkpoint-ledger.md) and is not an authority source.
+This document is the checkpoint authority for what PatchPilot implements, composes, and still withholds. It describes the repository after Controlled Finding Session 1-R authority review. [ADR 0032](../adr/0032-maintainer-reviewed-advisory-authority.md) is Accepted for production-uncomposed reviewer authority. [ADR 0035](../adr/0035-controlled-finding-creation.md) is Accepted for creation-only Finding architecture. Controlled Finding contracts and process-local creation authorization are implemented. Session 1-R reviewed the process-local creation authorization. Persistence is not implemented. The evidence-link migration is not implemented. No Finding can be created. Production composition is absent. Finding creation remains unavailable. Historical session narrative lives in [checkpoint-ledger.md](checkpoint-ledger.md) and is not an authority source.
 
 Read this file before treating `AGENTS.md`, an ADR body, or an architecture narrative as the current capability list.
 
@@ -64,6 +64,7 @@ Present in packages and tests, and not constructed by API, worker, web, seed, or
 - Product Match Evidence composition for one reviewed npm evaluation command
 - Reviewer approval capability architecture contracts (`reviewer_approval_capability_policy_v1`)
 - Durable reviewer-capability issuance and atomic approval consumption (`20261003120000_reviewer_capability_issuance`)
+- Controlled Finding creation contracts and process-local creation authorization (`create_finding_from_product_match_evidence`, `finding_creation_policy_v1` version 1). The authorization is process-local and is not durable. Session 1-R reviewed that authorization. The issuer function is not a package export. Persistence is not implemented. The evidence-link migration is not implemented. No Finding can be created. Production composition is absent.
 - Canonical CVE identity persistence
 - Read-only active-catalog KEV membership derivation
 
@@ -86,7 +87,7 @@ Simulated fixtures are not product evidence. Disposable legal rows are not persi
 - Finding and FindingObservation product infrastructure
 - Risk, remediation, and related models
 
-The Finding schema is placeholder infrastructure. It is not an implemented Finding workflow. The composed Finding repository is read-only (`findById`, `listForOrganization`). The generic `PrismaFindingRepository.create` path and its `CreateFindingInput` type have been removed, so production composition cannot create a Finding through the repository bundle. No production Finding writer exists. [ADR 0035](../adr/0035-controlled-finding-creation.md) accepts creation-only architecture. The first slice is creation only. A later implementation branch may add the additive evidence-link model and one production-uncomposed command. Direct Prisma Finding writes exist only in tests and test fixtures. Product Match Evidence does not grant Finding authority by itself.
+The Finding schema is placeholder infrastructure. It is not an implemented Finding workflow. The composed Finding repository is read-only (`findById`, `listForOrganization`). The generic `PrismaFindingRepository.create` path and its `CreateFindingInput` type have been removed, so production composition cannot create a Finding through the repository bundle. No production Finding writer exists. [ADR 0035](../adr/0035-controlled-finding-creation.md) accepts creation-only architecture. Session 1 implements the framework-independent contracts and the process-local creation authorization only. Session 1-R reviewed that authorization. Persistence is not implemented. The evidence-link migration is not implemented. No Finding can be created. Direct Prisma Finding writes exist only in tests and test fixtures. Product Match Evidence does not grant Finding authority by itself.
 
 `packages/policy-engine` has no scoring implementation. There is no export product model.
 
@@ -120,11 +121,11 @@ A signed-in user can select an organization and use the asset inventory. SBOM up
 
 ## Controlled Finding architecture
 
-[ADR 0032](../adr/0032-maintainer-reviewed-advisory-authority.md), the [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) creation-only exception, and [ADR 0035](../adr/0035-controlled-finding-creation.md) are Accepted. The controlled Finding architecture is accepted only because those ADRs are accepted together. Finding creation remains unavailable until an implementation branch adds the evidence-link model and its tests pass. The existing Finding and FindingObservation models remain placeholders. Product Match Evidence does not grant Finding authority by itself. Production composition remains absent. The implementation branch will add one forward migration for the additive evidence-link model and one production-uncomposed creation command. The first slice is creation only. Repeated observation and lifecycle transitions remain unavailable.
+[ADR 0032](../adr/0032-maintainer-reviewed-advisory-authority.md), the [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) creation-only exception, and [ADR 0035](../adr/0035-controlled-finding-creation.md) are Accepted. The controlled Finding architecture is accepted only because those ADRs are accepted together. Controlled Finding contracts and process-local creation authorization are implemented. Persistence is not implemented. The evidence-link migration is not implemented. No Finding can be created. Production composition is absent. The existing Finding and FindingObservation models remain placeholders. Product Match Evidence does not grant Finding authority by itself. Membership, role, and administrator status do not grant Finding authority. `finding_creation_policy_v1` version 1 limits one creation evidence set to 16 Product Match Evidence identities. That ceiling is an implementation policy limit for the first slice. It is not the Finding natural identity, not a schema constraint, and not a permanent domain maximum. ADR 0035 does not fix the number. A larger set is rejected and writes nothing. A later policy version may raise it. The issuer function is not a package export. Relative import of the issuer module is an internal same-package trust boundary, not a supported minting API. Session 1-R reviewed the process-local creation authorization. The controlled product slice is not complete. All lifecycle powers remain unavailable. Session 2 is next.
 
 ## Next
 
-The next repository step is review and merge of this architecture. This document does not start Finding implementation, does not add a migration, and does not make reviewer approval a user-facing workflow.
+The next repository step is Controlled Finding Session 2 migration and atomic creation. Session 1-R reviewed the process-local creation authorization. The issuer function is not a package export. This checkpoint does not add a migration, does not persist Findings, and does not compose production. Reviewer approval is not a user-facing workflow. All lifecycle powers remain unavailable.
 
 Generalized product matching is not live. Finding creation remains unavailable. Production OSV acquisition stays disabled.
 
@@ -163,4 +164,4 @@ CI status unavailable from the current environment. This checkpoint does not tre
 
 ## ADR posture
 
-Accepted: ADR 0001–0026, ADR 0028–0029, and ADR 0032–0035. Proposed: ADR 0027, ADR 0030, and ADR 0031. ADR 0032 is Accepted and production uncomposed. ADR 0035 is Accepted as creation-only architecture. Finding creation remains unavailable. Proposed does not mean the related code is absent. Implementation notes live on those ADR pages and in the sections above.
+Accepted: ADR 0001–0026, ADR 0028–0029, and ADR 0032–0035. Proposed: ADR 0027, ADR 0030, and ADR 0031. ADR 0032 is Accepted and production uncomposed. ADR 0035 is Accepted as creation-only architecture. Session 1 contracts and process-local creation authorization are implemented and production uncomposed. Session 1-R reviewed that authorization. Persistence is not implemented. Finding creation remains unavailable. Proposed does not mean the related code is absent. Implementation notes live on those ADR pages and in the sections above.

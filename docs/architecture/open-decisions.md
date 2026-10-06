@@ -121,7 +121,7 @@ OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cro
 | Finding lifecycle automation | Create, observe, resolve, reopen | **Architecture accepted, runtime absent.** Session 11 and Session 12 remain zero-Finding. |
 | KEV-after-Finding projection | Membership on a proven Finding | **Deferred.** KEV may be derived only after an `affected` Finding exists. KEV still creates no Finding. |
 | Risk integration | Scoring from matching | **Deferred.** No `finding.recalculate`. No RiskCalculation from match evaluation. |
-| Finding writes | Production Finding creation | **Architecture accepted, implementation absent.** [ADR 0035](../adr/0035-controlled-finding-creation.md) admits one creation-only slice. Production composition remains absent. The provider-driven ADR 0026 gate remains required for every other Finding power. |
+| Finding writes | Production Finding creation | **Contracts implemented, persistence absent.** [ADR 0035](../adr/0035-controlled-finding-creation.md) admits one creation-only slice. Session 1 implements process-local creation authorization. No Finding can be created. Production composition remains absent. The provider-driven ADR 0026 gate remains required for every other Finding power. |
 
 ## Closed in Session 11 Batch 4B-P (parser resource policy)
 
