@@ -51,14 +51,24 @@ test('checkpoint documents do not enable production OSV, Findings, or real produ
   assert.match(currentState, /Real product-eligible evaluation count:\s*0\b/);
   assert.match(currentState, /Persistent product-eligible evaluation count:\s*0\b/);
   assert.match(currentState, /Persistent Finding count:\s*0\b/);
-  assert.match(currentState, /ADR 0032 remains Proposed/);
+  assert.match(currentState, /ADR 0032 is Accepted/);
+  assert.doesNotMatch(currentState, /ADR 0032 remains Proposed/);
+  assert.match(currentState, /Finding creation remains unavailable/);
   assert.match(
     readRepositoryFile('docs/adr/0032-maintainer-reviewed-advisory-authority.md'),
-    /^- Status: Proposed$/m,
+    /^- Status: Accepted$/m,
   );
   assert.doesNotMatch(
     readRepositoryFile('docs/adr/0032-maintainer-reviewed-advisory-authority.md'),
+    /^- Status: Proposed$/m,
+  );
+  assert.match(
+    readRepositoryFile('docs/adr/0035-controlled-finding-creation.md'),
     /^- Status: Accepted$/m,
+  );
+  assert.match(
+    readRepositoryFile('docs/adr/0026-authoritative-match-evidence-and-finding-lifecycle.md'),
+    /controlled_maintainer_reviewed_finding_creation_v1/,
   );
 
   for (const text of [currentState, readme, agents]) {

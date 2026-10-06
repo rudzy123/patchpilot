@@ -97,3 +97,9 @@ Batch 1 and Batch 1-R are committed. Batch 2 adds `20261003120000_reviewer_capab
 Current checkpoint authority: [current-state.md](current-state.md).
 
 Batches 1, 1-R, 2, and 2-R are committed on `fix/reviewer-approval-capability`. The frozen migration `20261003120000_reviewer_capability_issuance` remains SHA-256 `08f18ce42ba19165f6d0a1bf872e5973bf74e26888e7f052c70c53779656dfbd`. The frozen count remains 22. Branch-closure review found the issued-capability chain complete for the reviewer-authority prerequisite and production uncomposed. Caller-supplied reviewer classification does not persist a new approval. ADR 0032 stays Proposed. The next repository step is the pull request. Finding creation remains unavailable. This ledger is not the current repository authority.
+
+## Controlled Finding architecture governance
+
+Current checkpoint authority: [current-state.md](current-state.md).
+
+On 2026-10-06 the governance session accepted ADR 0032 from the committed reviewer-capability implementation, amended ADR 0026 with the creation-only exception `controlled_maintainer_reviewed_finding_creation_v1`, and accepted ADR 0035 for the controlled Finding creation slice. No migration was added. The frozen count remains 23. Finding creation remains unavailable. Production composition remains absent. Entries above that say ADR 0032 stays Proposed record earlier checkpoints. This ledger is not the current repository authority.

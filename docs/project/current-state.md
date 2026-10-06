@@ -1,6 +1,6 @@
 # Current state
 
-This document is the checkpoint authority for what PatchPilot implements, composes, and still withholds. It describes the repository after post-merge reconciliation PR #52 (merge commit `f822814`) and committed Reviewer Approval Capability Batches 1, 1-R, 2, and 2-R. Branch-closure review of that work is recorded in this checkpoint. Historical session narrative lives in [checkpoint-ledger.md](checkpoint-ledger.md) and is not an authority source.
+This document is the checkpoint authority for what PatchPilot implements, composes, and still withholds. It describes the repository after controlled Finding architecture governance. [ADR 0032](../adr/0032-maintainer-reviewed-advisory-authority.md) is Accepted for production-uncomposed reviewer authority. [ADR 0035](../adr/0035-controlled-finding-creation.md) is Accepted for creation-only Finding architecture. Finding creation remains unavailable. Historical session narrative lives in [checkpoint-ledger.md](checkpoint-ledger.md) and is not an authority source.
 
 Read this file before treating `AGENTS.md`, an ADR body, or an architecture narrative as the current capability list.
 
@@ -86,7 +86,7 @@ Simulated fixtures are not product evidence. Disposable legal rows are not persi
 - Finding and FindingObservation product infrastructure
 - Risk, remediation, and related models
 
-The Finding schema is placeholder infrastructure. It is not an implemented Finding workflow. The composed Finding repository is read-only (`findById`, `listForOrganization`). The generic `PrismaFindingRepository.create` path and its `CreateFindingInput` type have been removed, so production composition cannot create a Finding through the repository bundle. No production Finding writer exists. A future Finding write must be a purpose-specific reviewed command under [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md). Direct Prisma Finding writes exist only in tests and test fixtures.
+The Finding schema is placeholder infrastructure. It is not an implemented Finding workflow. The composed Finding repository is read-only (`findById`, `listForOrganization`). The generic `PrismaFindingRepository.create` path and its `CreateFindingInput` type have been removed, so production composition cannot create a Finding through the repository bundle. No production Finding writer exists. [ADR 0035](../adr/0035-controlled-finding-creation.md) accepts creation-only architecture. The first slice is creation only. A later implementation branch may add the additive evidence-link model and one production-uncomposed command. Direct Prisma Finding writes exist only in tests and test fixtures. Product Match Evidence does not grant Finding authority by itself.
 
 `packages/policy-engine` has no scoring implementation. There is no export product model.
 
@@ -104,11 +104,11 @@ The Finding schema is placeholder infrastructure. It is not an implemented Findi
 
 The active ecosystem and evaluator registries that would admit `eligible` are empty. An empty registry blocks `eligible`. Synthetic evidence is denied as product evidence. KEV is not affectedness authority. `unknown` is not `unaffected`. An `affected` result is not Finding authority.
 
-## Reviewer-authority discrepancy
+## Reviewer authority
 
-[ADR 0032](../adr/0032-maintainer-reviewed-advisory-authority.md) remains Proposed. Decision 3 requires an issued reviewer capability. Reviewer Approval Capability Batch 1 defines that architecture: one sealed issuer-authority boundary, an opaque process-local presentation handle, exact approval-target binding, separation of duties, and closed expiration, revocation, cancellation, and consumption classifications. Caller-supplied reviewer identity and `reviewerAuthorityClassification` remain insufficient. Reviewer identity alone is not authority. Administrator, owner, maintainer, Git author, code owner, CI actor, and other ambient role strings do not grant approval authority.
+[ADR 0032](../adr/0032-maintainer-reviewed-advisory-authority.md) is Accepted. Decision 3 is implemented as an issued reviewer capability: one sealed issuer-authority boundary, an opaque process-local presentation handle, exact approval-target binding, separation of duties, and closed expiration, revocation, cancellation, and consumption classifications. Caller-supplied reviewer identity and `reviewerAuthorityClassification` remain insufficient. Reviewer identity alone is not authority. Administrator, owner, maintainer, Git author, code owner, CI actor, and other ambient role strings do not grant approval authority. Acceptance does not grant Finding authority.
 
-Batch 1 and Batch 1-R are committed. Batch 2 adds durable issuance on `reviewer_capability_issuance` and one append-only terminal observation on `reviewer_capability_lifecycle_observation`. The natural identity is the approval-claim fingerprint. Correlation is request binding and does not mint a second capability. Issuance and expiration use PostgreSQL `clock_timestamp()`. Validity is half-open for 900000 milliseconds: valid while database time is before `expires_at`, expired when database time is greater than or equal to `expires_at`. The process-local secret handle is not a column. The persisted issuer proof is the authorization UUID and decision fingerprint. `recordMaintainerReviewedAdvisoryApproval` parses and then returns `capability_authority_required` with zero writes. The PostgreSQL writer is `persistMaintainerReviewedAdvisoryApprovalWithCapability`, which inserts the approval and the consumed observation in one transaction. Exact approval replay returns `already_applied` before capability presentation, inserts nothing, and does not change timestamps or renew authority. An immutable conflict overwrites nothing. Revocation and cancellation append one terminal observation and block unused presentation. A consumed capability stays consumed. Revocation or cancellation does not alter a committed approval. Update and delete are rejected. Parent deletion is `ON DELETE RESTRICT`. Public inspection returns `reusableAuthority: false` and omits handles, authorization ids, fingerprints, and identities. Issuer and lifecycle seals are not package exports. A consumed observation must match the stored approval target. Production startup does not construct the adapter. Evaluator calls, product-match writes, Finding writes, and provider calls remain zero. User-facing reviewer approval is not operational. ADR 0032 remains Proposed. Batches 1, 1-R, 2, and 2-R are committed. Branch-closure review recorded this path as complete for the reviewer-authority prerequisite and production uncomposed.
+Batch 1 and Batch 1-R are committed. Batch 2 adds durable issuance on `reviewer_capability_issuance` and one append-only terminal observation on `reviewer_capability_lifecycle_observation`. The natural identity is the approval-claim fingerprint. Correlation is request binding and does not mint a second capability. Issuance and expiration use PostgreSQL `clock_timestamp()`. Validity is half-open for 900000 milliseconds: valid while database time is before `expires_at`, expired when database time is greater than or equal to `expires_at`. The process-local secret handle is not a column. The persisted issuer proof is the authorization UUID and decision fingerprint. `recordMaintainerReviewedAdvisoryApproval` parses and then returns `capability_authority_required` with zero writes. The PostgreSQL writer is `persistMaintainerReviewedAdvisoryApprovalWithCapability`, which inserts the approval and the consumed observation in one transaction. Exact approval replay returns `already_applied` before capability presentation, inserts nothing, and does not change timestamps or renew authority. An immutable conflict overwrites nothing. Revocation and cancellation append one terminal observation and block unused presentation. A consumed capability stays consumed. Revocation or cancellation does not alter a committed approval. Update and delete are rejected. Parent deletion is `ON DELETE RESTRICT`. Public inspection returns `reusableAuthority: false` and omits handles, authorization ids, fingerprints, and identities. Issuer and lifecycle seals are not package exports. A consumed observation must match the stored approval target. Production startup does not construct the adapter. Evaluator calls, product-match writes, Finding writes, and provider calls remain zero. User-facing reviewer approval is not operational. ADR 0032 is Accepted. Batches 1, 1-R, 2, and 2-R are committed. Branch-closure review recorded this path as complete for the reviewer-authority prerequisite and production uncomposed. Product Match Evidence does not grant Finding authority by itself.
 
 ## Product-match cardinality
 
@@ -118,9 +118,13 @@ Batch 1 and Batch 1-R are committed. Batch 2 adds durable issuance on `reviewer_
 
 A signed-in user can select an organization and use the asset inventory. SBOM upload, ingestion, and graph persistence are available through the API and worker. Sanitized provider status is available through the API. There is no vulnerability dashboard, no Finding workflow, and no remediation workflow.
 
+## Controlled Finding architecture
+
+[ADR 0032](../adr/0032-maintainer-reviewed-advisory-authority.md), the [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) creation-only exception, and [ADR 0035](../adr/0035-controlled-finding-creation.md) are Accepted. The controlled Finding architecture is accepted only because those ADRs are accepted together. Finding creation remains unavailable until an implementation branch adds the evidence-link model and its tests pass. The existing Finding and FindingObservation models remain placeholders. Product Match Evidence does not grant Finding authority by itself. Production composition remains absent. The implementation branch will add one forward migration for the additive evidence-link model and one production-uncomposed creation command. The first slice is creation only. Repeated observation and lifecycle transitions remain unavailable.
+
 ## Next
 
-Reviewer Approval Capability durable issuance and atomic approval consumption is implemented and production uncomposed. Batches 1, 1-R, 2, and 2-R are committed. Branch-closure review is complete. The next repository step is the pull request. This document does not start Finding implementation and does not make reviewer approval a user-facing workflow.
+The next repository step is review and merge of this architecture. This document does not start Finding implementation, does not add a migration, and does not make reviewer approval a user-facing workflow.
 
 Generalized product matching is not live. Finding creation remains unavailable. Production OSV acquisition stays disabled.
 
@@ -130,15 +134,17 @@ Recorded here and not implemented in this checkpoint.
 
 ### High priority
 
-1. Reviewer-authority capability. Issued capability authority is persisted and consumed atomically with approval insertion. Caller role strings do not issue or persist an approval. The path is production uncomposed. Branch-closure review is complete. Open the pull request before Finding design. Do not treat this as a user-facing approval workflow or Finding authority.
-2. Main CI verification. If a later main Quality rerun fails on the keyboard-focus test, suggested branch: `test/web-keyboard-focus-hermeticity`.
+1. Main CI verification. If a later main Quality rerun fails on the keyboard-focus test, suggested branch: `test/web-keyboard-focus-hermeticity`.
 
-### Before Finding implementation
+### Before the Finding implementation branch
 
-3. Product-match evidence cardinality. Closed by [ADR 0033](../adr/0033-product-match-evidence-cardinality.md) and `20261005120000_product_match_evidence_cardinality`. Multi-version SBOM normalization is closed by [ADR 0034](../adr/0034-multi-version-component-occurrence-normalization.md). New graphs use normalization version `2`. Historical version `1` graphs are not reprocessed.
-4. Integration-test database hermeticity. API and worker integration processes, and database-package integration tests, use disposable PostgreSQL databases. The persistent development database is not the automated integration target. `pnpm test:integration` runs package suites concurrently. `pnpm test:integration:serial` is diagnostic. Lifecycle helpers are on `@patchpilot/config/integration-test`, not the production config entry, and refuse a production process environment. Test database isolation is not product tenant isolation.
-5. Dependency advisory residuals. Re-audited on 2026-10-06 with Node.js 24.20.0 and pnpm 11.24.0. The audited critical Next.js advisory and the audited Fastify, fast-uri, Sharp, source-map-js, fast-copy, and development-tooling advisories that had a patched parent release are removed from the resolved graph. Two highs remain: `deepmerge-ts@7.1.5` through Prisma, and unpatched `braces@3.0.3` through ESLint tooling. `pnpm audit` and `pnpm audit --prod` still exit 1 because of those residuals. The record is [dependency-security.md](../security/dependency-security.md). This is repository supply-chain maintenance, not a product Finding.
-6. Adjacent generic writers. Review remediation and risk-policy create methods before those workflows become reachable.
+The implementation branch may add the additive evidence-link migration and one production-uncomposed creation command only after this architecture is merged. That branch must not compose production and must not implement lifecycle transitions.
+
+Adjacent generic writers remain a review item before remediation or risk workflows become reachable. They are not the creation-only command.
+
+Already merged, and not remaining prerequisites: Product Match Evidence cardinality ([ADR 0033](../adr/0033-product-match-evidence-cardinality.md)), normalization version `2` ([ADR 0034](../adr/0034-multi-version-component-occurrence-normalization.md)), reviewer-capability issuance ([ADR 0032](../adr/0032-maintainer-reviewed-advisory-authority.md)), and integration-test database hermeticity. API and worker integration processes, and database-package integration tests, use disposable PostgreSQL databases. Test database isolation is not product tenant isolation.
+
+Dependency advisory residuals remain repository supply-chain maintenance, not a product Finding. Re-audited on 2026-10-06 with Node.js 24.20.0 and pnpm 11.24.0. Two highs remain: `deepmerge-ts@7.1.5` through Prisma, and unpatched `braces@3.0.3` through ESLint tooling. `pnpm audit` and `pnpm audit --prod` still exit 1 because of those residuals. The record is [dependency-security.md](../security/dependency-security.md).
 
 ### Low priority
 
@@ -157,4 +163,4 @@ CI status unavailable from the current environment. This checkpoint does not tre
 
 ## ADR posture
 
-Accepted: ADR 0001–0026, ADR 0028–0029, ADR 0033, and ADR 0034. Proposed: ADR 0027, ADR 0030, ADR 0031, and ADR 0032. ADR 0032 remains Proposed. Proposed does not mean the related code is absent. Implementation notes live on those ADR pages and in the sections above.
+Accepted: ADR 0001–0026, ADR 0028–0029, and ADR 0032–0035. Proposed: ADR 0027, ADR 0030, and ADR 0031. ADR 0032 is Accepted and production uncomposed. ADR 0035 is Accepted as creation-only architecture. Finding creation remains unavailable. Proposed does not mean the related code is absent. Implementation notes live on those ADR pages and in the sections above.

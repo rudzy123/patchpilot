@@ -28,7 +28,7 @@ Version of the package is **not** part of finding identity. A newer ingestion th
 
 ## Creation
 
-A Finding may eventually be created only from a deterministic `affected` result produced by an approved [ADR 0025](../adr/0025-ecosystem-aware-package-identity-and-version-evaluation.md) evaluator, with append-only match evidence, a `present` observation on the current eligible ingestion, and every [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) creation gate. Unknown, unsupported, malformed, withdrawn, or incomplete evaluation does not create a Finding. KEV membership does not create a Finding. CVE identity does not create a Finding.
+A Finding may eventually be created only from a deterministic `affected` result, with append-only evidence, a `present` creation observation, and an admitted [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) gate. The provider-driven gate remains in force for provider-driven creation. The only admitted alternative is the creation-only exception `controlled_maintainer_reviewed_finding_creation_v1` in [ADR 0035](../adr/0035-controlled-finding-creation.md). That exception is accepted architecture and is not implemented. Unknown, unsupported, malformed, withdrawn, or incomplete evaluation does not create a Finding. KEV membership does not create a Finding. CVE identity does not create a Finding. Product Match Evidence does not grant Finding authority by itself.
 
 A newly created Finding begins `open` only when the current eligible ingestion has an `affected` evaluation and a `present` observation. Initial state is not derived from KEV, CISA `requiredAction`, provider severity, risk policy, or remediation. `currentRiskCalculationId` may remain null. Provider dates must not populate `Finding.dueAt`. An `absent` or `inconclusive` observation must not create a Finding.
 
@@ -92,7 +92,7 @@ If the diagram is not rendered, the transition table is authoritative.
 
 | Transition | Actor | Required fields |
 | --- | --- | --- |
-| Create `open` | system (correlation), only in a later authorized session | Observation `present`, deterministic `affected` match evaluation, vulnerability id, closed match method. Session 11 and Session 12 must not perform this write |
+| Create `open` | purpose-specific maintainer-reviewed command under [ADR 0035](../adr/0035-controlled-finding-creation.md), not yet implemented | Complete current affected Product Match Evidence set, one creation observation, one evidence link per qualifying row, and one audit event. Not automatic correlation. Not a provider-driven write |
 | → `verification_pending` | system when task → `completed` **and** finding is `open`, or `member`+ request verify **from `open`** | Task id or reason. Must **not** run if finding is `risk_accepted`, `mitigated`, or `false_positive` |
 | → `risk_accepted` | system when **RiskAcceptance** becomes `active` | See [remediation-lifecycle.md](remediation-lifecycle.md) (requester, approver, expiry) |
 | → `mitigated` | `admin` or `owner` | Compensating-control **Evidence** id, reason |
@@ -107,7 +107,7 @@ Due dates are **calculated recommendations** on **RiskCalculation**, not a findi
 
 | From | To | Trigger | Kind |
 | --- | --- | --- | --- |
-| (create) | `open` | A later authorized session created the finding from a `present` observation backed by deterministic `affected` evaluation | Calculated from intel + SBOM. Not Session 11 or Session 12 |
+| (create) | `open` | A later implementation of [ADR 0035](../adr/0035-controlled-finding-creation.md) creates one Finding from a complete affected Product Match Evidence set | Creation only. Not implemented. Not automatic correlation |
 | `open` | `verification_pending` | Remediation task `completed` or verify requested | Workflow |
 | `verification_pending` | `open` | Current ingestion's conclusive observation is `present` | Calculated |
 | `open` / `verification_pending` / `mitigated` / `inconclusive` | `risk_accepted` | Acceptance `active` | Workflow |
@@ -212,13 +212,18 @@ Finding reads and mutations require organization scope. Recalculation jobs, if a
 
 Due dates on the Finding row are tenant workflow data. CISA KEV `dueDate` / `requiredAction` and OSV provider dates must never populate or modify `Finding.dueAt` automatically.
 
+## Controlled creation-only slice
+
+[ADR 0035](../adr/0035-controlled-finding-creation.md) accepts one creation path: a complete current affected Product Match Evidence set for one asset, versionless component, Vulnerability, and latest successful normalization-version-2 ingestion becomes one Finding, one immutable creation observation, and one evidence link per qualifying row. Several affected versions on one asset are one Finding. An unaffected occurrence does not veto an affected occurrence. The lifecycle diagram above is not authorized by this slice. Repeated observations, risk, assignment, suppression, remediation, verification, closure, and reopening remain unavailable. Production composition remains absent. The Finding models remain placeholders.
+
 ## Session 15 provenance boundary
 
-Product-eligible affected match evidence is necessary and insufficient for Finding creation. Session 15 Batch 1 defines that boundary. Session 15 eligibility composition does not persist a product-eligible evaluation. Product Match Evidence later added a separate explicit command. The provider-free product-evidence path is implemented and verified in disposable PostgreSQL. Persistent product-eligible evaluation count: 0. That evidence is production uncomposed and is not Finding authority. Real product-eligible evaluation count remains 0. This work does not implement a Finding write gate, FindingObservation, risk, assignment, suppression, remediation, or verification. Finding creation remains unavailable. Synthetic Session 14 evidence cannot be relabeled into that prerequisite.
+Product-eligible affected match evidence is necessary and insufficient for Finding creation. Session 15 Batch 1 defines that boundary. Session 15 eligibility composition does not persist a product-eligible evaluation. Product Match Evidence later added a separate explicit command. The provider-free product-evidence path is implemented and verified in disposable PostgreSQL. Persistent product-eligible evaluation count: 0. That evidence is production uncomposed and is not Finding authority. Real product-eligible evaluation count remains 0. [ADR 0035](../adr/0035-controlled-finding-creation.md) accepts creation-only architecture and does not implement it. Finding creation remains unavailable. Synthetic Session 14 evidence cannot be relabeled into that prerequisite.
 
 ## Related documents
 
 - [ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md)
+- [ADR 0035](../adr/0035-controlled-finding-creation.md)
 - [Product-evidence provenance](product-evidence-provenance.md)
 - [Remediation lifecycle](remediation-lifecycle.md)
 - [Risk policy](risk-policy.md)

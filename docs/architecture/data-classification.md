@@ -37,7 +37,7 @@ Untrusted SBOM fields (component names, versions) are **Confidential** once stor
 | Protected OSV listing-evidence encryption keys and opaque key references | Restricted | Operator-provided instance keys, derived material, and complete key identifiers; never hardcoded; never in database rows as raw key material; complete identifiers are omitted from public contracts and metric labels |
 | Protected OSV listing-evidence envelope metadata | Internal | Envelope schema version, algorithm identifier, key-state classification, rotation and erasure state, and bounded length classification; not a decryption capability |
 | Protected OSV listing evidence digest and bounded counts | Internal | Domain-separated evidence-set digest and counts only; not a bare object-key digest; not sufficient for retrieval |
-| Finding, observations | Confidential | |
+| Finding, observations, and future evidence links | Confidential | Placeholder Finding rows are not an operational workflow. [ADR 0035](../adr/0035-controlled-finding-creation.md) classifies future observation-to-Product-Match-Evidence links as tenant-owned confidential evidence. Those links are not in the schema yet |
 | RiskCalculation factors | Confidential | May include environment |
 | Remediation notes | Confidential | |
 | RiskAcceptance reason | Confidential | |

@@ -31,6 +31,12 @@ It **closes** the Finding-identity, match-evidence, observation, and lifecycle-p
 runtime, and Finding writes remain unimplemented. ADR acceptance alone does **not** authorize
 Finding writes.
 
+Amended on 2026-10-06. The amendment adds the named creation-only exception
+`controlled_maintainer_reviewed_finding_creation_v1` in section 10A and
+[ADR 0035](0035-controlled-finding-creation.md). It does not remove the provider-driven write
+gate, tenant isolation, affected-only evidence, idempotency, audit, replay safety, or the
+prohibition on lifecycle writes. It does not implement a Finding writer.
+
 ## What this ADR is and is not
 
 | Kind | Meaning in this ADR |
@@ -399,6 +405,10 @@ If any condition fails, do not create a Finding. Unknown, unsupported, malformed
 incomplete evaluation does not satisfy the gate. An `absent` or `inconclusive` observation does not
 satisfy the gate.
 
+Section 10 is the provider-driven creation gate. It is not the gate for the creation-only
+exception in section 10A. Conditions 11 and 12 apply to an OSV provider revision. They are not
+the authority path for maintainer-reviewed Product Match Evidence.
+
 ### 11. Session write authorization
 
 - Session 11 remains zero-Finding.
@@ -435,7 +445,63 @@ Finding writes remain blocked until **all** of the following are complete:
 17. An adversarial review approves the complete write path.
 18. A later implementation batch explicitly states Finding writes are authorized.
 
-Do not give conditional permission before every gate is satisfied.
+Do not give conditional permission before every gate is satisfied. The list above is the gate
+for provider-driven Finding creation, automatic matching, bulk creation, and every lifecycle
+transition after creation. It is not waived in part. The only admitted alternative is the
+complete creation-only exception in section 10A.
+
+### 10A. Controlled maintainer-reviewed creation-only exception
+
+Amended on 2026-10-06. This section admits one named exception,
+`controlled_maintainer_reviewed_finding_creation_v1`. The exception is a complete replacement
+condition for the first creation-only slice. It is not a partial satisfaction of section 10 or
+of the blocked-until list in section 11. Those lists remain in force for provider-driven
+Finding creation and for every power this exception does not name.
+
+The exception requires **all** of the following:
+
+1. The evidence is legal, immutable, and `affected` Product Match Evidence. Synthetic evidence,
+   unknown evidence, and unaffected evidence do not qualify. An unaffected occurrence does not
+   veto an affected occurrence, and it is not a member of the qualifying set.
+2. The advisory authority is maintainer-reviewed under
+   [ADR 0032](0032-maintainer-reviewed-advisory-authority.md). Caller origin, Git tracking, and
+   ambient role do not qualify.
+3. Reviewer authority is the accepted issued-capability model under ADR 0032. A caller-supplied
+   reviewer classification is not authority.
+4. The evidence is currently applicable. Applicability is derived at read time. Historical
+   evidence for a superseded revision is not the current set.
+5. The evidence is bound to the latest successful SBOM ingestion whose graph uses normalization
+   version `2`. Normalization version `1` graphs are not reprocessed into this slice.
+6. The set is the complete affected Product Match Evidence set for one organization, asset,
+   versionless component, Vulnerability, and that ingestion. A partial set fails closed.
+7. Creation authority is purpose-specific, sealed, and process-local, as defined by
+   [ADR 0035](0035-controlled-finding-creation.md). It is not a durable authority table and it
+   is not a general Finding-write permission.
+8. The Finding natural identity remains `organization_id` + `asset_id` + `component_id` +
+   `vulnerability_id`.
+9. One database transaction persists one Finding, one immutable creation observation, one
+   evidence link per qualifying Product Match Evidence row, and one audit event. No network,
+   queue, object storage, parser, or evaluator runs inside that transaction.
+10. Exact replay writes nothing and returns the existing product object. Concurrent exact
+    creation converges to one authoritative result. A conflicting evidence set does not
+    overwrite the Finding.
+11. The implementation remains production uncomposed. No API, web action, worker, scheduler,
+    queue, Outbox consumer, or upload trigger is included.
+12. The slice grants no downstream lifecycle authority. It does not authorize suppression,
+    remediation, verification, risk, priority, assignment, notification, export, automatic
+    closure, or automatic reopening.
+
+The first controlled slice does not require the complete Finding lifecycle to be implemented.
+Section 11 item 13 remains required before any lifecycle transition. Section 11 items 1 through
+3 remain required before any provider-driven Finding creation. They are not the authority path
+for this exception.
+
+This amendment does not authorize automatic creation, bulk creation, suppression, remediation,
+verification, risk, priority, assignment, or provider-driven Finding creation. Acceptance of
+the exception does not add a Finding writer. [ADR 0023](0023-provider-neutral-cve-identity.md)
+still forbids a dormant Finding-write service until its four-condition gate holds, including a
+tested creation path. This section supplies only the architectural authorization for the named
+creation-only write.
 
 ### 12. Future positive-match transaction
 
