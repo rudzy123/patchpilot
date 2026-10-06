@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertDestructiveDatabaseCommandAllowed,
   assertDevelopmentSeedAllowed,
+  assertEphemeralTestDatabaseName,
   cloneProcessEnv,
   DatabaseCommandSafetyError,
   redactDatabaseUrl,
@@ -47,6 +48,22 @@ describe('database command safety', () => {
     );
     expect(redacted).not.toContain('super-secret');
     expect(redacted).toContain('REDACTED');
+  });
+
+  it('accepts bounded ephemeral database names and rejects the persistent database', () => {
+    expect(() => assertEphemeralTestDatabaseName('patchpilot_it_abcdef012345')).not.toThrow();
+    expect(() =>
+      assertEphemeralTestDatabaseName('patchpilot_it_api_1735689600_abcdef012345'),
+    ).not.toThrow();
+    expect(() => assertEphemeralTestDatabaseName('patchpilot_migrate_abcdef012345')).not.toThrow();
+    expect(() => assertEphemeralTestDatabaseName('patchpilot')).toThrow(DatabaseCommandSafetyError);
+    expect(() => assertEphemeralTestDatabaseName('postgres')).toThrow(DatabaseCommandSafetyError);
+    expect(() =>
+      assertEphemeralTestDatabaseName('patchpilot_it_"; DROP DATABASE patchpilot; --'),
+    ).toThrow(DatabaseCommandSafetyError);
+    expect(() => assertEphemeralTestDatabaseName(`patchpilot_it_${'a'.repeat(80)}`)).toThrow(
+      DatabaseCommandSafetyError,
+    );
   });
 
   it('overrides DATABASE_URL when cloning process env for subprocesses', () => {

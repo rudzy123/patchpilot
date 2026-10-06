@@ -14,6 +14,7 @@ import {
   createSystemClock,
 } from '@patchpilot/auth';
 import { loadServerConfigFrom } from '@patchpilot/config';
+import { readDisposableIntegrationDatabaseUrl } from '@patchpilot/config/integration-test';
 import type { AssetDetail, SessionResponse } from '@patchpilot/contracts';
 import {
   createPrismaUnitOfWork,
@@ -24,7 +25,7 @@ import {
 } from '@patchpilot/database';
 import type { PersistenceUnitOfWork } from '@patchpilot/domain';
 import { createLogger } from '@patchpilot/logger';
-import { createFoundationTestEnv } from '@patchpilot/test-utils';
+import { createIntegrationDatabaseTestEnv } from '@patchpilot/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApi } from './app.js';
@@ -39,7 +40,9 @@ import {
 const SOCKET_IP = '192.0.2.10';
 
 describe('asset inventory routes persistence', () => {
-  const config = loadServerConfigFrom(createFoundationTestEnv());
+  const config = loadServerConfigFrom(
+    createIntegrationDatabaseTestEnv(readDisposableIntegrationDatabaseUrl()),
+  );
   const logger = createLogger({
     service: 'api-asset-integration',
     level: 'silent',

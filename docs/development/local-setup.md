@@ -91,7 +91,7 @@ pnpm workflows:lint
 | `pnpm lint` | ESLint (root + packages) |
 | `pnpm typecheck` | TypeScript |
 | `pnpm test:unit` | Vitest unit tests (no Compose) |
-| `pnpm test:integration` | Compose-backed PostgreSQL, Redis, and MinIO checks |
+| `pnpm test:integration` | Compose-backed PostgreSQL, Redis, and MinIO checks. Integration suites create disposable databases. |
 | `pnpm build` | Production build of packages and apps |
 | `pnpm workflows:lint` | Checksum-pinned actionlint on `.github/workflows` |
 | `pnpm infrastructure:up` | Start local PostgreSQL, Redis, MinIO and wait until healthchecks pass |

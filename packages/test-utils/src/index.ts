@@ -118,6 +118,67 @@ export function createFoundationTestEnv(): Readonly<Record<string, string>> {
   });
 }
 
+export function createIntegrationDatabaseTestEnv(
+  databaseUrl: string,
+): Readonly<Record<string, string>> {
+  let databaseName: string;
+  try {
+    databaseName = decodeURIComponent(new URL(databaseUrl).pathname.replace(/^\//, ''));
+  } catch {
+    throw new Error('The disposable integration database URL is not valid.');
+  }
+
+  if (
+    databaseName.length === 0 ||
+    databaseName === 'patchpilot' ||
+    databaseName === 'postgres' ||
+    !databaseName.startsWith('patchpilot_it_')
+  ) {
+    throw new Error(
+      'Integration suites refuse the persistent development database. The disposable database name must start with patchpilot_it_.',
+    );
+  }
+
+  return Object.freeze({
+    ...createFoundationTestEnv(),
+    DATABASE_URL: databaseUrl,
+  });
+}
+
+export async function disconnectDatabaseClientAfter(
+  cleanup: () => Promise<void>,
+  disconnect: () => Promise<void>,
+): Promise<void> {
+  let cleanupError: unknown;
+  try {
+    await cleanup();
+  } catch (error) {
+    cleanupError = error;
+  }
+
+  try {
+    await disconnect();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'disconnect failed';
+    process.stderr.write(
+      `integration database client disconnect failed: ${redactConnectionSecrets(detail)}\n`,
+    );
+    if (cleanupError === undefined) {
+      cleanupError = error;
+    }
+  }
+
+  if (cleanupError !== undefined) {
+    throw cleanupError;
+  }
+}
+
+function redactConnectionSecrets(message: string): string {
+  return message
+    .replace(/postgresql:\/\/[^\s'"]+/gi, 'postgresql://<redacted>')
+    .replace(/postgres:\/\/[^\s'"]+/gi, 'postgres://<redacted>');
+}
+
 export function createFoundationProductionTestEnv(): Readonly<Record<string, string>> {
   return Object.freeze({
     ...createFoundationTestEnv(),

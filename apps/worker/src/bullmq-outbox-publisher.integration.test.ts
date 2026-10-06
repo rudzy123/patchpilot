@@ -2,13 +2,14 @@ import { randomUUID } from 'node:crypto';
 
 import { Queue } from 'bullmq';
 import { loadServerConfigFrom } from '@patchpilot/config';
+import { readDisposableIntegrationDatabaseUrl } from '@patchpilot/config/integration-test';
 import {
   SBOM_INGEST_JOB_TYPE,
   SBOM_INGESTION_REQUESTED_EVENT_TYPE,
   INTELLIGENCE_SYNC_JOB_TYPE,
   INTELLIGENCE_SYNC_REQUESTED_EVENT_TYPE,
 } from '@patchpilot/domain';
-import { createFoundationTestEnv } from '@patchpilot/test-utils';
+import { createIntegrationDatabaseTestEnv } from '@patchpilot/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createBullmqOutboxPublisher } from './bullmq-outbox-publisher.js';
@@ -25,7 +26,9 @@ describe('BullMQ outbox publisher integration', () => {
   });
 
   it('accepts a duplicate deterministic job id against Compose Redis', async () => {
-    const config = loadServerConfigFrom(createFoundationTestEnv());
+    const config = loadServerConfigFrom(
+      createIntegrationDatabaseTestEnv(readDisposableIntegrationDatabaseUrl()),
+    );
     const queueName = `patchpilot-it-${Date.now()}`;
     const publisher = createBullmqOutboxPublisher({
       redisUrl: config.redisUrl,
@@ -56,7 +59,9 @@ describe('BullMQ outbox publisher integration', () => {
   });
 
   it('publishes an intelligence.sync locator with organizationId null', async () => {
-    const config = loadServerConfigFrom(createFoundationTestEnv());
+    const config = loadServerConfigFrom(
+      createIntegrationDatabaseTestEnv(readDisposableIntegrationDatabaseUrl()),
+    );
     const queueName = `patchpilot-it-intel-${Date.now()}`;
     const publisher = createBullmqOutboxPublisher({
       redisUrl: config.redisUrl,
@@ -92,7 +97,9 @@ describe('BullMQ outbox publisher integration', () => {
   });
 
   it('re-adds a missing intelligence retry job after Redis loss', async () => {
-    const config = loadServerConfigFrom(createFoundationTestEnv());
+    const config = loadServerConfigFrom(
+      createIntegrationDatabaseTestEnv(readDisposableIntegrationDatabaseUrl()),
+    );
     const queueName = `patchpilot-it-intel-retry-${Date.now()}`;
     const redispatch = createIntelligenceJobRedispatch({
       redisUrl: config.redisUrl,

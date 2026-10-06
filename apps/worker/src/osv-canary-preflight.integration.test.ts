@@ -11,14 +11,17 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadServerConfigFrom } from '@patchpilot/config';
+import { readDisposableIntegrationDatabaseUrl } from '@patchpilot/config/integration-test';
 import { createS3OsvAdvisoryObjectStorage } from '@patchpilot/integrations';
-import { createFoundationTestEnv } from '@patchpilot/test-utils';
+import { createIntegrationDatabaseTestEnv } from '@patchpilot/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 describe('session 13 Batch 2F worker preflight rehearsal', { timeout: 60_000 }, () => {
-  const config = loadServerConfigFrom(createFoundationTestEnv());
+  const config = loadServerConfigFrom(
+    createIntegrationDatabaseTestEnv(readDisposableIntegrationDatabaseUrl()),
+  );
   let storage: ReturnType<typeof createS3OsvAdvisoryObjectStorage> | undefined;
 
   beforeAll(async () => {

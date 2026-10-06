@@ -14,6 +14,10 @@
       "types": "./dist/public.d.ts",
       "import": "./dist/public.js"
     },
+    "./integration-test": {
+      "types": "./dist/integration-test-database.d.ts",
+      "import": "./dist/integration-test-database.js"
+    },
     "./osv-listing-evidence-key": {
       "types": "./dist/osv-listing-evidence-key.d.ts",
       "import": "./dist/osv-listing-evidence-key.js"

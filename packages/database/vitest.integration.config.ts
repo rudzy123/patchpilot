@@ -9,5 +9,7 @@ export default defineConfig({
     testTimeout: 30_000,
     // beforeAll deploys every migration. Suite test timeouts do not raise this.
     hookTimeout: 120_000,
+    teardownTimeout: 30_000,
+    globalSetup: ['./src/integration-process-global-database.ts'],
   },
 });

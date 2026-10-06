@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,8 +11,20 @@ import {
   cloneProcessEnv,
   inspectDatabaseUrl,
 } from '@patchpilot/config';
+import {
+  assertIntegrationTestProcessAllowed,
+  readIntegrationServerDatabaseUrl,
+} from '@patchpilot/config/integration-test';
 import { PrismaClient } from '@prisma/client';
 import { createFoundationTestEnv } from '@patchpilot/test-utils';
+
+import {
+  createEphemeralDatabaseName,
+  type EphemeralDatabaseLabel,
+  MAX_STALE_EPHEMERAL_DATABASES_PER_RUN,
+  quoteEphemeralDatabaseIdentifier,
+  selectStaleEphemeralDatabases,
+} from './integration-database-name.js';
 
 const execFileAsync = promisify(execFile);
 const databasePackageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -197,14 +209,24 @@ export async function sha256File(filePath: string): Promise<string> {
   return createHash('sha256').update(contents).digest('hex');
 }
 
-export function testDatabaseUrl(): string {
-  const env = createFoundationTestEnv();
-  const url = env['DATABASE_URL'];
-  if (url === undefined) {
-    throw new Error('Test DATABASE_URL is missing.');
+export function integrationServerDatabaseUrl(): string {
+  assertIntegrationTestProcessAllowed();
+  const fallback = createFoundationTestEnv()['DATABASE_URL'];
+  const candidate = readIntegrationServerDatabaseUrl(fallback);
+
+  const inspected = inspectDatabaseUrl(candidate);
+  if (inspected.databaseName !== 'patchpilot') {
+    throw new Error(
+      'Integration database creation requires a server template whose database name is patchpilot. Disposable databases are created separately.',
+    );
   }
 
-  return url;
+  assertDestructiveDatabaseCommandAllowed(createFoundationTestEnv(), candidate);
+  return candidate;
+}
+
+export function testDatabaseUrl(): string {
+  return integrationServerDatabaseUrl();
 }
 
 export function withDatabaseName(databaseUrl: string, databaseName: string): string {
@@ -213,23 +235,34 @@ export function withDatabaseName(databaseUrl: string, databaseName: string): str
   return parsed.toString();
 }
 
-export async function createEphemeralDatabase(label: 'it' | 'migrate'): Promise<{
+export async function connectIntegrationAdmin(): Promise<PrismaClient> {
+  const baseUrl = integrationServerDatabaseUrl();
+  return new PrismaClient({
+    datasources: { db: { url: withDatabaseName(baseUrl, 'postgres') } },
+  });
+}
+
+export async function createEphemeralDatabase(
+  label: EphemeralDatabaseLabel,
+  options?: { scope?: string; nowMs?: number },
+): Promise<{
   databaseName: string;
   databaseUrl: string;
   admin: PrismaClient;
 }> {
-  const env = createFoundationTestEnv();
-  const baseUrl = testDatabaseUrl();
-  assertDestructiveDatabaseCommandAllowed(env, baseUrl);
+  const baseUrl = integrationServerDatabaseUrl();
+  const databaseName = createEphemeralDatabaseName(label, options);
+  const admin = await connectIntegrationAdmin();
 
-  const databaseName = `patchpilot_${label}_${randomBytes(6).toString('hex')}`;
-  assertEphemeralTestDatabaseName(databaseName);
+  try {
+    await admin.$executeRawUnsafe(
+      `CREATE DATABASE ${quoteEphemeralDatabaseIdentifier(databaseName)}`,
+    );
+  } catch (error) {
+    await admin.$disconnect();
+    throw error;
+  }
 
-  const admin = new PrismaClient({
-    datasources: { db: { url: withDatabaseName(baseUrl, 'postgres') } },
-  });
-
-  await admin.$executeRawUnsafe(`CREATE DATABASE "${databaseName}"`);
   return {
     databaseName,
     databaseUrl: withDatabaseName(baseUrl, databaseName),
@@ -237,16 +270,84 @@ export async function createEphemeralDatabase(label: 'it' | 'migrate'): Promise<
   };
 }
 
-export async function dropEphemeralDatabase(
+export async function dropOwnedEphemeralDatabase(
   admin: PrismaClient,
   databaseName: string,
 ): Promise<void> {
   assertEphemeralTestDatabaseName(databaseName);
-  await admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
-  await admin.$disconnect();
+  await admin.$executeRawUnsafe(
+    `DROP DATABASE IF EXISTS ${quoteEphemeralDatabaseIdentifier(databaseName)} WITH (FORCE)`,
+  );
+}
+
+export async function dropEphemeralDatabase(
+  admin: PrismaClient,
+  databaseName: string,
+): Promise<void> {
+  try {
+    await dropOwnedEphemeralDatabase(admin, databaseName);
+  } finally {
+    await admin.$disconnect();
+  }
+}
+
+export async function reapStaleEphemeralDatabases(nowMs = Date.now()): Promise<{
+  dropped: string[];
+  failures: number;
+}> {
+  const admin = await connectIntegrationAdmin();
+  const dropped: string[] = [];
+  let failures = 0;
+
+  try {
+    const rows = await admin.$queryRaw<Array<{ datname: string }>>`
+      SELECT datname
+      FROM pg_database
+      WHERE datname LIKE 'patchpilot%'
+      ORDER BY datname
+    `;
+    const candidates = selectStaleEphemeralDatabases(
+      rows.map((row) => row.datname),
+      nowMs,
+      MAX_STALE_EPHEMERAL_DATABASES_PER_RUN,
+    );
+
+    for (const databaseName of candidates) {
+      const active = await admin.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint AS count
+        FROM pg_stat_activity
+        WHERE datname = ${databaseName}
+      `;
+      const activeCount = Number(active[0]?.count ?? 0);
+      if (activeCount > 0) {
+        continue;
+      }
+
+      try {
+        await dropOwnedEphemeralDatabase(admin, databaseName);
+        dropped.push(databaseName);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (/does not exist/i.test(message)) {
+          continue;
+        }
+
+        failures += 1;
+      }
+    }
+  } finally {
+    await admin.$disconnect();
+  }
+
+  if (failures > 0) {
+    process.stderr.write(`integration database stale cleanup failed for ${failures} database(s)\n`);
+  }
+
+  return { dropped, failures };
 }
 
 export async function deployMigrations(databaseUrl: string): Promise<void> {
+  assertIntegrationTestProcessAllowed();
   inspectDatabaseUrl(databaseUrl);
   await execFileAsync('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
     cwd: databasePackageRoot,
@@ -255,6 +356,8 @@ export async function deployMigrations(databaseUrl: string): Promise<void> {
 }
 
 export async function applySession3Schema(databaseUrl: string): Promise<void> {
+  assertIntegrationTestProcessAllowed();
+  inspectDatabaseUrl(databaseUrl);
   const sql = await readFile(session3Migration, 'utf8');
   const client = new PrismaClient({
     datasources: { db: { url: databaseUrl } },
@@ -280,6 +383,7 @@ export async function applyMigrationSqlAndResolve(
   databaseUrl: string,
   directory: string,
 ): Promise<void> {
+  assertIntegrationTestProcessAllowed();
   inspectDatabaseUrl(databaseUrl);
   await execFileAsync(
     'pnpm',
