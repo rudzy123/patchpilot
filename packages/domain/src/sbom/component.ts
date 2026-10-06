@@ -63,6 +63,77 @@ export function isMatchableComponentIdentity(
   return component.identityState === 'resolved';
 }
 
+const OCCURRENCE_KEY_SEPARATOR = '\u001f';
+
+/**
+ * In-memory grain for one observed version of one versionless component.
+ * This is not Component.identityKey and it is not a database column.
+ */
+export function componentOccurrenceNormalizationKey(
+  component: Pick<NormalizedComponent, 'identityKey' | 'version'>,
+): string {
+  if (component.version.kind === 'unknown') {
+    return `${component.identityKey}${OCCURRENCE_KEY_SEPARATOR}unknown`;
+  }
+  return `${component.identityKey}${OCCURRENCE_KEY_SEPARATOR}known${OCCURRENCE_KEY_SEPARATOR}${component.version.value}`;
+}
+
+export type OccurrenceAliasFacts = {
+  version: ComponentVersion;
+  versionedPurl: string | null;
+  /** Null means this representation supplied no SHA-256 evidence. */
+  sha256Hex: ReadonlySet<string> | null;
+};
+
+export type OccurrenceAliasConflict = 'version' | 'versioned_purl' | 'sha256';
+
+function sameDigestSet(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+  if (left.size !== right.size) {
+    return false;
+  }
+  for (const digest of left) {
+    if (!right.has(digest)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Same-version alias check. A missing fact does not contradict a present fact.
+ * Disagreeing facts that are present on both sides fail closed.
+ */
+export function occurrenceAliasConflict(
+  kept: OccurrenceAliasFacts,
+  candidate: OccurrenceAliasFacts,
+): OccurrenceAliasConflict | null {
+  if (kept.version.kind !== candidate.version.kind) {
+    return 'version';
+  }
+  if (
+    kept.version.kind === 'known' &&
+    candidate.version.kind === 'known' &&
+    kept.version.value !== candidate.version.value
+  ) {
+    return 'version';
+  }
+  if (
+    kept.versionedPurl !== null &&
+    candidate.versionedPurl !== null &&
+    kept.versionedPurl !== candidate.versionedPurl
+  ) {
+    return 'versioned_purl';
+  }
+  if (
+    kept.sha256Hex !== null &&
+    candidate.sha256Hex !== null &&
+    !sameDigestSet(kept.sha256Hex, candidate.sha256Hex)
+  ) {
+    return 'sha256';
+  }
+  return null;
+}
+
 export function validateNormalizedComponent(
   component: NormalizedComponent,
 ): Result<NormalizedComponent> {

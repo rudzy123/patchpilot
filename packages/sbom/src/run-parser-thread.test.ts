@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
 
+import { CURRENT_SBOM_NORMALIZATION_VERSION } from '@patchpilot/domain';
 import { describe, expect, it, vi } from 'vitest';
 
 import { defaultSbomParserLimits } from './parser-limits.js';
@@ -32,7 +33,7 @@ function requestFromText(text: string) {
     byteLength: payload.byteLength,
     limits: defaultSbomParserLimits(),
     parserVersion: '0.1.0',
-    normalizationVersion: '1',
+    normalizationVersion: CURRENT_SBOM_NORMALIZATION_VERSION,
   };
 }
 

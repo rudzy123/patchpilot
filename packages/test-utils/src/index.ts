@@ -42,7 +42,7 @@ function foundationSbomEnv(): Record<string, string> {
     OBJECT_STORAGE_REGION: 'us-east-1',
     SBOM_ORPHAN_GRACE_SECONDS: '604800',
     SBOM_PARSER_VERSION: '0.1.0',
-    SBOM_NORMALIZATION_VERSION: '1',
+    SBOM_NORMALIZATION_VERSION: '2',
   };
 }
 

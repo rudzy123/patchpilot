@@ -1,5 +1,7 @@
 export {
+  CURRENT_SBOM_NORMALIZATION_VERSION,
   FORBIDDEN_KNOWN_VERSION_STRINGS,
+  HISTORICAL_SBOM_NORMALIZATION_VERSION,
   OUTBOX_QUEUE_NAME,
   OUTBOX_RELAY_BATCH_LIMIT,
   OUTBOX_RELAY_LEASE_MS,
@@ -162,10 +164,14 @@ export {
 } from './graph-completeness.js';
 export {
   buildComponentIdentityKey,
+  componentOccurrenceNormalizationKey,
   isMatchableComponentIdentity,
+  occurrenceAliasConflict,
   validateNormalizedComponent,
   type ComponentIdentityInput,
   type NormalizedComponent,
+  type OccurrenceAliasConflict,
+  type OccurrenceAliasFacts,
 } from './component.js';
 export {
   parseWarningCodes,

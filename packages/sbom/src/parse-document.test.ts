@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { validateNormalizedComponentGraph } from '@patchpilot/domain';
+import {
+  CURRENT_SBOM_NORMALIZATION_VERSION,
+  validateNormalizedComponentGraph,
+} from '@patchpilot/domain';
 import { describe, expect, it } from 'vitest';
 
 import { parseSbomParserRequest } from './parse-document.js';
@@ -32,7 +35,7 @@ function requestFromText(
     byteLength: payload.byteLength,
     limits: defaultSbomParserLimits(),
     parserVersion: '0.1.0',
-    normalizationVersion: '1',
+    normalizationVersion: CURRENT_SBOM_NORMALIZATION_VERSION,
     ...overrides,
   };
 }
@@ -151,7 +154,7 @@ describe('parseSbomParserRequest', () => {
         byteLength: bytes.byteLength,
         limits: defaultSbomParserLimits(),
         parserVersion: '0.1.0',
-        normalizationVersion: '1',
+        normalizationVersion: CURRENT_SBOM_NORMALIZATION_VERSION,
       }),
     ).toEqual({ ok: false, disposition: 'rejected', code: 'utf8' });
 

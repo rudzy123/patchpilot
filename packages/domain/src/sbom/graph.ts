@@ -1,7 +1,11 @@
 import type { GraphCompleteness, SbomSpecificationVersion } from '../lifecycle.js';
 import { dependencyRelationshipTypes } from '../lifecycle.js';
 import { err, ok, type Result } from '../result.js';
-import { validateNormalizedComponent, type NormalizedComponent } from './component.js';
+import {
+  componentOccurrenceNormalizationKey,
+  validateNormalizedComponent,
+  type NormalizedComponent,
+} from './component.js';
 import { SBOM_INVALID_GRAPH, sbomValidationError } from './errors.js';
 import { graphCompletenessMatchesCounts } from './graph-completeness.js';
 
@@ -73,17 +77,22 @@ export function validateNormalizedComponentGraph(
 
   const components: NormalizedComponent[] = [];
   const bomRefs = new Set<string>();
-  const identityKeys = new Set<string>();
+  const occurrenceKeys = new Set<string>();
 
   for (const component of graph.components) {
     const validated = validateNormalizedComponent(component);
     if (!validated.ok) {
       return validated;
     }
-    if (identityKeys.has(validated.value.identityKey)) {
-      return err(sbomValidationError('Normalized components must not repeat identityKey values.'));
+    const occurrenceKey = componentOccurrenceNormalizationKey(validated.value);
+    if (occurrenceKeys.has(occurrenceKey)) {
+      return err(
+        sbomValidationError(
+          'Normalized components must not repeat one component and observed version.',
+        ),
+      );
     }
-    identityKeys.add(validated.value.identityKey);
+    occurrenceKeys.add(occurrenceKey);
     if (validated.value.bomRef !== null) {
       if (validated.value.bomRef.length === 0) {
         return err(sbomValidationError('bomRef must be null or non-empty.'));

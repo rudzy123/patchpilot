@@ -1,7 +1,10 @@
 import {
   buildComponentIdentityKey,
+  componentOccurrenceNormalizationKey,
+  CURRENT_SBOM_NORMALIZATION_VERSION,
   deriveGraphCompleteness,
   knownComponentVersion,
+  occurrenceAliasConflict,
   parserThreadDisposition,
   unknownComponentVersion,
   validateNormalizedComponentGraph,
@@ -18,6 +21,12 @@ import type { ParserWorkerFailure, ParserWorkerSuccess } from './parser-thread.j
 import { normalizePackageUrl, versionedPackageUrl } from './purl.js';
 
 const UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+const SHA256_CONTENT = /^[a-fA-F0-9]{64}$/;
+
+type PreparedComponent = {
+  component: NormalizedComponent;
+  sha256Hex: ReadonlySet<string> | null;
+};
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -48,6 +57,58 @@ function observedVersion(raw: string | undefined): ComponentVersion {
     return known.value;
   }
   return unknownComponentVersion();
+}
+
+function presentVersion(value: string | null | undefined): string | null {
+  if (value === undefined || value === null || value.length === 0) {
+    return null;
+  }
+  return value;
+}
+
+function resolveObservedVersion(
+  listedRaw: string | undefined,
+  purlVersion: string | null,
+): ParserWorkerFailure | ComponentVersion {
+  const listed = presentVersion(listedRaw);
+  const purl = presentVersion(purlVersion);
+  if (listed !== null && purl !== null && listed !== purl) {
+    return parserFailure('component_version_conflict');
+  }
+  return observedVersion(listed ?? purl ?? undefined);
+}
+
+function collectSha256(
+  raw: Record<string, unknown>,
+): ParserWorkerFailure | { sha256Hex: ReadonlySet<string> | null } {
+  const hashes = raw['hashes'];
+  if (hashes === undefined) {
+    return { sha256Hex: null };
+  }
+  if (!Array.isArray(hashes)) {
+    return parserFailure('schema_invalid');
+  }
+  const digests = new Set<string>();
+  for (const hash of hashes) {
+    if (!isObjectRecord(hash)) {
+      return parserFailure('schema_invalid');
+    }
+    if (asString(hash['alg']) !== 'SHA-256') {
+      continue;
+    }
+    const content = asString(hash['content']);
+    if (content === undefined || !SHA256_CONTENT.test(content)) {
+      return parserFailure('component_hash_conflict');
+    }
+    digests.add(content.toLowerCase());
+  }
+  if (digests.size === 0) {
+    return { sha256Hex: null };
+  }
+  if (digests.size > 1) {
+    return parserFailure('component_hash_conflict');
+  }
+  return { sha256Hex: digests };
 }
 
 function collectComponents(document: Record<string, unknown>): Record<string, unknown>[] {
@@ -140,10 +201,17 @@ function warningSummaries(warnings: Map<ParseWarningCode, number>): CountOnlyWar
   return summaries;
 }
 
+function finishPrepared(
+  component: NormalizedComponent,
+  sha256Hex: ReadonlySet<string> | null,
+): PreparedComponent {
+  return { component, sha256Hex };
+}
+
 function normalizeOneComponent(
   raw: Record<string, unknown>,
   limits: SbomParserLimits,
-): ParserWorkerFailure | NormalizedComponent {
+): ParserWorkerFailure | PreparedComponent {
   const name = asString(raw['name']);
   if (name === undefined || name.length === 0) {
     return parserFailure('schema_invalid');
@@ -164,6 +232,11 @@ function normalizeOneComponent(
     return parserFailure('identifier_length');
   }
 
+  const hashes = collectSha256(raw);
+  if ('ok' in hashes) {
+    return hashes;
+  }
+
   const listedVersion = asString(raw['version']);
   const group = asString(raw['group']);
   const purlRaw = asString(raw['purl']);
@@ -180,12 +253,15 @@ function normalizeOneComponent(
       return parserFailure('identifier_length');
     }
 
-    const version = observedVersion(listedVersion ?? normalized.value.version ?? undefined);
+    const version = resolveObservedVersion(listedVersion, normalized.value.version);
+    if ('ok' in version) {
+      return version;
+    }
     if (version.kind === 'known' && version.value.length > limits.maxVersionChars) {
       return parserFailure('identifier_length');
     }
 
-    let versionedPurl = normalized.value.versioned;
+    let versionedPurl = version.kind === 'known' ? normalized.value.versioned : null;
     if (versionedPurl === null && version.kind === 'known') {
       const encoded = versionedPackageUrl(normalized.value, version.value);
       if (!encoded.ok) {
@@ -210,21 +286,27 @@ function normalizeOneComponent(
       return parserFailure('identifier_length');
     }
 
-    return {
-      bomRef,
-      name,
-      namespace: normalized.value.namespace,
-      ecosystem: normalized.value.type,
-      identityState,
-      versionlessPurl: normalized.value.versionless,
-      versionedPurl,
-      version,
-      isDirect: null,
-      identityKey: identityKey.value,
-    };
+    return finishPrepared(
+      {
+        bomRef,
+        name,
+        namespace: normalized.value.namespace,
+        ecosystem: normalized.value.type,
+        identityState,
+        versionlessPurl: normalized.value.versionless,
+        versionedPurl,
+        version,
+        isDirect: null,
+        identityKey: identityKey.value,
+      },
+      hashes.sha256Hex,
+    );
   }
 
-  const version = observedVersion(listedVersion);
+  const version = resolveObservedVersion(listedVersion, null);
+  if ('ok' in version) {
+    return version;
+  }
   if (version.kind === 'known' && version.value.length > limits.maxVersionChars) {
     return parserFailure('identifier_length');
   }
@@ -242,54 +324,121 @@ function normalizeOneComponent(
     return parserFailure('identifier_length');
   }
 
-  return {
-    bomRef,
-    name,
-    namespace: group === undefined || group.length === 0 ? null : group,
-    ecosystem: null,
-    identityState,
-    versionlessPurl: null,
-    versionedPurl: null,
-    version,
-    isDirect: null,
-    identityKey: identityKey.value,
-  };
+  return finishPrepared(
+    {
+      bomRef,
+      name,
+      namespace: group === undefined || group.length === 0 ? null : group,
+      ecosystem: null,
+      identityState,
+      versionlessPurl: null,
+      versionedPurl: null,
+      version,
+      isDirect: null,
+      identityKey: identityKey.value,
+    },
+    hashes.sha256Hex,
+  );
 }
 
-function collapseDuplicateIdentities(components: NormalizedComponent[]): {
-  components: NormalizedComponent[];
-  bomRefAlias: Map<string, string>;
-  duplicateCount: number;
-} {
-  const kept: NormalizedComponent[] = [];
-  const byIdentity = new Map<string, NormalizedComponent>();
-  const bomRefAlias = new Map<string, string>();
+type CollapsedOccurrence = {
+  component: NormalizedComponent;
+  sha256Hex: ReadonlySet<string> | null;
+  names: string[];
+  bomRefs: string[];
+};
+
+/**
+ * UTF-16 code-unit order. Alias labels must not follow document order.
+ */
+function earliestText(values: readonly string[]): string | undefined {
+  let selected: string | undefined;
+  for (const value of values) {
+    if (selected === undefined || value < selected) {
+      selected = value;
+    }
+  }
+  return selected;
+}
+
+function collapseOccurrences(prepared: readonly PreparedComponent[]):
+  | ParserWorkerFailure
+  | {
+      components: NormalizedComponent[];
+      bomRefAlias: Map<string, string>;
+      duplicateCount: number;
+    } {
+  const kept: CollapsedOccurrence[] = [];
+  const byOccurrence = new Map<string, CollapsedOccurrence>();
   let duplicateCount = 0;
 
-  for (const component of components) {
-    const existing = byIdentity.get(component.identityKey);
+  for (const candidate of prepared) {
+    const key = componentOccurrenceNormalizationKey(candidate.component);
+    const existing = byOccurrence.get(key);
     if (existing === undefined) {
-      byIdentity.set(component.identityKey, component);
-      kept.push(component);
-      if (component.bomRef !== null) {
-        bomRefAlias.set(component.bomRef, component.bomRef);
-      }
+      const created: CollapsedOccurrence = {
+        component: candidate.component,
+        sha256Hex: candidate.sha256Hex,
+        names: [candidate.component.name],
+        bomRefs: candidate.component.bomRef === null ? [] : [candidate.component.bomRef],
+      };
+      byOccurrence.set(key, created);
+      kept.push(created);
       continue;
+    }
+
+    const conflict = occurrenceAliasConflict(
+      {
+        version: existing.component.version,
+        versionedPurl: existing.component.versionedPurl,
+        sha256Hex: existing.sha256Hex,
+      },
+      {
+        version: candidate.component.version,
+        versionedPurl: candidate.component.versionedPurl,
+        sha256Hex: candidate.sha256Hex,
+      },
+    );
+    if (conflict === 'sha256') {
+      return parserFailure('component_hash_conflict');
+    }
+    if (conflict !== null) {
+      return parserFailure('component_version_conflict');
+    }
+    if (existing.sha256Hex === null && candidate.sha256Hex !== null) {
+      existing.sha256Hex = candidate.sha256Hex;
+    }
+    if (existing.component.versionedPurl === null && candidate.component.versionedPurl !== null) {
+      existing.component.versionedPurl = candidate.component.versionedPurl;
     }
 
     duplicateCount += 1;
-    if (component.bomRef === null) {
-      continue;
+    existing.names.push(candidate.component.name);
+    if (candidate.component.bomRef !== null) {
+      existing.bomRefs.push(candidate.component.bomRef);
     }
-    if (existing.bomRef === null) {
-      existing.bomRef = component.bomRef;
-      bomRefAlias.set(component.bomRef, component.bomRef);
-      continue;
-    }
-    bomRefAlias.set(component.bomRef, existing.bomRef);
   }
 
-  return { components: kept, bomRefAlias, duplicateCount };
+  const bomRefAlias = new Map<string, string>();
+  for (const entry of kept) {
+    const name = earliestText(entry.names);
+    if (name !== undefined) {
+      entry.component.name = name;
+    }
+    const canonicalBomRef = earliestText(entry.bomRefs);
+    entry.component.bomRef = canonicalBomRef ?? null;
+    if (canonicalBomRef !== undefined) {
+      for (const bomRef of entry.bomRefs) {
+        bomRefAlias.set(bomRef, canonicalBomRef);
+      }
+    }
+  }
+
+  return {
+    components: kept.map((entry) => entry.component),
+    bomRefAlias,
+    duplicateCount,
+  };
 }
 
 function resolveAlias(alias: Map<string, string>, bomRef: string): string {
@@ -320,6 +469,9 @@ export function normalizeCycloneDxDocument(
   normalizationVersion: string,
   specificationVersion: ParserWorkerSuccess['specificationVersion'],
 ): ParserWorkerSuccess | ParserWorkerFailure {
+  if (normalizationVersion !== CURRENT_SBOM_NORMALIZATION_VERSION) {
+    return parserFailure('unsupported_normalization_version');
+  }
   if (!isObjectRecord(document)) {
     return parserFailure('not_cyclonedx');
   }
@@ -333,24 +485,26 @@ export function normalizeCycloneDxDocument(
     return parserFailure('component_limit');
   }
 
-  const normalized: NormalizedComponent[] = [];
+  const prepared: PreparedComponent[] = [];
   const seenBomRefs = new Set<string>();
   for (const raw of rawComponents) {
     const component = normalizeOneComponent(raw, limits);
-    if ('ok' in component && component.ok === false) {
+    if ('ok' in component) {
       return component;
     }
-    const next = component as NormalizedComponent;
-    if (next.bomRef !== null) {
-      if (seenBomRefs.has(next.bomRef)) {
+    if (component.component.bomRef !== null) {
+      if (seenBomRefs.has(component.component.bomRef)) {
         return parserFailure('duplicate_bom_ref');
       }
-      seenBomRefs.add(next.bomRef);
+      seenBomRefs.add(component.component.bomRef);
     }
-    normalized.push(next);
+    prepared.push(component);
   }
 
-  const collapsed = collapseDuplicateIdentities(normalized);
+  const collapsed = collapseOccurrences(prepared);
+  if ('ok' in collapsed) {
+    return collapsed;
+  }
   const knownBomRefs = new Set<string>();
   for (const component of collapsed.components) {
     if (component.bomRef !== null) {

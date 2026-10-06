@@ -174,6 +174,35 @@ describe('process SBOM ingestion use case', () => {
       code: 'schema_invalid',
     });
     expect(rejected.ingestion?.state).toBe('rejected');
+    expect(rejected.operations).not.toContain('graph.persistOnceForIngestion');
+
+    for (const code of ['component_version_conflict', 'component_hash_conflict'] as const) {
+      const conflict = createHarness({
+        parser: async () => ({ ok: false, code }),
+      });
+      expect(await conflict.execute(payload())).toEqual({ kind: 'rejected', code });
+      expect(conflict.ingestion?.state).toBe('rejected');
+      expect(conflict.operations).not.toContain('graph.persistOnceForIngestion');
+      expect(conflict.audits.map((row) => row.action)).toEqual(['sbom.ingestion.rejected']);
+    }
+
+    let inFlightLabel: string | undefined;
+    const inFlight = createHarness({
+      ingestionState: 'processing',
+      parser: async (input) => {
+        inFlightLabel = input.normalizationVersion;
+        return { ok: false, code: 'unsupported_normalization_version' };
+      },
+    });
+    expect(inFlight.ingestion?.normalizationVersion).toBe(NORMALIZATION_VERSION);
+    expect(await inFlight.execute(payload())).toEqual({
+      kind: 'rejected',
+      code: 'unsupported_normalization_version',
+    });
+    expect(inFlightLabel).toBe(NORMALIZATION_VERSION);
+    expect(inFlightLabel).not.toBe('2');
+    expect(inFlight.ingestion?.normalizationVersion).toBe(NORMALIZATION_VERSION);
+    expect(inFlight.operations).not.toContain('graph.persistOnceForIngestion');
 
     const timedOut = createHarness({
       parser: async () => ({ ok: false, code: 'parser_timeout' }),

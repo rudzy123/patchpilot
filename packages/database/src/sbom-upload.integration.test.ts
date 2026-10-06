@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { PrismaClient } from '@prisma/client';
 import {
+  CURRENT_SBOM_NORMALIZATION_VERSION,
   createUploadSbomUseCase,
   hashIdempotencyKey,
   wrapRawIdempotencyKey,
@@ -25,7 +26,7 @@ import { createRepositories } from './repositories.js';
 const BODY = Buffer.from('{"bomFormat":"CycloneDX","specVersion":"1.6"}');
 const SHA = createHash('sha256').update(BODY).digest('hex');
 const PARSER_VERSION = '0.1.0';
-const NORMALIZATION_VERSION = '1';
+const NORMALIZATION_VERSION = CURRENT_SBOM_NORMALIZATION_VERSION;
 const CLOCK = { now: () => new Date() };
 
 describe('session 8 sbom upload workflow persistence', () => {
@@ -84,6 +85,7 @@ describe('session 8 sbom upload workflow persistence', () => {
     expect(sbom?.sha256).toBe(SHA);
     expect(sbom?.originalFilename).toBeNull();
     expect(ingestion?.state).toBe('accepted');
+    expect(ingestion?.normalizationVersion).toBe(CURRENT_SBOM_NORMALIZATION_VERSION);
     expect(ingestion?.idempotencyKey).toBeNull();
     expect(JSON.stringify(sbom)).not.toContain(BODY.toString('utf8'));
     expect(JSON.stringify(idempotency)).not.toContain(rawKey);
@@ -141,6 +143,13 @@ describe('session 8 sbom upload workflow persistence', () => {
     const first = await upload.execute(
       input(fixture, { idempotencyKey: hashIdempotencyKey('one'), body: streamOf(BODY) }),
     );
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      return;
+    }
+    const before = await prisma.sbomIngestion.findFirstOrThrow({
+      where: { id: first.value.ingestionId },
+    });
     const second = await upload.execute(
       input(fixture, {
         idempotencyKey: hashIdempotencyKey('two'),
@@ -148,13 +157,23 @@ describe('session 8 sbom upload workflow persistence', () => {
         body: streamOf(BODY),
       }),
     );
-    expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
-    if (!first.ok || !second.ok) {
+    if (!second.ok) {
       return;
     }
     expect(second.value.sbomId).toBe(first.value.sbomId);
     expect(second.value.ingestionId).toBe(first.value.ingestionId);
+    const after = await prisma.sbomIngestion.findFirstOrThrow({
+      where: { id: first.value.ingestionId },
+    });
+    expect(after.createdAt).toEqual(before.createdAt);
+    expect(after.updatedAt).toEqual(before.updatedAt);
+    expect(after.normalizationVersion).toBe(CURRENT_SBOM_NORMALIZATION_VERSION);
+    expect(
+      await prisma.componentOccurrence.count({
+        where: { organizationId: fixture.organizationId },
+      }),
+    ).toBe(0);
     expect(await prisma.sbom.count({ where: { organizationId: fixture.organizationId } })).toBe(1);
     expect(
       await prisma.sbomIngestion.count({ where: { organizationId: fixture.organizationId } }),
@@ -167,6 +186,36 @@ describe('session 8 sbom upload workflow persistence', () => {
         where: { organizationId: fixture.organizationId, action: 'sbom.duplicate' },
       }),
     ).toBe(1);
+  });
+
+  it('creates a new ingestion when the SBOM bytes differ', async () => {
+    const fixture = await seedTenant(prisma, 'bytes');
+    const storage = memoryStorage();
+    const upload = workflow(prisma, storage);
+    const other = Buffer.from('{"bomFormat":"CycloneDX","specVersion":"1.5"}');
+    const first = await upload.execute(
+      input(fixture, { idempotencyKey: hashIdempotencyKey('bytes-a'), body: streamOf(BODY) }),
+    );
+    const second = await upload.execute(
+      input(fixture, { idempotencyKey: hashIdempotencyKey('bytes-b'), body: streamOf(other) }),
+    );
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) {
+      return;
+    }
+    expect(second.value.sbomId).not.toBe(first.value.sbomId);
+    expect(second.value.ingestionId).not.toBe(first.value.ingestionId);
+    expect(await prisma.sbom.count({ where: { organizationId: fixture.organizationId } })).toBe(2);
+    expect(
+      await prisma.sbomIngestion.count({ where: { organizationId: fixture.organizationId } }),
+    ).toBe(2);
+    const ingestions = await prisma.sbomIngestion.findMany({
+      where: { organizationId: fixture.organizationId },
+    });
+    expect(
+      ingestions.every((row) => row.normalizationVersion === CURRENT_SBOM_NORMALIZATION_VERSION),
+    ).toBe(true);
   });
 
   it('allows one concurrent reservation winner for the same hashed key', async () => {

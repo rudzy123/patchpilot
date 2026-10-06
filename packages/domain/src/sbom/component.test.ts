@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { componentIdentityStates } from '../lifecycle.js';
 import {
   buildComponentIdentityKey,
+  componentOccurrenceNormalizationKey,
   isMatchableComponentIdentity,
+  occurrenceAliasConflict,
   validateNormalizedComponent,
   type NormalizedComponent,
 } from './component.js';
@@ -177,5 +179,101 @@ describe('normalized graph', () => {
         normalizationVersion: '1',
       }).ok,
     ).toBe(false);
+  });
+
+  it('accepts two observed versions of one versionless component and rejects a repeated version', () => {
+    const first = resolvedComponent();
+    const second: NormalizedComponent = {
+      ...first,
+      bomRef: 'pkg:npm/left-pad@2.0.0',
+      version: { kind: 'known', value: '2.0.0' },
+      versionedPurl: 'pkg:npm/left-pad@2.0.0',
+      isDirect: false,
+    };
+    expect(second.identityKey).toBe(first.identityKey);
+    expect(componentOccurrenceNormalizationKey(first)).not.toBe(
+      componentOccurrenceNormalizationKey(second),
+    );
+
+    const distinct = validateNormalizedComponentGraph({
+      specificationVersion: '1.6',
+      graphCompleteness: 'complete',
+      components: [first, second],
+      edges: [
+        {
+          fromBomRef: first.bomRef ?? '',
+          toBomRef: second.bomRef ?? '',
+          relationshipType: 'depends_on',
+        },
+      ],
+      warnings: [],
+      componentCount: 2,
+      dependencyEdgeCount: 1,
+      warningCount: 0,
+      capturedAt: null,
+      parserVersion: '0.1.0',
+      normalizationVersion: '2',
+    });
+    expect(distinct.ok).toBe(true);
+
+    const repeated = validateNormalizedComponentGraph({
+      specificationVersion: '1.6',
+      graphCompleteness: 'complete',
+      components: [first, { ...first, bomRef: 'alias-ref' }],
+      edges: [
+        {
+          fromBomRef: first.bomRef ?? '',
+          toBomRef: 'alias-ref',
+          relationshipType: 'depends_on',
+        },
+      ],
+      warnings: [],
+      componentCount: 2,
+      dependencyEdgeCount: 1,
+      warningCount: 0,
+      capturedAt: null,
+      parserVersion: '0.1.0',
+      normalizationVersion: '2',
+    });
+    expect(repeated.ok).toBe(false);
+  });
+});
+
+describe('occurrence alias facts', () => {
+  const known = { kind: 'known' as const, value: '1.0.0' };
+  const hashA = new Set(['a'.repeat(64)]);
+  const hashB = new Set(['b'.repeat(64)]);
+
+  it('allows a missing hash or versioned PURL and rejects present contradictions', () => {
+    expect(
+      occurrenceAliasConflict(
+        { version: known, versionedPurl: 'pkg:npm/left-pad@1.0.0', sha256Hex: hashA },
+        { version: known, versionedPurl: 'pkg:npm/left-pad@1.0.0', sha256Hex: null },
+      ),
+    ).toBeNull();
+    expect(
+      occurrenceAliasConflict(
+        { version: known, versionedPurl: null, sha256Hex: null },
+        { version: known, versionedPurl: 'pkg:npm/left-pad@1.0.0', sha256Hex: hashA },
+      ),
+    ).toBeNull();
+    expect(
+      occurrenceAliasConflict(
+        { version: known, versionedPurl: 'pkg:npm/left-pad@1.0.0', sha256Hex: hashA },
+        { version: known, versionedPurl: 'pkg:npm/left-pad@1.0.0', sha256Hex: hashB },
+      ),
+    ).toBe('sha256');
+    expect(
+      occurrenceAliasConflict(
+        { version: known, versionedPurl: 'pkg:npm/left-pad@1.0.0', sha256Hex: null },
+        { version: known, versionedPurl: 'pkg:npm/left-pad@9.9.9', sha256Hex: null },
+      ),
+    ).toBe('versioned_purl');
+    expect(
+      occurrenceAliasConflict(
+        { version: known, versionedPurl: null, sha256Hex: null },
+        { version: { kind: 'unknown' }, versionedPurl: null, sha256Hex: null },
+      ),
+    ).toBe('version');
   });
 });

@@ -110,7 +110,7 @@ Legend: **G** global/shared catalog, **T** tenant-owned, **S** security-sensitiv
 | **VulnerabilityMatchEvaluation** vs **Finding** | Future tenant-owned append-only evaluation of one occurrence against one pinned provider revision vs the stable tenant Finding. The evaluation model is **not** implemented. Only `affected` may eventually contribute to Finding creation. |
 | **VulnerabilityMatchEvaluation** vs **FindingObservation** | Per-occurrence evaluation proof vs one summarized Finding-level observation per ingestion |
 | **Vulnerability** vs **provider revision** | Advisory identity vs one immutable or generation-visible affected-data revision used for matching. Evaluations pin a revision; they never match "latest" without identity. |
-| **Component** vs **ComponentOccurrence** | Versionless package identity vs this package **version** listed in **this ingestion** |
+| **Component** vs **ComponentOccurrence** | Versionless package identity vs one observed **version** of that package in **this ingestion**. Different observed versions are different occurrences. |
 | **Vulnerability** vs **CveIdentity** | OSV-keyed advisory row vs one canonical CVE string. Sharing a CVE does not merge advisories. |
 | **CveIdentity** vs KEV membership | Identity is the CVE string. Session 10 Batch 5B derives **active-catalog membership** by exact read-time equality of that string against active `KevEntry.normalizedCve`. Membership is not tenant exposure, not a Finding, and does not require an identity row. |
 | **Vulnerability** vs **Finding** | Shared intel vs tenant+asset observation of it. Session 9 import must not create Findings. Session 10, Session 11, and Session 12 remain zero-Finding. |
@@ -380,10 +380,10 @@ A component as listed in a specific **SBOMIngestion**, including version and bom
 | `componentId` | Versionless identity |
 | `version` | Untrusted text; **not** part of **Component** or **Finding** identity. Unknown versions persist as `version_known = false` with an empty placeholder. `*`, `latest`, and `unknown` cannot be represented as known ComponentVersion values in Session 8. They may appear only as literal observed evidence if a future explicit policy permits them. |
 | `versionedPurl` | Optional full PURL including version as listed in the document |
-| `bomRef` | Optional, untrusted |
+| `bomRef` | Optional document-local graph address. Not Component identity. Untrusted. |
 | `isDirect` | Observed from the document when present; otherwise unknown |
 
-Uniqueness: `(organizationId, sbomIngestionId, componentId, version)`. Parser reprocess of the same SBOM inserts a new ingestion and a new occurrence set; it does not overwrite a completed ingestion's graph.
+Uniqueness: `(organizationId, sbomIngestionId, componentId, version)`. One ingestion may store more than one occurrence of one Component when the observed versions differ. A known version and an explicit unknown version are different occurrences. Unknown is not `unaffected`. `bom-ref` addresses the document graph and is not Component identity. Same-version representations alias to one occurrence only when version classification, observed version, present versioned PURLs, and present SHA-256 sets agree. The stored display name and canonical `bom-ref` are the lexicographically earliest values, so document order does not choose them. Contradictory CycloneDX/PURL versions or SHA-256 digests reject the ingestion and persist no graph. Dependency paths create edges. They do not create another occurrence for a version that is already present. Occurrence versions are not updated in place. Parser reprocess of the same SBOM inserts a new ingestion and a new occurrence set; it does not overwrite a completed ingestion's graph. New graphs are labeled normalization version `2`. Completed graphs labeled `1` stay labeled `1`.
 
 ## DependencyRelationship
 
