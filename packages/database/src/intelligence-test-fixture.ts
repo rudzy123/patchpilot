@@ -2,20 +2,14 @@ import { randomUUID } from 'node:crypto';
 
 import type { PrismaClient } from '@prisma/client';
 import {
-  JSON_SCHEMA_VERSION_V1,
   parseFinalIntelligenceSnapshotObjectKey,
   type CalendarDate,
   type CanonicalCve,
   type KevNormalizedEntryRecord,
 } from '@patchpilot/domain';
 
-import {
-  SHA_A,
-  createAsset,
-  createOrg,
-  createProcessingIngestion,
-  createSbom,
-} from './sbom-test-fixture.js';
+import { insertOpenFindingForConstraintTest } from './finding-constraint-fixture.js';
+import { createAsset, createOrg } from './sbom-test-fixture.js';
 
 export const KEV_PARSER_VERSION = '0.1.0';
 export const KEV_NORMALIZATION_VERSION = '1';
@@ -132,17 +126,6 @@ export async function createStagingGeneration(
 export async function seedZeroFindingBaseline(prisma: PrismaClient) {
   const org = await createOrg(prisma, `kev-find-${randomUUID().slice(0, 8)}`);
   const asset = await createAsset(prisma, org.id, 'baseline-asset');
-  const sbom = await createSbom(prisma, {
-    organizationId: org.id,
-    assetId: asset.id,
-    sha256: SHA_A,
-    receivedAt: NOW,
-  });
-  const ingestion = await createProcessingIngestion(prisma, {
-    organizationId: org.id,
-    sbomId: sbom.id,
-    assetId: asset.id,
-  });
   const vulnerability = await prisma.vulnerability.create({
     data: { osvId: `PATCHPILOT-KEV-${randomUUID().slice(0, 8)}` },
   });
@@ -154,29 +137,18 @@ export async function seedZeroFindingBaseline(prisma: PrismaClient) {
       name: 'kev-baseline',
     },
   });
-  const finding = await prisma.finding.create({
-    data: {
-      organizationId: org.id,
-      assetId: asset.id,
-      vulnerabilityId: vulnerability.id,
-      componentId: component.id,
-      firstObservedAt: NOW,
-      lastObservedAt: NOW,
-    },
+  const created = await insertOpenFindingForConstraintTest(prisma, {
+    organizationId: org.id,
+    assetId: asset.id,
+    vulnerabilityId: vulnerability.id,
+    componentId: component.id,
   });
-  const observation = await prisma.findingObservation.create({
-    data: {
-      organizationId: org.id,
-      findingId: finding.id,
-      sbomId: sbom.id,
-      sbomIngestionId: ingestion.id,
-      result: 'present',
-      method: 'exact_purl',
-      observedAt: NOW,
-      evidence: { schemaVersion: JSON_SCHEMA_VERSION_V1, metadata: {} },
-    },
-  });
-  return { org, finding, observation, vulnerability };
+  return {
+    org,
+    finding: created.finding,
+    observation: created.observation,
+    vulnerability,
+  };
 }
 
 export function syntheticKevEntry(input: {

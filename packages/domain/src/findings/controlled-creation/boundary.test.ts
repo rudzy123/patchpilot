@@ -41,6 +41,10 @@ function walk(directory: string, files: string[] = []): string[] {
 }
 
 function isProductionSource(filePath: string): boolean {
+  const name = path.basename(filePath);
+  if (/-fixture\.ts$/.test(name) || /-harness\.ts$/.test(name) || /-test-seam\.ts$/.test(name)) {
+    return false;
+  }
   return /\.(ts|tsx|mjs)$/.test(filePath) && !/\.test\.(ts|tsx|mjs)$/.test(filePath);
 }
 
@@ -86,16 +90,15 @@ describe('controlled finding creation source boundary', () => {
 });
 
 describe('controlled finding creation production exclusion', () => {
-  it('is not constructed by API, web, worker, or database production sources', () => {
-    const roots = ['apps/api', 'apps/web', 'apps/worker', 'packages/database/src'].map((root) =>
-      path.join(repoRoot, root),
-    );
+  it('is not constructed by API, web, or worker sources', () => {
+    const roots = ['apps/api', 'apps/web', 'apps/worker'].map((root) => path.join(repoRoot, root));
     const offenders: string[] = [];
     const forbidden = [
       'issueFindingCreationAuthorization',
       'findings/controlled-creation',
       'openFindingCreationCommand',
       'presentFindingCreationAuthorization',
+      'createControlledFindingCreationPersistence',
     ];
     for (const root of roots) {
       for (const filePath of walk(root).filter(isProductionSource)) {
@@ -106,6 +109,34 @@ describe('controlled finding creation production exclusion', () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('lets only the uncomposed persistence adapter verify a sealed authorization', () => {
+    const allowed = 'packages/database/src/controlled-finding-creation-persistence.ts';
+    const offenders: string[] = [];
+    const databaseRoot = path.join(repoRoot, 'packages/database/src');
+    for (const filePath of walk(databaseRoot).filter(isProductionSource)) {
+      const relative = path.relative(repoRoot, filePath);
+      const source = readFileSync(filePath, 'utf8');
+      if (
+        source.includes('issueFindingCreationAuthorization') ||
+        source.includes('findings/controlled-creation')
+      ) {
+        offenders.push(relative);
+      }
+      const verifies =
+        source.includes('presentFindingCreationAuthorization') ||
+        source.includes('openFindingCreationCommand');
+      if (verifies && relative !== allowed) {
+        offenders.push(relative);
+      }
+    }
+    const adapter = readFileSync(path.join(repoRoot, allowed), 'utf8');
+    expect(adapter).toContain('presentFindingCreationAuthorization');
+    expect(adapter).not.toContain('issueFindingCreationAuthorization');
+    expect(offenders).toEqual([]);
+    const barrel = readFileSync(path.join(databaseRoot, 'index.ts'), 'utf8');
+    expect(barrel).not.toContain('createControlledFindingCreationPersistence');
   });
 });
 
@@ -144,16 +175,21 @@ describe('controlled finding creation issuer containment', () => {
 });
 
 describe('controlled finding creation checkpoint', () => {
-  it('records contracts without persistence or production composition', () => {
+  it('records the uncomposed creation transaction without a user-facing Finding product', () => {
     const checkpoint = readFileSync(path.join(repoRoot, 'docs/project/current-state.md'), 'utf8');
     expect(checkpoint).toContain('process-local creation authorization are implemented');
-    expect(checkpoint).toContain('Persistence is not implemented.');
-    expect(checkpoint).toContain('The evidence-link migration is not implemented.');
-    expect(checkpoint).toContain('No Finding can be created.');
+    expect(checkpoint).toContain(
+      'The atomic creation transaction and evidence-link model are implemented and production uncomposed.',
+    );
+    expect(checkpoint).toContain('Tenant-facing inspection is not implemented.');
+    expect(checkpoint).toContain('Lifecycle transitions remain unavailable.');
     expect(checkpoint).toContain('Production composition is absent.');
+    expect(checkpoint).toContain('A user-facing Finding product is not operational.');
     expect(checkpoint).toContain('Session 1-R reviewed the process-local creation authorization.');
+    expect(checkpoint).toContain('Session 2-R reviewed the creation transaction.');
     expect(checkpoint).toContain('The issuer function is not a package export.');
-    expect(checkpoint).toContain('Session 2 is next.');
+    expect(checkpoint).toContain('Session 3 inspection and explanation is next.');
+    expect(checkpoint).not.toContain('Session 2-R is next.');
     expect(checkpoint).not.toContain('Session 1-R is next.');
     expect(checkpoint).toContain('All lifecycle powers remain unavailable.');
     expect(checkpoint).toContain('The controlled product slice is not complete.');

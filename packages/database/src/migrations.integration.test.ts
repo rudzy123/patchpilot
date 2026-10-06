@@ -28,11 +28,13 @@ import {
   PRODUCT_MATCH_EVIDENCE_BATCH_2_APPROVAL,
   PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
   PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+  CONTROLLED_FINDING_CREATION,
   REVIEWER_CAPABILITY_ISSUANCE,
   applyMigrationSqlAndResolve,
   applyThroughSession14,
   applyThroughSession15,
   applyThroughReviewerCapability,
+  applyThroughProductMatchCardinality,
   applySession3Schema,
   applyThroughAuditActorAnonymous,
   applyThroughPolicyCreatorMembership,
@@ -80,6 +82,7 @@ const PRISMA_TABLES = [
   'vulnerability_cve_identity',
   'finding',
   'finding_observation',
+  'finding_creation_evidence_link',
   'risk_policy',
   'risk_calculation',
   'remediation_task',
@@ -152,6 +155,10 @@ const PRISMA_FOREIGN_KEYS = [
   'vulnerability_source_record_supersedes_revision_fkey',
   'risk_policy_created_by_membership_fkey',
   'finding_organization_id_assigned_membership_id_fkey',
+  'finding_observation_actor_membership_fkey',
+  'finding_creation_evidence_link_finding_fkey',
+  'finding_creation_evidence_link_observation_fkey',
+  'finding_creation_evidence_link_evidence_fkey',
   'local_credential_user_id_fkey',
   'session_user_id_fkey',
   'session_active_organization_id_fkey',
@@ -404,6 +411,9 @@ const SQL_ONLY_CHECKS = [
   'reviewer_capability_issuance_policy_chk',
   'reviewer_capability_lifecycle_observation_classification_chk',
   'reviewer_capability_lifecycle_observation_shape_chk',
+  'finding_creation_initial_state_chk',
+  'finding_observation_creation_shape_chk',
+  'finding_creation_evidence_link_outcome_chk',
 ] as const;
 
 const SQL_ONLY_INDEXES = [
@@ -477,6 +487,13 @@ const SQL_ONLY_INDEXES = [
   'reviewer_capability_issuance_vulnerability_idx',
   'reviewer_capability_lifecycle_observation_capability_uidx',
   'reviewer_capability_lifecycle_observation_approval_uidx',
+  'finding_alignment_key',
+  'finding_observation_org_id_key',
+  'finding_observation_alignment_key',
+  'product_match_evaluation_evidence_alignment_key',
+  'finding_creation_evidence_link_org_id_key',
+  'finding_creation_evidence_link_evidence_uidx',
+  'finding_creation_evidence_link_observation_evidence_uidx',
 ] as const;
 
 const SQL_ONLY_TRIGGERS = [
@@ -550,6 +567,15 @@ const SQL_ONLY_TRIGGERS = [
   'reviewer_capability_issuance_append_only',
   'reviewer_capability_lifecycle_observation_guard',
   'reviewer_capability_lifecycle_observation_append_only',
+  'finding_creation_insert_guard',
+  'finding_update_rejected',
+  'finding_delete_rejected',
+  'finding_observation_creation_guard',
+  'finding_creation_row_complete',
+  'finding_creation_evidence_link_guard',
+  'finding_creation_evidence_link_append_only',
+  'finding_observation_creation_complete',
+  'finding_creation_evidence_link_complete',
 ] as const;
 
 const SQL_ONLY_FUNCTIONS = [
@@ -595,6 +621,14 @@ const SQL_ONLY_FUNCTIONS = [
   'patchpilot_reviewer_capability_is_expired',
   'patchpilot_reviewer_capability_issuance_guard',
   'patchpilot_reviewer_capability_observation_guard',
+  'patchpilot_finding_creation_qualifying_evidence',
+  'patchpilot_finding_creation_insert_guard',
+  'patchpilot_finding_reject_update',
+  'patchpilot_finding_reject_delete',
+  'patchpilot_finding_observation_creation_guard',
+  'patchpilot_finding_creation_row_complete',
+  'patchpilot_finding_creation_evidence_link_guard',
+  'patchpilot_finding_creation_complete',
 ] as const;
 
 async function names(client: PrismaClient, sql: string): Promise<string[]> {
@@ -794,6 +828,21 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
     SELECT COUNT(*)::bigint AS findings FROM "finding"
   `;
   expect(Number(findingRows[0]?.findings)).toBe(0);
+  const creationRows = await client.$queryRaw<
+    Array<{
+      observations: bigint | number | string;
+      links: bigint | number | string;
+      audits: bigint | number | string;
+    }>
+  >`
+    SELECT
+      (SELECT COUNT(*) FROM "finding_observation")::bigint AS observations,
+      (SELECT COUNT(*) FROM "finding_creation_evidence_link")::bigint AS links,
+      (SELECT COUNT(*) FROM "audit_event" WHERE "action" = 'finding.created')::bigint AS audits
+  `;
+  expect(Number(creationRows[0]?.observations)).toBe(0);
+  expect(Number(creationRows[0]?.links)).toBe(0);
+  expect(Number(creationRows[0]?.audits)).toBe(0);
 
   const triggers = await names(
     client,
@@ -1307,8 +1356,8 @@ async function assertOsvAcquisitionCatalog(client: PrismaClient): Promise<void> 
 
 describe('frozen migrations', () => {
   it('keeps Session 3 through Session 13 Batch 3D-S SQL byte-stable', async () => {
-    expect(FROZEN_MIGRATIONS).toHaveLength(23);
-    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(23);
+    expect(FROZEN_MIGRATIONS).toHaveLength(24);
+    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(24);
     expect(FROZEN_MIGRATIONS.map((item) => item.directory)).toEqual([
       ...EXPECTED_APPLIED_MIGRATIONS,
     ]);
@@ -1355,32 +1404,33 @@ describe('frozen migrations', () => {
         (name) => name === SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
       ),
     ).toEqual([SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE]);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-1)).toBe(PRODUCT_MATCH_EVIDENCE_CARDINALITY);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-2)).toBe(REVIEWER_CAPABILITY_ISSUANCE);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-3)).toBe(PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-4)).toBe(PRODUCT_MATCH_EVIDENCE_BATCH_2_APPROVAL);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-5)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-1)).toBe(CONTROLLED_FINDING_CREATION);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-2)).toBe(PRODUCT_MATCH_EVIDENCE_CARDINALITY);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-3)).toBe(REVIEWER_CAPABILITY_ISSUANCE);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-4)).toBe(PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-5)).toBe(PRODUCT_MATCH_EVIDENCE_BATCH_2_APPROVAL);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-6)).toBe(
       SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-6)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-7)).toBe(
       SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-7)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-8)).toBe(
       SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-8)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-9)).toBe(
       SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-9)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-10)).toBe(
       SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-10)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-11)).toBe(
       SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-11)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-12)).toBe(
       SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-12)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-13)).toBe(
       SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
     );
     expect(
@@ -1850,6 +1900,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
 
@@ -1936,6 +1987,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2079,6 +2131,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -2145,6 +2198,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2200,6 +2254,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2253,6 +2308,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2308,6 +2364,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2362,6 +2419,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2407,6 +2465,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       const afterDef = await names(
         client,
@@ -2453,6 +2512,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2498,6 +2558,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2544,6 +2605,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2591,6 +2653,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
       const evidenceCounts = await client.$queryRaw<
@@ -2651,6 +2714,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2691,6 +2755,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -2742,6 +2807,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await deployMigrations(ephemeral.databaseUrl);
       const appliedTwice = await names(
@@ -2790,6 +2856,7 @@ describe('migrations', { timeout: 90_000 }, () => {
       );
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       const evidence = await client.$queryRaw<Array<{ count: bigint }>>`
         SELECT COUNT(*)::bigint AS count FROM "product_match_evaluation_evidence"
@@ -2799,6 +2866,62 @@ describe('migrations', { timeout: 90_000 }, () => {
       `;
       expect(Number(evidence[0]?.count)).toBe(0);
       expect(Number(findings[0]?.count)).toBe(0);
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedTwice = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedTwice).toEqual(appliedAfter);
+      expect(appliedTwice).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
+      await assertFinalMigratedSchema(client);
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades the cardinality frozen head by applying only controlled finding creation', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughProductMatchCardinality(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore.at(-1)).toBe(PRODUCT_MATCH_EVIDENCE_CARDINALITY);
+      expect(appliedBefore).not.toContain(CONTROLLED_FINDING_CREATION);
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        CONTROLLED_FINDING_CREATION,
+      ]);
+      const counts = await client.$queryRaw<
+        Array<{
+          findings: bigint;
+          observations: bigint;
+          links: bigint;
+          audits: bigint;
+        }>
+      >`
+        SELECT
+          (SELECT COUNT(*) FROM "finding")::bigint AS findings,
+          (SELECT COUNT(*) FROM "finding_observation")::bigint AS observations,
+          (SELECT COUNT(*) FROM "finding_creation_evidence_link")::bigint AS links,
+          (SELECT COUNT(*) FROM "audit_event" WHERE "action" = 'finding.created')::bigint AS audits
+      `;
+      expect(Number(counts[0]?.findings)).toBe(0);
+      expect(Number(counts[0]?.observations)).toBe(0);
+      expect(Number(counts[0]?.links)).toBe(0);
+      expect(Number(counts[0]?.audits)).toBe(0);
 
       await deployMigrations(ephemeral.databaseUrl);
       const appliedTwice = await names(
@@ -2885,6 +3008,7 @@ describe('migrations', { timeout: 90_000 }, () => {
       );
       await applyMigrationSqlAndResolve(ephemeral.databaseUrl, REVIEWER_CAPABILITY_ISSUANCE);
       await applyMigrationSqlAndResolve(ephemeral.databaseUrl, PRODUCT_MATCH_EVIDENCE_CARDINALITY);
+      await applyMigrationSqlAndResolve(ephemeral.databaseUrl, CONTROLLED_FINDING_CREATION);
       await assertFinalMigratedSchema(client);
 
       const checkDef = await names(
@@ -2984,6 +3108,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await assertFinalMigratedSchema(client);
 

@@ -41,6 +41,7 @@ import {
   deployMigrations,
   dropEphemeralDatabase,
   EXPECTED_APPLIED_MIGRATIONS,
+  CONTROLLED_FINDING_CREATION,
   PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
   PRODUCT_MATCH_EVIDENCE_CARDINALITY,
   REVIEWER_CAPABILITY_ISSUANCE,
@@ -731,9 +732,11 @@ describe('durable reviewer capability PostgreSQL persistence', () => {
       expect(beforeNames.at(-1)).toBe(PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION);
       expect(beforeNames).not.toContain(REVIEWER_CAPABILITY_ISSUANCE);
       expect(beforeNames).not.toContain(PRODUCT_MATCH_EVIDENCE_CARDINALITY);
+      expect(beforeNames).not.toContain(CONTROLLED_FINDING_CREATION);
       expect(EXPECTED_APPLIED_MIGRATIONS.filter((name) => !beforeNames.includes(name))).toEqual([
         REVIEWER_CAPABILITY_ISSUANCE,
         PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+        CONTROLLED_FINDING_CREATION,
       ]);
       await deployMigrations(ephemeral.databaseUrl);
       const appliedAfter = await client.$queryRaw<Array<{ name: string }>>`

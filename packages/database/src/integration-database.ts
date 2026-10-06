@@ -126,6 +126,10 @@ export const FROZEN_MIGRATIONS = [
     directory: '20261005120000_product_match_evidence_cardinality',
     sha256: '6a62e06d0a5ae25c198f2227c25997a63588a9f24d39337cc95379b129a425d7',
   },
+  {
+    directory: '20261006120000_controlled_finding_creation',
+    sha256: 'b646ceb889e68ab76154fded3f3c6a9b186f82be28d34a7574cb17136d1aadb1',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
@@ -174,6 +178,8 @@ export const REVIEWER_CAPABILITY_ISSUANCE = '20261003120000_reviewer_capability_
 export const PRODUCT_MATCH_EVIDENCE_CARDINALITY =
   '20261005120000_product_match_evidence_cardinality' as const;
 
+export const CONTROLLED_FINDING_CREATION = '20261006120000_controlled_finding_creation' as const;
+
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
   '20260827120000_tenant_model',
@@ -198,6 +204,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
   REVIEWER_CAPABILITY_ISSUANCE,
   PRODUCT_MATCH_EVIDENCE_CARDINALITY,
+  CONTROLLED_FINDING_CREATION,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
@@ -540,4 +547,9 @@ export async function applyThroughProductMatchEvaluation(databaseUrl: string): P
 export async function applyThroughReviewerCapability(databaseUrl: string): Promise<void> {
   await applyThroughProductMatchEvaluation(databaseUrl);
   await applyMigrationSqlAndResolve(databaseUrl, REVIEWER_CAPABILITY_ISSUANCE);
+}
+
+export async function applyThroughProductMatchCardinality(databaseUrl: string): Promise<void> {
+  await applyThroughReviewerCapability(databaseUrl);
+  await applyMigrationSqlAndResolve(databaseUrl, PRODUCT_MATCH_EVIDENCE_CARDINALITY);
 }

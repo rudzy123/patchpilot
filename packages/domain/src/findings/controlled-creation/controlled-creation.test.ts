@@ -569,11 +569,12 @@ describe('controlled finding creation contracts', () => {
     expect(FINDING_CREATION_WITHHELD_POWERS.verification).toBe('unavailable');
     expect(FINDING_CREATION_WITHHELD_POWERS.aiAuthority).toBe('unavailable');
     expect(FINDING_CREATION_EVIDENCE_ELIGIBILITY_IMPLEMENTED).toBe(false);
-    expect(FINDING_CREATION_PERSISTENCE_BOUNDARY.implemented).toBe(false);
-    expect(FINDING_CREATION_PERSISTENCE_BOUNDARY.evidenceLinkMigrationImplemented).toBe(false);
+    expect(FINDING_CREATION_PERSISTENCE_BOUNDARY.implemented).toBe(true);
+    expect(FINDING_CREATION_PERSISTENCE_BOUNDARY.evidenceLinkMigrationImplemented).toBe(true);
     expect(FINDING_CREATION_PERSISTENCE_BOUNDARY.productionComposition).toBe('absent');
     expect(FINDING_CREATION_PERSISTENCE_BOUNDARY.durableCreationAuthorityTable).toBe(false);
-    expect(FINDING_CREATION_INVARIANTS.findingCanBeCreated).toBe(false);
+    expect(FINDING_CREATION_INVARIANTS.findingCanBeCreated).toBe(true);
+    expect(FINDING_CREATION_INVARIANTS.productionRegistration).toBe('absent');
     expect(FINDING_CREATION_EVIDENCE_REQUIREMENTS).toContain('outcome_affected');
     expect(FINDING_CREATION_EVIDENCE_REQUIREMENTS).toContain('non_synthetic');
     expect(FINDING_CREATION_EVIDENCE_REQUIREMENTS).toContain(

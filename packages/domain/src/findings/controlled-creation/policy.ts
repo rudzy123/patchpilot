@@ -371,12 +371,12 @@ export const FINDING_CREATION_INVARIANTS = Object.freeze({
   issuerDeepImportSupported: false,
   internalIssuerTrustBoundary: 'same_package_relative_import',
   productionRegistration: FINDING_CREATION_PRODUCTION_REGISTRATION,
-  persistenceImplemented: false,
-  evidenceLinkMigrationImplemented: false,
-  findingCanBeCreated: false,
-  session: 'controlled_finding_session_1',
-  sessionReview: 'controlled_finding_session_1r',
-  nextSession: 'controlled_finding_session_2',
+  persistenceImplemented: true,
+  evidenceLinkMigrationImplemented: true,
+  findingCanBeCreated: true,
+  session: 'controlled_finding_session_2',
+  sessionReview: 'controlled_finding_session_2r',
+  nextSession: 'controlled_finding_session_3',
 });
 
 export const FINDING_CREATION_EVIDENCE_REQUIREMENTS = [
@@ -399,9 +399,9 @@ export type FindingCreationEvidenceRequirement =
   (typeof FINDING_CREATION_EVIDENCE_REQUIREMENTS)[number];
 
 export const FINDING_CREATION_PERSISTENCE_BOUNDARY = Object.freeze({
-  implemented: false,
-  migrationImplemented: false,
-  evidenceLinkMigrationImplemented: false,
+  implemented: true,
+  migrationImplemented: true,
+  evidenceLinkMigrationImplemented: true,
   productionComposition: 'absent',
   issuerPackageExport: 'absent',
   reloadsOrganizationAndMembership: true,
