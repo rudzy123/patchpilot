@@ -219,8 +219,11 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   nothing. Batch 2 persists issuance and consumes the capability in the same
   transaction as the approval insert. Database time sets the 900000-millisecond
   half-open expiration. The adapter is production uncomposed. The capability
-  grants no evaluator or Finding authority. ADR 0032 remains Proposed.
-  User-facing reviewer approval is not operational. Batches 1, 1-R, 2, and 2-R are committed. Branch-closure review is complete.
+  grants no evaluator or Finding authority. ADR 0032 is Accepted. Acceptance does
+  not grant Finding authority. User-facing reviewer approval is not operational.
+  Batches 1, 1-R, 2, and 2-R are committed. Branch-closure review is complete.
+  [ADR 0035](../adr/0035-controlled-finding-creation.md) accepts creation-only
+  Finding architecture and does not implement it.
 - **Separation of duties:** Exact distinct author and reviewer identities.
   Case-only and confusable differences fail closed as `ineligible_self_approved`.
 - **Approval purpose:** `approve_maintainer_reviewed_advisory_for_product_evaluation`.

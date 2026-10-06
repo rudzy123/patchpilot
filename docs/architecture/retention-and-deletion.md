@@ -20,7 +20,7 @@ Configurable knobs (for when operators opt in later in the same architecture):
 | --- | --- | --- |
 | Audit events | Keep forever | Not in v0.1 |
 | SBOM objects + **SBOM** rows | Keep | Future job after `retainUntil`; still write `sbom.purged` audit **before** object delete, keeping hash in audit |
-| Findings and calculations | Keep | Future; never without policy |
+| Findings, creation observations, evidence links, and calculations | Keep | Future; never without policy. [ADR 0035](../adr/0035-controlled-finding-creation.md) keeps creation evidence append-only. No cascade delete is authorized |
 | Match-evaluation evidence | Keep | Session 14 Batch 3 rows are insert-only; UPDATE and DELETE are forbidden; no purge job; deletion requires a later authorized migration. Session 15 Batch 3 does not insert a product-eligible row. Session 15 Batch 3-R keeps that write count at 0 |
 | Advisory revision evidence | Keep | Session 15 Batch 2 families, revisions, aliases, and Vulnerability bindings are insert-only. Session 15 Batch 2-R confirmed UPDATE and DELETE are forbidden and foreign keys are `ON DELETE RESTRICT`. No purge job |
 | Intelligence snapshots | Keep additive | Compact only identical hashes |
