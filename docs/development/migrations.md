@@ -109,7 +109,7 @@ pnpm db:migrate:deploy
 pnpm test:integration
 ```
 
-Integration tests cover clean apply, Session 3 upgrade, Session 5 upgrade, frozen migration checksums, Prisma-modeled objects, and named SQL-only extras. `prisma migrate diff` is not the sole drift check because Prisma cannot express those extras.
+`pnpm db:migrate:deploy` in that sequence checks the database named by `DATABASE_URL`. Integration tests do not use that database. They deploy the frozen chain into disposable databases. Integration tests cover clean apply, Session 3 upgrade, Session 5 upgrade, frozen migration checksums, Prisma-modeled objects, and named SQL-only extras. `prisma migrate diff` is not the sole drift check because Prisma cannot express those extras.
 
 ## Related documents
 

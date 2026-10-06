@@ -14,6 +14,7 @@ import {
   createSystemClock,
 } from '@patchpilot/auth';
 import { loadServerConfigFrom } from '@patchpilot/config';
+import { readDisposableIntegrationDatabaseUrl } from '@patchpilot/config/integration-test';
 import {
   intelligenceProviderListResponseSchema,
   intelligenceProviderStatusSchema,
@@ -30,7 +31,7 @@ import {
   resetPrismaClientForTests,
 } from '@patchpilot/database';
 import { createLogger } from '@patchpilot/logger';
-import { createFoundationTestEnv } from '@patchpilot/test-utils';
+import { createIntegrationDatabaseTestEnv } from '@patchpilot/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApi } from './app.js';
@@ -42,7 +43,9 @@ const SOCKET_IP = '192.0.2.10';
 const EMAIL = `intel-it-${randomUUID()}@synthetic.patchpilot.test`;
 
 describe('intelligence provider status routes persistence', () => {
-  const config = loadServerConfigFrom(createFoundationTestEnv());
+  const config = loadServerConfigFrom(
+    createIntegrationDatabaseTestEnv(readDisposableIntegrationDatabaseUrl()),
+  );
   const prisma = getPrismaClient({ databaseUrl: config.databaseUrl });
   const hasher = createArgon2PasswordHasher();
   let homeOrganizationId: string;
@@ -222,7 +225,9 @@ async function snapshotCounts() {
 }
 
 async function buildApp() {
-  const config = loadServerConfigFrom(createFoundationTestEnv());
+  const config = loadServerConfigFrom(
+    createIntegrationDatabaseTestEnv(readDisposableIntegrationDatabaseUrl()),
+  );
   const logger = createLogger({
     service: 'api-intelligence-integration',
     level: 'silent',
@@ -305,7 +310,9 @@ async function login(app: Awaited<ReturnType<typeof buildApp>>) {
     payload: { email: EMAIL, password: VALID_PASSWORD },
   });
   expect(loggedIn.statusCode).toBe(200);
-  const config = loadServerConfigFrom(createFoundationTestEnv());
+  const config = loadServerConfigFrom(
+    createIntegrationDatabaseTestEnv(readDisposableIntegrationDatabaseUrl()),
+  );
   return sessionFrom(loggedIn, config.auth.cookieName);
 }
 

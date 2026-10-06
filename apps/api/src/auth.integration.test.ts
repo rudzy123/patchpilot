@@ -14,6 +14,7 @@ import {
   createSystemClock,
 } from '@patchpilot/auth';
 import { loadServerConfigFrom } from '@patchpilot/config';
+import { readDisposableIntegrationDatabaseUrl } from '@patchpilot/config/integration-test';
 import type { SessionResponse } from '@patchpilot/contracts';
 import {
   createPrismaUnitOfWork,
@@ -23,7 +24,7 @@ import {
   resetPrismaClientForTests,
 } from '@patchpilot/database';
 import { createLogger } from '@patchpilot/logger';
-import { createFoundationTestEnv } from '@patchpilot/test-utils';
+import { createIntegrationDatabaseTestEnv } from '@patchpilot/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApi } from './app.js';
@@ -38,7 +39,9 @@ import {
 const SOCKET_IP = '192.0.2.10';
 
 describe('authentication routes persistence', () => {
-  const config = loadServerConfigFrom(createFoundationTestEnv());
+  const config = loadServerConfigFrom(
+    createIntegrationDatabaseTestEnv(readDisposableIntegrationDatabaseUrl()),
+  );
   const logger = createLogger({
     service: 'api-auth-integration',
     level: 'silent',

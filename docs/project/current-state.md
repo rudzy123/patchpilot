@@ -136,7 +136,7 @@ Recorded here and not implemented in this checkpoint.
 ### Before Finding implementation
 
 3. Product-match evidence cardinality. Closed by [ADR 0033](../adr/0033-product-match-evidence-cardinality.md) and `20261005120000_product_match_evidence_cardinality`. Multi-version SBOM normalization is closed by [ADR 0034](../adr/0034-multi-version-component-occurrence-normalization.md). New graphs use normalization version `2`. Historical version `1` graphs are not reprocessed.
-4. Integration-test database hermeticity. Suggested future branch: `test/integration-database-hermeticity`. API and worker integration tests should use disposable databases rather than the shared development database.
+4. Integration-test database hermeticity. API and worker integration processes, and database-package integration tests, use disposable PostgreSQL databases. The persistent development database is not the automated integration target. `pnpm test:integration` runs package suites concurrently. `pnpm test:integration:serial` is diagnostic. Lifecycle helpers are on `@patchpilot/config/integration-test`, not the production config entry, and refuse a production process environment. Test database isolation is not product tenant isolation.
 5. Dependency advisory residuals. Re-audited on 2026-10-06 with Node.js 24.20.0 and pnpm 11.24.0. The audited critical Next.js advisory and the audited Fastify, fast-uri, Sharp, source-map-js, fast-copy, and development-tooling advisories that had a patched parent release are removed from the resolved graph. Two highs remain: `deepmerge-ts@7.1.5` through Prisma, and unpatched `braces@3.0.3` through ESLint tooling. `pnpm audit` and `pnpm audit --prod` still exit 1 because of those residuals. The record is [dependency-security.md](../security/dependency-security.md). This is repository supply-chain maintenance, not a product Finding.
 6. Adjacent generic writers. Review remediation and risk-policy create methods before those workflows become reachable.
 
@@ -146,7 +146,7 @@ Recorded and not fixed. This checkpoint does not authorize destructive cleanup.
 
 - No TRUNCATE guard on append-only tables
 - Stale compiled gitignored fixture output
-- Leaked throwaway databases
+- Leaked throwaway databases that predate timestamped names. New disposable databases older than 2 hours and idle can be reaped, at most 8 per integration process start.
 - Stale merged branches
 - Development seed source-label precision
 - Fastify 6 migration for top-level `disableRequestLogging`. Fastify 5.12.5 still honors it and emits `FSTDEP023`. The warning is not disabled.

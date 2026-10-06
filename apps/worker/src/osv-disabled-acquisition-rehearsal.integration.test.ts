@@ -12,16 +12,21 @@ import https from 'node:https';
 import { inspect } from 'node:util';
 
 import { loadServerConfigFrom } from '@patchpilot/config';
+import { readDisposableIntegrationDatabaseUrl } from '@patchpilot/config/integration-test';
 import {
   createOsvAcquisitionPersistence,
   createOsvAcquisitionResumeInspection,
+  disconnectPrisma,
   getPrismaClient,
 } from '@patchpilot/database';
 import {
   createOsvAttachedBodyReadPort,
   createS3OsvAdvisoryObjectStorage,
 } from '@patchpilot/integrations';
-import { createFoundationTestEnv } from '@patchpilot/test-utils';
+import {
+  createIntegrationDatabaseTestEnv,
+  disconnectDatabaseClientAfter,
+} from '@patchpilot/test-utils';
 import {
   authorizeOsvGenerationBoundRetrieval,
   createOsvAdvisoryParserHost,
@@ -84,7 +89,9 @@ function leakHaystack(value: unknown): string {
 }
 
 describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
-  const config = loadServerConfigFrom(createFoundationTestEnv());
+  const config = loadServerConfigFrom(
+    createIntegrationDatabaseTestEnv(readDisposableIntegrationDatabaseUrl()),
+  );
   const prisma = getPrismaClient({ databaseUrl: config.databaseUrl });
   const objectStore = storage(false);
   const trackedStores: ReturnType<typeof createS3OsvAdvisoryObjectStorage>[] = [];
@@ -388,23 +395,25 @@ describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
     }
   });
 
-  afterAll(async () => {
-    https.request = originalHttpsRequest;
-    const errors: string[] = [];
-    try {
-      for (const run of tracked) {
-        await cleanupRun(run);
+  afterAll(() =>
+    disconnectDatabaseClientAfter(async () => {
+      https.request = originalHttpsRequest;
+      const errors: string[] = [];
+      try {
+        for (const run of tracked) {
+          await cleanupRun(run);
+        }
+        await cleanupSharedParsedDocument();
+      } catch (error: unknown) {
+        errors.push(error instanceof Error ? error.message : 'cleanup_failed');
       }
-      await cleanupSharedParsedDocument();
-    } catch (error: unknown) {
-      errors.push(error instanceof Error ? error.message : 'cleanup_failed');
-    }
-    objectStore.destroy();
-    if (host !== undefined) {
-      await host.shutdown();
-    }
-    expect(errors).toEqual([]);
-  });
+      objectStore.destroy();
+      if (host !== undefined) {
+        await host.shutdown();
+      }
+      expect(errors).toEqual([]);
+    }, disconnectPrisma),
+  );
 
   it('reaches ready_for_activation on a synthetic complete-inventory candidate without activating', async () => {
     const token = randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase();

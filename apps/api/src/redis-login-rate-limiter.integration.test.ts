@@ -7,8 +7,9 @@ import {
   loginIpRedisKey,
 } from '@patchpilot/auth';
 import { loadServerConfigFrom } from '@patchpilot/config';
+import { readDisposableIntegrationDatabaseUrl } from '@patchpilot/config/integration-test';
 import { createLogger } from '@patchpilot/logger';
-import { createFoundationTestEnv } from '@patchpilot/test-utils';
+import { createIntegrationDatabaseTestEnv } from '@patchpilot/test-utils';
 
 import { createRedisLoginRateLimiter } from './redis-login-rate-limiter.js';
 
@@ -18,7 +19,9 @@ describe('redis login rate limiter integration', () => {
   const accountDigest = digestLoginAccount(email);
   const ipKey = loginIpRedisKey(peerIp);
   const accountKey = loginAccountRedisKey(accountDigest);
-  const config = loadServerConfigFrom(createFoundationTestEnv());
+  const config = loadServerConfigFrom(
+    createIntegrationDatabaseTestEnv(readDisposableIntegrationDatabaseUrl()),
+  );
   const limiter = createRedisLoginRateLimiter({
     redisUrl: config.redisUrl,
     auth: {

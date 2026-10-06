@@ -27,6 +27,7 @@ jobs:
     env:
       PATCHPILOT_DEPLOYMENT_ENVIRONMENT: test
       PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS: 'true'
+      # Server template only. Suites create disposable databases and do not write to this database.
       DATABASE_URL: postgresql://patchpilot:patchpilot-dev-not-for-production@127.0.0.1:55432/patchpilot
       REDIS_URL: redis://127.0.0.1:16379
       OBJECT_STORAGE_ENDPOINT: http://127.0.0.1:19000
@@ -97,9 +98,6 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm db:generate
-
-      - name: Apply Prisma migrations
-        run: pnpm db:migrate:deploy
 
       - name: Run integration tests
         run: pnpm test:integration

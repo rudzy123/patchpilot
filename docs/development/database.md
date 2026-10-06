@@ -39,7 +39,9 @@ Persist timestamps as `timestamptz`. Generate UUIDs in PostgreSQL (`gen_random_u
 
 ## Integration tests
 
-`packages/database` integration tests create ephemeral databases named `patchpilot_it_*` or `patchpilot_migrate_*` on the local Compose/CI PostgreSQL, apply migrations, then drop those databases. They require `PATCHPILOT_ALLOW_DESTRUCTIVE_DATABASE=true` in the test env record (`createFoundationTestEnv`).
+API, worker, and database integration suites create disposable databases on the local Compose or CI PostgreSQL server. They do not use the persistent `patchpilot` development database. The server URL in `DATABASE_URL` is a template for host, port, and credentials. See [testing.md](testing.md#integration-database-isolation) for the isolation grain, migration deployment, and cleanup contract.
+
+The test env record from `createFoundationTestEnv` still carries `PATCHPILOT_ALLOW_DESTRUCTIVE_DATABASE=true` so creation is allowed only against loopback. `NODE_ENV=production` or `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production` disables the lifecycle even if that record is non-production. Production runtime configuration is unchanged.
 
 ## Related documents
 

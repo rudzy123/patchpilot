@@ -7,5 +7,7 @@ export default defineConfig({
     pool: 'threads',
     fileParallelism: false,
     testTimeout: 30_000,
+    teardownTimeout: 30_000,
+    globalSetup: ['../../packages/database/src/integration-process-global-worker.ts'],
   },
 });

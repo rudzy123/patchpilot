@@ -2,7 +2,8 @@
  * Session 12 Batch 8-R disabled OSV runtime composition rehearsal.
  *
  * Synthetic RUSTSEC bytes only. Scripted listing and retrieval. Disposable
- * MinIO, shared PostgreSQL, and isolated parser worker. No contact with
+ * MinIO, a disposable PostgreSQL database owned by this worker process, and
+ * an isolated parser worker. No contact with
  * storage.googleapis.com or osv.dev. No catalog activation, matching,
  * Findings, scheduler, Outbox, or OSV enablement.
  *
@@ -18,17 +19,22 @@ import { createHash, randomUUID } from 'node:crypto';
 import https from 'node:https';
 
 import { loadServerConfigFrom } from '@patchpilot/config';
+import { readDisposableIntegrationDatabaseUrl } from '@patchpilot/config/integration-test';
 import {
   createOsvAcquisitionPersistence,
   createOsvAcquisitionResumeInspection,
   createOsvRuntimeCoordinationPersistence,
+  disconnectPrisma,
   getPrismaClient,
 } from '@patchpilot/database';
 import {
   createOsvAttachedBodyReadPort,
   createS3OsvAdvisoryObjectStorage,
 } from '@patchpilot/integrations';
-import { createFoundationTestEnv } from '@patchpilot/test-utils';
+import {
+  createIntegrationDatabaseTestEnv,
+  disconnectDatabaseClientAfter,
+} from '@patchpilot/test-utils';
 import {
   createClosedOsvRuntimeSyncJobInput,
   createOsvAdvisoryParserHost,
@@ -64,7 +70,9 @@ function expectOk<T>(
 }
 
 describe('Session 12 Batch 8 disabled runtime composition', { timeout: 120_000 }, () => {
-  const config = loadServerConfigFrom(createFoundationTestEnv());
+  const config = loadServerConfigFrom(
+    createIntegrationDatabaseTestEnv(readDisposableIntegrationDatabaseUrl()),
+  );
   const prisma = getPrismaClient({ databaseUrl: config.databaseUrl });
   const syntheticBody = new TextEncoder().encode(
     JSON.stringify({
@@ -120,12 +128,14 @@ describe('Session 12 Batch 8 disabled runtime composition', { timeout: 120_000 }
     await prisma.$executeRaw`TRUNCATE TABLE "osv_runtime_lease_projection"`;
   });
 
-  afterAll(async () => {
-    https.request = originalHttpsRequest;
-    if (host !== undefined) {
-      await host.shutdown();
-    }
-  });
+  afterAll(() =>
+    disconnectDatabaseClientAfter(async () => {
+      https.request = originalHttpsRequest;
+      if (host !== undefined) {
+        await host.shutdown();
+      }
+    }, disconnectPrisma),
+  );
 
   it('halt before lease persists request and run without listing or provider contact', async () => {
     let listingCalls = 0;

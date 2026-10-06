@@ -96,13 +96,20 @@ export function assertDestructiveDatabaseCommandAllowed(
   return inspected;
 }
 
+const EPHEMERAL_DATABASE_NAME = /^patchpilot_(?:it|migrate)_[a-z0-9_]{12,40}$/;
+const POSTGRES_IDENTIFIER_MAX_LENGTH = 63;
+
 export function assertEphemeralTestDatabaseName(databaseName: string): void {
   if (
-    !databaseName.startsWith('patchpilot_it_') &&
-    !databaseName.startsWith('patchpilot_migrate_')
+    databaseName === 'patchpilot' ||
+    databaseName === 'postgres' ||
+    databaseName === 'template0' ||
+    databaseName === 'template1' ||
+    databaseName.length > POSTGRES_IDENTIFIER_MAX_LENGTH ||
+    !EPHEMERAL_DATABASE_NAME.test(databaseName)
   ) {
     throw new DatabaseCommandSafetyError(
-      'Ephemeral test databases must be named patchpilot_it_* or patchpilot_migrate_*.',
+      'Ephemeral test databases must match patchpilot_it_* or patchpilot_migrate_* using only lowercase letters, digits, and underscores, with length 63 or less.',
     );
   }
 }
