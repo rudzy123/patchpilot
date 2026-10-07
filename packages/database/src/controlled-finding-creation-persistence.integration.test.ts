@@ -516,7 +516,6 @@ describe('controlled finding creation persistence', () => {
       foreignResourceRevealed: false,
       authorityCreated: false,
     });
-    expect(created).not.toHaveProperty('findingId');
     const after = await lineage(seeded.organizationId);
     expect(after).toEqual({
       findings: 1,
@@ -528,6 +527,10 @@ describe('controlled finding creation persistence', () => {
     const finding = await prisma.finding.findFirstOrThrow({
       where: { organizationId: seeded.organizationId },
     });
+    expect(created.status).toBe('created');
+    if (created.status === 'created') {
+      expect(created.findingId).toBe(finding.id);
+    }
     expect(finding.state).toBe('open');
     expect(finding.componentOccurrenceId).toBeNull();
     expect(finding.resolvedAt).toBeNull();
@@ -685,6 +688,7 @@ describe('controlled finding creation persistence', () => {
     const replay = await writer().apply(sealed);
     expect(replay).toMatchObject({
       status: 'already_applied',
+      findingId: finding.id,
       writesPerformed: false,
       observationAdded: false,
       auditEventAdded: false,
@@ -711,6 +715,7 @@ describe('controlled finding creation persistence', () => {
     const conflict = await writer().apply(subset);
     expect(conflict.status).toBe('immutable_conflict');
     expect(conflict.writesPerformed).toBe(false);
+    expect(conflict).not.toHaveProperty('findingId');
     const counts = await lineage(seeded.organizationId);
     expect(counts).toMatchObject({ findings: 1, observations: 1, links: 2, audits: 1 });
   });
@@ -725,6 +730,7 @@ describe('controlled finding creation persistence', () => {
     const result = await writer().apply(other);
     expect(result.status).toBe('finding_already_exists');
     expect(result.writesPerformed).toBe(false);
+    expect(result).not.toHaveProperty('findingId');
     expect(await lineage(seeded.organizationId)).toEqual(before);
   });
 
@@ -739,6 +745,8 @@ describe('controlled finding creation persistence', () => {
     const absentResult = await writer().apply(seal(local, [randomUUID()]));
     expect(foreignResult).toEqual(absentResult);
     expect(foreignResult.status).toBe('not_found');
+    expect(foreignResult).not.toHaveProperty('findingId');
+    expect(absentResult).not.toHaveProperty('findingId');
     expect(JSON.stringify(foreignResult)).not.toContain(foreign.organizationId);
     expect(await lineage(local.organizationId)).toMatchObject({ findings: 0, audits: 0 });
     expect(await lineage(foreign.organizationId)).toMatchObject({ findings: 0 });

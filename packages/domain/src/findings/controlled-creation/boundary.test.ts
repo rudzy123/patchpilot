@@ -141,12 +141,15 @@ describe('controlled finding creation production exclusion', () => {
 });
 
 describe('controlled finding creation issuer containment', () => {
-  it('keeps the issuer out of production sources except its module', () => {
-    const allowed = 'packages/domain/src/findings/controlled-creation/authorization.ts';
+  it('keeps the issuer out of production sources except its module and the creation application', () => {
+    const allowed = new Set([
+      'packages/domain/src/findings/controlled-creation/authorization.ts',
+      'packages/domain/src/findings/controlled-operator/creation.ts',
+    ]);
     const offenders: string[] = [];
     for (const filePath of walk(repoRoot).filter(isProductionSource)) {
       const relative = path.relative(repoRoot, filePath);
-      if (relative === allowed) {
+      if (allowed.has(relative)) {
         continue;
       }
       const source = readFileSync(filePath, 'utf8');
@@ -155,6 +158,11 @@ describe('controlled finding creation issuer containment', () => {
       }
     }
     expect(offenders).toEqual([]);
+    const application = readFileSync(
+      path.join(repoRoot, 'packages/domain/src/findings/controlled-operator/creation.ts'),
+      'utf8',
+    );
+    expect(application).toContain('issueFindingCreationAuthorization');
   });
 
   it('rejects package subpath imports of the issuer module', () => {
@@ -200,7 +208,18 @@ describe('controlled finding creation checkpoint', () => {
     expect(checkpoint).not.toContain('Branch-closure review is next.');
     expect(checkpoint).not.toContain('Session 3-R is next.');
     expect(checkpoint).not.toContain('Session 2-R is next.');
-    expect(checkpoint).not.toContain('Session 1-R is next.');
+    expect(checkpoint).toContain(
+      'Controlled Finding Operator API Session 1-R reviewed the application authorization boundary.',
+    );
+    expect(checkpoint).not.toContain('Controlled Finding Operator API Session 1-R is next.');
+    expect(checkpoint).toContain('The operator permissions are implemented.');
+    expect(checkpoint).toContain(
+      'The application creation and inspection boundaries are implemented.',
+    );
+    expect(checkpoint).toContain('Private creation issuance remains contained.');
+    expect(checkpoint).toContain('HTTP routes are not yet implemented.');
+    expect(checkpoint).toContain('Production composition remains absent.');
+    expect(checkpoint).toContain('Automatic and lifecycle capabilities remain unavailable.');
     expect(checkpoint).toContain('All lifecycle powers remain unavailable.');
     expect(checkpoint).toContain('The controlled product slice is not complete.');
   });

@@ -3,7 +3,8 @@
  * Supported package surface is the `@patchpilot/domain` root export only.
  * This module is not that export. A plain object, JSON value, clone, spread,
  * prototype copy, Proxy, or type assertion is not authority.
- * `issueFindingCreationAuthorization` is the internal issuer. Same-package
+ * `issueFindingCreationAuthorization` is the internal issuer. The only
+ * production caller is the controlled creation application module. Same-package
  * relative imports can reach it. That is an internal trust boundary, not a
  * supported authority-minting API. This module does not persist a Finding.
  */

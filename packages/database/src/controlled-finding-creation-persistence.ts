@@ -464,6 +464,7 @@ async function applyInTransaction(
   return {
     schemaVersion: FINDING_CREATION_TRANSACTION_SCHEMA_VERSION,
     status: 'created',
+    findingId,
     foreignResourceRevealed: false,
     tenantDisclosure: 'indistinguishable',
     authorityCreated: false,
@@ -554,6 +555,7 @@ async function classifyStored(
     return {
       schemaVersion: FINDING_CREATION_TRANSACTION_SCHEMA_VERSION,
       status: 'already_applied',
+      findingId: finding.id,
       foreignResourceRevealed: false,
       tenantDisclosure: 'indistinguishable',
       authorityCreated: false,
