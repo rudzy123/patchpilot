@@ -73,6 +73,13 @@ test('checkpoint documents do not enable production OSV, Findings, or real produ
     readRepositoryFile('docs/adr/0026-authoritative-match-evidence-and-finding-lifecycle.md'),
     /controlled_maintainer_reviewed_finding_creation_v1/,
   );
+  assert.match(
+    readRepositoryFile('docs/adr/0036-controlled-finding-operator-api.md'),
+    /^- Status: Accepted$/m,
+  );
+  assert.match(currentState, /The protected operator API is the approved next implementation/);
+  assert.match(currentState, /Those routes are not implemented/);
+  assert.doesNotMatch(currentState, /POST \/findings` is registered/);
 
   for (const text of [currentState, readme, agents]) {
     assert.doesNotMatch(text, /Production OSV acquisition:\s*enabled/);

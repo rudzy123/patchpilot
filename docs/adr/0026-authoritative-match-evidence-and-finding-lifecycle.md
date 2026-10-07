@@ -37,6 +37,12 @@ Amended on 2026-10-06. The amendment adds the named creation-only exception
 gate, tenant isolation, affected-only evidence, idempotency, audit, replay safety, or the
 prohibition on lifecycle writes. It does not implement a Finding writer.
 
+Amended on 2026-10-07. [ADR 0036](0036-controlled-finding-operator-api.md) admits exactly two
+protected operator routes for that exception: `POST /findings` and `GET /findings/:findingId`.
+The amendment does not remove the provider-driven write gate, tenant isolation, affected-only
+evidence, idempotency, audit, replay safety, or the prohibition on lifecycle writes. It does
+not implement the routes.
+
 ## What this ADR is and is not
 
 | Kind | Meaning in this ADR |
@@ -45,7 +51,7 @@ prohibition on lifecycle writes. It does not implement a Finding writer.
 | Lifecycle policy | Binding occupancy, resolution, reopen, and protection rules; **not** implemented transitions |
 | Finding-write authorization gate | The complete list that must all be true before any Finding writer exists |
 | Future implementation | Required later; **not** present in Batch 1D |
-| Deferred | Risk scoring, KEV-after-Finding projection, Finding APIs, and fan-out runtime |
+| Deferred | Risk scoring, KEV-after-Finding projection, Finding APIs other than the two [ADR 0036](0036-controlled-finding-operator-api.md) routes, and fan-out runtime |
 | Rejected | Must not be the approved Finding or evidence foundation |
 
 Batch 1D records decisions only. Session 11 remains zero-Finding after this ADR. No matcher, no
@@ -485,8 +491,13 @@ The exception requires **all** of the following:
 10. Exact replay writes nothing and returns the existing product object. Concurrent exact
     creation converges to one authoritative result. A conflicting evidence set does not
     overwrite the Finding.
-11. The implementation remains production uncomposed. No API, web action, worker, scheduler,
-    queue, Outbox consumer, or upload trigger is included.
+11. The only production reachability this exception admits is `POST /findings` and
+    `GET /findings/:findingId`, as [ADR 0036](0036-controlled-finding-operator-api.md)
+    specifies. Those routes are authorized and are not implemented by this amendment.
+    API-process composition of the existing controlled services is the only composition
+    that may later register them. No web action, CLI, worker, scheduler, queue, Outbox
+    consumer, upload trigger, evaluator trigger, provider trigger, bulk route, Finding
+    list, or qualifying-evidence preview is included.
 12. The slice grants no downstream lifecycle authority. It does not authorize suppression,
     remediation, verification, risk, priority, assignment, notification, export, automatic
     closure, or automatic reopening.
@@ -501,7 +512,9 @@ verification, risk, priority, assignment, or provider-driven Finding creation. A
 the exception does not add a Finding writer. [ADR 0023](0023-provider-neutral-cve-identity.md)
 still forbids a dormant Finding-write service until its four-condition gate holds, including a
 tested creation path. This section supplies only the architectural authorization for the named
-creation-only write.
+creation-only write. The 2026-10-07 reachability amendment does not add a second writer and
+does not waive section 10 or the blocked-until list in section 11 for any power section 10A
+does not name.
 
 ### 12. Future positive-match transaction
 
@@ -1091,7 +1104,10 @@ Safe logging may include:
 - stable reason codes
 - job ID under established internal policy
 
-No per-comparison debug logging in production.
+No per-comparison debug logging in production. The two operator routes in
+[ADR 0036](0036-controlled-finding-operator-api.md) use a narrower rule: metric labels are the
+route template and public outcome, and logs omit evidence ids and raw resource ids. That
+narrowing does not change this list for future matching orchestration.
 
 ### 35. Security threats
 

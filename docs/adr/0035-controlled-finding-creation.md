@@ -11,6 +11,11 @@ Accepted as the architecture for one creation-only Finding slice under
 normal pull-request review. This ADR does not implement the transaction, add a migration,
 compose production, or authorize the wider Finding lifecycle.
 
+Amended on 2026-10-07. [ADR 0036](0036-controlled-finding-operator-api.md) admits exactly two
+protected operator routes, `POST /findings` and `GET /findings/:findingId`. The amendment
+does not weaken evidence completeness, sealed creation authority, replay, tenant isolation,
+audit, or the production boundary for every other surface. It does not implement the routes.
+
 ## Context
 
 [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md) accepts Finding identity
@@ -27,8 +32,9 @@ current applicability at query time. [ADR 0034](0034-multi-version-component-occ
 keeps distinct observed versions as distinct occurrences on normalization version `2`.
 Finding identity stays versionless.
 
-The Finding and FindingObservation models remain placeholder infrastructure. Persistent Finding
-count is 0. No production Finding writer exists.
+The Finding and FindingObservation models remain placeholder infrastructure for every power
+except the controlled creation transaction. Persistent Finding count is 0. The controlled
+writer exists and is production uncomposed. No production route calls it.
 
 ## Decision
 
@@ -98,7 +104,9 @@ A client-supplied `organizationId` is not authorization. Evidence authority is r
 from storage inside the creation transaction. The presented fingerprint must match that
 re-derived set. No durable creation-authority table is required. The authorization is not a
 reviewer-approval capability and cannot be reused for a second purpose. Ambient owner,
-administrator, or maintainer role is not this authorization.
+administrator, or maintainer role is not this authorization. `finding:create_controlled` is
+only the route permission in [ADR 0036](0036-controlled-finding-operator-api.md). It is not
+this sealed authorization. Administrator status remains insufficient for creation.
 
 ### 4. Atomic creation
 
@@ -153,18 +161,27 @@ versions. It does not include raw SBOM bytes, credentials, reviewer capability h
 another organization's data.
 
 A foreign Finding and an absent Finding are publicly indistinguishable. The inspection result
-does not reveal whether the identifier exists in another organization.
+does not reveal whether the identifier exists in another organization. The
+[ADR 0036](0036-controlled-finding-operator-api.md) read, when implemented, requires
+`finding:inspect` on the active session organization. `finding:read` is not that permission.
+The read still changes no state.
 
 ### 8. Production boundary
 
-The implementation remains production uncomposed. This ADR authorizes no API route, web
-action, worker, scheduler, queue, Outbox consumer, BullMQ processor, upload trigger,
-evaluator trigger, or bulk command. Production startup does not construct the creation
-command. Seed and migration do not insert Findings.
+This ADR does not itself register a route. The creation and inspection commands stay
+production uncomposed until the API-process composition authorized by
+[ADR 0036](0036-controlled-finding-operator-api.md) is implemented. That composition may
+register only `POST /findings` and `GET /findings/:findingId`. This ADR still authorizes
+no web action, CLI, worker, scheduler, queue, Outbox consumer, BullMQ processor, upload
+trigger, evaluator trigger, provider trigger, bulk command, Finding list, or
+qualifying-evidence preview. Worker, web, scheduler, and queue startup do not construct
+the creation command. API startup does not construct it in this amendment. Seed and
+migration do not insert Findings.
 
-[ADR 0023](0023-provider-neutral-cve-identity.md) still requires a tested creation path
-before a Finding writer exists. This ADR supplies the named architectural authorization
-only. It does not add a dormant writer.
+[ADR 0023](0023-provider-neutral-cve-identity.md) still requires its four-condition gate
+before any provider-driven Finding writer. The controlled writer for this slice is
+production uncomposed. This amendment does not add a second writer, and ADR 0036 does
+not satisfy the provider-driven gate.
 
 ### 9. Explicit deferrals
 
@@ -195,9 +212,10 @@ satisfy that gate.
 
 ## Migration intent
 
-The intended implementation classification is an additive evidence-link model with one
-forward migration. This ADR does not create that migration and does not change the frozen
-migration count.
+The intended implementation classification was an additive evidence-link model with one
+forward migration. That migration is implemented and frozen. This amendment does not create
+another migration and does not change the frozen migration count. [ADR 0036](0036-controlled-finding-operator-api.md)
+does not require a rate-limit migration.
 
 The future migration may:
 
@@ -245,8 +263,9 @@ object.
 
 Negative: placeholder Finding columns for assignment, due date, and risk remain in the schema
 until a later migration guards them. Operators must not read those empty columns as an
-implemented workflow. The creation command will not exist until a later implementation branch
-adds the migration and the uncomposed writer.
+implemented workflow. The creation command and evidence-link migration now exist and remain
+production uncomposed. [ADR 0036](0036-controlled-finding-operator-api.md) authorizes later
+API reachability and does not add that composition here.
 
 ## Security and tenancy
 
@@ -262,13 +281,14 @@ credentials, capability handles, or complete evidence payloads.
 
 An incomplete evidence set, a withdrawn revision, a normalization-version-1 ingestion, a
 foreign asset, or a fingerprint mismatch fails closed and writes nothing. Exact replay
-returns the existing object. An immutable conflict modifies nothing. A failed future
+returns the existing object. An immutable conflict modifies nothing. A failed database
 migration is recovered by restoring the database and reapplying the forward-only chain.
-Operators do not edit frozen migrations and do not seed Findings to make the migration pass.
+Operators do not edit frozen migrations and do not seed Findings to make a migration pass.
 
 ## Follow-up
 
-Implementation is a later branch. It may add one forward migration and one production-uncomposed
-creation command with tenant-isolation, replay, and concurrency tests. It may not add a route,
-worker, or scheduler. Repeated observations and lifecycle transitions remain unavailable until
-a separate accepted decision.
+The creation command and its forward migration are implemented and production uncomposed.
+Route implementation is a later branch under [ADR 0036](0036-controlled-finding-operator-api.md).
+That branch may register only `POST /findings` and `GET /findings/:findingId`. It may not add
+a worker, scheduler, or any other route. Repeated observations and lifecycle transitions remain
+unavailable until a separate accepted decision.
