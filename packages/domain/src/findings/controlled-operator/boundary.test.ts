@@ -55,7 +55,7 @@ describe('controlled finding operator public surface', () => {
   it('exports the permission catalog and withholds the factories and issuer', () => {
     expect(domainPublic.FINDING_CREATE_CONTROLLED_PERMISSION).toBe('finding:create_controlled');
     expect(domainPublic.FINDING_INSPECT_PERMISSION).toBe('finding:inspect');
-    expect(domainPublic.CONTROLLED_FINDING_OPERATOR_PRODUCTION_REGISTRATION).toBe('absent');
+    expect(domainPublic.CONTROLLED_FINDING_OPERATOR_PRODUCTION_REGISTRATION).toBe('api_process');
     expect(domainPublic.controlledFindingOperatorPermissionsForRole('owner')).toEqual([
       'finding:create_controlled',
       'finding:inspect',
@@ -76,7 +76,11 @@ describe('controlled finding operator public surface', () => {
     const packageJson = JSON.parse(
       readFileSync(path.join(repoRoot, 'packages/domain/package.json'), 'utf8'),
     ) as { exports: Record<string, unknown> };
-    expect(Object.keys(packageJson.exports)).toEqual(['.']);
+    expect(Object.keys(packageJson.exports).sort()).toEqual(['.', './controlled-finding-operator']);
+    const operatorExport = packageJson.exports['./controlled-finding-operator'];
+    expect(operatorExport).toMatchObject({
+      import: './dist/findings/controlled-operator/index.js',
+    });
     const barrel = readFileSync(path.join(repoRoot, 'packages/domain/src/index.ts'), 'utf8');
     expect(barrel).not.toContain('issueFindingCreationAuthorization');
     expect(barrel).not.toContain('createControlledFindingCreationApplication');
@@ -177,7 +181,7 @@ describe('controlled finding operator source boundary', () => {
 });
 
 describe('controlled finding operator production exclusion', () => {
-  it('is not constructed by API, web, worker, seed, queue, or database startup', () => {
+  it('is constructed only by the API finding runtime', () => {
     const roots = [
       'apps/api',
       'apps/web',
@@ -185,21 +189,41 @@ describe('controlled finding operator production exclusion', () => {
       'packages/auth/src',
       'packages/database/src',
     ].map((root) => path.join(repoRoot, root));
-    const forbidden = [
+    const composition = 'apps/api/src/finding-runtime.ts';
+    const factoryNeedles = [
       'createControlledFindingCreationApplication',
       'createControlledFindingInspectionApplication',
+      'controlled-finding-operator',
+    ];
+    const forbiddenEverywhere = [
       'issueFindingCreationAuthorization',
       'findings/controlled-operator',
     ];
     const offenders: string[] = [];
     for (const root of roots) {
       for (const filePath of walk(root).filter(isProductionSource)) {
+        const relative = path.relative(repoRoot, filePath);
         const source = readFileSync(filePath, 'utf8');
-        if (forbidden.some((needle) => source.includes(needle))) {
-          offenders.push(path.relative(repoRoot, filePath));
+        if (forbiddenEverywhere.some((needle) => source.includes(needle))) {
+          offenders.push(relative);
+        }
+        if (relative !== composition && factoryNeedles.some((needle) => source.includes(needle))) {
+          offenders.push(relative);
         }
       }
     }
     expect(offenders).toEqual([]);
+    const runtime = readFileSync(path.join(repoRoot, composition), 'utf8');
+    expect(runtime).toContain('createControlledFindingCreationApplication');
+    expect(runtime).toContain('createControlledFindingInspectionApplication');
+    expect(runtime).not.toContain('issueFindingCreationAuthorization');
+    const routes = readFileSync(path.join(repoRoot, 'apps/api/src/finding-routes.ts'), 'utf8');
+    expect(routes).not.toContain('issueFindingCreationAuthorization');
+    expect(routes).not.toContain('createControlledFindingCreationApplication');
+    expect(routes).not.toContain('createControlledFindingInspectionApplication');
+    expect(routes).not.toContain('createControlledFindingCreationPersistence');
+    const server = readFileSync(path.join(repoRoot, 'apps/api/src/server.ts'), 'utf8');
+    expect(server).toContain('composeControlledFindingOperatorRuntime');
+    expect(server).not.toContain('issueFindingCreationAuthorization');
   });
 });

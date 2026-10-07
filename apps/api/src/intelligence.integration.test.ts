@@ -35,6 +35,7 @@ import { createIntegrationDatabaseTestEnv } from '@patchpilot/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApi } from './app.js';
+import { denyFindingOperatorRuntime } from './finding-runtime.js';
 import { createAssetRuntime } from './asset-runtime.js';
 import { TEST_ORIGIN, VALID_PASSWORD, emptySbomRuntime } from './auth-test-harness.js';
 import { createIntelligenceRuntime } from './intelligence-runtime.js';
@@ -295,6 +296,7 @@ async function buildApp() {
       staleThresholdSeconds: config.intelligence.kevStaleThresholdSeconds,
       now: () => clock.now(),
     }),
+    findings: denyFindingOperatorRuntime(),
   });
 }
 

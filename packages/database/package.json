@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./controlled-finding-persistence": {
+      "types": "./dist/controlled-finding-persistence.d.ts",
+      "import": "./dist/controlled-finding-persistence.js"
     }
   },
   "main": "./dist/index.js",

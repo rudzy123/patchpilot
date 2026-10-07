@@ -10,10 +10,10 @@ export const FINDING_CREATE_CONTROLLED_PERMISSION = 'finding:create_controlled' 
 
 export const FINDING_INSPECT_PERMISSION = 'finding:inspect' as const;
 
-export const CONTROLLED_FINDING_OPERATOR_PRODUCTION_REGISTRATION = 'absent' as const;
+export const CONTROLLED_FINDING_OPERATOR_PRODUCTION_REGISTRATION = 'api_process' as const;
 
 export const CONTROLLED_FINDING_OPERATOR_NEXT_REVIEW =
-  'controlled_finding_operator_api_session_2' as const;
+  'controlled_finding_operator_api_reviewed' as const;
 
 export type ControlledFindingOperatorPermission =
   typeof FINDING_CREATE_CONTROLLED_PERMISSION | typeof FINDING_INSPECT_PERMISSION;

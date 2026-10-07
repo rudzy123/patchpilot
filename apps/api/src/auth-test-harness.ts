@@ -47,6 +47,8 @@ import { buildApi } from './app.js';
 import type { AssetRuntime } from './asset-runtime.js';
 import type { AuthRuntime } from './auth-runtime.js';
 import type { DatabaseReadyCheck } from './app.js';
+import type { FindingOrganizationRateLimiter } from './finding-rate-limit.js';
+import { denyFindingOperatorRuntime, type FindingOperatorRuntime } from './finding-runtime.js';
 import { createIntelligenceRuntime, type IntelligenceRuntime } from './intelligence-runtime.js';
 import type { SbomRuntime } from './sbom-runtime.js';
 
@@ -87,6 +89,8 @@ export async function buildTestApi(options?: {
   assets?: AssetRuntime;
   sboms?: SbomRuntime;
   intelligence?: IntelligenceRuntime;
+  findings?: FindingOperatorRuntime;
+  findingOrganizationLimiter?: FindingOrganizationRateLimiter;
 }) {
   const harness = options?.harness ?? createAuthTestHarness(options);
   const app = await buildApi({
@@ -98,6 +102,10 @@ export async function buildTestApi(options?: {
     sboms: options?.sboms ?? emptySbomRuntime(),
     intelligence:
       options?.intelligence ?? emptyIntelligenceRuntime(options?.config ?? harness.config),
+    findings: options?.findings ?? denyFindingOperatorRuntime(),
+    ...(options?.findingOrganizationLimiter === undefined
+      ? {}
+      : { findingOrganizationLimiter: options.findingOrganizationLimiter }),
     ...(options?.now === undefined ? {} : { now: options.now }),
     ...(options?.generateId === undefined ? {} : { generateId: options.generateId }),
   });
@@ -188,7 +196,7 @@ export function createAuthTestHarness(options?: {
   };
 }
 
-function emptyAssetRuntime(): AssetRuntime {
+export function emptyAssetRuntime(): AssetRuntime {
   const denied = {
     async execute() {
       return { ok: false as const, error: ORGANIZATION_CONTEXT_REQUIRED };

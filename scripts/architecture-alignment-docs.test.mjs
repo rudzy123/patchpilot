@@ -49,7 +49,7 @@ test('checkpoint documents do not enable production OSV, Findings, or real produ
   assert.match(currentState, /Production OSV acquisition:\s*disabled/);
   assert.match(
     currentState,
-    /Finding creation from match evidence:\s*controlled transaction implemented, production uncomposed/,
+    /Finding creation from match evidence:\s*controlled transaction implemented and composed only by owner POST \/findings in the API process/,
   );
   assert.match(currentState, /Real product-eligible evaluation count:\s*0\b/);
   assert.match(currentState, /Persistent product-eligible evaluation count:\s*0\b/);
@@ -77,8 +77,13 @@ test('checkpoint documents do not enable production OSV, Findings, or real produ
     readRepositoryFile('docs/adr/0036-controlled-finding-operator-api.md'),
     /^- Status: Accepted$/m,
   );
-  assert.match(currentState, /The protected operator API is the approved next implementation/);
-  assert.match(currentState, /Those routes are not implemented/);
+  assert.match(currentState, /POST \/findings is composed and owner-only/);
+  assert.match(currentState, /GET \/findings\/:findingId is composed for owners and admins/);
+  assert.match(
+    currentState,
+    /Controlled Finding Operator API Session 2-R reviewed the composed routes/,
+  );
+  assert.match(currentState, /Exact replay is publicly reachable/);
   assert.doesNotMatch(currentState, /POST \/findings` is registered/);
 
   for (const text of [currentState, readme, agents]) {

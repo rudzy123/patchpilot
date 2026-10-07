@@ -80,25 +80,30 @@ describe('controlled finding inspection public surface', () => {
 });
 
 describe('controlled finding inspection production exclusion', () => {
-  it('is not constructed by API, web, worker, or seed sources', () => {
+  it('is not constructed by API, web, worker, or seed sources except the API runtime', () => {
     const roots = ['apps/api', 'apps/web', 'apps/worker', 'packages/database/src/seed'].map(
       (root) => path.join(repoRoot, root),
     );
-    const forbidden = [
-      'openFindingInspection',
-      'findings/controlled-inspection',
-      'createControlledFindingInspectionPersistence',
-    ];
+    const persistence = 'createControlledFindingInspectionPersistence';
+    const allowedPersistence = new Set(['apps/api/src/finding-runtime.ts']);
+    const forbidden = ['openFindingInspection', 'findings/controlled-inspection'];
     const offenders: string[] = [];
     for (const root of roots) {
       for (const filePath of walk(root).filter(isProductionSource)) {
+        const relative = path.relative(repoRoot, filePath);
         const source = readFileSync(filePath, 'utf8');
         if (forbidden.some((needle) => source.includes(needle))) {
-          offenders.push(path.relative(repoRoot, filePath));
+          offenders.push(relative);
+        }
+        if (source.includes(persistence) && !allowedPersistence.has(relative)) {
+          offenders.push(relative);
         }
       }
     }
     expect(offenders).toEqual([]);
+    const runtime = readFileSync(path.join(repoRoot, 'apps/api/src/finding-runtime.ts'), 'utf8');
+    expect(runtime).toContain(persistence);
+    expect(runtime).not.toContain('openFindingInspection');
   });
 
   it('is not registered on the repository, outbox, queue, or startup roots', () => {

@@ -1,8 +1,9 @@
 /**
- * Production-uncomposed controlled Finding creation.
+ * Controlled Finding creation transaction.
  * One transaction inserts one Finding, one creation observation, one evidence
  * link per qualifying row, and one audit event, or inserts none of them.
- * API, web, worker, seed, and the package barrel do not construct this adapter.
+ * The API finding operator runtime is the only production constructor.
+ * Web, worker, seed, and the package barrel do not construct this adapter.
  */
 
 import { createHash } from 'node:crypto';

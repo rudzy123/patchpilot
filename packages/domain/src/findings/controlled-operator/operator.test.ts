@@ -163,10 +163,10 @@ describe('controlled finding operator permissions', () => {
     }
   });
 
-  it('keeps the operator application production registration absent', () => {
-    expect(CONTROLLED_FINDING_OPERATOR_PRODUCTION_REGISTRATION).toBe('absent');
+  it('records API-process registration and the next review', () => {
+    expect(CONTROLLED_FINDING_OPERATOR_PRODUCTION_REGISTRATION).toBe('api_process');
     expect(CONTROLLED_FINDING_OPERATOR_NEXT_REVIEW).toBe(
-      'controlled_finding_operator_api_session_2',
+      'controlled_finding_operator_api_reviewed',
     );
     expect(FINDING_CREATION_INVARIANTS.issuerProductionCaller).toBe(
       'controlled_finding_creation_application',

@@ -20,6 +20,7 @@
     "src/integration-typescript-resolver-hooks.mjs",
     "src/intelligence-test-fixture.ts",
     "src/finding-constraint-fixture.ts",
+    "src/controlled-finding-operator-seed-fixture.ts",
     "src/reviewer-capability-approval-harness.ts",
     "src/reviewer-capability-test-seam.ts",
     "src/osv-bounded-listing-canary-operator-main.ts",

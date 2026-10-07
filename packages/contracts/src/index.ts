@@ -120,6 +120,15 @@ export {
   type IntelligenceProviderStatus,
   type IntelligencePublicFailureCodeContract,
 } from './intelligence.js';
+export {
+  controlledFindingCreationRequestSchema,
+  controlledFindingCreationResponseSchema,
+  controlledFindingIdParamSchema,
+  controlledFindingInspectionResponseSchema,
+  type ControlledFindingCreationRequest,
+  type ControlledFindingCreationResponse,
+  type ControlledFindingInspectionResponse,
+} from './findings.js';
 
 export const healthServiceSchema = z.enum(['api', 'web', 'worker']);
 
