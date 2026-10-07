@@ -6,7 +6,7 @@ A **finding** is the tenant-owned link between an asset's observed component ide
 
 Session 8 ([ADR 0020](../adr/0020-sbom-ingestion-graph-completion.md)) may mark an ingestion `completed` after evidence verification and graph persist **without** creating findings. `graphCompleteness` values `empty` and `no_dependencies` are not remediation evidence: `empty` does not mean the Asset contains no software, and `no_dependencies` does not prove the software has no dependencies. Future correlation is a separate additive workflow.
 
-This document is lifecycle **architecture**. Session 11 and Session 12 remain zero-Finding. Session 14 Batch 3 persists uncomposed match-evaluation evidence and does not create Findings. No Finding ensure, observation ensure, or Finding-write runtime exists. Session 13 is not Finding-write authorization.
+This document is lifecycle **architecture**. Session 11 and Session 12 remain zero-Finding. Session 14 Batch 3 persists uncomposed match-evaluation evidence and does not create Findings. No production Finding ensure, observation ensure, or Finding-write runtime exists. The controlled writer and inspection reader are production uncomposed. Session 13 is not Finding-write authorization.
 
 ## Identity
 
@@ -92,7 +92,7 @@ If the diagram is not rendered, the transition table is authoritative.
 
 | Transition | Actor | Required fields |
 | --- | --- | --- |
-| Create `open` | purpose-specific maintainer-reviewed command under [ADR 0035](../adr/0035-controlled-finding-creation.md). Contracts exist. The writer is not implemented | Complete current affected Product Match Evidence set, one creation observation, one evidence link per qualifying row, and one audit event. Not automatic correlation. Not a provider-driven write |
+| Create `open` | purpose-specific maintainer-reviewed command under [ADR 0035](../adr/0035-controlled-finding-creation.md). The writer is implemented and production uncomposed | Complete current affected Product Match Evidence set, one creation observation, one evidence link per qualifying row, and one audit event. Not automatic correlation. Not a provider-driven write |
 | → `verification_pending` | system when task → `completed` **and** finding is `open`, or `member`+ request verify **from `open`** | Task id or reason. Must **not** run if finding is `risk_accepted`, `mitigated`, or `false_positive` |
 | → `risk_accepted` | system when **RiskAcceptance** becomes `active` | See [remediation-lifecycle.md](remediation-lifecycle.md) (requester, approver, expiry) |
 | → `mitigated` | `admin` or `owner` | Compensating-control **Evidence** id, reason |
@@ -218,7 +218,7 @@ Due dates on the Finding row are tenant workflow data. CISA KEV `dueDate` / `req
 
 ## Session 15 provenance boundary
 
-Product-eligible affected match evidence is necessary and insufficient for Finding creation. Session 15 Batch 1 defines that boundary. Session 15 eligibility composition does not persist a product-eligible evaluation. Product Match Evidence later added a separate explicit command. The provider-free product-evidence path is implemented and verified in disposable PostgreSQL. Persistent product-eligible evaluation count: 0. That evidence is production uncomposed and is not Finding authority. Real product-eligible evaluation count remains 0. [ADR 0035](../adr/0035-controlled-finding-creation.md) accepts creation-only architecture. Session 1 implements its contracts and process-local authorization. The atomic creation transaction is implemented and production uncomposed. Safe inspection and explanation are implemented and production uncomposed. Lifecycle transitions remain unavailable. Finding creation remains unavailable. Synthetic Session 14 evidence cannot be relabeled into that prerequisite.
+Product-eligible affected match evidence is necessary and insufficient for Finding creation. Session 15 Batch 1 defines that boundary. Session 15 eligibility composition does not persist a product-eligible evaluation. Product Match Evidence later added a separate explicit command. The provider-free product-evidence path is implemented and verified in disposable PostgreSQL. Persistent product-eligible evaluation count: 0. That evidence is production uncomposed and is not Finding authority. Real product-eligible evaluation count remains 0. [ADR 0035](../adr/0035-controlled-finding-creation.md) accepts creation-only architecture. Session 1 implements its contracts and process-local authorization. The atomic creation transaction is implemented and production uncomposed. Safe inspection and explanation are implemented and production uncomposed. Lifecycle transitions remain unavailable. Automatic and user-facing Finding creation remain unavailable. Synthetic Session 14 evidence cannot be relabeled into that prerequisite.
 
 ## Related documents
 

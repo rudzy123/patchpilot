@@ -266,7 +266,7 @@ Session 12 implemented the disabled, uncomposed runtime-enablement foundation. P
 
 ## Closed by controlled Finding architecture governance
 
-Reviewer-capability adversarial review is closed. Batches 1, 1-R, 2, and 2-R are committed. [ADR 0032](../adr/0032-maintainer-reviewed-advisory-authority.md) is Accepted. Durable issuance, database time, exact target binding, and atomic approval consumption are implemented and production uncomposed. The adapter is not a user-facing approval workflow and is not Finding authority. Creation-only Finding architecture is Accepted in [ADR 0035](../adr/0035-controlled-finding-creation.md) and is not implemented.
+Reviewer-capability adversarial review is closed. Batches 1, 1-R, 2, and 2-R are committed. [ADR 0032](../adr/0032-maintainer-reviewed-advisory-authority.md) is Accepted. Durable issuance, database time, exact target binding, and atomic approval consumption are implemented and production uncomposed. The adapter is not a user-facing approval workflow and is not Finding authority. Creation-only Finding architecture is Accepted in [ADR 0035](../adr/0035-controlled-finding-creation.md). The atomic creation transaction, evidence links, and safe inspection are implemented and production uncomposed. Lifecycle transitions remain unavailable.
 
 ## Still open
 
