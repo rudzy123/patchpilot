@@ -181,14 +181,21 @@ describe('controlled finding creation checkpoint', () => {
     expect(checkpoint).toContain(
       'The atomic creation transaction and evidence-link model are implemented and production uncomposed.',
     );
-    expect(checkpoint).toContain('Tenant-facing inspection is not implemented.');
+    expect(checkpoint).toContain(
+      'Safe inspection and explanation are implemented and production uncomposed.',
+    );
     expect(checkpoint).toContain('Lifecycle transitions remain unavailable.');
     expect(checkpoint).toContain('Production composition is absent.');
     expect(checkpoint).toContain('A user-facing Finding product is not operational.');
     expect(checkpoint).toContain('Session 1-R reviewed the process-local creation authorization.');
     expect(checkpoint).toContain('Session 2-R reviewed the creation transaction.');
     expect(checkpoint).toContain('The issuer function is not a package export.');
-    expect(checkpoint).toContain('Session 3 inspection and explanation is next.');
+    expect(checkpoint).toContain('Session 3-R reviewed safe inspection and explanation.');
+    expect(checkpoint).toContain('publicly indistinguishable');
+    expect(checkpoint).toContain('Explanation is derived from immutable evidence.');
+    expect(checkpoint).toContain('Applicability is read time only.');
+    expect(checkpoint).toContain('Branch-closure review is next.');
+    expect(checkpoint).not.toContain('Session 3-R is next.');
     expect(checkpoint).not.toContain('Session 2-R is next.');
     expect(checkpoint).not.toContain('Session 1-R is next.');
     expect(checkpoint).toContain('All lifecycle powers remain unavailable.');
