@@ -493,11 +493,17 @@ The exception requires **all** of the following:
     overwrite the Finding.
 11. The only production reachability this exception admits is `POST /findings` and
     `GET /findings/:findingId`, as [ADR 0036](0036-controlled-finding-operator-api.md)
-    specifies. Those routes are authorized and are not implemented by this amendment.
+    specifies, together with the read-only route
+    `GET /assets/:assetId/controlled-finding-targets`, as
+    [ADR 0037](0037-controlled-finding-target-discovery.md) specifies. The creation and
+    inspection routes are authorized and are not implemented by this amendment.
     API-process composition of the existing controlled services is the only composition
-    that may later register them. No web action, CLI, worker, scheduler, queue, Outbox
-    consumer, upload trigger, evaluator trigger, provider trigger, bulk route, Finding
-    list, or qualifying-evidence preview is included.
+    that may later register the creation and inspection routes. Discovery is a separate
+    read-only API-process composition under ADR 0037 and is not a Finding writer. No web action, CLI,
+    worker, scheduler, queue, Outbox consumer, upload trigger, evaluator trigger,
+    provider trigger, bulk route, Finding list, second preview, cross-asset discovery,
+    or create-all is included. Further amended on 2026-10-07. The qualifying-evidence
+    preview exclusion remains in force for every surface ADR 0037 does not name.
 12. The slice grants no downstream lifecycle authority. It does not authorize suppression,
     remediation, verification, risk, priority, assignment, notification, export, automatic
     closure, or automatic reopening.

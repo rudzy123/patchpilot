@@ -94,6 +94,7 @@ Deny by default. Check **permission constants**, not scattered role comparisons.
 | `finding:triage` | | yes | yes | yes |
 | `finding:create_controlled` | | | | yes |
 | `finding:inspect` | | | yes | yes |
+| `finding:discover_controlled` | | | yes | yes |
 | `remediation:manage` | | yes | yes | yes |
 | `risk_acceptance:request` | | | yes | yes |
 | `risk_acceptance:approve` | | | | yes |
@@ -104,7 +105,7 @@ Deny by default. Check **permission constants**, not scattered role comparisons.
 | `audit:read` | yes | yes | yes | yes |
 | `intelligence:read` | yes | yes | yes | yes |
 
-A later ADR may supersede this catalog. Owner can both request and approve risk acceptance; that residual is documented, not a bypass. [ADR 0022](0022-intelligence-provider-status-authorization.md) adds `intelligence:read` for sanitized global provider-status GETs. It does not supersede this catalog, reuse `integration:read`, or close instance-operator identity. [ADR 0036](0036-controlled-finding-operator-api.md) adds `finding:create_controlled` and `finding:inspect` for the protected operator routes. Owner receives both. Admin receives inspection only. Member and viewer receive neither. `finding:triage` is not creation authority. `finding:read` is not inspection authority for those routes. The two permissions are not interchangeable. This catalog is extended, not superseded.
+A later ADR may supersede this catalog. Owner can both request and approve risk acceptance; that residual is documented, not a bypass. [ADR 0022](0022-intelligence-provider-status-authorization.md) adds `intelligence:read` for sanitized global provider-status GETs. It does not supersede this catalog, reuse `integration:read`, or close instance-operator identity. [ADR 0036](0036-controlled-finding-operator-api.md) adds `finding:create_controlled` and `finding:inspect` for the protected operator routes. Owner receives both. Admin receives inspection only. Member and viewer receive neither. `finding:triage` is not creation authority. `finding:read` is not inspection authority for those routes. The two permissions are not interchangeable. [ADR 0037](0037-controlled-finding-target-discovery.md) adds `finding:discover_controlled` for one later read-only asset-scoped discovery route. Owner and admin receive it. Member and viewer do not. It does not grant creation, inspection, or lifecycle authority, and those permissions do not grant discovery. The discovery constant is not implemented until that implementation branch. This catalog is extended, not superseded.
 
 ### Login abuse controls
 
