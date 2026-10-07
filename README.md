@@ -2,7 +2,7 @@
 
 Self-hosted vulnerability prioritization and remediation. The product must remain fully useful without an AI provider.
 
-PatchPilot currently provides production-composed inventory, SBOM ingestion, and KEV intelligence foundations. Reviewed advisory approval and legal product-evidence verification are implemented but production uncomposed. Persistent product-eligible evaluation count is zero. Automatic matching and Finding creation remain unavailable. Production OSV acquisition remains disabled. Findings, prioritization, remediation, and verification are not operational.
+PatchPilot currently provides production-composed inventory, SBOM ingestion, and KEV intelligence foundations. Reviewed advisory approval and legal product-evidence verification are implemented but production uncomposed. Persistent product-eligible evaluation count is zero. Automatic matching and automatic Finding creation remain unavailable. Owner POST /findings and owner or admin GET /findings/:findingId are composed in the API. Production OSV acquisition remains disabled. A user-facing Finding product, prioritization, remediation, and verification are not operational.
 
 The repository is a pnpm + Turborepo monorepo with `web`, `api`, and `worker` applications, shared packages, and local Compose for PostgreSQL, Redis, and MinIO. The capability checkpoint is [docs/project/current-state.md](docs/project/current-state.md).
 
