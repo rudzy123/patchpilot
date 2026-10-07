@@ -72,7 +72,7 @@ Canonical detail is [.cursor/rules/security.mdc](.cursor/rules/security.mdc). Th
 - Tests must not contact `storage.googleapis.com` or `osv.dev`.
 - Synthetic evidence is not product evidence. `unknown` is not `unaffected`. An `affected` result is not Finding authority.
 - Real product-eligible evaluation count remains 0. Product-evidence eligibility composition is not product matching. In the accepted zero-eligibility state it invokes no product evaluator and writes no product match row.
-- Finding creation from match evidence is unavailable. The Finding schema is placeholder infrastructure. Do not describe it as an operational workflow.
+- Finding creation from match evidence is a controlled, production-uncomposed transaction. Safe inspection and explanation are implemented and production uncomposed. Lifecycle transitions remain unavailable. Do not describe a user-facing Finding product as operational.
 - Match-evaluation evidence and advisory revisions are immutable. Do not update or delete audit rows in place. Do not cascade-delete evidence.
 - Protected provider identities stay off public reads. Optional AI, if it ever exists, is never authoritative.
 - GitHub and other source-control integrations are not MVP.

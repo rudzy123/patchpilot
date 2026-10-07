@@ -10,6 +10,7 @@ import {
   deployMigrations,
   dropEphemeralDatabase,
 } from './integration-database.js';
+import { insertOpenFindingForConstraintTest } from './finding-constraint-fixture.js';
 import { createRepositories } from './repositories.js';
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -551,15 +552,11 @@ describe('session 5 review corrections', () => {
     const component = await prisma.component.create({
       data: { organizationId: orgA.id, identityKey: 'npm|act', ecosystem: 'npm', name: 'act' },
     });
-    const finding = await prisma.finding.create({
-      data: {
-        organizationId: orgA.id,
-        assetId: assetA.id,
-        vulnerabilityId: vulnerability.id,
-        componentId: component.id,
-        firstObservedAt: new Date(),
-        lastObservedAt: new Date(),
-      },
+    const { finding } = await insertOpenFindingForConstraintTest(prisma, {
+      organizationId: orgA.id,
+      assetId: assetA.id,
+      vulnerabilityId: vulnerability.id,
+      componentId: component.id,
     });
     await expect(
       prisma.finding.update({

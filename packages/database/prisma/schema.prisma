@@ -978,35 +978,35 @@ model Organization {
   createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships           Membership[]
-  sessions              Session[]
-  teams                 Team[]
-  teamMemberships       TeamMembership[]
-  environments          Environment[]
-  assets                Asset[]
-  assetOwners           AssetOwner[]
-  assetTags             AssetTag[]
-  assetExternalIds      AssetExternalIdentifier[]
-  repositoryConnections RepositoryConnection[]
-  sboms                 Sbom[]
-  sbomIngestions        SbomIngestion[]
-  components            Component[]
-  componentOccurrences  ComponentOccurrence[]
-  dependencyEdges       DependencyRelationship[]
-  findings              Finding[]
-  findingObservations   FindingObservation[]
-  riskPolicies          RiskPolicy[]
-  riskCalculations      RiskCalculation[]
-  remediationTasks      RemediationTask[]
-  riskAcceptances       RiskAcceptance[]
-  evidence              Evidence[]
-  auditEvents           AuditEvent[]
-  integrations          Integration[]
-  externalCredentials   ExternalCredential[]
-  outboxEvents          OutboxEvent[]
-  backgroundJobs        BackgroundJob[]
-  idempotencyRecords    IdempotencyRecord[]
-  matchEvaluationEvidence MatchEvaluationEvidence[]
+  memberships                    Membership[]
+  sessions                       Session[]
+  teams                          Team[]
+  teamMemberships                TeamMembership[]
+  environments                   Environment[]
+  assets                         Asset[]
+  assetOwners                    AssetOwner[]
+  assetTags                      AssetTag[]
+  assetExternalIds               AssetExternalIdentifier[]
+  repositoryConnections          RepositoryConnection[]
+  sboms                          Sbom[]
+  sbomIngestions                 SbomIngestion[]
+  components                     Component[]
+  componentOccurrences           ComponentOccurrence[]
+  dependencyEdges                DependencyRelationship[]
+  findings                       Finding[]
+  findingObservations            FindingObservation[]
+  riskPolicies                   RiskPolicy[]
+  riskCalculations               RiskCalculation[]
+  remediationTasks               RemediationTask[]
+  riskAcceptances                RiskAcceptance[]
+  evidence                       Evidence[]
+  auditEvents                    AuditEvent[]
+  integrations                   Integration[]
+  externalCredentials            ExternalCredential[]
+  outboxEvents                   OutboxEvent[]
+  backgroundJobs                 BackgroundJob[]
+  idempotencyRecords             IdempotencyRecord[]
+  matchEvaluationEvidence        MatchEvaluationEvidence[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@index([status], map: "organization_status_idx")
@@ -1084,18 +1084,19 @@ model Membership {
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization             Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  user                     User              @relation(fields: [userId], references: [id], onDelete: Restrict)
-  teamMemberships          TeamMembership[]
-  assetOwners              AssetOwner[]      @relation("AssetOwnerMembership")
-  uploadedSboms            Sbom[]            @relation("SbomUploadedByMembership")
-  assignedFindings         Finding[]         @relation("FindingAssignedMembership")
-  assignedRemediationTasks RemediationTask[] @relation("RemediationAssignedMembership")
-  requestedRiskAcceptances RiskAcceptance[]  @relation("RiskAcceptanceRequesterMembership")
-  approvedRiskAcceptances  RiskAcceptance[]  @relation("RiskAcceptanceApproverMembership")
-  submittedEvidence        Evidence[]        @relation("EvidenceSubmittedByMembership")
-  auditEvents              AuditEvent[]      @relation("AuditActorMembership")
-  createdRiskPolicies      RiskPolicy[]      @relation("RiskPolicyCreatedByMembership")
+  organization                Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user                        User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  teamMemberships             TeamMembership[]
+  assetOwners                 AssetOwner[]         @relation("AssetOwnerMembership")
+  uploadedSboms               Sbom[]               @relation("SbomUploadedByMembership")
+  assignedFindings            Finding[]            @relation("FindingAssignedMembership")
+  findingCreationObservations FindingObservation[] @relation("FindingObservationActorMembership")
+  assignedRemediationTasks    RemediationTask[]    @relation("RemediationAssignedMembership")
+  requestedRiskAcceptances    RiskAcceptance[]     @relation("RiskAcceptanceRequesterMembership")
+  approvedRiskAcceptances     RiskAcceptance[]     @relation("RiskAcceptanceApproverMembership")
+  submittedEvidence           Evidence[]           @relation("EvidenceSubmittedByMembership")
+  auditEvents                 AuditEvent[]         @relation("AuditActorMembership")
+  createdRiskPolicies         RiskPolicy[]         @relation("RiskPolicyCreatedByMembership")
 
   @@unique([organizationId, id], map: "membership_org_id_key")
   @@unique([organizationId, userId], map: "membership_org_user_key")
@@ -1307,15 +1308,15 @@ model Sbom {
   parserVersionLastSucceeded String?               @map("parser_version_last_succeeded") @db.VarChar(64)
   createdAt                  DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  asset                Asset                    @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
-  uploadedByMembership Membership?              @relation("SbomUploadedByMembership", fields: [organizationId, uploadedByMembershipId], references: [organizationId, id], onDelete: Restrict)
-  ingestions           SbomIngestion[]
-  componentOccurrences ComponentOccurrence[]
-  dependencyEdges      DependencyRelationship[]
-  observations         FindingObservation[]
-  evidence             Evidence[]
-  matchEvaluationEvidence MatchEvaluationEvidence[]
+  organization                   Organization                     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  asset                          Asset                            @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
+  uploadedByMembership           Membership?                      @relation("SbomUploadedByMembership", fields: [organizationId, uploadedByMembershipId], references: [organizationId, id], onDelete: Restrict)
+  ingestions                     SbomIngestion[]
+  componentOccurrences           ComponentOccurrence[]
+  dependencyEdges                DependencyRelationship[]
+  observations                   FindingObservation[]
+  evidence                       Evidence[]
+  matchEvaluationEvidence        MatchEvaluationEvidence[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@unique([organizationId, id], map: "sbom_org_id_key")
@@ -1350,15 +1351,15 @@ model SbomIngestion {
   createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  sbom                 Sbom                     @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict)
-  asset                Asset                    @relation("AssetIngestions", fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
-  currentForAssets     Asset[]                  @relation("AssetCurrentIngestion")
-  componentOccurrences ComponentOccurrence[]
-  dependencyEdges      DependencyRelationship[]
-  observations         FindingObservation[]
-  riskCalculations     RiskCalculation[]
-  matchEvaluationEvidence MatchEvaluationEvidence[]
+  organization                   Organization                     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  sbom                           Sbom                             @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict)
+  asset                          Asset                            @relation("AssetIngestions", fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
+  currentForAssets               Asset[]                          @relation("AssetCurrentIngestion")
+  componentOccurrences           ComponentOccurrence[]
+  dependencyEdges                DependencyRelationship[]
+  observations                   FindingObservation[]
+  riskCalculations               RiskCalculation[]
+  matchEvaluationEvidence        MatchEvaluationEvidence[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@unique([organizationId, id], map: "sbom_ingestion_org_id_key")
@@ -1381,10 +1382,10 @@ model Component {
   identityState  ComponentIdentityState @default(resolved) @map("identity_state")
   createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  occurrences  ComponentOccurrence[]
-  findings     Finding[]
-  matchEvaluationEvidence MatchEvaluationEvidence[]
+  organization                   Organization                     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  occurrences                    ComponentOccurrence[]
+  findings                       Finding[]
+  matchEvaluationEvidence        MatchEvaluationEvidence[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@unique([organizationId, id], map: "component_org_id_key")
@@ -1407,16 +1408,16 @@ model ComponentOccurrence {
   isDirect        Boolean? @map("is_direct")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization  Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  asset         Asset                    @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
-  sbom          Sbom                     @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict)
-  sbomIngestion SbomIngestion            @relation(fields: [organizationId, sbomIngestionId, sbomId], references: [organizationId, id, sbomId], onDelete: Restrict)
-  component     Component                @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict)
-  outgoingEdges DependencyRelationship[] @relation("DependencyFrom")
-  incomingEdges DependencyRelationship[] @relation("DependencyTo")
-  findings      Finding[]
-  observations  FindingObservation[]
-  matchEvaluationEvidence MatchEvaluationEvidence[]
+  organization                   Organization                     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  asset                          Asset                            @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
+  sbom                           Sbom                             @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict)
+  sbomIngestion                  SbomIngestion                    @relation(fields: [organizationId, sbomIngestionId, sbomId], references: [organizationId, id, sbomId], onDelete: Restrict)
+  component                      Component                        @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict)
+  outgoingEdges                  DependencyRelationship[]         @relation("DependencyFrom")
+  incomingEdges                  DependencyRelationship[]         @relation("DependencyTo")
+  findings                       Finding[]
+  observations                   FindingObservation[]
+  matchEvaluationEvidence        MatchEvaluationEvidence[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@unique([organizationId, id], map: "component_occurrence_org_id_key")
@@ -1463,14 +1464,14 @@ model Vulnerability {
   createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  aliases                       VulnerabilityAlias[]
-  sourceRecords                 VulnerabilitySourceRecord[]
-  findings                      Finding[]
-  cveIdentityLinks              VulnerabilityCveIdentityLink[]
-  advisoryVulnerabilityBindings AdvisoryVulnerabilityBinding[]
+  aliases                             VulnerabilityAlias[]
+  sourceRecords                       VulnerabilitySourceRecord[]
+  findings                            Finding[]
+  cveIdentityLinks                    VulnerabilityCveIdentityLink[]
+  advisoryVulnerabilityBindings       AdvisoryVulnerabilityBinding[]
   maintainerReviewedAdvisoryApprovals MaintainerReviewedAdvisoryApproval[]
-  reviewerCapabilityIssuances ReviewerCapabilityIssuance[]
-  productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
+  reviewerCapabilityIssuances         ReviewerCapabilityIssuance[]
+  productMatchEvaluationEvidence      ProductMatchEvaluationEvidence[]
 
   @@index([cveId], map: "vulnerability_cve_idx")
   @@map("vulnerability")
@@ -1549,8 +1550,8 @@ model Finding {
   componentId              String       @map("component_id") @db.Uuid
   componentOccurrenceId    String?      @map("component_occurrence_id") @db.Uuid
   state                    FindingState @default(open)
-  firstObservedAt          DateTime     @map("first_observed_at") @db.Timestamptz(6)
-  lastObservedAt           DateTime     @map("last_observed_at") @db.Timestamptz(6)
+  firstObservedAt          DateTime     @default(dbgenerated("CURRENT_TIMESTAMP")) @map("first_observed_at") @db.Timestamptz(6)
+  lastObservedAt           DateTime     @default(dbgenerated("CURRENT_TIMESTAMP")) @map("last_observed_at") @db.Timestamptz(6)
   resolvedAt               DateTime?    @map("resolved_at") @db.Timestamptz(6)
   reopenedAt               DateTime?    @map("reopened_at") @db.Timestamptz(6)
   assignedMembershipId     String?      @map("assigned_membership_id") @db.Uuid
@@ -1559,24 +1560,26 @@ model Finding {
   currentRiskCalculationId String?      @map("current_risk_calculation_id") @db.Uuid
   version                  Int          @default(1)
   createdAt                DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt                DateTime     @default(dbgenerated("CURRENT_TIMESTAMP")) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization           Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  asset                  Asset                @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
-  vulnerability          Vulnerability        @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict)
-  component              Component            @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict)
-  componentOccurrence    ComponentOccurrence? @relation(fields: [organizationId, componentOccurrenceId, assetId, componentId], references: [organizationId, id, assetId, componentId], onDelete: Restrict)
-  assignedMembership     Membership?          @relation("FindingAssignedMembership", fields: [organizationId, assignedMembershipId], references: [organizationId, id], onDelete: Restrict)
-  assignedTeam           Team?                @relation("FindingAssignedTeam", fields: [organizationId, assignedTeamId], references: [organizationId, id], onDelete: Restrict)
-  currentRiskCalculation RiskCalculation?     @relation("FindingCurrentCalculation", fields: [organizationId, currentRiskCalculationId], references: [organizationId, id], onDelete: Restrict)
+  organization           Organization                  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  asset                  Asset                         @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Restrict)
+  vulnerability          Vulnerability                 @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict)
+  component              Component                     @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict)
+  componentOccurrence    ComponentOccurrence?          @relation(fields: [organizationId, componentOccurrenceId, assetId, componentId], references: [organizationId, id, assetId, componentId], onDelete: Restrict)
+  assignedMembership     Membership?                   @relation("FindingAssignedMembership", fields: [organizationId, assignedMembershipId], references: [organizationId, id], onDelete: Restrict)
+  assignedTeam           Team?                         @relation("FindingAssignedTeam", fields: [organizationId, assignedTeamId], references: [organizationId, id], onDelete: Restrict)
+  currentRiskCalculation RiskCalculation?              @relation("FindingCurrentCalculation", fields: [organizationId, currentRiskCalculationId], references: [organizationId, id], onDelete: Restrict)
   observations           FindingObservation[]
-  calculations           RiskCalculation[]    @relation("FindingCalculations")
+  creationEvidenceLinks  FindingCreationEvidenceLink[]
+  calculations           RiskCalculation[]             @relation("FindingCalculations")
   remediationTasks       RemediationTask[]
   riskAcceptances        RiskAcceptance[]
   evidence               Evidence[]
 
   @@unique([organizationId, id], map: "finding_org_id_key")
   @@unique([organizationId, assetId, componentId, vulnerabilityId], map: "finding_identity_key")
+  @@unique([organizationId, id, assetId, componentId, vulnerabilityId], map: "finding_alignment_key")
   @@index([organizationId, state], map: "finding_org_state_idx")
   @@index([organizationId, assetId], map: "finding_org_asset_idx")
   @@index([organizationId, vulnerabilityId], map: "finding_org_vulnerability_idx")
@@ -1586,28 +1589,66 @@ model Finding {
 }
 
 model FindingObservation {
-  id              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId  String                   @map("organization_id") @db.Uuid
-  findingId       String                   @map("finding_id") @db.Uuid
-  sbomId          String                   @map("sbom_id") @db.Uuid
-  sbomIngestionId String                   @map("sbom_ingestion_id") @db.Uuid
-  occurrenceId    String?                  @map("occurrence_id") @db.Uuid
-  result          FindingObservationResult
-  method          String                   @db.VarChar(64)
-  observedAt      DateTime                 @map("observed_at") @db.Timestamptz(6)
+  id                       String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId           String                   @map("organization_id") @db.Uuid
+  findingId                String                   @map("finding_id") @db.Uuid
+  sbomId                   String                   @map("sbom_id") @db.Uuid
+  sbomIngestionId          String                   @map("sbom_ingestion_id") @db.Uuid
+  occurrenceId             String?                  @map("occurrence_id") @db.Uuid
+  result                   FindingObservationResult
+  method                   String                   @db.VarChar(64)
+  observedAt               DateTime                 @map("observed_at") @db.Timestamptz(6)
   /// Safe evidence metadata. schemaVersion required. Must not contain raw SBOM content.
-  evidence        Json
-  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  evidence                 Json
+  createdAt                DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  transitionClassification String?                  @map("transition_classification") @db.VarChar(64)
+  creationPurpose          String?                  @map("creation_purpose") @db.VarChar(80)
+  creationPolicyId         String?                  @map("creation_policy_id") @db.VarChar(80)
+  creationPolicyVersion    Int?                     @map("creation_policy_version") @db.SmallInt
+  actorMembershipId        String?                  @map("actor_membership_id") @db.Uuid
+  correlationId            String?                  @map("correlation_id") @db.Uuid
+  replayFingerprint        String?                  @map("replay_fingerprint") @db.Char(64)
+  affectedEvidenceCount    Int?                     @map("affected_evidence_count")
 
-  organization  Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  finding       Finding              @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
-  sbom          Sbom                 @relation(fields: [organizationId, sbomId], references: [organizationId, id], onDelete: Restrict)
-  sbomIngestion SbomIngestion        @relation(fields: [organizationId, sbomIngestionId], references: [organizationId, id], onDelete: Restrict)
-  occurrence    ComponentOccurrence? @relation(fields: [organizationId, occurrenceId], references: [organizationId, id], onDelete: Restrict)
+  organization          Organization                  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  finding               Finding                       @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
+  sbom                  Sbom                          @relation(fields: [organizationId, sbomId], references: [organizationId, id], onDelete: Restrict)
+  sbomIngestion         SbomIngestion                 @relation(fields: [organizationId, sbomIngestionId], references: [organizationId, id], onDelete: Restrict)
+  occurrence            ComponentOccurrence?          @relation(fields: [organizationId, occurrenceId], references: [organizationId, id], onDelete: Restrict)
+  actorMembership       Membership?                   @relation("FindingObservationActorMembership", fields: [organizationId, actorMembershipId], references: [organizationId, id], onDelete: Restrict, map: "finding_observation_actor_membership_fkey")
+  creationEvidenceLinks FindingCreationEvidenceLink[]
 
   @@unique([organizationId, findingId, sbomIngestionId], map: "finding_observation_identity_key")
+  @@unique([organizationId, id], map: "finding_observation_org_id_key")
+  @@unique([organizationId, id, findingId, sbomIngestionId], map: "finding_observation_alignment_key")
   @@index([organizationId, findingId, observedAt], map: "finding_observation_finding_time_idx")
   @@map("finding_observation")
+}
+
+/// Append-only link from one creation observation to one qualifying Product Match Evidence row.
+/// Several affected versions share one Finding and one creation observation.
+model FindingCreationEvidenceLink {
+  id                               String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId                   String                 @map("organization_id") @db.Uuid
+  findingId                        String                 @map("finding_id") @db.Uuid
+  findingObservationId             String                 @map("finding_observation_id") @db.Uuid
+  productMatchEvaluationEvidenceId String                 @map("product_match_evaluation_evidence_id") @db.Uuid
+  assetId                          String                 @map("asset_id") @db.Uuid
+  componentId                      String                 @map("component_id") @db.Uuid
+  vulnerabilityId                  String                 @map("vulnerability_id") @db.Uuid
+  sbomIngestionId                  String                 @map("sbom_ingestion_id") @db.Uuid
+  componentOccurrenceId            String                 @map("component_occurrence_id") @db.Uuid
+  outcome                          MatchEvaluationOutcome
+  createdAt                        DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  finding     Finding                        @relation(fields: [organizationId, findingId, assetId, componentId, vulnerabilityId], references: [organizationId, id, assetId, componentId, vulnerabilityId], onDelete: Restrict, map: "finding_creation_evidence_link_finding_fkey")
+  observation FindingObservation             @relation(fields: [organizationId, findingObservationId, findingId, sbomIngestionId], references: [organizationId, id, findingId, sbomIngestionId], onDelete: Restrict, map: "finding_creation_evidence_link_observation_fkey")
+  evidence    ProductMatchEvaluationEvidence @relation(fields: [organizationId, productMatchEvaluationEvidenceId, assetId, componentId, vulnerabilityId, sbomIngestionId, componentOccurrenceId], references: [organizationId, id, assetId, componentId, vulnerabilityId, sbomIngestionId, componentOccurrenceId], onDelete: Restrict, map: "finding_creation_evidence_link_evidence_fkey")
+
+  @@unique([organizationId, id], map: "finding_creation_evidence_link_org_id_key")
+  @@unique([organizationId, productMatchEvaluationEvidenceId], map: "finding_creation_evidence_link_evidence_uidx")
+  @@unique([organizationId, findingObservationId, productMatchEvaluationEvidenceId], map: "finding_creation_evidence_link_observation_evidence_uidx")
+  @@map("finding_creation_evidence_link")
 }
 
 model RiskPolicy {
@@ -2839,12 +2880,12 @@ model OsvListingProviderContactAuthorization {
   revokedByOperatorIdentityId        String?                                      @map("revoked_by_operator_identity_id") @db.Uuid
   createdAt                          DateTime                                     @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  sourceCanaryAuthorization OsvCanaryAuthorization                    @relation("OsvListingProviderContactSourceAuthorization", fields: [sourceCanaryAuthorizationId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_source_fkey")
-  operatorIdentity          OsvCanaryInstanceOperatorIdentity         @relation("OsvListingProviderContactAuthorizationIssuer", fields: [operatorIdentityId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_operator_fkey")
-  revokedByOperatorIdentity OsvCanaryInstanceOperatorIdentity?        @relation("OsvListingProviderContactAuthorizationRevoker", fields: [revokedByOperatorIdentityId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_revoker_fkey")
-  preflightEvidence         OsvCanaryProviderFreePreflightAttestation @relation(fields: [preflightEvidenceId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_preflight_fkey")
-  synchronizationRequest    OsvRuntimeSynchronizationRequest          @relation("OsvListingProviderContactRequest", fields: [synchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict, map: "osv_listing_provider_contact_request_fkey")
-  synchronizationRun        OsvRuntimeSynchronizationRun              @relation("OsvListingProviderContactRun", fields: [synchronizationRunId, synchronizationRequestId], references: [id, requestId], onDelete: Restrict, map: "osv_listing_provider_contact_run_fkey")
+  sourceCanaryAuthorization      OsvCanaryAuthorization                    @relation("OsvListingProviderContactSourceAuthorization", fields: [sourceCanaryAuthorizationId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_source_fkey")
+  operatorIdentity               OsvCanaryInstanceOperatorIdentity         @relation("OsvListingProviderContactAuthorizationIssuer", fields: [operatorIdentityId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_operator_fkey")
+  revokedByOperatorIdentity      OsvCanaryInstanceOperatorIdentity?        @relation("OsvListingProviderContactAuthorizationRevoker", fields: [revokedByOperatorIdentityId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_revoker_fkey")
+  preflightEvidence              OsvCanaryProviderFreePreflightAttestation @relation(fields: [preflightEvidenceId], references: [id], onDelete: Restrict, map: "osv_listing_provider_contact_preflight_fkey")
+  synchronizationRequest         OsvRuntimeSynchronizationRequest          @relation("OsvListingProviderContactRequest", fields: [synchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict, map: "osv_listing_provider_contact_request_fkey")
+  synchronizationRun             OsvRuntimeSynchronizationRun              @relation("OsvListingProviderContactRun", fields: [synchronizationRunId, synchronizationRequestId], references: [id, requestId], onDelete: Restrict, map: "osv_listing_provider_contact_run_fkey")
   consumedRequest                OsvRuntimeSynchronizationRequest?         @relation("OsvListingProviderContactConsumedRequest", fields: [consumedBySynchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict, map: "osv_listing_provider_contact_consumed_request_fkey")
   consumedRun                    OsvRuntimeSynchronizationRun?             @relation("OsvListingProviderContactConsumedRun", fields: [consumedBySynchronizationRunId, consumedBySynchronizationRequestId], references: [id, requestId], onDelete: Restrict, map: "osv_listing_provider_contact_consumed_run_fkey")
   listingObservationEvidenceSets OsvListingObservationEvidenceSet[]
@@ -2873,74 +2914,74 @@ model OsvListingProviderContactAuthorization {
 model OsvListingObservationEvidenceSet {
   id String @id @db.Uuid
 
-  evidenceSchemaVersion            String @map("evidence_schema_version") @db.VarChar(128)
-  evidencePolicyId                 String @map("evidence_policy_id") @db.VarChar(128)
-  purposeId                        String @map("purpose_id") @db.VarChar(128)
-  ownership                        String @db.VarChar(64)
-  listingExecutionId               String @map("listing_execution_id") @db.Uuid
-  providerContactAuthorizationId   String @map("provider_contact_authorization_id") @db.Uuid
-  synchronizationRequestId         String @map("synchronization_request_id") @db.Uuid
-  synchronizationRunId             String @map("synchronization_run_id") @db.Uuid
-  provider                         String @db.VarChar(32)
-  approvedPrefix                   String @map("approved_prefix") @db.VarChar(32)
-  listingProtocolId                String @map("listing_protocol_id") @db.VarChar(128)
-  listingPolicyId                  String @map("listing_policy_id") @db.VarChar(128)
-  budgetProfileId                  String @map("budget_profile_id") @db.VarChar(128)
-  workScope                        OsvRuntimeWorkScope             @map("work_scope")
-  leaseScope                       String                          @map("lease_scope") @db.VarChar(128)
-  synchronizationReason            OsvRuntimeSynchronizationReason @map("synchronization_reason")
-  runtimeVersionSetFingerprint     String @map("runtime_version_set_fingerprint") @db.Text
-  sourceLicenseRegistryVersion     String @map("source_license_registry_version") @db.VarChar(128)
-  classificationPolicyId           String @map("classification_policy_id") @db.VarChar(128)
-  canonicalEvidenceSetAlgorithmId  String @map("canonical_evidence_set_algorithm_id") @db.VarChar(128)
-  encryptionPolicyId               String @map("encryption_policy_id") @db.VarChar(128)
-  associatedDataPolicyId           String @map("associated_data_policy_id") @db.VarChar(128)
-  associatedDataAlgorithmId        String @map("associated_data_algorithm_id") @db.VarChar(128)
-  envelopeSchemaVersion            String @map("envelope_schema_version") @db.VarChar(128)
-  algorithmId                      String @map("algorithm_id") @db.VarChar(32)
-  retentionPolicyId                String @map("retention_policy_id") @db.VarChar(128)
-  pageOrdinal                      Int    @map("page_ordinal")
-  canonicalEvidenceSetDigest       String @map("canonical_evidence_set_digest") @db.Text
+  evidenceSchemaVersion           String                          @map("evidence_schema_version") @db.VarChar(128)
+  evidencePolicyId                String                          @map("evidence_policy_id") @db.VarChar(128)
+  purposeId                       String                          @map("purpose_id") @db.VarChar(128)
+  ownership                       String                          @db.VarChar(64)
+  listingExecutionId              String                          @map("listing_execution_id") @db.Uuid
+  providerContactAuthorizationId  String                          @map("provider_contact_authorization_id") @db.Uuid
+  synchronizationRequestId        String                          @map("synchronization_request_id") @db.Uuid
+  synchronizationRunId            String                          @map("synchronization_run_id") @db.Uuid
+  provider                        String                          @db.VarChar(32)
+  approvedPrefix                  String                          @map("approved_prefix") @db.VarChar(32)
+  listingProtocolId               String                          @map("listing_protocol_id") @db.VarChar(128)
+  listingPolicyId                 String                          @map("listing_policy_id") @db.VarChar(128)
+  budgetProfileId                 String                          @map("budget_profile_id") @db.VarChar(128)
+  workScope                       OsvRuntimeWorkScope             @map("work_scope")
+  leaseScope                      String                          @map("lease_scope") @db.VarChar(128)
+  synchronizationReason           OsvRuntimeSynchronizationReason @map("synchronization_reason")
+  runtimeVersionSetFingerprint    String                          @map("runtime_version_set_fingerprint") @db.Text
+  sourceLicenseRegistryVersion    String                          @map("source_license_registry_version") @db.VarChar(128)
+  classificationPolicyId          String                          @map("classification_policy_id") @db.VarChar(128)
+  canonicalEvidenceSetAlgorithmId String                          @map("canonical_evidence_set_algorithm_id") @db.VarChar(128)
+  encryptionPolicyId              String                          @map("encryption_policy_id") @db.VarChar(128)
+  associatedDataPolicyId          String                          @map("associated_data_policy_id") @db.VarChar(128)
+  associatedDataAlgorithmId       String                          @map("associated_data_algorithm_id") @db.VarChar(128)
+  envelopeSchemaVersion           String                          @map("envelope_schema_version") @db.VarChar(128)
+  algorithmId                     String                          @map("algorithm_id") @db.VarChar(32)
+  retentionPolicyId               String                          @map("retention_policy_id") @db.VarChar(128)
+  pageOrdinal                     Int                             @map("page_ordinal")
+  canonicalEvidenceSetDigest      String                          @map("canonical_evidence_set_digest") @db.Text
 
-  translatorObservationCount   Int    @map("translator_observation_count")
-  acceptedObservationCount     Int    @map("accepted_observation_count")
-  protectedObservationCount    Int    @map("protected_observation_count")
-  rejectedObservationCount     Int    @map("rejected_observation_count")
-  exactDuplicateCount          Int    @map("exact_duplicate_count")
-  duplicateAmbiguityCount      Int    @map("duplicate_ambiguity_count")
-  immutableConflictCount       Int    @map("immutable_conflict_count")
+  translatorObservationCount      Int    @map("translator_observation_count")
+  acceptedObservationCount        Int    @map("accepted_observation_count")
+  protectedObservationCount       Int    @map("protected_observation_count")
+  rejectedObservationCount        Int    @map("rejected_observation_count")
+  exactDuplicateCount             Int    @map("exact_duplicate_count")
+  duplicateAmbiguityCount         Int    @map("duplicate_ambiguity_count")
+  immutableConflictCount          Int    @map("immutable_conflict_count")
   totalProtectedKeyPlaintextBytes BigInt @map("total_protected_key_plaintext_bytes")
-  totalEnvelopeBytes           BigInt @map("total_envelope_bytes")
-  totalCanonicalBytes          BigInt @map("total_canonical_bytes")
-  totalMetadataBytes           BigInt @map("total_metadata_bytes")
-  eventCount                   Int    @map("event_count")
+  totalEnvelopeBytes              BigInt @map("total_envelope_bytes")
+  totalCanonicalBytes             BigInt @map("total_canonical_bytes")
+  totalMetadataBytes              BigInt @map("total_metadata_bytes")
+  eventCount                      Int    @map("event_count")
 
-  evidenceState                  OsvListingObservationEvidenceSetState            @map("evidence_state")
-  candidateSelectionReadiness    OsvListingObservationSetCandidateReadiness       @map("candidate_selection_readiness")
-  retentionOverdueClassification OsvListingObservationRetentionOverdueClassification @map("retention_overdue_classification")
-  legalHoldActive                Boolean                                          @map("legal_hold_active")
-  legalHoldClassification        OsvListingObservationLegalHoldClassification     @map("legal_hold_classification")
-  dependentAuthorizationsTerminal Boolean                                         @map("dependent_authorizations_terminal")
-  candidateSelectionAuthorized   Boolean                                          @map("candidate_selection_authorized")
-  bodyRetrievalAuthorized        Boolean                                          @map("body_retrieval_authorized")
-  batch4pPermitted               Boolean                                          @map("batch_4p_permitted")
-  paginationAuthorized           Boolean                                          @map("pagination_authorized")
-  activationAuthorized           Boolean                                          @map("activation_authorized")
-  matchingAuthorized             Boolean                                          @map("matching_authorized")
-  findingWritesAuthorized        Boolean                                          @map("finding_writes_authorized")
-  providerContactAuthorized      Boolean                                          @map("provider_contact_authorized")
+  evidenceState                   OsvListingObservationEvidenceSetState               @map("evidence_state")
+  candidateSelectionReadiness     OsvListingObservationSetCandidateReadiness          @map("candidate_selection_readiness")
+  retentionOverdueClassification  OsvListingObservationRetentionOverdueClassification @map("retention_overdue_classification")
+  legalHoldActive                 Boolean                                             @map("legal_hold_active")
+  legalHoldClassification         OsvListingObservationLegalHoldClassification        @map("legal_hold_classification")
+  dependentAuthorizationsTerminal Boolean                                             @map("dependent_authorizations_terminal")
+  candidateSelectionAuthorized    Boolean                                             @map("candidate_selection_authorized")
+  bodyRetrievalAuthorized         Boolean                                             @map("body_retrieval_authorized")
+  batch4pPermitted                Boolean                                             @map("batch_4p_permitted")
+  paginationAuthorized            Boolean                                             @map("pagination_authorized")
+  activationAuthorized            Boolean                                             @map("activation_authorized")
+  matchingAuthorized              Boolean                                             @map("matching_authorized")
+  findingWritesAuthorized         Boolean                                             @map("finding_writes_authorized")
+  providerContactAuthorized       Boolean                                             @map("provider_contact_authorized")
 
-  rowRevision          BigInt    @map("row_revision")
-  capturedAt           DateTime  @default(now()) @map("captured_at") @db.Timestamptz(6)
-  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  reviewRecordedAt     DateTime? @map("review_recorded_at") @db.Timestamptz(6)
-  legalHoldChangedAt   DateTime? @map("legal_hold_changed_at") @db.Timestamptz(6)
-  retentionOverdueAt   DateTime? @map("retention_overdue_at") @db.Timestamptz(6)
-  purgedAt             DateTime? @map("purged_at") @db.Timestamptz(6)
+  rowRevision        BigInt    @map("row_revision")
+  capturedAt         DateTime  @default(now()) @map("captured_at") @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  reviewRecordedAt   DateTime? @map("review_recorded_at") @db.Timestamptz(6)
+  legalHoldChangedAt DateTime? @map("legal_hold_changed_at") @db.Timestamptz(6)
+  retentionOverdueAt DateTime? @map("retention_overdue_at") @db.Timestamptz(6)
+  purgedAt           DateTime? @map("purged_at") @db.Timestamptz(6)
 
-  providerContactAuthorization OsvListingProviderContactAuthorization @relation(fields: [providerContactAuthorizationId], references: [id], onDelete: Restrict, map: "osv_listing_observation_evidence_set_authorization_fkey")
-  synchronizationRequest       OsvRuntimeSynchronizationRequest       @relation("OsvListingObservationEvidenceSetRequest", fields: [synchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict, map: "osv_listing_observation_evidence_set_request_fkey")
-  synchronizationRun           OsvRuntimeSynchronizationRun           @relation("OsvListingObservationEvidenceSetRun", fields: [synchronizationRunId, synchronizationRequestId], references: [id, requestId], onDelete: Restrict, map: "osv_listing_observation_evidence_set_run_fkey")
+  providerContactAuthorization OsvListingProviderContactAuthorization  @relation(fields: [providerContactAuthorizationId], references: [id], onDelete: Restrict, map: "osv_listing_observation_evidence_set_authorization_fkey")
+  synchronizationRequest       OsvRuntimeSynchronizationRequest        @relation("OsvListingObservationEvidenceSetRequest", fields: [synchronizationRequestId, workScope, synchronizationReason, runtimeVersionSetFingerprint, leaseScope], references: [id, workScope, synchronizationReason, versionSetFingerprint, leaseScope], onDelete: Restrict, map: "osv_listing_observation_evidence_set_request_fkey")
+  synchronizationRun           OsvRuntimeSynchronizationRun            @relation("OsvListingObservationEvidenceSetRun", fields: [synchronizationRunId, synchronizationRequestId], references: [id, requestId], onDelete: Restrict, map: "osv_listing_observation_evidence_set_run_fkey")
   observations                 OsvListingObservationEvidence[]
   envelopes                    OsvListingObservationEvidenceEnvelope[]
   purgeRecords                 OsvListingObservationEvidencePurge[]
@@ -2962,45 +3003,45 @@ model OsvListingObservationEvidenceSet {
 model OsvListingObservationEvidence {
   id String @id @db.Uuid
 
-  evidenceSetId                    String @map("evidence_set_id") @db.Uuid
-  listingExecutionId               String @map("listing_execution_id") @db.Uuid
-  providerContactAuthorizationId   String @map("provider_contact_authorization_id") @db.Uuid
-  synchronizationRequestId         String @map("synchronization_request_id") @db.Uuid
-  synchronizationRunId             String @map("synchronization_run_id") @db.Uuid
-  provider                         String @db.VarChar(32)
-  approvedPrefix                   String @map("approved_prefix") @db.VarChar(32)
-  listingProtocolId                String @map("listing_protocol_id") @db.VarChar(128)
-  sourceLicenseRegistryVersion     String @map("source_license_registry_version") @db.VarChar(128)
-  runtimeVersionSetFingerprint     String @map("runtime_version_set_fingerprint") @db.Text
-  evidenceSchemaVersion            String @map("evidence_schema_version") @db.VarChar(128)
-  classificationPolicyId           String @map("classification_policy_id") @db.VarChar(128)
-  observationCanonicalAlgorithmId  String @map("observation_canonical_algorithm_id") @db.VarChar(128)
-  encryptionPolicyId               String @map("encryption_policy_id") @db.VarChar(128)
-  associatedDataPolicyId           String @map("associated_data_policy_id") @db.VarChar(128)
-  associatedDataAlgorithmId        String @map("associated_data_algorithm_id") @db.VarChar(128)
-  envelopeSchemaVersion            String @map("envelope_schema_version") @db.VarChar(128)
+  evidenceSetId                   String @map("evidence_set_id") @db.Uuid
+  listingExecutionId              String @map("listing_execution_id") @db.Uuid
+  providerContactAuthorizationId  String @map("provider_contact_authorization_id") @db.Uuid
+  synchronizationRequestId        String @map("synchronization_request_id") @db.Uuid
+  synchronizationRunId            String @map("synchronization_run_id") @db.Uuid
+  provider                        String @db.VarChar(32)
+  approvedPrefix                  String @map("approved_prefix") @db.VarChar(32)
+  listingProtocolId               String @map("listing_protocol_id") @db.VarChar(128)
+  sourceLicenseRegistryVersion    String @map("source_license_registry_version") @db.VarChar(128)
+  runtimeVersionSetFingerprint    String @map("runtime_version_set_fingerprint") @db.Text
+  evidenceSchemaVersion           String @map("evidence_schema_version") @db.VarChar(128)
+  classificationPolicyId          String @map("classification_policy_id") @db.VarChar(128)
+  observationCanonicalAlgorithmId String @map("observation_canonical_algorithm_id") @db.VarChar(128)
+  encryptionPolicyId              String @map("encryption_policy_id") @db.VarChar(128)
+  associatedDataPolicyId          String @map("associated_data_policy_id") @db.VarChar(128)
+  associatedDataAlgorithmId       String @map("associated_data_algorithm_id") @db.VarChar(128)
+  envelopeSchemaVersion           String @map("envelope_schema_version") @db.VarChar(128)
 
-  observationOrdinal               Int    @map("observation_ordinal")
-  listingObservationIdentity       String @map("listing_observation_identity") @db.Text
-  providerGeneration               String @map("provider_generation") @db.Text
+  observationOrdinal              Int                                                  @map("observation_ordinal")
+  listingObservationIdentity      String                                               @map("listing_observation_identity") @db.Text
+  providerGeneration              String                                               @map("provider_generation") @db.Text
   /// Declared listing byte count. Not retrieved size and not body authority.
-  declaredListingByteCount         BigInt @map("declared_listing_byte_count")
-  sourceFamilyClassification       String @map("source_family_classification") @db.VarChar(96)
-  classificationStatus             OsvClassificationStatus @map("classification_status")
-  duplicateClassification          OsvListingObservationDuplicateClassification @map("duplicate_classification")
-  immutableConflictClassification  OsvListingObservationImmutableConflictClassification @map("immutable_conflict_classification")
-  candidateSelectionEligibility    OsvListingObservationCandidateSelectionEligibility @map("candidate_selection_eligibility")
-  evidenceState                    OsvListingObservationEvidenceSetState @map("evidence_state")
-  candidateSelectionAuthorized     Boolean @map("candidate_selection_authorized")
-  bodyRetrievalAuthorized          Boolean @map("body_retrieval_authorized")
-  batch4pPermitted                 Boolean @map("batch_4p_permitted")
-  plaintextLengthAccounting        Int     @map("plaintext_length_accounting")
+  declaredListingByteCount        BigInt                                               @map("declared_listing_byte_count")
+  sourceFamilyClassification      String                                               @map("source_family_classification") @db.VarChar(96)
+  classificationStatus            OsvClassificationStatus                              @map("classification_status")
+  duplicateClassification         OsvListingObservationDuplicateClassification         @map("duplicate_classification")
+  immutableConflictClassification OsvListingObservationImmutableConflictClassification @map("immutable_conflict_classification")
+  candidateSelectionEligibility   OsvListingObservationCandidateSelectionEligibility   @map("candidate_selection_eligibility")
+  evidenceState                   OsvListingObservationEvidenceSetState                @map("evidence_state")
+  candidateSelectionAuthorized    Boolean                                              @map("candidate_selection_authorized")
+  bodyRetrievalAuthorized         Boolean                                              @map("body_retrieval_authorized")
+  batch4pPermitted                Boolean                                              @map("batch_4p_permitted")
+  plaintextLengthAccounting       Int                                                  @map("plaintext_length_accounting")
 
   rowRevision BigInt   @map("row_revision")
   capturedAt  DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  evidenceSet OsvListingObservationEvidenceSet @relation(fields: [evidenceSetId, listingExecutionId, providerContactAuthorizationId, synchronizationRequestId, synchronizationRunId, provider, approvedPrefix, listingProtocolId, sourceLicenseRegistryVersion, runtimeVersionSetFingerprint], references: [id, listingExecutionId, providerContactAuthorizationId, synchronizationRequestId, synchronizationRunId, provider, approvedPrefix, listingProtocolId, sourceLicenseRegistryVersion, runtimeVersionSetFingerprint], onDelete: Restrict, map: "osv_listing_observation_evidence_set_aad_fkey")
+  evidenceSet OsvListingObservationEvidenceSet        @relation(fields: [evidenceSetId, listingExecutionId, providerContactAuthorizationId, synchronizationRequestId, synchronizationRunId, provider, approvedPrefix, listingProtocolId, sourceLicenseRegistryVersion, runtimeVersionSetFingerprint], references: [id, listingExecutionId, providerContactAuthorizationId, synchronizationRequestId, synchronizationRunId, provider, approvedPrefix, listingProtocolId, sourceLicenseRegistryVersion, runtimeVersionSetFingerprint], onDelete: Restrict, map: "osv_listing_observation_evidence_set_aad_fkey")
   envelopes   OsvListingObservationEvidenceEnvelope[]
 
   @@unique([evidenceSetId, observationOrdinal], map: "osv_listing_observation_evidence_ordinal_uidx")
@@ -3021,31 +3062,31 @@ model OsvListingObservationEvidence {
 model OsvListingObservationEvidenceEnvelope {
   id String @id @db.Uuid
 
-  observationId                  String @map("observation_id") @db.Uuid
-  evidenceSetId                  String @map("evidence_set_id") @db.Uuid
-  providerGeneration             String @map("provider_generation") @db.Text
-  declaredListingByteCount       BigInt @map("declared_listing_byte_count")
-  sourceFamilyClassification     String @map("source_family_classification") @db.VarChar(96)
-  classificationStatus           OsvClassificationStatus @map("classification_status")
-  envelopeOrdinal                Int    @map("envelope_ordinal")
-  envelopeSchemaVersion          String @map("envelope_schema_version") @db.VarChar(128)
-  cryptographicPolicyId          String @map("cryptographic_policy_id") @db.VarChar(128)
-  algorithmId                    String @map("algorithm_id") @db.VarChar(32)
-  associatedDataPolicyId         String @map("associated_data_policy_id") @db.VarChar(128)
-  opaqueKeyAlias                 String @map("opaque_key_alias") @db.VarChar(64)
-  keyVersionClassification       OsvListingObservationKeyVersionClassification @map("key_version_classification")
-  envelopeState                  OsvListingObservationEnvelopeState @map("envelope_state")
-  rotationState                  OsvListingObservationEnvelopeRotationState @map("rotation_state")
-  erasureState                   OsvListingObservationEnvelopeErasureState @map("erasure_state")
-  plaintextLengthAccounting      Int    @map("plaintext_length_accounting")
-  ciphertextLengthAccounting     Int    @map("ciphertext_length_accounting")
+  observationId              String                                        @map("observation_id") @db.Uuid
+  evidenceSetId              String                                        @map("evidence_set_id") @db.Uuid
+  providerGeneration         String                                        @map("provider_generation") @db.Text
+  declaredListingByteCount   BigInt                                        @map("declared_listing_byte_count")
+  sourceFamilyClassification String                                        @map("source_family_classification") @db.VarChar(96)
+  classificationStatus       OsvClassificationStatus                       @map("classification_status")
+  envelopeOrdinal            Int                                           @map("envelope_ordinal")
+  envelopeSchemaVersion      String                                        @map("envelope_schema_version") @db.VarChar(128)
+  cryptographicPolicyId      String                                        @map("cryptographic_policy_id") @db.VarChar(128)
+  algorithmId                String                                        @map("algorithm_id") @db.VarChar(32)
+  associatedDataPolicyId     String                                        @map("associated_data_policy_id") @db.VarChar(128)
+  opaqueKeyAlias             String                                        @map("opaque_key_alias") @db.VarChar(64)
+  keyVersionClassification   OsvListingObservationKeyVersionClassification @map("key_version_classification")
+  envelopeState              OsvListingObservationEnvelopeState            @map("envelope_state")
+  rotationState              OsvListingObservationEnvelopeRotationState    @map("rotation_state")
+  erasureState               OsvListingObservationEnvelopeErasureState     @map("erasure_state")
+  plaintextLengthAccounting  Int                                           @map("plaintext_length_accounting")
+  ciphertextLengthAccounting Int                                           @map("ciphertext_length_accounting")
   /// Restricted. nonce_12 || ciphertext || tag_16. Public queries must omit.
-  protectedIdentityEnvelope      Bytes? @map("protected_identity_envelope") @db.ByteA
-  rowRevision                    BigInt @map("row_revision")
-  createdAt                      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  rotationRecordedAt             DateTime? @map("rotation_recorded_at") @db.Timestamptz(6)
-  erasureAttemptedAt             DateTime? @map("erasure_attempted_at") @db.Timestamptz(6)
-  erasureCompletedAt             DateTime? @map("erasure_completed_at") @db.Timestamptz(6)
+  protectedIdentityEnvelope  Bytes?                                        @map("protected_identity_envelope") @db.ByteA
+  rowRevision                BigInt                                        @map("row_revision")
+  createdAt                  DateTime                                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  rotationRecordedAt         DateTime?                                     @map("rotation_recorded_at") @db.Timestamptz(6)
+  erasureAttemptedAt         DateTime?                                     @map("erasure_attempted_at") @db.Timestamptz(6)
+  erasureCompletedAt         DateTime?                                     @map("erasure_completed_at") @db.Timestamptz(6)
 
   observation OsvListingObservationEvidence    @relation(fields: [observationId, evidenceSetId, providerGeneration, declaredListingByteCount, sourceFamilyClassification, classificationStatus], references: [id, evidenceSetId, providerGeneration, declaredListingByteCount, sourceFamilyClassification, classificationStatus], onDelete: Restrict, map: "osv_listing_observation_evidence_envelope_observation_fkey")
   evidenceSet OsvListingObservationEvidenceSet @relation(fields: [evidenceSetId], references: [id], onDelete: Restrict, map: "osv_listing_observation_evidence_envelope_set_fkey")
@@ -3062,16 +3103,16 @@ model OsvListingObservationEvidenceEnvelope {
 model OsvListingObservationEvidencePurge {
   id String @id @db.Uuid
 
-  evidenceSetId                    String @map("evidence_set_id") @db.Uuid
-  purgeAuthorizationClassification String @map("purge_authorization_classification") @db.VarChar(128)
-  purgeReasonCode                  String @map("purge_reason_code") @db.VarChar(64)
-  legalHoldDecision                String @map("legal_hold_decision") @db.VarChar(64)
-  dependentAuthorityTerminalDecision String @map("dependent_authority_terminal_decision") @db.VarChar(64)
-  erasureMechanismClassification   String @map("erasure_mechanism_classification") @db.VarChar(128)
-  erasureOutcome                   OsvListingObservationPurgeErasureOutcome @map("erasure_outcome")
-  attemptedAt                      DateTime @default(now()) @map("attempted_at") @db.Timestamptz(6)
-  completedAt                      DateTime? @map("completed_at") @db.Timestamptz(6)
-  createdAt                        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  evidenceSetId                      String                                   @map("evidence_set_id") @db.Uuid
+  purgeAuthorizationClassification   String                                   @map("purge_authorization_classification") @db.VarChar(128)
+  purgeReasonCode                    String                                   @map("purge_reason_code") @db.VarChar(64)
+  legalHoldDecision                  String                                   @map("legal_hold_decision") @db.VarChar(64)
+  dependentAuthorityTerminalDecision String                                   @map("dependent_authority_terminal_decision") @db.VarChar(64)
+  erasureMechanismClassification     String                                   @map("erasure_mechanism_classification") @db.VarChar(128)
+  erasureOutcome                     OsvListingObservationPurgeErasureOutcome @map("erasure_outcome")
+  attemptedAt                        DateTime                                 @default(now()) @map("attempted_at") @db.Timestamptz(6)
+  completedAt                        DateTime?                                @map("completed_at") @db.Timestamptz(6)
+  createdAt                          DateTime                                 @default(now()) @map("created_at") @db.Timestamptz(6)
 
   evidenceSet OsvListingObservationEvidenceSet @relation(fields: [evidenceSetId], references: [id], onDelete: Restrict, map: "osv_listing_observation_evidence_purge_set_fkey")
 
@@ -3280,49 +3321,49 @@ enum MatchEvaluationVersionClassification {
 /// Advisory evidence is an identifier and fingerprint, not a catalog foreign key.
 /// Affected evidence is not Finding authority.
 model MatchEvaluationEvidence {
-  id                              String                                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId                  String                                 @map("organization_id") @db.Uuid
-  componentOccurrenceId           String                                 @map("component_occurrence_id") @db.Uuid
-  assetId                         String                                 @map("asset_id") @db.Uuid
-  sbomId                          String                                 @map("sbom_id") @db.Uuid
-  sbomIngestionId                 String                                 @map("sbom_ingestion_id") @db.Uuid
-  componentId                     String                                 @map("component_id") @db.Uuid
-  sbomSha256                      String                                 @map("sbom_sha256") @db.Text
-  componentIdentityKey            String                                 @map("component_identity_key") @db.VarChar(2048)
-  versionKnown                    Boolean                                @map("version_known")
-  componentEvidenceFingerprint    String                                 @map("component_evidence_fingerprint") @db.Text
-  evidenceSchemaVersion           String                                 @map("evidence_schema_version") @db.VarChar(80)
-  evaluationId                    String                                 @unique(map: "match_evaluation_evidence_evaluation_uidx") @map("evaluation_id") @db.Uuid
-  evaluatorId                     String                                 @map("evaluator_id") @db.VarChar(80)
-  evaluatorVersion                String                                 @map("evaluator_version") @db.VarChar(64)
-  evaluatorImplementation         String                                 @map("evaluator_implementation") @db.VarChar(64)
-  policyId                        String                                 @map("policy_id") @db.VarChar(80)
-  ecosystem                       String                                 @db.VarChar(16)
-  packageNamespace                String?                                @map("package_namespace") @db.VarChar(214)
-  packageName                     String                                 @map("package_name") @db.VarChar(214)
-  packageIdentityKey              String                                 @map("package_identity_key") @db.VarChar(1024)
-  rawObservedVersion              String                                 @map("raw_observed_version") @db.VarChar(256)
-  rawObservedVersionSha256        String                                 @map("raw_observed_version_sha256") @db.Text
-  rawObservedVersionRetention     MatchEvaluationVersionRetention        @map("raw_observed_version_retention")
-  parsedVersionClassification     MatchEvaluationVersionClassification   @map("parsed_version_classification")
-  advisoryIdentity                String                                 @map("advisory_identity") @db.VarChar(512)
-  advisorySourceClassification    MatchEvaluationAdvisorySource          @map("advisory_source_classification")
-  advisoryEvidenceFingerprint     String                                 @map("advisory_evidence_fingerprint") @db.Text
-  advisoryEvidenceOrigin          MatchEvaluationAdvisoryOrigin          @map("advisory_evidence_origin")
-  rangeFingerprint                String                                 @map("range_fingerprint") @db.Text
-  outcome                         MatchEvaluationOutcome
-  replayFingerprint               String                                 @map("replay_fingerprint") @db.Text
-  findingCreation                 String                                 @map("finding_creation") @db.VarChar(32)
-  suppressionAuthority            Boolean                                @default(false) @map("suppression_authority")
+  id                                String                               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId                    String                               @map("organization_id") @db.Uuid
+  componentOccurrenceId             String                               @map("component_occurrence_id") @db.Uuid
+  assetId                           String                               @map("asset_id") @db.Uuid
+  sbomId                            String                               @map("sbom_id") @db.Uuid
+  sbomIngestionId                   String                               @map("sbom_ingestion_id") @db.Uuid
+  componentId                       String                               @map("component_id") @db.Uuid
+  sbomSha256                        String                               @map("sbom_sha256") @db.Text
+  componentIdentityKey              String                               @map("component_identity_key") @db.VarChar(2048)
+  versionKnown                      Boolean                              @map("version_known")
+  componentEvidenceFingerprint      String                               @map("component_evidence_fingerprint") @db.Text
+  evidenceSchemaVersion             String                               @map("evidence_schema_version") @db.VarChar(80)
+  evaluationId                      String                               @unique(map: "match_evaluation_evidence_evaluation_uidx") @map("evaluation_id") @db.Uuid
+  evaluatorId                       String                               @map("evaluator_id") @db.VarChar(80)
+  evaluatorVersion                  String                               @map("evaluator_version") @db.VarChar(64)
+  evaluatorImplementation           String                               @map("evaluator_implementation") @db.VarChar(64)
+  policyId                          String                               @map("policy_id") @db.VarChar(80)
+  ecosystem                         String                               @db.VarChar(16)
+  packageNamespace                  String?                              @map("package_namespace") @db.VarChar(214)
+  packageName                       String                               @map("package_name") @db.VarChar(214)
+  packageIdentityKey                String                               @map("package_identity_key") @db.VarChar(1024)
+  rawObservedVersion                String                               @map("raw_observed_version") @db.VarChar(256)
+  rawObservedVersionSha256          String                               @map("raw_observed_version_sha256") @db.Text
+  rawObservedVersionRetention       MatchEvaluationVersionRetention      @map("raw_observed_version_retention")
+  parsedVersionClassification       MatchEvaluationVersionClassification @map("parsed_version_classification")
+  advisoryIdentity                  String                               @map("advisory_identity") @db.VarChar(512)
+  advisorySourceClassification      MatchEvaluationAdvisorySource        @map("advisory_source_classification")
+  advisoryEvidenceFingerprint       String                               @map("advisory_evidence_fingerprint") @db.Text
+  advisoryEvidenceOrigin            MatchEvaluationAdvisoryOrigin        @map("advisory_evidence_origin")
+  rangeFingerprint                  String                               @map("range_fingerprint") @db.Text
+  outcome                           MatchEvaluationOutcome
+  replayFingerprint                 String                               @map("replay_fingerprint") @db.Text
+  findingCreation                   String                               @map("finding_creation") @db.VarChar(32)
+  suppressionAuthority              Boolean                              @default(false) @map("suppression_authority")
   evaluationTimestampClassification String                               @map("evaluation_timestamp_classification") @db.VarChar(16)
-  createdAt                       DateTime                               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+  createdAt                         DateTime                             @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
 
-  organization         Organization                  @relation(fields: [organizationId], references: [id], onDelete: Restrict, map: "match_evaluation_evidence_organization_fkey")
-  componentOccurrence  ComponentOccurrence           @relation(fields: [organizationId, componentOccurrenceId, assetId, componentId], references: [organizationId, id, assetId, componentId], onDelete: Restrict, map: "match_evaluation_evidence_occurrence_fkey")
-  component            Component                     @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict, map: "match_evaluation_evidence_component_fkey")
-  sbom                 Sbom                          @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict, map: "match_evaluation_evidence_sbom_fkey")
-  sbomIngestion        SbomIngestion                 @relation(fields: [organizationId, sbomIngestionId, sbomId], references: [organizationId, id, sbomId], onDelete: Restrict, map: "match_evaluation_evidence_ingestion_fkey")
-  explanations         MatchEvaluationExplanation[]
+  organization        Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict, map: "match_evaluation_evidence_organization_fkey")
+  componentOccurrence ComponentOccurrence          @relation(fields: [organizationId, componentOccurrenceId, assetId, componentId], references: [organizationId, id, assetId, componentId], onDelete: Restrict, map: "match_evaluation_evidence_occurrence_fkey")
+  component           Component                    @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict, map: "match_evaluation_evidence_component_fkey")
+  sbom                Sbom                         @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict, map: "match_evaluation_evidence_sbom_fkey")
+  sbomIngestion       SbomIngestion                @relation(fields: [organizationId, sbomIngestionId, sbomId], references: [organizationId, id, sbomId], onDelete: Restrict, map: "match_evaluation_evidence_ingestion_fkey")
+  explanations        MatchEvaluationExplanation[]
 
   @@unique([organizationId, id], map: "match_evaluation_evidence_org_id_key")
   @@unique([organizationId, componentOccurrenceId, replayFingerprint], map: "match_evaluation_evidence_occurrence_replay_uidx")
@@ -3333,11 +3374,11 @@ model MatchEvaluationEvidence {
 }
 
 model MatchEvaluationExplanation {
-  id                         String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId             String                           @map("organization_id") @db.Uuid
-  matchEvaluationEvidenceId  String                           @map("match_evaluation_evidence_id") @db.Uuid
-  ordinal                    Int                              @db.SmallInt
-  explanationCode            MatchEvaluationExplanationCode   @map("explanation_code")
+  id                        String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId            String                         @map("organization_id") @db.Uuid
+  matchEvaluationEvidenceId String                         @map("match_evaluation_evidence_id") @db.Uuid
+  ordinal                   Int                            @db.SmallInt
+  explanationCode           MatchEvaluationExplanationCode @map("explanation_code")
 
   evidence MatchEvaluationEvidence @relation(fields: [organizationId, matchEvaluationEvidenceId], references: [organizationId, id], onDelete: Restrict, map: "match_evaluation_explanation_evidence_fkey")
 
@@ -3437,16 +3478,16 @@ enum AdvisoryBindingClassification {
 /// Global instance-owned advisory family. Source plus provider-native id.
 /// No active revision pointer, tenant, or Finding state.
 model AdvisoryFamily {
-  id                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  familySchemaVersion    String                 @map("family_schema_version") @db.VarChar(80)
-  source                 AdvisoryEvidenceSource
-  advisoryId             String                 @map("advisory_id") @db.VarChar(512)
-  familyDigest           String                 @unique(map: "advisory_family_digest_uidx") @map("family_digest") @db.Text
-  sourceRegistryVersion  String                 @map("source_registry_version") @db.VarChar(80)
-  createdAt              DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+  id                    String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  familySchemaVersion   String                 @map("family_schema_version") @db.VarChar(80)
+  source                AdvisoryEvidenceSource
+  advisoryId            String                 @map("advisory_id") @db.VarChar(512)
+  familyDigest          String                 @unique(map: "advisory_family_digest_uidx") @map("family_digest") @db.Text
+  sourceRegistryVersion String                 @map("source_registry_version") @db.VarChar(80)
+  createdAt             DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
 
-  revisions AdvisoryRevision[]
-  approvals MaintainerReviewedAdvisoryApproval[]
+  revisions                      AdvisoryRevision[]
+  approvals                      MaintainerReviewedAdvisoryApproval[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@unique([source, advisoryId], map: "advisory_family_source_advisory_uidx")
@@ -3456,55 +3497,55 @@ model AdvisoryFamily {
 /// Immutable advisory revision. Identity is the revision digest, not the family id.
 /// Product eligibility is not stored.
 model AdvisoryRevision {
-  id                            String                            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  revisionSchemaVersion         String                            @map("revision_schema_version") @db.VarChar(80)
-  advisoryFamilyId              String                            @map("advisory_family_id") @db.Uuid
-  source                        AdvisoryEvidenceSource
-  advisoryId                    String                            @map("advisory_id") @db.VarChar(512)
-  familyDigest                  String                            @map("family_digest") @db.Text
-  revisionDigest                String                            @unique(map: "advisory_revision_digest_uidx") @map("revision_digest") @db.Text
-  providerGeneration            String                            @map("provider_generation") @db.VarChar(64)
-  contentFingerprint            String                            @map("content_fingerprint") @db.Text
-  session14RangeFingerprint     String                            @map("session14_range_fingerprint") @db.Text
-  productRangeFingerprint       String                            @map("product_range_fingerprint") @db.Text
-  parserId                      String                            @map("parser_id") @db.VarChar(80)
-  parserResourcePolicy          String                            @map("parser_resource_policy") @db.VarChar(80)
-  advisorySchemaVersion         String                            @map("advisory_schema_version") @db.VarChar(80)
-  authorIdentity                String?                           @map("author_identity") @db.VarChar(128)
-  advisorySchemaCommit          String                            @map("advisory_schema_commit") @db.VarChar(40)
-  sourceLicenseRegistryVersion  String                            @map("source_license_registry_version") @db.VarChar(80)
-  sourceLicensePolicyVersion    String                            @map("source_license_policy_version") @db.VarChar(80)
-  spdxLicenseId                 String?                           @map("spdx_license_id") @db.VarChar(32)
-  origin                        AdvisoryEvidenceOrigin
-  trustClassification           AdvisoryEvidenceTrust             @map("trust_classification")
-  revisionDisposition           AdvisoryRevisionDisposition       @map("revision_disposition")
-  withdrawalClassification      AdvisoryWithdrawalClassification  @map("withdrawal_classification")
-  quarantineClassification      AdvisoryQuarantineClassification  @map("quarantine_classification")
-  supersedesRevisionDigest      String                            @map("supersedes_revision_digest") @db.VarChar(64)
-  supersedesAdvisoryRevisionId  String?                           @map("supersedes_advisory_revision_id") @db.Uuid
-  retrievalClassification       AdvisoryRetrievalClassification   @map("retrieval_classification")
-  retrievalEvidenceId           String                            @map("retrieval_evidence_id") @db.VarChar(64)
-  retrievalPolicyId             String                            @map("retrieval_policy_id") @db.VarChar(80)
-  ecosystem                     String                            @db.VarChar(16)
-  packageNamespace              String?                           @map("package_namespace") @db.VarChar(214)
-  packageName                   String                            @map("package_name") @db.VarChar(214)
-  packageIdentityKey            String                            @map("package_identity_key") @db.VarChar(1024)
-  evaluatorVersion              String                            @map("evaluator_version") @db.VarChar(64)
-  matchingPolicyId              String                            @map("matching_policy_id") @db.VarChar(80)
-  aliasCount                    Int                               @map("alias_count") @db.SmallInt
-  cveAliasCount                 Int                               @map("cve_alias_count") @db.SmallInt
-  aliasSetDigest                String                            @map("alias_set_digest") @db.Text
-  replayFingerprint             String                            @unique(map: "advisory_revision_replay_uidx") @map("replay_fingerprint") @db.Text
-  createdAt                     DateTime                          @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+  id                           String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  revisionSchemaVersion        String                           @map("revision_schema_version") @db.VarChar(80)
+  advisoryFamilyId             String                           @map("advisory_family_id") @db.Uuid
+  source                       AdvisoryEvidenceSource
+  advisoryId                   String                           @map("advisory_id") @db.VarChar(512)
+  familyDigest                 String                           @map("family_digest") @db.Text
+  revisionDigest               String                           @unique(map: "advisory_revision_digest_uidx") @map("revision_digest") @db.Text
+  providerGeneration           String                           @map("provider_generation") @db.VarChar(64)
+  contentFingerprint           String                           @map("content_fingerprint") @db.Text
+  session14RangeFingerprint    String                           @map("session14_range_fingerprint") @db.Text
+  productRangeFingerprint      String                           @map("product_range_fingerprint") @db.Text
+  parserId                     String                           @map("parser_id") @db.VarChar(80)
+  parserResourcePolicy         String                           @map("parser_resource_policy") @db.VarChar(80)
+  advisorySchemaVersion        String                           @map("advisory_schema_version") @db.VarChar(80)
+  authorIdentity               String?                          @map("author_identity") @db.VarChar(128)
+  advisorySchemaCommit         String                           @map("advisory_schema_commit") @db.VarChar(40)
+  sourceLicenseRegistryVersion String                           @map("source_license_registry_version") @db.VarChar(80)
+  sourceLicensePolicyVersion   String                           @map("source_license_policy_version") @db.VarChar(80)
+  spdxLicenseId                String?                          @map("spdx_license_id") @db.VarChar(32)
+  origin                       AdvisoryEvidenceOrigin
+  trustClassification          AdvisoryEvidenceTrust            @map("trust_classification")
+  revisionDisposition          AdvisoryRevisionDisposition      @map("revision_disposition")
+  withdrawalClassification     AdvisoryWithdrawalClassification @map("withdrawal_classification")
+  quarantineClassification     AdvisoryQuarantineClassification @map("quarantine_classification")
+  supersedesRevisionDigest     String                           @map("supersedes_revision_digest") @db.VarChar(64)
+  supersedesAdvisoryRevisionId String?                          @map("supersedes_advisory_revision_id") @db.Uuid
+  retrievalClassification      AdvisoryRetrievalClassification  @map("retrieval_classification")
+  retrievalEvidenceId          String                           @map("retrieval_evidence_id") @db.VarChar(64)
+  retrievalPolicyId            String                           @map("retrieval_policy_id") @db.VarChar(80)
+  ecosystem                    String                           @db.VarChar(16)
+  packageNamespace             String?                          @map("package_namespace") @db.VarChar(214)
+  packageName                  String                           @map("package_name") @db.VarChar(214)
+  packageIdentityKey           String                           @map("package_identity_key") @db.VarChar(1024)
+  evaluatorVersion             String                           @map("evaluator_version") @db.VarChar(64)
+  matchingPolicyId             String                           @map("matching_policy_id") @db.VarChar(80)
+  aliasCount                   Int                              @map("alias_count") @db.SmallInt
+  cveAliasCount                Int                              @map("cve_alias_count") @db.SmallInt
+  aliasSetDigest               String                           @map("alias_set_digest") @db.Text
+  replayFingerprint            String                           @unique(map: "advisory_revision_replay_uidx") @map("replay_fingerprint") @db.Text
+  createdAt                    DateTime                         @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
 
-  family            AdvisoryFamily                    @relation(fields: [advisoryFamilyId], references: [id], onDelete: Restrict, map: "advisory_revision_family_fkey")
-  supersedes        AdvisoryRevision?                 @relation("AdvisoryRevisionSupersession", fields: [supersedesAdvisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_revision_supersedes_fkey")
-  successors        AdvisoryRevision[]                @relation("AdvisoryRevisionSupersession")
-  aliases           AdvisoryRevisionAlias[]
-  binding           AdvisoryVulnerabilityBinding?
-  approval          MaintainerReviewedAdvisoryApproval?
-  reviewerCapabilityIssuances ReviewerCapabilityIssuance[]
-  rangeEvents       AdvisoryRevisionRangeEvent[]
+  family                         AdvisoryFamily                      @relation(fields: [advisoryFamilyId], references: [id], onDelete: Restrict, map: "advisory_revision_family_fkey")
+  supersedes                     AdvisoryRevision?                   @relation("AdvisoryRevisionSupersession", fields: [supersedesAdvisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_revision_supersedes_fkey")
+  successors                     AdvisoryRevision[]                  @relation("AdvisoryRevisionSupersession")
+  aliases                        AdvisoryRevisionAlias[]
+  binding                        AdvisoryVulnerabilityBinding?
+  approval                       MaintainerReviewedAdvisoryApproval?
+  reviewerCapabilityIssuances    ReviewerCapabilityIssuance[]
+  rangeEvents                    AdvisoryRevisionRangeEvent[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@index([advisoryFamilyId], map: "advisory_revision_family_idx")
@@ -3514,16 +3555,16 @@ model AdvisoryRevision {
 
 /// Immutable alias evidence for one revision. Presence is not affectedness.
 model AdvisoryRevisionAlias {
-  id                       String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  advisoryRevisionId       String                 @map("advisory_revision_id") @db.Uuid
-  ordinal                  Int                    @db.SmallInt
-  aliasType                AdvisoryAliasType      @map("alias_type")
-  aliasValue               String                 @map("alias_value") @db.VarChar(512)
-  aliasPolicyVersion       String                 @map("alias_policy_version") @db.VarChar(80)
-  sourceClassification     AdvisoryEvidenceOrigin @map("source_classification")
-  reviewClassification     AdvisoryAliasReview    @map("review_classification")
-  replayFingerprint        String                 @unique(map: "advisory_revision_alias_replay_uidx") @map("replay_fingerprint") @db.Text
-  createdAt                DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  advisoryRevisionId   String                 @map("advisory_revision_id") @db.Uuid
+  ordinal              Int                    @db.SmallInt
+  aliasType            AdvisoryAliasType      @map("alias_type")
+  aliasValue           String                 @map("alias_value") @db.VarChar(512)
+  aliasPolicyVersion   String                 @map("alias_policy_version") @db.VarChar(80)
+  sourceClassification AdvisoryEvidenceOrigin @map("source_classification")
+  reviewClassification AdvisoryAliasReview    @map("review_classification")
+  replayFingerprint    String                 @unique(map: "advisory_revision_alias_replay_uidx") @map("replay_fingerprint") @db.Text
+  createdAt            DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
 
   revision AdvisoryRevision @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_revision_alias_revision_fkey")
 
@@ -3535,22 +3576,22 @@ model AdvisoryRevisionAlias {
 /// One reviewed binding from an immutable revision to one global Vulnerability.
 /// Aliases do not create this row. KEV is not authority.
 model AdvisoryVulnerabilityBinding {
-  id                          String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  bindingSchemaVersion        String                         @map("binding_schema_version") @db.VarChar(80)
-  advisoryRevisionId          String                         @unique(map: "advisory_vulnerability_binding_revision_uidx") @map("advisory_revision_id") @db.Uuid
-  vulnerabilityId             String                         @map("vulnerability_id") @db.Uuid
-  mappingPolicyId             String                         @map("mapping_policy_id") @db.VarChar(80)
-  mappingMethod               String                         @map("mapping_method") @db.VarChar(64)
-  mappingEvidenceFingerprint  String                         @map("mapping_evidence_fingerprint") @db.Text
-  mappingReviewState          String                         @map("mapping_review_state") @db.VarChar(32)
-  mappingSourceClassification String                         @map("mapping_source_classification") @db.VarChar(64)
-  conflictClassification      String                         @map("conflict_classification") @db.VarChar(32)
-  bindingClassification       AdvisoryBindingClassification  @map("binding_classification")
-  replayFingerprint           String                         @unique(map: "advisory_vulnerability_binding_replay_uidx") @map("replay_fingerprint") @db.Text
-  createdAt                   DateTime                       @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+  id                          String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bindingSchemaVersion        String                        @map("binding_schema_version") @db.VarChar(80)
+  advisoryRevisionId          String                        @unique(map: "advisory_vulnerability_binding_revision_uidx") @map("advisory_revision_id") @db.Uuid
+  vulnerabilityId             String                        @map("vulnerability_id") @db.Uuid
+  mappingPolicyId             String                        @map("mapping_policy_id") @db.VarChar(80)
+  mappingMethod               String                        @map("mapping_method") @db.VarChar(64)
+  mappingEvidenceFingerprint  String                        @map("mapping_evidence_fingerprint") @db.Text
+  mappingReviewState          String                        @map("mapping_review_state") @db.VarChar(32)
+  mappingSourceClassification String                        @map("mapping_source_classification") @db.VarChar(64)
+  conflictClassification      String                        @map("conflict_classification") @db.VarChar(32)
+  bindingClassification       AdvisoryBindingClassification @map("binding_classification")
+  replayFingerprint           String                        @unique(map: "advisory_vulnerability_binding_replay_uidx") @map("replay_fingerprint") @db.Text
+  createdAt                   DateTime                      @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
 
-  revision      AdvisoryRevision @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_vulnerability_binding_revision_fkey")
-  vulnerability Vulnerability    @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "advisory_vulnerability_binding_vulnerability_fkey")
+  revision      AdvisoryRevision                    @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_vulnerability_binding_revision_fkey")
+  vulnerability Vulnerability                       @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "advisory_vulnerability_binding_vulnerability_fkey")
   approval      MaintainerReviewedAdvisoryApproval?
 
   @@index([vulnerabilityId], map: "advisory_vulnerability_binding_vulnerability_idx")
@@ -3561,36 +3602,36 @@ model AdvisoryVulnerabilityBinding {
 /// Existence of a valid row is the approval. There is no status Boolean.
 /// The row is not evaluation authority, Finding authority, or tenant data.
 model MaintainerReviewedAdvisoryApproval {
-  id                            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  approvalSchemaVersion         String   @map("approval_schema_version") @db.VarChar(80)
-  advisoryRevisionId            String   @unique(map: "maintainer_reviewed_advisory_approval_revision_uidx") @map("advisory_revision_id") @db.Uuid
-  advisoryFamilyId              String   @map("advisory_family_id") @db.Uuid
-  familyDigest                  String   @map("family_digest") @db.Text
-  approvalPolicyId              String   @map("approval_policy_id") @db.VarChar(80)
-  approvalPolicyVersion         Int      @map("approval_policy_version") @db.SmallInt
-  approvalPurpose               String   @map("approval_purpose") @db.VarChar(80)
-  sourceClassification          String   @map("source_classification") @db.VarChar(64)
-  authorIdentity                String   @map("author_identity") @db.VarChar(128)
-  reviewerIdentity              String   @map("reviewer_identity") @db.VarChar(128)
-  reviewerClassification        String   @map("reviewer_classification") @db.VarChar(64)
-  contentFingerprint            String   @map("content_fingerprint") @db.Text
-  rangeFingerprint              String   @map("range_fingerprint") @db.Text
-  packageIdentityKey            String   @map("package_identity_key") @db.VarChar(1024)
-  vulnerabilityId               String   @map("vulnerability_id") @db.Uuid
-  advisoryVulnerabilityBindingId String  @unique(map: "maintainer_reviewed_advisory_approval_binding_uidx") @map("advisory_vulnerability_binding_id") @db.Uuid
-  sourceLicensePolicyId         String   @map("source_license_policy_id") @db.VarChar(80)
-  sourceLicensePolicyVersion    Int      @map("source_license_policy_version") @db.SmallInt
-  approvedLicenseClassification String   @map("approved_license_classification") @db.VarChar(32)
-  licenseDecisionCanonical      String   @map("license_decision_canonical") @db.Text
-  replayFingerprint             String   @unique(map: "maintainer_reviewed_advisory_approval_replay_uidx") @map("replay_fingerprint") @db.Text
-  createdAt                     DateTime @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+  id                             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  approvalSchemaVersion          String   @map("approval_schema_version") @db.VarChar(80)
+  advisoryRevisionId             String   @unique(map: "maintainer_reviewed_advisory_approval_revision_uidx") @map("advisory_revision_id") @db.Uuid
+  advisoryFamilyId               String   @map("advisory_family_id") @db.Uuid
+  familyDigest                   String   @map("family_digest") @db.Text
+  approvalPolicyId               String   @map("approval_policy_id") @db.VarChar(80)
+  approvalPolicyVersion          Int      @map("approval_policy_version") @db.SmallInt
+  approvalPurpose                String   @map("approval_purpose") @db.VarChar(80)
+  sourceClassification           String   @map("source_classification") @db.VarChar(64)
+  authorIdentity                 String   @map("author_identity") @db.VarChar(128)
+  reviewerIdentity               String   @map("reviewer_identity") @db.VarChar(128)
+  reviewerClassification         String   @map("reviewer_classification") @db.VarChar(64)
+  contentFingerprint             String   @map("content_fingerprint") @db.Text
+  rangeFingerprint               String   @map("range_fingerprint") @db.Text
+  packageIdentityKey             String   @map("package_identity_key") @db.VarChar(1024)
+  vulnerabilityId                String   @map("vulnerability_id") @db.Uuid
+  advisoryVulnerabilityBindingId String   @unique(map: "maintainer_reviewed_advisory_approval_binding_uidx") @map("advisory_vulnerability_binding_id") @db.Uuid
+  sourceLicensePolicyId          String   @map("source_license_policy_id") @db.VarChar(80)
+  sourceLicensePolicyVersion     Int      @map("source_license_policy_version") @db.SmallInt
+  approvedLicenseClassification  String   @map("approved_license_classification") @db.VarChar(32)
+  licenseDecisionCanonical       String   @map("license_decision_canonical") @db.Text
+  replayFingerprint              String   @unique(map: "maintainer_reviewed_advisory_approval_replay_uidx") @map("replay_fingerprint") @db.Text
+  createdAt                      DateTime @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
 
-  revision      AdvisoryRevision             @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_revision_fkey")
-  family        AdvisoryFamily               @relation(fields: [advisoryFamilyId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_family_fkey")
-  vulnerability Vulnerability                @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_vulnerability_fkey")
-  binding       AdvisoryVulnerabilityBinding @relation(fields: [advisoryVulnerabilityBindingId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_binding_fkey")
+  revision                                AdvisoryRevision                         @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_revision_fkey")
+  family                                  AdvisoryFamily                           @relation(fields: [advisoryFamilyId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_family_fkey")
+  vulnerability                           Vulnerability                            @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_vulnerability_fkey")
+  binding                                 AdvisoryVulnerabilityBinding             @relation(fields: [advisoryVulnerabilityBindingId], references: [id], onDelete: Restrict, map: "maintainer_reviewed_advisory_approval_binding_fkey")
   reviewerCapabilityLifecycleObservations ReviewerCapabilityLifecycleObservation[]
-  productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
+  productMatchEvaluationEvidence          ProductMatchEvaluationEvidence[]
 
   @@index([advisoryFamilyId], map: "maintainer_reviewed_advisory_approval_family_idx")
   @@index([vulnerabilityId], map: "maintainer_reviewed_advisory_approval_vulnerability_idx")
@@ -3600,35 +3641,35 @@ model MaintainerReviewedAdvisoryApproval {
 /// Immutable reviewer-capability issuance. Status is not stored.
 /// One terminal observation is the only lifecycle write. No secret material.
 model ReviewerCapabilityIssuance {
-  id                          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  issuanceSchemaVersion       String   @map("issuance_schema_version") @db.VarChar(80)
-  capabilityPolicyId          String   @map("capability_policy_id") @db.VarChar(80)
-  capabilityPolicyVersion     Int      @map("capability_policy_version") @db.SmallInt
-  approvalPolicyId            String   @map("approval_policy_id") @db.VarChar(80)
-  approvalPolicyVersion       Int      @map("approval_policy_version") @db.SmallInt
-  approvalPurpose             String   @map("approval_purpose") @db.VarChar(80)
-  issuerAuthorizationId       String   @unique(map: "reviewer_capability_issuance_authorization_uidx") @map("issuer_authorization_id") @db.Uuid
-  issuerDecisionFingerprint   String   @map("issuer_decision_fingerprint") @db.Text
-  approvalClaimFingerprint    String   @unique(map: "reviewer_capability_issuance_claim_uidx") @map("approval_claim_fingerprint") @db.Text
-  advisoryFamilyIdentity      String   @map("advisory_family_identity") @db.Text
-  advisoryRevisionId          String   @map("advisory_revision_id") @db.Uuid
-  contentFingerprint          String   @map("content_fingerprint") @db.Text
-  affectedRangeFingerprint    String   @map("affected_range_fingerprint") @db.Text
-  npmPackageIdentity          String   @map("npm_package_identity") @db.VarChar(1024)
-  vulnerabilityId             String   @map("vulnerability_id") @db.Uuid
-  sourceLicensePolicyId       String   @map("source_license_policy_id") @db.VarChar(80)
-  sourceLicensePolicyVersion  Int      @map("source_license_policy_version") @db.SmallInt
-  approvedLicenseClassification String @map("approved_license_classification") @db.VarChar(32)
-  licenseDecisionCanonical    String   @map("license_decision_canonical") @db.Text
-  sourceClassification        String   @map("source_classification") @db.VarChar(64)
-  authorIdentity              String   @map("author_identity") @db.VarChar(128)
-  reviewerIdentity            String   @map("reviewer_identity") @db.VarChar(128)
-  correlationId               String   @map("correlation_id") @db.Uuid
-  issuedAt                    DateTime @default(dbgenerated("clock_timestamp()")) @map("issued_at") @db.Timestamptz(6)
-  expiresAt                   DateTime @default(dbgenerated("clock_timestamp()")) @map("expires_at") @db.Timestamptz(6)
+  id                            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  issuanceSchemaVersion         String   @map("issuance_schema_version") @db.VarChar(80)
+  capabilityPolicyId            String   @map("capability_policy_id") @db.VarChar(80)
+  capabilityPolicyVersion       Int      @map("capability_policy_version") @db.SmallInt
+  approvalPolicyId              String   @map("approval_policy_id") @db.VarChar(80)
+  approvalPolicyVersion         Int      @map("approval_policy_version") @db.SmallInt
+  approvalPurpose               String   @map("approval_purpose") @db.VarChar(80)
+  issuerAuthorizationId         String   @unique(map: "reviewer_capability_issuance_authorization_uidx") @map("issuer_authorization_id") @db.Uuid
+  issuerDecisionFingerprint     String   @map("issuer_decision_fingerprint") @db.Text
+  approvalClaimFingerprint      String   @unique(map: "reviewer_capability_issuance_claim_uidx") @map("approval_claim_fingerprint") @db.Text
+  advisoryFamilyIdentity        String   @map("advisory_family_identity") @db.Text
+  advisoryRevisionId            String   @map("advisory_revision_id") @db.Uuid
+  contentFingerprint            String   @map("content_fingerprint") @db.Text
+  affectedRangeFingerprint      String   @map("affected_range_fingerprint") @db.Text
+  npmPackageIdentity            String   @map("npm_package_identity") @db.VarChar(1024)
+  vulnerabilityId               String   @map("vulnerability_id") @db.Uuid
+  sourceLicensePolicyId         String   @map("source_license_policy_id") @db.VarChar(80)
+  sourceLicensePolicyVersion    Int      @map("source_license_policy_version") @db.SmallInt
+  approvedLicenseClassification String   @map("approved_license_classification") @db.VarChar(32)
+  licenseDecisionCanonical      String   @map("license_decision_canonical") @db.Text
+  sourceClassification          String   @map("source_classification") @db.VarChar(64)
+  authorIdentity                String   @map("author_identity") @db.VarChar(128)
+  reviewerIdentity              String   @map("reviewer_identity") @db.VarChar(128)
+  correlationId                 String   @map("correlation_id") @db.Uuid
+  issuedAt                      DateTime @default(dbgenerated("clock_timestamp()")) @map("issued_at") @db.Timestamptz(6)
+  expiresAt                     DateTime @default(dbgenerated("clock_timestamp()")) @map("expires_at") @db.Timestamptz(6)
 
-  revision      AdvisoryRevision @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "reviewer_capability_issuance_revision_fkey")
-  vulnerability Vulnerability    @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "reviewer_capability_issuance_vulnerability_fkey")
+  revision      AdvisoryRevision                        @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "reviewer_capability_issuance_revision_fkey")
+  vulnerability Vulnerability                           @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "reviewer_capability_issuance_vulnerability_fkey")
   observation   ReviewerCapabilityLifecycleObservation?
 
   @@index([advisoryRevisionId], map: "reviewer_capability_issuance_revision_idx")
@@ -3710,18 +3751,20 @@ model ProductMatchEvaluationEvidence {
   suppressionAuthority         Boolean                @default(false) @map("suppression_authority")
   createdAt                    DateTime               @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
 
-  organization        Organization                         @relation(fields: [organizationId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_organization_fkey")
-  componentOccurrence ComponentOccurrence                  @relation(fields: [organizationId, componentOccurrenceId, assetId, componentId], references: [organizationId, id, assetId, componentId], onDelete: Restrict, map: "product_match_evaluation_evidence_occurrence_fkey")
-  component           Component                            @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict, map: "product_match_evaluation_evidence_component_fkey")
-  sbom                Sbom                                 @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict, map: "product_match_evaluation_evidence_sbom_fkey")
-  sbomIngestion       SbomIngestion                        @relation(fields: [organizationId, sbomIngestionId, sbomId], references: [organizationId, id, sbomId], onDelete: Restrict, map: "product_match_evaluation_evidence_ingestion_fkey")
-  family              AdvisoryFamily                       @relation(fields: [advisoryFamilyId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_family_fkey")
-  revision            AdvisoryRevision                     @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_revision_fkey")
-  approval            MaintainerReviewedAdvisoryApproval   @relation(fields: [approvalId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_approval_fkey")
-  vulnerability       Vulnerability                        @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_vulnerability_fkey")
-  explanations        ProductMatchEvaluationExplanation[]
+  organization          Organization                        @relation(fields: [organizationId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_organization_fkey")
+  componentOccurrence   ComponentOccurrence                 @relation(fields: [organizationId, componentOccurrenceId, assetId, componentId], references: [organizationId, id, assetId, componentId], onDelete: Restrict, map: "product_match_evaluation_evidence_occurrence_fkey")
+  component             Component                           @relation(fields: [organizationId, componentId], references: [organizationId, id], onDelete: Restrict, map: "product_match_evaluation_evidence_component_fkey")
+  sbom                  Sbom                                @relation(fields: [organizationId, sbomId, assetId], references: [organizationId, id, assetId], onDelete: Restrict, map: "product_match_evaluation_evidence_sbom_fkey")
+  sbomIngestion         SbomIngestion                       @relation(fields: [organizationId, sbomIngestionId, sbomId], references: [organizationId, id, sbomId], onDelete: Restrict, map: "product_match_evaluation_evidence_ingestion_fkey")
+  family                AdvisoryFamily                      @relation(fields: [advisoryFamilyId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_family_fkey")
+  revision              AdvisoryRevision                    @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_revision_fkey")
+  approval              MaintainerReviewedAdvisoryApproval  @relation(fields: [approvalId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_approval_fkey")
+  vulnerability         Vulnerability                       @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_vulnerability_fkey")
+  explanations          ProductMatchEvaluationExplanation[]
+  creationEvidenceLinks FindingCreationEvidenceLink[]
 
   @@unique([organizationId, id], map: "product_match_evaluation_evidence_org_id_key")
+  @@unique([organizationId, id, assetId, componentId, vulnerabilityId, sbomIngestionId, componentOccurrenceId], map: "product_match_evaluation_evidence_alignment_key")
   @@unique([organizationId, replayFingerprint], map: "product_match_evaluation_evidence_org_replay_uidx")
   @@unique([organizationId, componentOccurrenceId, advisoryRevisionId, approvalId, evaluatorId, evaluatorVersion, matchingPolicyId, matchingPolicyVersion, productEvidencePolicyId, productEvidencePolicyVersion], map: "product_match_evaluation_evidence_evaluation_uidx")
   @@index([organizationId, componentOccurrenceId], map: "product_match_evaluation_evidence_occurrence_idx")
@@ -3731,11 +3774,11 @@ model ProductMatchEvaluationEvidence {
 }
 
 model ProductMatchEvaluationExplanation {
-  id                              String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId                  String                         @map("organization_id") @db.Uuid
-  productMatchEvaluationEvidenceId String                        @map("product_match_evaluation_evidence_id") @db.Uuid
-  ordinal                         Int                            @db.SmallInt
-  explanationCode                 MatchEvaluationExplanationCode @map("explanation_code")
+  id                               String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId                   String                         @map("organization_id") @db.Uuid
+  productMatchEvaluationEvidenceId String                         @map("product_match_evaluation_evidence_id") @db.Uuid
+  ordinal                          Int                            @db.SmallInt
+  explanationCode                  MatchEvaluationExplanationCode @map("explanation_code")
 
   evidence ProductMatchEvaluationEvidence @relation(fields: [organizationId, productMatchEvaluationEvidenceId], references: [organizationId, id], onDelete: Restrict, map: "product_match_evaluation_explanation_evidence_fkey")
 

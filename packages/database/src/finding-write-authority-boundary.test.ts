@@ -96,19 +96,27 @@ describe('Finding generic-write containment', () => {
   });
 
   it('keeps direct Prisma Finding writes out of production sources', () => {
+    const allowedRawSql = 'packages/database/src/controlled-finding-creation-persistence.ts';
     const offenders: string[] = [];
     for (const filePath of productionSources()) {
+      const relative = path.relative(repoRoot, filePath);
       const source = readFileSync(filePath, 'utf8');
-      if (FINDING_WRITE.test(source) || FINDING_RAW_SQL.test(source)) {
-        offenders.push(path.relative(repoRoot, filePath));
+      if (FINDING_WRITE.test(source)) {
+        offenders.push(relative);
+      } else if (FINDING_RAW_SQL.test(source) && relative !== allowedRawSql) {
+        offenders.push(relative);
       }
     }
+    const adapter = readFileSync(path.join(repoRoot, allowedRawSql), 'utf8');
+    expect(adapter).not.toMatch(FINDING_WRITE);
+    expect(adapter).toMatch(FINDING_RAW_SQL);
     expect(offenders).toEqual([]);
   });
 
   it('keeps the Finding-writing intelligence fixture out of the production build', () => {
     const buildConfig = readFileSync(path.join(srcDir, '..', 'tsconfig.build.json'), 'utf8');
     expect(buildConfig).toContain('src/intelligence-test-fixture.ts');
+    expect(buildConfig).toContain('src/finding-constraint-fixture.ts');
     expect(buildConfig).toContain('src/**/*.test.ts');
   });
 });

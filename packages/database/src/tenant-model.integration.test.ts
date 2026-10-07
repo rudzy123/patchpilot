@@ -11,6 +11,7 @@ import {
   deployMigrations,
   dropEphemeralDatabase,
 } from './integration-database.js';
+import { insertOpenFindingForConstraintTest } from './finding-constraint-fixture.js';
 import { persistTenantChangeWithAuditAndOutbox } from './persistence-fixture.js';
 import { createPrismaUnitOfWork, createRepositories } from './repositories.js';
 import { seedDevelopmentData, developmentSeedIds } from './seed/development.js';
@@ -421,25 +422,17 @@ describe('tenant model persistence', () => {
         name: 'demo',
       },
     });
-    const findingA = await prisma.finding.create({
-      data: {
-        organizationId: orgA.id,
-        assetId: assetA.id,
-        vulnerabilityId: vulnerability.id,
-        componentId: componentA.id,
-        firstObservedAt: new Date(),
-        lastObservedAt: new Date(),
-      },
+    const { finding: findingA } = await insertOpenFindingForConstraintTest(prisma, {
+      organizationId: orgA.id,
+      assetId: assetA.id,
+      vulnerabilityId: vulnerability.id,
+      componentId: componentA.id,
     });
-    const findingB = await prisma.finding.create({
-      data: {
-        organizationId: orgB.id,
-        assetId: assetB.id,
-        vulnerabilityId: vulnerability.id,
-        componentId: componentB.id,
-        firstObservedAt: new Date(),
-        lastObservedAt: new Date(),
-      },
+    const { finding: findingB } = await insertOpenFindingForConstraintTest(prisma, {
+      organizationId: orgB.id,
+      assetId: assetB.id,
+      vulnerabilityId: vulnerability.id,
+      componentId: componentB.id,
     });
     expect(findingA.vulnerabilityId).toBe(findingB.vulnerabilityId);
     await expect(
@@ -466,26 +459,6 @@ describe('tenant model persistence', () => {
     const asset = await prisma.asset.create({
       data: { organizationId: org.id, name: 'imm-asset', assetType: 'application' },
     });
-    const sbom = await prisma.sbom.create({
-      data: {
-        organizationId: org.id,
-        assetId: asset.id,
-        objectKey: `org/${org.id}/imm`,
-        sha256: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
-        byteLength: 16,
-        declaredContentType: 'application/json',
-        receivedAt: new Date(),
-      },
-    });
-    const ingestion = await prisma.sbomIngestion.create({
-      data: {
-        organizationId: org.id,
-        sbomId: sbom.id,
-        assetId: asset.id,
-        parserVersion: '0.0.0-test',
-        normalizationVersion: '1',
-      },
-    });
     const vulnerability = await prisma.vulnerability.create({
       data: { osvId: `PATCHPILOT-IMM-${randomUUID().slice(0, 8)}` },
     });
@@ -497,28 +470,26 @@ describe('tenant model persistence', () => {
         name: 'imm',
       },
     });
-    const finding = await prisma.finding.create({
-      data: {
-        organizationId: org.id,
-        assetId: asset.id,
-        vulnerabilityId: vulnerability.id,
-        componentId: component.id,
-        firstObservedAt: new Date(),
-        lastObservedAt: new Date(),
-      },
+    const { finding, observation } = await insertOpenFindingForConstraintTest(prisma, {
+      organizationId: org.id,
+      assetId: asset.id,
+      vulnerabilityId: vulnerability.id,
+      componentId: component.id,
     });
-    const observation = await prisma.findingObservation.create({
-      data: {
-        organizationId: org.id,
-        findingId: finding.id,
-        sbomId: sbom.id,
-        sbomIngestionId: ingestion.id,
-        result: 'present',
-        method: 'exact_purl',
-        observedAt: new Date(),
-        evidence: { schemaVersion: JSON_SCHEMA_VERSION_V1, metadata: {} },
-      },
-    });
+    await expect(
+      prisma.findingObservation.create({
+        data: {
+          organizationId: org.id,
+          findingId: finding.id,
+          sbomId: observation.sbomId,
+          sbomIngestionId: observation.sbomIngestionId,
+          result: 'present',
+          method: 'exact_purl',
+          observedAt: new Date(),
+          evidence: { schemaVersion: JSON_SCHEMA_VERSION_V1, metadata: {} },
+        },
+      }),
+    ).rejects.toThrow();
     await expect(
       prisma.findingObservation.update({
         where: { id: observation.id },
@@ -629,15 +600,11 @@ describe('tenant model persistence', () => {
         name: 'ra',
       },
     });
-    const finding = await prisma.finding.create({
-      data: {
-        organizationId: org.id,
-        assetId: asset.id,
-        vulnerabilityId: vulnerability.id,
-        componentId: component.id,
-        firstObservedAt: new Date(),
-        lastObservedAt: new Date(),
-      },
+    const { finding } = await insertOpenFindingForConstraintTest(prisma, {
+      organizationId: org.id,
+      assetId: asset.id,
+      vulnerabilityId: vulnerability.id,
+      componentId: component.id,
     });
     const startsAt = new Date('2026-01-01T00:00:00.000Z');
     const expiresAt = new Date('2026-01-31T00:00:00.000Z');
@@ -712,15 +679,11 @@ describe('tenant model persistence', () => {
         name: 'rem',
       },
     });
-    const finding = await prisma.finding.create({
-      data: {
-        organizationId: orgA.id,
-        assetId: assetA.id,
-        vulnerabilityId: vulnerability.id,
-        componentId: component.id,
-        firstObservedAt: new Date(),
-        lastObservedAt: new Date(),
-      },
+    const { finding } = await insertOpenFindingForConstraintTest(prisma, {
+      organizationId: orgA.id,
+      assetId: assetA.id,
+      vulnerabilityId: vulnerability.id,
+      componentId: component.id,
     });
     await expect(
       prisma.remediationTask.create({

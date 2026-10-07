@@ -37,8 +37,8 @@ test('current frozen migration count agrees with the registry and migration dire
     .sort();
 
   assert.deepEqual([...registeredDirectories].sort(), directoriesOnDisk);
-  assert.match(readRepositoryFile(currentStatePath), /Frozen migrations:\s*23\b/);
-  assert.equal(registeredDirectories.length, 23);
+  assert.match(readRepositoryFile(currentStatePath), /Frozen migrations:\s*24\b/);
+  assert.equal(registeredDirectories.length, 24);
 });
 
 test('checkpoint documents do not enable production OSV, Findings, or real product eligibility', () => {
@@ -47,13 +47,16 @@ test('checkpoint documents do not enable production OSV, Findings, or real produ
   const agents = readRepositoryFile('AGENTS.md');
 
   assert.match(currentState, /Production OSV acquisition:\s*disabled/);
-  assert.match(currentState, /Finding creation from match evidence:\s*unavailable/);
+  assert.match(
+    currentState,
+    /Finding creation from match evidence:\s*controlled transaction implemented, production uncomposed/,
+  );
   assert.match(currentState, /Real product-eligible evaluation count:\s*0\b/);
   assert.match(currentState, /Persistent product-eligible evaluation count:\s*0\b/);
   assert.match(currentState, /Persistent Finding count:\s*0\b/);
   assert.match(currentState, /ADR 0032 is Accepted/);
   assert.doesNotMatch(currentState, /ADR 0032 remains Proposed/);
-  assert.match(currentState, /Finding creation remains unavailable/);
+  assert.match(currentState, /Automatic Finding creation remains unavailable/);
   assert.match(
     readRepositoryFile('docs/adr/0032-maintainer-reviewed-advisory-authority.md'),
     /^- Status: Accepted$/m,
