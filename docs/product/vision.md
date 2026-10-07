@@ -4,7 +4,7 @@ PatchPilot is a self-hosted platform that helps people find, prioritize, and clo
 
 Operators inventory software assets, upload CycloneDX SBOMs, correlate components with vulnerability intelligence, enrich applicable findings with CISA Known Exploited Vulnerabilities (KEV) data, calculate an explainable environmental priority, assign remediation work, record risk acceptance and compensating controls, re-scan, and export operational and executive reports. The system preserves audit history so later reviewers can see what was known, who decided, and which policy produced a score.
 
-That paragraph is the product goal. The implemented foundation is production-composed inventory, SBOM ingestion, and CISA KEV synchronization when enabled, plus sanitized provider status. Reviewed OSV, matching, provenance, and evidence capabilities remain production uncomposed. Findings, prioritization, remediation, and verification are not operational. The checkpoint is [current-state.md](../project/current-state.md).
+That paragraph is the product goal. The implemented foundation is production-composed inventory, SBOM ingestion, and CISA KEV synchronization when enabled, plus sanitized provider status. Reviewed OSV, matching, provenance, and evidence capabilities remain production uncomposed. Owner POST /findings and owner or admin GET /findings/:findingId are composed in the API. A user-facing Finding product, prioritization, remediation, and verification are not operational. The checkpoint is [current-state.md](../project/current-state.md).
 
 PatchPilot is for individual developers, small businesses, nonprofits, engineering teams, and larger organizations that need a private, production-minded workflow rather than a black-box score.
 
