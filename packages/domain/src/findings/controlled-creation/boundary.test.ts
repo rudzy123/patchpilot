@@ -194,7 +194,10 @@ describe('controlled finding creation checkpoint', () => {
     expect(checkpoint).toContain('publicly indistinguishable');
     expect(checkpoint).toContain('Explanation is derived from immutable evidence.');
     expect(checkpoint).toContain('Applicability is read time only.');
-    expect(checkpoint).toContain('Branch-closure review is next.');
+    expect(checkpoint).toContain('The Controlled Finding vertical slice is merged.');
+    expect(checkpoint).toContain('The protected operator API is the approved next implementation.');
+    expect(checkpoint).toContain('Those routes are not implemented.');
+    expect(checkpoint).not.toContain('Branch-closure review is next.');
     expect(checkpoint).not.toContain('Session 3-R is next.');
     expect(checkpoint).not.toContain('Session 2-R is next.');
     expect(checkpoint).not.toContain('Session 1-R is next.');

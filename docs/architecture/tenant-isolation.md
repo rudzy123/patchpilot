@@ -113,6 +113,8 @@ System jobs (Session 9 OSV/KEV catalog import, [ADR 0021](../adr/0021-vulnerabil
 
 Future matching orchestration must reload Organization as authority, then scope Asset, SBOM, ingestion, Component, ComponentOccurrence, Finding, FindingObservation, and match evaluation by that `organizationId`. Compound tenant foreign keys remain required where repository conventions support them. Every tenant write includes `organizationId`. Queue payloads are locators, not organization proof. Session 14 Batch 3 match-evaluation rows use the component occurrence's organization and reject a cross-tenant occurrence as absent. Session 15 Batch 3 reloads the occurrence with organization and occurrence identity together. Session 15 Batch 3-R rejects a non-UUID identifier before the transaction and keeps the organization predicate on the query. A cross-tenant identifier is absent. Product-match occurrence inspection, product-match evidence inspection, and product-evidence component inspection use that same organization-scoped predicate. A foreign tenant-owned row and an absent row are publicly indistinguishable. Product Match Evidence uniqueness includes the organization, so one tenant's replay fingerprint does not conflict with another tenant's row. The lookup does not read the row globally and then report that its organization differs. A malformed identifier remains a distinct closed failure. No private diagnostic stores a foreign organization or resource identity. Advisory revisions and Vulnerability bindings stay global and are not rewritten by a tenant request. No production matching exists.
 
+[ADR 0036](../adr/0036-controlled-finding-operator-api.md) keeps that indistinguishability for the future operator routes. `POST /findings` and `GET /findings/:findingId` derive the organization, membership, and permission from the opaque session. The request does not establish organization authority. A foreign or absent asset, evidence row, or Finding stays one public not-found result. Those routes are authorized and are not implemented. The creation transaction still reloads the active membership and the complete evidence set.
+
 ## How cache keys include organization context
 
 Any cache (HTTP response cache, Redis cache if added later) for tenant-owned data **must** include `organizationId` in the key. Global intel cache keys must **not** include tenant ids and must not store tenant component names.
@@ -125,7 +127,7 @@ Application-level organization scoping is the v0.1 strategy. **Row-Level Securit
 
 ## How logs and metrics avoid disclosure
 
-Log organization and resource **UUIDs**, counts, and hashes — not raw SBOMs, package lists, or export bodies. Metric labels: event type and state, not tenant name or package name. See [observability](observability.md).
+Log organization and resource **UUIDs**, counts, and hashes — not raw SBOMs, package lists, or export bodies. Metric labels: event type and state, not tenant name or package name. The controlled Finding operator routes follow the narrower log and metric rule in [ADR 0036](../adr/0036-controlled-finding-operator-api.md): no evidence ids or raw resource ids in logs or metric labels, and no Finding id in a metric label. See [observability](observability.md).
 
 ## How support and administrative access is controlled
 

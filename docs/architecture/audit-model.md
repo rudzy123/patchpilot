@@ -139,15 +139,15 @@ Routine `GET /intelligence/providers` and `GET /intelligence/providers/:provider
 
 ### Future matching and Finding lifecycle events
 
-[ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) records future bounded audit principles. **None of these actions are implemented** in Session 11. Do not add audit constants now.
+[ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md) records future bounded audit principles for provider-driven matching. `finding.created` is implemented. The controlled creation transaction inserts that one append-only event in the same transaction as the Finding, creation observation, and evidence links. Exact replay inserts no second `finding.created` row. The implemented payload metadata is purpose, policy id, policy version, affected evidence count, and ingestion id. It does not contain evidence ids.
 
-Per-positive Finding lifecycle actions may later include `finding.created`, `finding.observed`, `finding.resolved`, and `finding.reopened`. The existing catalog already names `finding.state_changed`, `finding.false_positive`, and `finding.mitigated`. A later write session must reconcile specific names with that catalog and must not emit duplicate generic and specific events for the same transition.
+Rejected creation requests and routine Finding inspection reads are bounded security logs or metrics. They are not immutable audit rows. Do not add `finding.inspected` for the [ADR 0036](../adr/0036-controlled-finding-operator-api.md) read route.
+
+The other per-positive lifecycle actions remain future: `finding.observed`, `finding.resolved`, and `finding.reopened`. The existing catalog already names `finding.state_changed`, `finding.false_positive`, and `finding.mitigated`. A later lifecycle session must reconcile specific names with that catalog and must not emit duplicate generic and specific events for the same transition. Session 11 and Session 12 must not emit those future lifecycle audits. The implemented `finding.created` event is the controlled-creation exception, not a provider-driven lifecycle audit.
 
 A per-job aggregate `vulnerability.match_evaluated` may later record bounded IDs, counts, versions, and statuses. Do not create one **AuditEvent** per negative comparison. Positive match evidence is not replaced by an audit event.
 
-Payloads must not contain provider prose, package inventories, affected-version arrays, raw provider records, SBOM bodies, CVE lists, KEV bodies, raw comparator errors, credentials, or URLs. Full PURLs appear only if internal policy explicitly permits them.
-
-Replay uniqueness remains tenant `(organizationId, action, subjectId, correlationId)`. Session 11 and Session 12 must not emit Finding lifecycle audits.
+Payloads must not contain provider prose, package inventories, affected-version arrays, raw provider records, SBOM bodies, CVE lists, KEV bodies, raw comparator errors, credentials, or URLs. Full PURLs appear only if internal policy explicitly permits them. Evidence ids stay out of `finding.created` and out of route logs. Replay uniqueness remains tenant `(organizationId, action, subjectId, correlationId)`.
 
 ## Integrity properties
 
