@@ -9,7 +9,17 @@
 Accepted as the reachability decision for the already implemented controlled Finding
 creation and inspection capabilities. Merge to `main` remains subject to normal
 pull-request review. This ADR does not implement routes, compose production, add a
-migration, or authorize any Finding power beyond the two routes named here.
+migration, or authorize any Finding creation or inspection power beyond the two routes
+named here.
+
+Further amended on 2026-10-07. Owner `POST /findings` and owner or admin
+`GET /findings/:findingId` are composed in the API process. [ADR 0037](0037-controlled-finding-target-discovery.md)
+admits one later read-only route, `GET /assets/:assetId/controlled-finding-targets`.
+The amendment does not weaken creation authority, exact replay, explicit evidence
+acknowledgement, tenant isolation, inspection confidentiality, anti-automation, or
+lifecycle deferrals. It does not implement that route. Sentences in this ADR that say
+production startup does not construct the two operator routes describe the decision
+before that composition.
 
 ## Context
 
@@ -39,19 +49,27 @@ scheduler, queue, and Outbox composition cannot construct it.
 ## Decision
 
 PatchPilot accepts deliberate, authenticated operator reachability for the existing
-controlled Finding services, and withholds every other Finding surface.
+controlled Finding services. Creation and inspection remain the two routes below.
+Read-only target discovery is admitted only by
+[ADR 0037](0037-controlled-finding-target-discovery.md).
 
 ### 1. Access surface
 
-One production surface is authorized, and only as a later API-process implementation:
+One production creation and inspection surface is authorized, and only as a later
+API-process implementation:
 
 - `POST /findings`
 - `GET /findings/:findingId`
 
+[ADR 0037](0037-controlled-finding-target-discovery.md) is the only additional route
+this decision admits: `GET /assets/:assetId/controlled-finding-targets`. That route
+is read-only, asset-scoped, and not implemented by this amendment.
+
 This decision does not authorize a CLI, web action, worker command, queue, scheduler,
-upload trigger, evaluator trigger, provider trigger, bulk route, Finding list route, or
-qualifying-evidence preview route. `GET /findings` is not authorized. No other method
-or path is authorized. This ADR does not register either route.
+upload trigger, evaluator trigger, provider trigger, bulk route, Finding list route,
+global discovery route, second preview route, arbitrary search, cross-asset discovery,
+create-all, or preview-and-create. `GET /findings` is not authorized. No other method
+or path is authorized besides the discovery route named above. This ADR does not register either creation or inspection route.
 
 ### 2. Creation route
 
@@ -108,6 +126,9 @@ These statements are binding:
   checks its own permission.
 - Widening either permission, including granting one to `member` or `viewer`, or
   granting creation to `admin`, requires a later permission review.
+- `finding:discover_controlled` is defined by
+  [ADR 0037](0037-controlled-finding-target-discovery.md). Neither permission in this
+  section grants it. Discovery does not grant either permission in this section.
 - A role string, permission list, or administrator flag in the request is ambient
   authority and is rejected. The server derives the permission from the active
   membership role.
@@ -345,7 +366,9 @@ perform the composition.
 
 The following remain unavailable:
 
-- qualifying-evidence preview;
+- qualifying-evidence preview, except the single read-only asset-scoped route in
+  [ADR 0037](0037-controlled-finding-target-discovery.md), which this amendment does
+  not implement;
 - Finding list;
 - web UI;
 - CLI;
@@ -391,6 +414,8 @@ behind the ADR 0026 provider gate. This ADR does not satisfy that gate.
   an accepted residual.
 - **Authorize a list, preview, web action, or CLI in the same decision.** Rejected:
   each widens tenant disclosure or the set of composers that can construct creation.
+  A later decision may admit one read-only asset-scoped discovery route.
+  [ADR 0037](0037-controlled-finding-target-discovery.md) is that decision.
 
 ## Consequences
 
@@ -435,6 +460,7 @@ The implementation branch may register only `POST /findings` and
 section 4, and compose the API process as section 15 allows. It needs
 tenant-isolation, CSRF and Origin, rate-limit, replay, stale-evidence, audit, and
 issuer-confinement tests, without exploit payloads. It must not add a migration, a
-dependency, a list route, a preview route, a worker composer, or a lifecycle
+dependency, a list route, a second preview route, a worker composer, or a lifecycle
 transition. A runbook for the composed routes belongs to that implementation, not to
-this decision.
+this decision. Discovery implementation is a later branch under
+[ADR 0037](0037-controlled-finding-target-discovery.md) and is not this follow-up.

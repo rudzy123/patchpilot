@@ -16,6 +16,15 @@ protected operator routes, `POST /findings` and `GET /findings/:findingId`. The 
 does not weaken evidence completeness, sealed creation authority, replay, tenant isolation,
 audit, or the production boundary for every other surface. It does not implement the routes.
 
+Further amended on 2026-10-07. Owner `POST /findings` and owner or admin
+`GET /findings/:findingId` are composed in the API process. Sentences above that call
+those commands production uncomposed describe the earlier amendment, not the current
+checkpoint. [ADR 0037](0037-controlled-finding-target-discovery.md) admits one later
+read-only route, `GET /assets/:assetId/controlled-finding-targets`. The amendment does
+not weaken creation authority, exact replay, explicit evidence acknowledgement, tenant
+isolation, inspection confidentiality, anti-automation, or lifecycle deferrals. It does
+not implement that route.
+
 ## Context
 
 [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md) accepts Finding identity
@@ -171,12 +180,14 @@ The read still changes no state.
 This ADR does not itself register a route. The creation and inspection commands stay
 production uncomposed until the API-process composition authorized by
 [ADR 0036](0036-controlled-finding-operator-api.md) is implemented. That composition may
-register only `POST /findings` and `GET /findings/:findingId`. This ADR still authorizes
-no web action, CLI, worker, scheduler, queue, Outbox consumer, BullMQ processor, upload
-trigger, evaluator trigger, provider trigger, bulk command, Finding list, or
-qualifying-evidence preview. Worker, web, scheduler, and queue startup do not construct
-the creation command. API startup does not construct it in this amendment. Seed and
-migration do not insert Findings.
+register only `POST /findings` and `GET /findings/:findingId`.
+[ADR 0037](0037-controlled-finding-target-discovery.md) may later register only
+`GET /assets/:assetId/controlled-finding-targets` as a read-only discovery route. This ADR
+still authorizes no web action, CLI, worker, scheduler, queue, Outbox consumer, BullMQ
+processor, upload trigger, evaluator trigger, provider trigger, bulk command, Finding list,
+second preview, cross-asset discovery, or create-all. The discovery route is not a writer.
+Worker, web, scheduler, and queue startup do not construct the creation command. API startup
+does not construct it in this amendment. Seed and migration do not insert Findings.
 
 [ADR 0023](0023-provider-neutral-cve-identity.md) still requires its four-condition gate
 before any provider-driven Finding writer. The controlled writer for this slice is
@@ -287,8 +298,10 @@ Operators do not edit frozen migrations and do not seed Findings to make a migra
 
 ## Follow-up
 
-The creation command and its forward migration are implemented and production uncomposed.
-Route implementation is a later branch under [ADR 0036](0036-controlled-finding-operator-api.md).
-That branch may register only `POST /findings` and `GET /findings/:findingId`. It may not add
-a worker, scheduler, or any other route. Repeated observations and lifecycle transitions remain
-unavailable until a separate accepted decision.
+The creation command, its forward migration, and the [ADR 0036](0036-controlled-finding-operator-api.md)
+routes are implemented. That implementation registered only `POST /findings` and
+`GET /findings/:findingId`. It did not add a worker, scheduler, or any other route.
+Repeated observations and lifecycle transitions remain unavailable until a separate
+accepted decision. Discovery, when implemented, is a separate branch under
+[ADR 0037](0037-controlled-finding-target-discovery.md) and may register only
+`GET /assets/:assetId/controlled-finding-targets`.

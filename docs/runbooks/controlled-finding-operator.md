@@ -38,7 +38,7 @@ The limiters are process-local. Restarting the API process clears them. There is
 
 ## What this route does not do
 
-Publishing the route does not authorize another component to call it. Web startup, workers, schedulers, queues, upload processing, evaluator processing, provider synchronization, seeds, and migrations do not construct it. There is no list, preview, bulk creation, or lifecycle route.
+Publishing the route does not authorize another component to call it. Web startup, workers, schedulers, queues, upload processing, evaluator processing, provider synchronization, seeds, and migrations do not construct it. There is no Finding list, bulk creation, or lifecycle route. [ADR 0037](../adr/0037-controlled-finding-target-discovery.md) accepts `GET /assets/:assetId/controlled-finding-targets` as a later read-only route. That route is not implemented, and this runbook does not operate it. No current route returns the complete creation acknowledgement.
 
 ## Related
 
