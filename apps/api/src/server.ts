@@ -28,6 +28,7 @@ import { startTelemetry } from '@patchpilot/observability';
 
 import { buildApi } from './app.js';
 import { createAssetRuntime } from './asset-runtime.js';
+import { composeControlledFindingOperatorRuntime } from './finding-runtime.js';
 import { createIntelligenceRuntime } from './intelligence-runtime.js';
 import { createRedisLoginRateLimiter } from './redis-login-rate-limiter.js';
 import { createSbomRuntime } from './sbom-runtime.js';
@@ -138,6 +139,7 @@ async function main(): Promise<void> {
       staleThresholdSeconds: config.intelligence.kevStaleThresholdSeconds,
       now: () => clock.now(),
     }),
+    findings: composeControlledFindingOperatorRuntime(prisma),
   });
 
   let shuttingDown = false;

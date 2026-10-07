@@ -1072,3 +1072,12 @@ export {
   type FindingInspectionResult,
   type FindingInspectionStatus,
 } from './findings/controlled-inspection/index.js';
+
+export {
+  CONTROLLED_FINDING_OPERATOR_NEXT_REVIEW,
+  CONTROLLED_FINDING_OPERATOR_PRODUCTION_REGISTRATION,
+  FINDING_CREATE_CONTROLLED_PERMISSION,
+  FINDING_INSPECT_PERMISSION,
+  controlledFindingOperatorPermissionsForRole,
+  type ControlledFindingOperatorPermission,
+} from './findings/controlled-operator/permissions.js';

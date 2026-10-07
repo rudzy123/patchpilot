@@ -1,7 +1,8 @@
 /**
- * Production-uncomposed controlled Finding inspection.
+ * Controlled Finding inspection read.
  * One organization-scoped read projects stored lineage.
- * API, web, worker, seed, and the package barrel do not construct this adapter.
+ * The API finding operator runtime is the only production constructor.
+ * Web, worker, seed, and the package barrel do not construct this adapter.
  * The read does not insert, update, or delete a Finding.
  */
 

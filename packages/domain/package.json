@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./controlled-finding-operator": {
+      "types": "./dist/findings/controlled-operator/index.d.ts",
+      "import": "./dist/findings/controlled-operator/index.js"
     }
   },
   "main": "./dist/index.js",

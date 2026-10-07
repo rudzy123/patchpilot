@@ -29,6 +29,7 @@ import { createIntegrationDatabaseTestEnv } from '@patchpilot/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApi } from './app.js';
+import { denyFindingOperatorRuntime } from './finding-runtime.js';
 import { createAssetRuntime, type AssetRuntime } from './asset-runtime.js';
 import {
   TEST_ORIGIN,
@@ -325,6 +326,7 @@ describe('asset inventory routes persistence', () => {
       assets: runtime,
       sboms: emptySbomRuntime(),
       intelligence: emptyIntelligenceRuntime(config),
+      findings: denyFindingOperatorRuntime(),
     });
   }
 

@@ -49,6 +49,12 @@ export const AUTH_HTTP_RATE_LIMITED: AppError = Object.freeze({
   message: 'Too many requests. Try again later.',
 });
 
+/** Fail-closed response when the Finding operator store or limiter cannot decide. */
+export const FINDING_OPERATOR_UNAVAILABLE: AppError = Object.freeze({
+  code: 'internal',
+  message: 'Finding operator is temporarily unavailable.',
+});
+
 export function httpStatusForError(error: AppError): number {
   if (error.code === 'validation' && error.message === SBOM_UPLOAD_TOO_LARGE.message) {
     return 413;
@@ -71,7 +77,8 @@ export function httpStatusForError(error: AppError): number {
       return 422;
     case 'internal':
       return error.message === LOGIN_UNAVAILABLE.message ||
-        error.message === INTELLIGENCE_STATUS_UNAVAILABLE.message
+        error.message === INTELLIGENCE_STATUS_UNAVAILABLE.message ||
+        error.message === FINDING_OPERATOR_UNAVAILABLE.message
         ? 503
         : 500;
   }

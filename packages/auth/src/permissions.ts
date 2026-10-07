@@ -1,4 +1,12 @@
-import { err, ok, type MembershipRole, type Result } from '@patchpilot/domain';
+import {
+  controlledFindingOperatorPermissionsForRole,
+  err,
+  FINDING_CREATE_CONTROLLED_PERMISSION,
+  FINDING_INSPECT_PERMISSION,
+  ok,
+  type MembershipRole,
+  type Result,
+} from '@patchpilot/domain';
 
 import { PERMISSION_DENIED } from './errors.js';
 import type { TrustedActor } from './trusted-actor.js';
@@ -16,6 +24,8 @@ export const PERMISSIONS = {
   sbomUpload: 'sbom:upload',
   findingRead: 'finding:read',
   findingTriage: 'finding:triage',
+  findingCreateControlled: FINDING_CREATE_CONTROLLED_PERMISSION,
+  findingInspect: FINDING_INSPECT_PERMISSION,
   remediationManage: 'remediation:manage',
   riskAcceptanceRequest: 'risk_acceptance:request',
   riskAcceptanceApprove: 'risk_acceptance:approve',
@@ -42,6 +52,8 @@ export const permissionCatalog: readonly Permission[] = Object.freeze([
   PERMISSIONS.sbomUpload,
   PERMISSIONS.findingRead,
   PERMISSIONS.findingTriage,
+  PERMISSIONS.findingCreateControlled,
+  PERMISSIONS.findingInspect,
   PERMISSIONS.remediationManage,
   PERMISSIONS.riskAcceptanceRequest,
   PERMISSIONS.riskAcceptanceApprove,
@@ -63,6 +75,7 @@ const VIEWER_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.policyRead,
   PERMISSIONS.auditRead,
   PERMISSIONS.intelligenceRead,
+  ...controlledFindingOperatorPermissionsForRole('viewer'),
 ];
 
 const MEMBER_PERMISSIONS: readonly Permission[] = [
@@ -70,10 +83,12 @@ const MEMBER_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.sbomUpload,
   PERMISSIONS.findingTriage,
   PERMISSIONS.remediationManage,
+  ...operatorGrantsBeyond('member', VIEWER_PERMISSIONS),
 ];
 
 const ADMIN_PERMISSIONS: readonly Permission[] = [
   ...MEMBER_PERMISSIONS,
+  ...operatorGrantsBeyond('admin', MEMBER_PERMISSIONS),
   PERMISSIONS.membershipManage,
   PERMISSIONS.teamManage,
   PERMISSIONS.assetManage,
@@ -85,9 +100,19 @@ const ADMIN_PERMISSIONS: readonly Permission[] = [
 
 const OWNER_PERMISSIONS: readonly Permission[] = [
   ...ADMIN_PERMISSIONS,
+  ...operatorGrantsBeyond('owner', ADMIN_PERMISSIONS),
   PERMISSIONS.organizationManage,
   PERMISSIONS.riskAcceptanceApprove,
 ];
+
+function operatorGrantsBeyond(
+  role: MembershipRole,
+  already: readonly Permission[],
+): readonly Permission[] {
+  return controlledFindingOperatorPermissionsForRole(role).filter(
+    (permission) => !already.includes(permission),
+  );
+}
 
 const ROLE_PERMISSIONS: Record<MembershipRole, ReadonlySet<Permission>> = {
   viewer: new Set(VIEWER_PERMISSIONS),

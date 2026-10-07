@@ -32,6 +32,13 @@ const matrix: Record<Permission, Record<MembershipRole, boolean>> = {
   [PERMISSIONS.sbomUpload]: { viewer: false, member: true, admin: true, owner: true },
   [PERMISSIONS.findingRead]: { viewer: true, member: true, admin: true, owner: true },
   [PERMISSIONS.findingTriage]: { viewer: false, member: true, admin: true, owner: true },
+  [PERMISSIONS.findingCreateControlled]: {
+    viewer: false,
+    member: false,
+    admin: false,
+    owner: true,
+  },
+  [PERMISSIONS.findingInspect]: { viewer: false, member: false, admin: true, owner: true },
   [PERMISSIONS.remediationManage]: { viewer: false, member: true, admin: true, owner: true },
   [PERMISSIONS.riskAcceptanceRequest]: { viewer: false, member: false, admin: true, owner: true },
   [PERMISSIONS.riskAcceptanceApprove]: { viewer: false, member: false, admin: false, owner: true },
@@ -53,6 +60,45 @@ describe('permission catalog', () => {
         expect(hasPermission(role, permission)).toBe(matrix[permission][role]);
       }
     }
+  });
+
+  it('maps controlled finding operator permissions without reusing triage or read', () => {
+    expect(PERMISSIONS.findingCreateControlled).toBe('finding:create_controlled');
+    expect(PERMISSIONS.findingInspect).toBe('finding:inspect');
+    expect(PERMISSIONS.findingCreateControlled).not.toBe(PERMISSIONS.findingTriage);
+    expect(PERMISSIONS.findingInspect).not.toBe(PERMISSIONS.findingRead);
+    expect(hasPermission('owner', PERMISSIONS.findingCreateControlled)).toBe(true);
+    expect(hasPermission('owner', PERMISSIONS.findingInspect)).toBe(true);
+    expect(hasPermission('admin', PERMISSIONS.findingCreateControlled)).toBe(false);
+    expect(hasPermission('admin', PERMISSIONS.findingInspect)).toBe(true);
+    expect(hasPermission('member', PERMISSIONS.findingCreateControlled)).toBe(false);
+    expect(hasPermission('member', PERMISSIONS.findingInspect)).toBe(false);
+    expect(hasPermission('viewer', PERMISSIONS.findingCreateControlled)).toBe(false);
+    expect(hasPermission('viewer', PERMISSIONS.findingInspect)).toBe(false);
+    expect(hasPermission('member', PERMISSIONS.findingTriage)).toBe(true);
+    expect(hasPermission('viewer', PERMISSIONS.findingRead)).toBe(true);
+  });
+
+  it('ignores caller-supplied permission strings and uses the membership role', () => {
+    const actor = {
+      userId: '11111111-1111-4111-8111-111111111111',
+      sessionId: 'session-1',
+      organizationId: '22222222-2222-4222-8222-222222222222',
+      membershipId: '33333333-3333-4333-8333-333333333333',
+      role: 'member' as const,
+      permissions: [
+        PERMISSIONS.findingCreateControlled,
+        PERMISSIONS.findingInspect,
+        PERMISSIONS.findingTriage,
+        PERMISSIONS.findingRead,
+      ],
+    };
+    expect(actorHasPermission(actor, PERMISSIONS.findingCreateControlled)).toBe(false);
+    expect(actorHasPermission(actor, PERMISSIONS.findingInspect)).toBe(false);
+    expect(requirePermission(actor, PERMISSIONS.findingCreateControlled)).toEqual({
+      ok: false,
+      error: PERMISSION_DENIED,
+    });
   });
 
   it('grants intelligence:read to every role and does not reuse integration:read', () => {

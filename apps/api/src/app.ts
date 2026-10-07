@@ -20,6 +20,9 @@ import { registerAssetRoutes } from './asset-routes.js';
 import type { AssetRuntime } from './asset-runtime.js';
 import { registerAuthRoutes } from './auth-routes.js';
 import type { AuthRuntime } from './auth-runtime.js';
+import { registerFindingRoutes } from './finding-routes.js';
+import type { FindingOperatorRuntime } from './finding-runtime.js';
+import type { FindingOrganizationRateLimiter } from './finding-rate-limit.js';
 import { registerIntelligenceRoutes } from './intelligence-routes.js';
 import type { IntelligenceRuntime } from './intelligence-runtime.js';
 import { registerSbomRoutes } from './sbom-routes.js';
@@ -38,6 +41,8 @@ export type ApiDependencies = {
   assets: AssetRuntime;
   sboms: SbomRuntime;
   intelligence: IntelligenceRuntime;
+  findings: FindingOperatorRuntime;
+  findingOrganizationLimiter?: FindingOrganizationRateLimiter;
   now?: () => string;
   generateId?: () => string;
 };
@@ -212,6 +217,16 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     config: dependencies.config,
     auth: dependencies.auth,
     intelligence: dependencies.intelligence,
+  });
+
+  await registerFindingRoutes(app, {
+    config: dependencies.config,
+    logger: dependencies.logger,
+    auth: dependencies.auth,
+    findings: dependencies.findings,
+    ...(dependencies.findingOrganizationLimiter === undefined
+      ? {}
+      : { findingOrganizationLimiter: dependencies.findingOrganizationLimiter }),
   });
 
   app.addHook('onSend', async (request, _reply, payload) => {

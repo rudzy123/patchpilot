@@ -28,6 +28,7 @@ import { createIntegrationDatabaseTestEnv } from '@patchpilot/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApi } from './app.js';
+import { denyFindingOperatorRuntime } from './finding-runtime.js';
 import { createAssetRuntime } from './asset-runtime.js';
 import {
   TEST_ORIGIN,
@@ -143,6 +144,7 @@ describe('authentication routes persistence', () => {
       assets,
       sboms: emptySbomRuntime(),
       intelligence: emptyIntelligenceRuntime(config),
+      findings: denyFindingOperatorRuntime(),
     });
 
     const loggedIn = await app.inject({
@@ -294,6 +296,7 @@ describe('authentication routes persistence', () => {
         listOrganizations: createListActiveOrganizationsUseCase(shared),
         audit: repos.auditEvents,
       },
+      findings: denyFindingOperatorRuntime(),
       assets,
       sboms: emptySbomRuntime(),
       intelligence: emptyIntelligenceRuntime(config),

@@ -69,7 +69,7 @@ describe('controlled finding creation public surface', () => {
     const packageJson = JSON.parse(
       readFileSync(path.join(repoRoot, 'packages/domain/package.json'), 'utf8'),
     ) as { exports: Record<string, unknown> };
-    expect(Object.keys(packageJson.exports)).toEqual(['.']);
+    expect(Object.keys(packageJson.exports).sort()).toEqual(['.', './controlled-finding-operator']);
   });
 });
 
@@ -90,25 +90,33 @@ describe('controlled finding creation source boundary', () => {
 });
 
 describe('controlled finding creation production exclusion', () => {
-  it('is not constructed by API, web, or worker sources', () => {
+  it('is not constructed by API, web, or worker sources except the API runtime', () => {
     const roots = ['apps/api', 'apps/web', 'apps/worker'].map((root) => path.join(repoRoot, root));
     const offenders: string[] = [];
+    const persistence = 'createControlledFindingCreationPersistence';
+    const allowedPersistence = new Set(['apps/api/src/finding-runtime.ts']);
     const forbidden = [
       'issueFindingCreationAuthorization',
       'findings/controlled-creation',
       'openFindingCreationCommand',
       'presentFindingCreationAuthorization',
-      'createControlledFindingCreationPersistence',
     ];
     for (const root of roots) {
       for (const filePath of walk(root).filter(isProductionSource)) {
+        const relative = path.relative(repoRoot, filePath);
         const source = readFileSync(filePath, 'utf8');
         if (forbidden.some((needle) => source.includes(needle))) {
-          offenders.push(path.relative(repoRoot, filePath));
+          offenders.push(relative);
+        }
+        if (source.includes(persistence) && !allowedPersistence.has(relative)) {
+          offenders.push(relative);
         }
       }
     }
     expect(offenders).toEqual([]);
+    const runtime = readFileSync(path.join(repoRoot, 'apps/api/src/finding-runtime.ts'), 'utf8');
+    expect(runtime).toContain(persistence);
+    expect(runtime).not.toContain('issueFindingCreationAuthorization');
   });
 
   it('lets only the uncomposed persistence adapter verify a sealed authorization', () => {
@@ -141,12 +149,15 @@ describe('controlled finding creation production exclusion', () => {
 });
 
 describe('controlled finding creation issuer containment', () => {
-  it('keeps the issuer out of production sources except its module', () => {
-    const allowed = 'packages/domain/src/findings/controlled-creation/authorization.ts';
+  it('keeps the issuer out of production sources except its module and the creation application', () => {
+    const allowed = new Set([
+      'packages/domain/src/findings/controlled-creation/authorization.ts',
+      'packages/domain/src/findings/controlled-operator/creation.ts',
+    ]);
     const offenders: string[] = [];
     for (const filePath of walk(repoRoot).filter(isProductionSource)) {
       const relative = path.relative(repoRoot, filePath);
-      if (relative === allowed) {
+      if (allowed.has(relative)) {
         continue;
       }
       const source = readFileSync(filePath, 'utf8');
@@ -155,6 +166,11 @@ describe('controlled finding creation issuer containment', () => {
       }
     }
     expect(offenders).toEqual([]);
+    const application = readFileSync(
+      path.join(repoRoot, 'packages/domain/src/findings/controlled-operator/creation.ts'),
+      'utf8',
+    );
+    expect(application).toContain('issueFindingCreationAuthorization');
   });
 
   it('rejects package subpath imports of the issuer module', () => {
@@ -179,13 +195,13 @@ describe('controlled finding creation checkpoint', () => {
     const checkpoint = readFileSync(path.join(repoRoot, 'docs/project/current-state.md'), 'utf8');
     expect(checkpoint).toContain('process-local creation authorization are implemented');
     expect(checkpoint).toContain(
-      'The atomic creation transaction and evidence-link model are implemented and production uncomposed.',
+      'The atomic creation transaction and evidence-link model are implemented.',
     );
     expect(checkpoint).toContain(
-      'Safe inspection and explanation are implemented and production uncomposed.',
+      'Safe inspection is composed for owners and admins through GET /findings/:findingId.',
     );
     expect(checkpoint).toContain('Lifecycle transitions remain unavailable.');
-    expect(checkpoint).toContain('Production composition is absent.');
+    expect(checkpoint).toContain('POST /findings is composed and owner-only.');
     expect(checkpoint).toContain('A user-facing Finding product is not operational.');
     expect(checkpoint).toContain('Session 1-R reviewed the process-local creation authorization.');
     expect(checkpoint).toContain('Session 2-R reviewed the creation transaction.');
@@ -195,12 +211,24 @@ describe('controlled finding creation checkpoint', () => {
     expect(checkpoint).toContain('Explanation is derived from immutable evidence.');
     expect(checkpoint).toContain('Applicability is read time only.');
     expect(checkpoint).toContain('The Controlled Finding vertical slice is merged.');
-    expect(checkpoint).toContain('The protected operator API is the approved next implementation.');
-    expect(checkpoint).toContain('Those routes are not implemented.');
+    expect(checkpoint).toContain(
+      'Controlled Finding Operator API Session 2-R reviewed the composed routes.',
+    );
+    expect(checkpoint).toContain('Exact replay is publicly reachable.');
     expect(checkpoint).not.toContain('Branch-closure review is next.');
     expect(checkpoint).not.toContain('Session 3-R is next.');
-    expect(checkpoint).not.toContain('Session 2-R is next.');
-    expect(checkpoint).not.toContain('Session 1-R is next.');
+    expect(checkpoint).not.toContain('Controlled Finding Operator API Session 2 is next.');
+    expect(checkpoint).toContain(
+      'Controlled Finding Operator API Session 1-R reviewed the application authorization boundary.',
+    );
+    expect(checkpoint).not.toContain('Controlled Finding Operator API Session 1-R is next.');
+    expect(checkpoint).toContain('The operator permissions are implemented.');
+    expect(checkpoint).toContain(
+      'The application creation and inspection boundaries are implemented.',
+    );
+    expect(checkpoint).toContain('Private creation issuance remains contained.');
+    expect(checkpoint).toContain('GET /findings/:findingId is composed for owners and admins.');
+    expect(checkpoint).toContain('Automatic and lifecycle capabilities remain unavailable.');
     expect(checkpoint).toContain('All lifecycle powers remain unavailable.');
     expect(checkpoint).toContain('The controlled product slice is not complete.');
   });

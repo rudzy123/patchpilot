@@ -114,6 +114,11 @@ type FindingCreationTransactionBase = {
 export type FindingCreationTransactionResult =
   | (FindingCreationTransactionBase & {
       readonly status: 'created';
+      /**
+       * Tenant-scoped Finding id for the active organization.
+       * Failure results omit this field.
+       */
+      readonly findingId: string;
       readonly writesPerformed: true;
       readonly observationAdded: true;
       readonly auditEventAdded: true;
@@ -121,6 +126,8 @@ export type FindingCreationTransactionResult =
     })
   | (FindingCreationTransactionBase & {
       readonly status: 'already_applied';
+      /** Tenant-scoped Finding id for the active organization. */
+      readonly findingId: string;
       readonly writesPerformed: false;
       readonly observationAdded: false;
       readonly auditEventAdded: false;

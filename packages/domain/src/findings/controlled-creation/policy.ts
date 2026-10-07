@@ -370,6 +370,7 @@ export const FINDING_CREATION_INVARIANTS = Object.freeze({
   issuerPackageExport: 'absent',
   issuerDeepImportSupported: false,
   internalIssuerTrustBoundary: 'same_package_relative_import',
+  issuerProductionCaller: 'controlled_finding_creation_application',
   productionRegistration: FINDING_CREATION_PRODUCTION_REGISTRATION,
   persistenceImplemented: true,
   evidenceLinkMigrationImplemented: true,
