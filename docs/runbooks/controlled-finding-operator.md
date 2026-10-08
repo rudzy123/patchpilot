@@ -52,7 +52,7 @@ The peer limit is 30 requests per 60 seconds on the direct socket, before authen
 
 The discovery transaction reloads the active membership and the active organization, and it accepts only an owner or admin role on that membership. A caller-supplied role does not grant discovery.
 
-This runbook does not operate a Finding list, a second preview, a CLI, a worker, or automatic creation. [ADR 0038](../adr/0038-controlled-finding-web-workflow.md) accepts a nested web workflow that is not implemented. This runbook does not operate that workflow. Lifecycle powers remain unavailable. Controlled Finding Target Discovery Session 1-R reviewed this route.
+This runbook does not operate a Finding list, a second preview, a CLI, a worker, or automatic creation. [ADR 0038](../adr/0038-controlled-finding-web-workflow.md) is implemented as a nested web workflow. Owner confirmation is explicit. Admin review is read-only. Acknowledgements remain ephemeral. Stale acknowledgements fail closed. Exact replay is supported. Controlled Finding Web Workflow Session 1-R reviewed this uncommitted workflow. Branch-closure review is next. This runbook does not operate that workflow. Lifecycle powers remain unavailable. Controlled Finding Target Discovery Session 1-R reviewed this route.
 
 Web startup, workers, schedulers, queues, upload processing, evaluator processing, provider synchronization, seeds, and migrations do not construct discovery.
 

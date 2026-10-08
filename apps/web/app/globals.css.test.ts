@@ -16,5 +16,7 @@ describe('web focus styles', () => {
     expect(css).toContain('select:focus-visible');
     expect(css).toContain('textarea:focus-visible');
     expect(css).toContain('outline');
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(css).toContain('animation: none');
   });
 });

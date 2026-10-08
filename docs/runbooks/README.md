@@ -22,7 +22,8 @@ They do not include exploit payloads. They do not claim compliance.
 | [Tenant isolation incident](tenant-isolation-incident.md) | Suspected cross-organization read or write |
 | [Audit integrity failure](audit-integrity-failure.md) | Missing, altered, or cascade-deleted audit or evidence |
 | [Authentication failure](authentication-failure.md) | Login, session, CSRF, cookie, or login-limiter problems |
-| [Controlled Finding operator](controlled-finding-operator.md) | Owner creation, owner or admin inspection, and owner or admin target discovery. The nested web workflow is not operated here |
+| [Controlled Finding operator](controlled-finding-operator.md) | Owner creation, owner or admin inspection, and owner or admin target discovery through the API |
+| [Controlled Finding web workflow](controlled-finding-web-workflow.md) | Nested target review and direct Finding inspection in the web application |
 | [CI failure](ci-failure.md) | GitHub Actions or local quality gates fail |
 | [Dependency alert](dependency-alert.md) | Dependabot or Dependency Review flags a package |
 | [Secret exposure](secret-exposure.md) | Credential in git, logs, or artifacts |

@@ -108,6 +108,8 @@ describe('createAuthApi', () => {
       status: 401,
       code: 'unauthorized',
       message: GENERIC_LOGIN_FAILURE,
+      requestId: 'req-1',
+      correlationId: 'corr-1',
     });
     expect(JSON.stringify(error)).not.toContain(PASSWORD);
     expect(JSON.stringify(error)).not.toContain(EMAIL);
@@ -279,6 +281,179 @@ describe('createAuthApi', () => {
       status: 409,
       code: 'conflict',
       message: ASSET_VERSION_CONFLICT,
+      requestId: 'req-1',
+      correlationId: 'corr-1',
     });
+  });
+
+  it('calls controlled Finding reads without a CSRF header and creation with the exact body', async () => {
+    const acknowledgement = {
+      assetId: ASSET_ID,
+      componentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      vulnerabilityId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      expectedSbomIngestionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      expectedProductMatchEvidenceIds: [
+        'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      ],
+    };
+    const discovery = {
+      candidates: [
+        {
+          classification: 'eligible_for_creation',
+          componentId: acknowledgement.componentId,
+          vulnerabilityId: acknowledgement.vulnerabilityId,
+          vulnerabilityPublicId: 'CVE-2024-0001',
+          affectedVersions: {
+            values: ['1.0.0'],
+            truncated: false,
+            omittedDistinctCount: 0,
+            distinctCount: 1,
+          },
+          affectedOccurrenceCount: 1,
+          otherOccurrenceCount: 0,
+          explanationCodes: [],
+          acknowledgement,
+        },
+      ],
+      oversizedCandidateCount: 0,
+      nextCursor: 'cursor-b',
+    };
+    const inspection = {
+      schemaVersion: 'finding_inspection_projection_v1',
+      findingId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      state: 'open',
+      asset: { id: ASSET_ID, displayName: 'Payments' },
+      component: {
+        id: acknowledgement.componentId,
+        ecosystem: 'npm',
+        namespace: null,
+        name: 'left-pad',
+      },
+      vulnerability: {
+        id: acknowledgement.vulnerabilityId,
+        publicId: 'CVE-2024-0001',
+      },
+      affectedVersions: {
+        values: ['1.0.0'],
+        truncated: false,
+        omittedDistinctCount: 0,
+        distinctCount: 1,
+      },
+      affectedOccurrenceCount: 1,
+      otherOccurrenceCount: 0,
+      otherOccurrenceClassification: 'no_other_occurrences_in_creation_ingestion',
+      createdAt: '2026-08-28T13:00:00.000Z',
+      creationObservationPolicy: {
+        policyId: 'finding_creation_policy_v1',
+        policyVersion: 1,
+      },
+      explanationCodes: [],
+      creationEvidenceApplicability: 'current',
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes('/controlled-finding-targets')) {
+        return jsonResponse(200, discovery);
+      }
+      if (init?.method === 'POST') {
+        return jsonResponse(201, { status: 'created', findingId: inspection.findingId });
+      }
+      return jsonResponse(200, inspection);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const api = createAuthApi(API_BASE);
+
+    await api.listControlledFindingTargets(ASSET_ID, { cursor: 'cursor-b' });
+    await api.inspectControlledFinding(inspection.findingId);
+    await api.createControlledFinding(acknowledgement, CSRF_TOKEN_FIXTURE);
+
+    const discoveryCall = fetchCall(fetchMock, 0);
+    const inspectionCall = fetchCall(fetchMock, 1);
+    const creationCall = fetchCall(fetchMock, 2);
+    expect(discoveryCall.url).toBe(
+      `${API_BASE}/assets/${ASSET_ID}/controlled-finding-targets?limit=10&cursor=cursor-b`,
+    );
+    expect(discoveryCall.url).not.toContain('organization');
+    expect(discoveryCall.init.method).toBe('GET');
+    expect(discoveryCall.init.credentials).toBe('include');
+    expect(discoveryCall.init.cache).toBe('no-store');
+    expect(discoveryCall.init.body).toBeUndefined();
+    expect((discoveryCall.init.headers as Headers).get(CSRF_HEADER_NAME)).toBeNull();
+    expect((discoveryCall.init.headers as Headers).get('origin')).toBeNull();
+
+    expect(inspectionCall.url).toBe(`${API_BASE}/findings/${inspection.findingId}`);
+    expect(inspectionCall.init.method).toBe('GET');
+    expect(inspectionCall.init.credentials).toBe('include');
+    expect(inspectionCall.init.cache).toBe('no-store');
+    expect((inspectionCall.init.headers as Headers).get(CSRF_HEADER_NAME)).toBeNull();
+    expect(inspectionCall.init.body).toBeUndefined();
+
+    expect(creationCall.url).toBe(`${API_BASE}/findings`);
+    expect(creationCall.init.method).toBe('POST');
+    expect(creationCall.init.credentials).toBe('include');
+    expect(creationCall.init.cache).toBe('no-store');
+    expect((creationCall.init.headers as Headers).get('content-type')).toBe('application/json');
+    expect((creationCall.init.headers as Headers).get(CSRF_HEADER_NAME)).toBe(CSRF_TOKEN_FIXTURE);
+    expect((creationCall.init.headers as Headers).get('origin')).toBeNull();
+    expect(creationCall.init.body).toBe(JSON.stringify(acknowledgement));
+    expect(String(creationCall.init.body)).not.toContain('organizationId');
+    expect(String(creationCall.init.body)).not.toContain('idempotency');
+  });
+
+  it('keeps public error identifiers and drops raw failure content', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse(409, {
+          error: {
+            code: 'conflict',
+            message: 'The request conflicts with the current evidence.',
+            requestId: 'req-safe',
+            correlationId: 'corr-safe',
+            stack: 'SELECT secret FROM finding',
+            evidenceIds: ['dddddddd-dddd-4ddd-8ddd-dddddddddddd'],
+          },
+        }),
+      ),
+    );
+    const api = createAuthApi(API_BASE);
+    const error = await api
+      .createControlledFinding(
+        {
+          assetId: ASSET_ID,
+          componentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          vulnerabilityId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          expectedSbomIngestionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          expectedProductMatchEvidenceIds: ['dddddddd-dddd-4ddd-8ddd-dddddddddddd'],
+        },
+        CSRF_TOKEN_FIXTURE,
+      )
+      .catch((caught: unknown) => caught);
+
+    expect(error).toEqual({
+      status: 409,
+      code: 'conflict',
+      message: 'The request conflicts with the current evidence.',
+      requestId: 'req-safe',
+      correlationId: 'corr-safe',
+    });
+    expect(JSON.stringify(error)).not.toContain('SELECT');
+    expect(JSON.stringify(error)).not.toContain('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+  });
+
+  it('does not request controlled Finding routes for a non-canonical identifier', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(500, { error: { code: 'internal' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const api = createAuthApi(API_BASE);
+    const discovery = await api
+      .listControlledFindingTargets('NOT-A-UUID')
+      .catch((caught: unknown) => caught);
+    const inspection = await api
+      .inspectControlledFinding('FFFFFFFF-FFFF-4FFF-8FFF-FFFFFFFFFFFF')
+      .catch((caught: unknown) => caught);
+    expect(discovery).toMatchObject({ status: 404, code: 'not_found' });
+    expect(inspection).toMatchObject({ status: 404, code: 'not_found' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

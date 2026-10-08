@@ -98,6 +98,32 @@ nav[aria-label='Account'] {
   margin: 1rem 0;
 }
 
+.finding-candidate {
+  border: 1px solid currentColor;
+  margin: 1rem 0;
+  padding: 1rem;
+}
+
+.finding-candidate,
+.asset-dialog {
+  overflow-wrap: anywhere;
+}
+
+.asset-dialog h2:focus,
+.finding-outcome:focus {
+  outline: 0.15rem solid currentColor;
+  outline-offset: 0.15rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asset-dialog,
+  .finding-candidate {
+    animation: none;
+    scroll-behavior: auto;
+    transition: none;
+  }
+}
+
 .asset-table-wrap {
   overflow-x: auto;
 }
