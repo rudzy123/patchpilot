@@ -504,6 +504,10 @@ The exception requires **all** of the following:
     provider trigger, bulk route, Finding list, second preview, cross-asset discovery,
     or create-all is included. Further amended on 2026-10-07. The qualifying-evidence
     preview exclusion remains in force for every surface ADR 0037 does not name.
+    Further amended on 2026-10-08. [ADR 0038](0038-controlled-finding-web-workflow.md)
+    admits one nested browser client of the routes already named in this item. That
+    client is not a new writer, not a new API route, and not a Finding list. The web
+    process does not construct creation or inspection authority.
 12. The slice grants no downstream lifecycle authority. It does not authorize suppression,
     remediation, verification, risk, priority, assignment, notification, export, automatic
     closure, or automatic reopening.
