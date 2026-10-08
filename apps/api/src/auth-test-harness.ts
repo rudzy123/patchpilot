@@ -49,6 +49,10 @@ import type { AuthRuntime } from './auth-runtime.js';
 import type { DatabaseReadyCheck } from './app.js';
 import type { FindingOrganizationRateLimiter } from './finding-rate-limit.js';
 import { denyFindingOperatorRuntime, type FindingOperatorRuntime } from './finding-runtime.js';
+import {
+  denyFindingDiscoveryRuntime,
+  type FindingDiscoveryRuntime,
+} from './finding-discovery-runtime.js';
 import { createIntelligenceRuntime, type IntelligenceRuntime } from './intelligence-runtime.js';
 import type { SbomRuntime } from './sbom-runtime.js';
 
@@ -91,6 +95,8 @@ export async function buildTestApi(options?: {
   intelligence?: IntelligenceRuntime;
   findings?: FindingOperatorRuntime;
   findingOrganizationLimiter?: FindingOrganizationRateLimiter;
+  discovery?: FindingDiscoveryRuntime;
+  discoveryOrganizationLimiter?: FindingOrganizationRateLimiter;
 }) {
   const harness = options?.harness ?? createAuthTestHarness(options);
   const app = await buildApi({
@@ -106,6 +112,12 @@ export async function buildTestApi(options?: {
     ...(options?.findingOrganizationLimiter === undefined
       ? {}
       : { findingOrganizationLimiter: options.findingOrganizationLimiter }),
+    ...(options?.discovery === undefined
+      ? { discovery: denyFindingDiscoveryRuntime() }
+      : { discovery: options.discovery }),
+    ...(options?.discoveryOrganizationLimiter === undefined
+      ? {}
+      : { discoveryOrganizationLimiter: options.discoveryOrganizationLimiter }),
     ...(options?.now === undefined ? {} : { now: options.now }),
     ...(options?.generateId === undefined ? {} : { generateId: options.generateId }),
   });

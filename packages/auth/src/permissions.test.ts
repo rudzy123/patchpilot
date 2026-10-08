@@ -38,6 +38,12 @@ const matrix: Record<Permission, Record<MembershipRole, boolean>> = {
     admin: false,
     owner: true,
   },
+  [PERMISSIONS.findingDiscoverControlled]: {
+    viewer: false,
+    member: false,
+    admin: true,
+    owner: true,
+  },
   [PERMISSIONS.findingInspect]: { viewer: false, member: false, admin: true, owner: true },
   [PERMISSIONS.remediationManage]: { viewer: false, member: true, admin: true, owner: true },
   [PERMISSIONS.riskAcceptanceRequest]: { viewer: false, member: false, admin: true, owner: true },
@@ -64,7 +70,15 @@ describe('permission catalog', () => {
 
   it('maps controlled finding operator permissions without reusing triage or read', () => {
     expect(PERMISSIONS.findingCreateControlled).toBe('finding:create_controlled');
+    expect(PERMISSIONS.findingDiscoverControlled).toBe('finding:discover_controlled');
     expect(PERMISSIONS.findingInspect).toBe('finding:inspect');
+    expect(PERMISSIONS.findingDiscoverControlled).not.toBe(PERMISSIONS.findingRead);
+    expect(PERMISSIONS.findingDiscoverControlled).not.toBe(PERMISSIONS.findingTriage);
+    expect(PERMISSIONS.findingDiscoverControlled).not.toBe(PERMISSIONS.findingInspect);
+    expect(PERMISSIONS.findingDiscoverControlled).not.toBe(PERMISSIONS.findingCreateControlled);
+    expect(hasPermission('admin', PERMISSIONS.findingDiscoverControlled)).toBe(true);
+    expect(hasPermission('member', PERMISSIONS.findingDiscoverControlled)).toBe(false);
+    expect(hasPermission('viewer', PERMISSIONS.findingDiscoverControlled)).toBe(false);
     expect(PERMISSIONS.findingCreateControlled).not.toBe(PERMISSIONS.findingTriage);
     expect(PERMISSIONS.findingInspect).not.toBe(PERMISSIONS.findingRead);
     expect(hasPermission('owner', PERMISSIONS.findingCreateControlled)).toBe(true);
@@ -89,12 +103,14 @@ describe('permission catalog', () => {
       permissions: [
         PERMISSIONS.findingCreateControlled,
         PERMISSIONS.findingInspect,
+        PERMISSIONS.findingDiscoverControlled,
         PERMISSIONS.findingTriage,
         PERMISSIONS.findingRead,
       ],
     };
     expect(actorHasPermission(actor, PERMISSIONS.findingCreateControlled)).toBe(false);
     expect(actorHasPermission(actor, PERMISSIONS.findingInspect)).toBe(false);
+    expect(actorHasPermission(actor, PERMISSIONS.findingDiscoverControlled)).toBe(false);
     expect(requirePermission(actor, PERMISSIONS.findingCreateControlled)).toEqual({
       ok: false,
       error: PERMISSION_DENIED,

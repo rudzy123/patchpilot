@@ -123,10 +123,12 @@ export {
 export {
   controlledFindingCreationRequestSchema,
   controlledFindingCreationResponseSchema,
+  controlledFindingDiscoveryResponseSchema,
   controlledFindingIdParamSchema,
   controlledFindingInspectionResponseSchema,
   type ControlledFindingCreationRequest,
   type ControlledFindingCreationResponse,
+  type ControlledFindingDiscoveryResponse,
   type ControlledFindingInspectionResponse,
 } from './findings.js';
 

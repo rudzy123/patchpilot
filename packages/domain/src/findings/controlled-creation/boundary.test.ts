@@ -69,7 +69,11 @@ describe('controlled finding creation public surface', () => {
     const packageJson = JSON.parse(
       readFileSync(path.join(repoRoot, 'packages/domain/package.json'), 'utf8'),
     ) as { exports: Record<string, unknown> };
-    expect(Object.keys(packageJson.exports).sort()).toEqual(['.', './controlled-finding-operator']);
+    expect(Object.keys(packageJson.exports).sort()).toEqual([
+      '.',
+      './controlled-finding-discovery',
+      './controlled-finding-operator',
+    ]);
   });
 });
 

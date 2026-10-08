@@ -38,7 +38,23 @@ The limiters are process-local. Restarting the API process clears them. There is
 
 ## What this route does not do
 
-Publishing the route does not authorize another component to call it. Web startup, workers, schedulers, queues, upload processing, evaluator processing, provider synchronization, seeds, and migrations do not construct it. There is no Finding list, bulk creation, or lifecycle route. [ADR 0037](../adr/0037-controlled-finding-target-discovery.md) accepts `GET /assets/:assetId/controlled-finding-targets` as a later read-only route. That route is not implemented, and this runbook does not operate it. No current route returns the complete creation acknowledgement.
+Publishing `POST /findings` or `GET /findings/:findingId` does not authorize another component to call them. Web startup, workers, schedulers, queues, upload processing, evaluator processing, provider synchronization, seeds, and migrations do not construct creation or inspection. There is no Finding list, bulk creation, or lifecycle route.
+
+## Discovery
+
+`GET /assets/:assetId/controlled-finding-targets` is owner and admin only. It requires `finding:discover_controlled`. Member and viewer are denied. `finding:read`, `finding:triage`, `finding:inspect`, and `finding:create_controlled` do not grant discovery. Discovery does not grant creation or inspection.
+
+The route is read-only. It returns at most 20 candidates for one asset. Each creatable or exactly replayable candidate includes the acknowledgement `POST /findings` already requires. That acknowledgement is the complete current qualifying Product Match Evidence set. `POST /findings` revalidates the set and remains owner-only. A stale acknowledgement fails closed. Evidence ids are not creation authority.
+
+A cursor bound to an older ingestion is a conflict. The client restarts without a cursor. Sets larger than 16 are omitted and counted without identities. An existing Finding whose lineage differs is reported as `existing_finding` with `lifecycleUpdate` `unavailable` and without the acknowledgement or a Finding id.
+
+The peer limit is 30 requests per 60 seconds on the direct socket, before authentication. The organization limit is 20 requests per 60 seconds after permission succeeds. Each API process keeps its own organization window. Several API processes multiply that ceiling. That multiplication is an accepted residual. There is no rate-limit table. A limiter fault, database outage, or statement timeout is service unavailable and returns no partial page. Routine discovery writes no audit event. Session resolution may still update session last-seen outside the discovery transaction. That bookkeeping is not a discovery write and is not an audit event.
+
+The discovery transaction reloads the active membership and the active organization, and it accepts only an owner or admin role on that membership. A caller-supplied role does not grant discovery.
+
+This runbook does not operate a Finding list, a second preview, a web UI, a CLI, a worker, or automatic creation. Lifecycle powers remain unavailable. Controlled Finding Target Discovery Session 1-R reviewed this route.
+
+Web startup, workers, schedulers, queues, upload processing, evaluator processing, provider synchronization, seeds, and migrations do not construct discovery.
 
 ## Related
 
