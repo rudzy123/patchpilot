@@ -20,6 +20,8 @@ import {
   valuesFromAsset,
 } from '../../../lib/asset-form';
 import { canMutateAssets } from '../../../lib/asset-permissions';
+import { canPresentControlledFindingTargets } from '../../../lib/finding-permissions';
+import { isCanonicalUuid } from '../../../lib/resource-id';
 import {
   GENERIC_SESSION_EXPIRED,
   GENERIC_UNAVAILABLE,
@@ -181,6 +183,13 @@ function AssetDetailPageBody({ assetId }: { assetId: string }): ReactElement {
           ) : null}
           {errorMessage !== null ? <p role="alert">{errorMessage}</p> : null}
           <AssetReadOnlySummary asset={asset} />
+          {canPresentControlledFindingTargets(organization.role) && isCanonicalUuid(asset.id) ? (
+            <p>
+              <Link href={`/assets/${asset.id}/findings/targets`} prefetch={false}>
+                Review controlled Finding targets
+              </Link>
+            </p>
+          ) : null}
           {readOnly ? null : (
             <>
               <h2>Edit asset</h2>

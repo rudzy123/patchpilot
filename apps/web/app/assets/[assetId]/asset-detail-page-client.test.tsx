@@ -57,8 +57,12 @@ describe('AssetDetailPageClient', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/SBOM/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/vulnerabilit/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/finding/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/remediation/i)).not.toBeInTheDocument();
+    const targets = screen.getByRole('link', { name: 'Review controlled Finding targets' });
+    expect(targets).toHaveAttribute('href', `/assets/${ASSET_ID}/findings/targets`);
+    expect(targets.getAttribute('href')).not.toContain('<script>');
+    expect(authApi.listControlledFindingTargets).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /Create Finding/i })).not.toBeInTheDocument();
   });
 
   it('saves edits with expectedVersion and the in-memory CSRF token', async () => {
@@ -149,6 +153,10 @@ describe('AssetDetailPageClient', () => {
     expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
     expect(authApi.updateAsset).not.toHaveBeenCalled();
     expect(authApi.archiveAsset).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole('link', { name: 'Review controlled Finding targets' }),
+    ).not.toBeInTheDocument();
+    expect(authApi.listControlledFindingTargets).not.toHaveBeenCalled();
   });
 
   it('renders the archived state without mutation controls', async () => {
@@ -228,5 +236,25 @@ describe('AssetDetailPageClient', () => {
 
     expect(await screen.findByText(/Changes require an administrator/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Review controlled Finding targets' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the controlled Finding target link to an owner without loading targets', async () => {
+    const authApi = createFakeAuthApi({
+      readSession: vi.fn(async () =>
+        sessionFixture({
+          organization: { ...publicOrganizationFixture, role: 'owner' },
+        }),
+      ),
+    });
+    renderWithAuth(<AssetDetailPageClient assetId={ASSET_ID} />, { authApi });
+
+    const targets = await screen.findByRole('link', { name: 'Review controlled Finding targets' });
+    expect(targets).toHaveAttribute('href', `/assets/${ASSET_ID}/findings/targets`);
+    expect(targets.getAttribute('href')).not.toContain('Payments');
+    expect(authApi.listControlledFindingTargets).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /Create Finding/i })).not.toBeInTheDocument();
   });
 });

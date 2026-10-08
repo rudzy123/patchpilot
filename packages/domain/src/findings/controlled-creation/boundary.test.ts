@@ -195,7 +195,7 @@ describe('controlled finding creation issuer containment', () => {
 });
 
 describe('controlled finding creation checkpoint', () => {
-  it('records the uncomposed creation transaction without a user-facing Finding product', () => {
+  it('records composed creation and inspection without a lifecycle-complete Finding product', () => {
     const checkpoint = readFileSync(path.join(repoRoot, 'docs/project/current-state.md'), 'utf8');
     expect(checkpoint).toContain('process-local creation authorization are implemented');
     expect(checkpoint).toContain(
@@ -206,7 +206,9 @@ describe('controlled finding creation checkpoint', () => {
     );
     expect(checkpoint).toContain('Lifecycle transitions remain unavailable.');
     expect(checkpoint).toContain('POST /findings is composed and owner-only.');
-    expect(checkpoint).toContain('A user-facing Finding product is not operational.');
+    expect(checkpoint).toContain(
+      'The nested web workflow is not a lifecycle-complete Finding product.',
+    );
     expect(checkpoint).toContain('Session 1-R reviewed the process-local creation authorization.');
     expect(checkpoint).toContain('Session 2-R reviewed the creation transaction.');
     expect(checkpoint).toContain('The issuer function is not a package export.');

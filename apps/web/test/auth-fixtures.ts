@@ -42,6 +42,13 @@ export const adminOrganizationFixture: PublicAuthOrganization = {
   role: 'admin',
 };
 
+export const ownerOrganizationFixture: PublicAuthOrganization = {
+  id: ORGANIZATION_ID,
+  slug: 'ada-org',
+  name: 'Ada Org',
+  role: 'owner',
+};
+
 export const secondOrganizationFixture: PublicAuthOrganization = {
   id: SECOND_ORGANIZATION_ID,
   slug: 'second-org',
@@ -162,6 +169,17 @@ export function createFakeAuthApi(overrides: Partial<FakeAuthApi> = {}): FakeAut
       items: [membershipOptionFixture],
       nextCursor: null,
     })),
+    listControlledFindingTargets: vi.fn(async () => ({
+      candidates: [],
+      oversizedCandidateCount: 0,
+      nextCursor: null,
+    })),
+    createControlledFinding: vi.fn(async () => {
+      throw new Error('createControlledFinding was not stubbed');
+    }),
+    inspectControlledFinding: vi.fn(async () => {
+      throw new Error('inspectControlledFinding was not stubbed');
+    }),
     ...overrides,
   };
 }

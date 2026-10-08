@@ -2,6 +2,9 @@ import {
   archiveAssetRequestSchema,
   assetDetailSchema,
   assetListResponseSchema,
+  controlledFindingCreationResponseSchema,
+  controlledFindingDiscoveryResponseSchema,
+  controlledFindingInspectionResponseSchema,
   environmentOptionsResponseSchema,
   errorEnvelopeSchema,
   membershipOptionsResponseSchema,
@@ -11,12 +14,18 @@ import {
   type ArchiveAssetRequest,
   type AssetDetail,
   type AssetListResponse,
+  type ControlledFindingCreationRequest,
+  type ControlledFindingCreationResponse,
+  type ControlledFindingDiscoveryResponse,
+  type ControlledFindingInspectionResponse,
   type EnvironmentOption,
   type MembershipOption,
   type OrganizationsResponse,
   type SessionResponse,
   type TeamOption,
 } from '@patchpilot/contracts';
+
+import { isCanonicalUuid } from './resource-id';
 
 /** Synchronizer token header. Must match `AUTH_CSRF_HEADER_NAME` / ADR 0019. */
 export const CSRF_HEADER_NAME = 'x-csrf-token';
@@ -29,10 +38,17 @@ export const ORGANIZATION_CONTEXT_REQUIRED = 'Organization context is required.'
 export const ASSET_VERSION_CONFLICT = 'Asset version conflict.';
 export const ASSET_ARCHIVED = 'Asset is archived.';
 
+/** Default discovery page size. Matches the API default of 10. */
+export const CONTROLLED_FINDING_TARGET_PAGE_LIMIT = 10;
+
+export const FINDING_SERVICE_UNAVAILABLE = 'The service is temporarily unavailable.';
+
 export type AuthRequestError = {
   status: number;
   code: string;
   message: string;
+  requestId?: string;
+  correlationId?: string;
 };
 
 export function createAuthApi(apiBaseUrl: string) {
@@ -188,6 +204,60 @@ export function createAuthApi(apiBaseUrl: string) {
         unauthorizedMessage: GENERIC_SESSION_EXPIRED,
       });
     },
+
+    listControlledFindingTargets(
+      assetId: string,
+      query?: { cursor: string },
+    ): Promise<ControlledFindingDiscoveryResponse> {
+      if (!isCanonicalUuid(assetId)) {
+        return Promise.reject(createAuthRequestError(404, 'not_found', 'Not found.'));
+      }
+      const params: Record<string, string> = {
+        limit: String(CONTROLLED_FINDING_TARGET_PAGE_LIMIT),
+      };
+      if (query !== undefined) {
+        params['cursor'] = query.cursor;
+      }
+      return sendJson({
+        baseUrl,
+        path: `/assets/${assetId}/controlled-finding-targets`,
+        method: 'GET',
+        query: params,
+        parse: (value) => controlledFindingDiscoveryResponseSchema.parse(value),
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+        unavailableMessage: FINDING_SERVICE_UNAVAILABLE,
+      });
+    },
+
+    createControlledFinding(
+      body: ControlledFindingCreationRequest,
+      csrfToken: string,
+    ): Promise<ControlledFindingCreationResponse> {
+      return sendJson({
+        baseUrl,
+        path: '/findings',
+        method: 'POST',
+        body,
+        csrfToken,
+        parse: (value) => controlledFindingCreationResponseSchema.parse(value),
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+        unavailableMessage: FINDING_SERVICE_UNAVAILABLE,
+      });
+    },
+
+    inspectControlledFinding(findingId: string): Promise<ControlledFindingInspectionResponse> {
+      if (!isCanonicalUuid(findingId)) {
+        return Promise.reject(createAuthRequestError(404, 'not_found', 'Not found.'));
+      }
+      return sendJson({
+        baseUrl,
+        path: `/findings/${findingId}`,
+        method: 'GET',
+        parse: (value) => controlledFindingInspectionResponseSchema.parse(value),
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+        unavailableMessage: FINDING_SERVICE_UNAVAILABLE,
+      });
+    },
   };
 }
 
@@ -209,6 +279,7 @@ async function sendJson<T>(input: {
   parse: (value: unknown) => T;
   acceptNoContent?: boolean;
   unauthorizedMessage?: string;
+  unavailableMessage?: string;
 }): Promise<T> {
   const headers = new Headers();
   if (input.body !== undefined) {
@@ -237,7 +308,12 @@ async function sendJson<T>(input: {
 
   const payload: unknown = await readJson(response);
   if (!response.ok) {
-    throw mapErrorEnvelope(payload, response.status, input.unauthorizedMessage);
+    throw mapErrorEnvelope(
+      payload,
+      response.status,
+      input.unauthorizedMessage,
+      input.unavailableMessage,
+    );
   }
 
   return input.parse(payload);
@@ -260,40 +336,76 @@ function mapErrorEnvelope(
   payload: unknown,
   status: number,
   unauthorizedMessage: string | undefined,
+  unavailableMessage: string | undefined,
 ): AuthRequestError {
   const parsed = errorEnvelopeSchema.safeParse(payload);
   if (!parsed.success) {
     return createAuthRequestError(
       status,
       status === 401 ? 'unauthorized' : 'internal',
-      status === 401 ? (unauthorizedMessage ?? GENERIC_SESSION_EXPIRED) : GENERIC_UNAVAILABLE,
+      status === 401
+        ? (unauthorizedMessage ?? GENERIC_SESSION_EXPIRED)
+        : (unavailableMessage ?? GENERIC_UNAVAILABLE),
     );
   }
+
+  const identifiers = {
+    requestId: parsed.data.error.requestId,
+    correlationId: parsed.data.error.correlationId,
+  };
 
   if (parsed.data.error.code === 'unauthorized') {
     return createAuthRequestError(
       status,
       'unauthorized',
       unauthorizedMessage ?? parsed.data.error.message,
+      identifiers,
     );
   }
 
   if (parsed.data.error.code === 'forbidden') {
     if (parsed.data.error.message === ORGANIZATION_CONTEXT_REQUIRED) {
-      return createAuthRequestError(status, 'forbidden', ORGANIZATION_CONTEXT_REQUIRED);
+      return createAuthRequestError(
+        status,
+        'forbidden',
+        ORGANIZATION_CONTEXT_REQUIRED,
+        identifiers,
+      );
     }
-    return createAuthRequestError(status, 'forbidden', GENERIC_ACCESS_DENIED);
+    return createAuthRequestError(status, 'forbidden', GENERIC_ACCESS_DENIED, identifiers);
   }
 
   if (parsed.data.error.code === 'rate_limited' || parsed.data.error.code === 'internal') {
-    return createAuthRequestError(status, parsed.data.error.code, parsed.data.error.message);
+    return createAuthRequestError(
+      status,
+      parsed.data.error.code,
+      parsed.data.error.message,
+      identifiers,
+    );
   }
 
-  return createAuthRequestError(status, parsed.data.error.code, parsed.data.error.message);
+  return createAuthRequestError(
+    status,
+    parsed.data.error.code,
+    parsed.data.error.message,
+    identifiers,
+  );
 }
 
-function createAuthRequestError(status: number, code: string, message: string): AuthRequestError {
-  return { status, code, message };
+function createAuthRequestError(
+  status: number,
+  code: string,
+  message: string,
+  identifiers?: { requestId: string; correlationId: string },
+): AuthRequestError {
+  return {
+    status,
+    code,
+    message,
+    ...(identifiers === undefined
+      ? {}
+      : { requestId: identifiers.requestId, correlationId: identifiers.correlationId }),
+  };
 }
 
 export function isAuthRequestError(error: unknown): error is AuthRequestError {
