@@ -13,6 +13,10 @@
     "./controlled-finding-operator": {
       "types": "./dist/findings/controlled-operator/index.d.ts",
       "import": "./dist/findings/controlled-operator/index.js"
+    },
+    "./controlled-finding-discovery": {
+      "types": "./dist/findings/controlled-discovery/index.d.ts",
+      "import": "./dist/findings/controlled-discovery/index.js"
     }
   },
   "main": "./dist/index.js",

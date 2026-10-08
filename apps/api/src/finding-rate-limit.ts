@@ -28,6 +28,23 @@ export const FINDING_INSPECTION_PEER_LIMIT = Object.freeze({
   windowMs: 60_000,
 });
 
+export const FINDING_DISCOVERY_PEER_LIMIT = Object.freeze({
+  max: 30,
+  windowMs: 60_000,
+});
+
+/**
+ * Process-local discovery ceiling. Each API process allows this many
+ * discovery reads per organization per window. Several processes multiply
+ * the ceiling. That multiplication is an accepted residual. Restarting the
+ * process clears it. There is no Redis store and no rate-limit migration.
+ * Discovery counters are independent of creation and inspection.
+ */
+export const FINDING_DISCOVERY_ORGANIZATION_LIMIT = Object.freeze({
+  max: 20,
+  windowMs: 60_000,
+});
+
 export type FindingOrganizationRateLimitDecision = 'allowed' | 'limited' | 'unavailable';
 
 export type FindingOrganizationRateLimiter = {

@@ -29,6 +29,7 @@ import { startTelemetry } from '@patchpilot/observability';
 import { buildApi } from './app.js';
 import { createAssetRuntime } from './asset-runtime.js';
 import { composeControlledFindingOperatorRuntime } from './finding-runtime.js';
+import { composeControlledFindingDiscoveryRuntime } from './finding-discovery-runtime.js';
 import { createIntelligenceRuntime } from './intelligence-runtime.js';
 import { createRedisLoginRateLimiter } from './redis-login-rate-limiter.js';
 import { createSbomRuntime } from './sbom-runtime.js';
@@ -140,6 +141,7 @@ async function main(): Promise<void> {
       now: () => clock.now(),
     }),
     findings: composeControlledFindingOperatorRuntime(prisma),
+    discovery: composeControlledFindingDiscoveryRuntime(prisma),
   });
 
   let shuttingDown = false;

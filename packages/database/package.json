@@ -13,6 +13,10 @@
     "./controlled-finding-persistence": {
       "types": "./dist/controlled-finding-persistence.d.ts",
       "import": "./dist/controlled-finding-persistence.js"
+    },
+    "./controlled-finding-discovery-persistence": {
+      "types": "./dist/controlled-finding-discovery-persistence.d.ts",
+      "import": "./dist/controlled-finding-discovery-persistence.js"
     }
   },
   "main": "./dist/index.js",

@@ -1,7 +1,9 @@
 import {
+  controlledFindingDiscoveryPermissionsForRole,
   controlledFindingOperatorPermissionsForRole,
   err,
   FINDING_CREATE_CONTROLLED_PERMISSION,
+  FINDING_DISCOVER_CONTROLLED_PERMISSION,
   FINDING_INSPECT_PERMISSION,
   ok,
   type MembershipRole,
@@ -25,6 +27,7 @@ export const PERMISSIONS = {
   findingRead: 'finding:read',
   findingTriage: 'finding:triage',
   findingCreateControlled: FINDING_CREATE_CONTROLLED_PERMISSION,
+  findingDiscoverControlled: FINDING_DISCOVER_CONTROLLED_PERMISSION,
   findingInspect: FINDING_INSPECT_PERMISSION,
   remediationManage: 'remediation:manage',
   riskAcceptanceRequest: 'risk_acceptance:request',
@@ -53,6 +56,7 @@ export const permissionCatalog: readonly Permission[] = Object.freeze([
   PERMISSIONS.findingRead,
   PERMISSIONS.findingTriage,
   PERMISSIONS.findingCreateControlled,
+  PERMISSIONS.findingDiscoverControlled,
   PERMISSIONS.findingInspect,
   PERMISSIONS.remediationManage,
   PERMISSIONS.riskAcceptanceRequest,
@@ -76,6 +80,7 @@ const VIEWER_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.auditRead,
   PERMISSIONS.intelligenceRead,
   ...controlledFindingOperatorPermissionsForRole('viewer'),
+  ...controlledFindingDiscoveryPermissionsForRole('viewer'),
 ];
 
 const MEMBER_PERMISSIONS: readonly Permission[] = [
@@ -84,11 +89,13 @@ const MEMBER_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.findingTriage,
   PERMISSIONS.remediationManage,
   ...operatorGrantsBeyond('member', VIEWER_PERMISSIONS),
+  ...discoveryGrantsBeyond('member', VIEWER_PERMISSIONS),
 ];
 
 const ADMIN_PERMISSIONS: readonly Permission[] = [
   ...MEMBER_PERMISSIONS,
   ...operatorGrantsBeyond('admin', MEMBER_PERMISSIONS),
+  ...discoveryGrantsBeyond('admin', MEMBER_PERMISSIONS),
   PERMISSIONS.membershipManage,
   PERMISSIONS.teamManage,
   PERMISSIONS.assetManage,
@@ -101,9 +108,19 @@ const ADMIN_PERMISSIONS: readonly Permission[] = [
 const OWNER_PERMISSIONS: readonly Permission[] = [
   ...ADMIN_PERMISSIONS,
   ...operatorGrantsBeyond('owner', ADMIN_PERMISSIONS),
+  ...discoveryGrantsBeyond('owner', ADMIN_PERMISSIONS),
   PERMISSIONS.organizationManage,
   PERMISSIONS.riskAcceptanceApprove,
 ];
+
+function discoveryGrantsBeyond(
+  role: MembershipRole,
+  already: readonly Permission[],
+): readonly Permission[] {
+  return controlledFindingDiscoveryPermissionsForRole(role).filter(
+    (permission) => !already.includes(permission),
+  );
+}
 
 function operatorGrantsBeyond(
   role: MembershipRole,

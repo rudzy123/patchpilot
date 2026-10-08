@@ -22,6 +22,9 @@ import { registerAuthRoutes } from './auth-routes.js';
 import type { AuthRuntime } from './auth-runtime.js';
 import { registerFindingRoutes } from './finding-routes.js';
 import type { FindingOperatorRuntime } from './finding-runtime.js';
+import { registerFindingDiscoveryRoutes } from './finding-discovery-routes.js';
+import { denyFindingDiscoveryRuntime } from './finding-discovery-runtime.js';
+import type { FindingDiscoveryRuntime } from './finding-discovery-runtime.js';
 import type { FindingOrganizationRateLimiter } from './finding-rate-limit.js';
 import { registerIntelligenceRoutes } from './intelligence-routes.js';
 import type { IntelligenceRuntime } from './intelligence-runtime.js';
@@ -43,6 +46,8 @@ export type ApiDependencies = {
   intelligence: IntelligenceRuntime;
   findings: FindingOperatorRuntime;
   findingOrganizationLimiter?: FindingOrganizationRateLimiter;
+  discovery?: FindingDiscoveryRuntime;
+  discoveryOrganizationLimiter?: FindingOrganizationRateLimiter;
   now?: () => string;
   generateId?: () => string;
 };
@@ -229,6 +234,16 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       : { findingOrganizationLimiter: dependencies.findingOrganizationLimiter }),
   });
 
+  await registerFindingDiscoveryRoutes(app, {
+    config: dependencies.config,
+    logger: dependencies.logger,
+    auth: dependencies.auth,
+    discovery: dependencies.discovery ?? denyFindingDiscoveryRuntime(),
+    ...(dependencies.discoveryOrganizationLimiter === undefined
+      ? {}
+      : { discoveryOrganizationLimiter: dependencies.discoveryOrganizationLimiter }),
+  });
+
   app.addHook('onSend', async (request, _reply, payload) => {
     createChildLogger(dependencies.logger, {
       requestId: request.requestId,
@@ -237,7 +252,7 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       {
         req: {
           method: request.method,
-          url: request.routeOptions.url ?? request.url.split('?')[0],
+          url: request.routeOptions.url ?? 'unmatched',
           headers: request.headers,
         },
       },

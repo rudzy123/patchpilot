@@ -2,6 +2,14 @@ import {
   FINDING_CREATION_MAX_EVIDENCE_SET_SIZE,
   FINDING_CREATION_POLICY_ID,
   FINDING_CREATION_POLICY_VERSION,
+  FINDING_DISCOVERY_AFFECTED_VERSION_DISPLAY_LIMIT,
+  FINDING_DISCOVERY_EXPLANATION_CODES,
+  FINDING_DISCOVERY_LIFECYCLE_UPDATE,
+  FINDING_DISCOVERY_MAX_CURSOR_LENGTH,
+  FINDING_DISCOVERY_MAX_EVIDENCE_SET_SIZE,
+  FINDING_DISCOVERY_MAX_OVERSIZED_COUNT,
+  FINDING_DISCOVERY_MAX_PAGE_SIZE,
+  FINDING_DISCOVERY_PUBLIC_ID_MAX_LENGTH,
   FINDING_INSPECTION_AFFECTED_VERSION_DISPLAY_LIMIT,
   FINDING_INSPECTION_APPLICABILITY,
   FINDING_INSPECTION_EXPLANATION_CODES,
@@ -95,4 +103,51 @@ export type ControlledFindingCreationResponse = z.infer<
 >;
 export type ControlledFindingInspectionResponse = z.infer<
   typeof controlledFindingInspectionResponseSchema
+>;
+
+const discoveryVersionSummarySchema = z.strictObject({
+  values: z.array(z.string().min(1).max(256)).max(FINDING_DISCOVERY_AFFECTED_VERSION_DISPLAY_LIMIT),
+  truncated: z.boolean(),
+  omittedDistinctCount: z.number().int().nonnegative(),
+  distinctCount: z.number().int().nonnegative(),
+});
+
+const discoveryCandidateBase = {
+  componentId: lowercaseUuidSchema,
+  vulnerabilityId: lowercaseUuidSchema,
+  vulnerabilityPublicId: z.string().min(1).max(FINDING_DISCOVERY_PUBLIC_ID_MAX_LENGTH),
+  affectedVersions: discoveryVersionSummarySchema,
+  affectedOccurrenceCount: z.number().int().min(1).max(FINDING_DISCOVERY_MAX_EVIDENCE_SET_SIZE),
+  otherOccurrenceCount: z.number().int().nonnegative(),
+  explanationCodes: z.array(z.enum(FINDING_DISCOVERY_EXPLANATION_CODES)),
+};
+
+export const controlledFindingDiscoveryResponseSchema = z.strictObject({
+  candidates: z
+    .array(
+      z.discriminatedUnion('classification', [
+        z.strictObject({
+          classification: z.literal('eligible_for_creation'),
+          ...discoveryCandidateBase,
+          acknowledgement: controlledFindingCreationRequestSchema,
+        }),
+        z.strictObject({
+          classification: z.literal('exact_replay_available'),
+          ...discoveryCandidateBase,
+          acknowledgement: controlledFindingCreationRequestSchema,
+        }),
+        z.strictObject({
+          classification: z.literal('existing_finding'),
+          ...discoveryCandidateBase,
+          lifecycleUpdate: z.literal(FINDING_DISCOVERY_LIFECYCLE_UPDATE),
+        }),
+      ]),
+    )
+    .max(FINDING_DISCOVERY_MAX_PAGE_SIZE),
+  oversizedCandidateCount: z.number().int().min(0).max(FINDING_DISCOVERY_MAX_OVERSIZED_COUNT),
+  nextCursor: z.string().min(1).max(FINDING_DISCOVERY_MAX_CURSOR_LENGTH).nullable(),
+});
+
+export type ControlledFindingDiscoveryResponse = z.infer<
+  typeof controlledFindingDiscoveryResponseSchema
 >;

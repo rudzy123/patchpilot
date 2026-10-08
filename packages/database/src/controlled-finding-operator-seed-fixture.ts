@@ -39,7 +39,7 @@ import {
   resolvedComponent,
 } from './sbom-test-fixture.js';
 
-const PACKAGE_NAME = 'reviewed-npm-widget';
+const DEFAULT_PACKAGE_NAME = 'reviewed-npm-widget';
 const RANGES = [
   {
     type: 'SEMVER' as const,
@@ -61,6 +61,8 @@ export type ControlledFindingSeedTarget = {
   readonly componentId: string;
   readonly vulnerabilityId: string;
   readonly ingestionId: string;
+  readonly sbomId: string;
+  readonly sbomSha256: string;
   readonly evidence: readonly ControlledFindingSeedEvidence[];
 };
 
@@ -70,11 +72,19 @@ export async function seedControlledFindingEvidence(
     readonly label: string;
     readonly organizationId: string;
     readonly versions: readonly { readonly version: string; readonly bomRef: string }[];
+    readonly packageName?: string;
+    readonly attach?: {
+      readonly assetId: string;
+      readonly sbomId: string;
+      readonly ingestionId: string;
+      readonly sbomSha256: string;
+    };
   },
 ): Promise<ControlledFindingSeedTarget> {
   if (input.versions.length === 0) {
     throw new Error('controlled finding seed requires a version');
   }
+  const packageName = input.packageName ?? DEFAULT_PACKAGE_NAME;
   const rangeFingerprint = session14RangeFingerprint(RANGES, []);
   const contentFingerprint = digest(`content:${input.label}:${randomUUID()}`);
   const advisoryId = `REVIEWNPM${digest(input.label).slice(0, 8).toUpperCase()}`;
@@ -124,8 +134,8 @@ export async function seedControlledFindingEvidence(
       retrievalEvidenceId: MAINTAINER_REVIEWED_APPROVAL_PINS.retrievalEvidence,
       retrievalPolicyId: MAINTAINER_REVIEWED_APPROVAL_PINS.retrievalPolicy,
       ecosystem: 'npm',
-      packageName: PACKAGE_NAME,
-      packageIdentityKey: packageIdentity(),
+      packageName,
+      packageIdentityKey: packageIdentity(packageName),
       evaluatorVersion: PRODUCT_MATCH_EVALUATOR_VERSION,
       matchingPolicyId: PRODUCT_MATCH_MATCHING_POLICY_ID,
       aliasCount: 0,
@@ -176,7 +186,7 @@ export async function seedControlledFindingEvidence(
     expectedSourceClassification: MAINTAINER_REVIEWED_APPROVAL_PINS.origin,
     expectedContentFingerprint: contentFingerprint,
     expectedRangeFingerprint: rangeFingerprint,
-    expectedNpmPackageIdentity: packageIdentity(),
+    expectedNpmPackageIdentity: packageIdentity(packageName),
     expectedVulnerabilityId: vulnerability.id,
     authorIdentity,
     reviewerIdentity: 'reviewer.two',
@@ -200,7 +210,7 @@ export async function seedControlledFindingEvidence(
       reviewerClassification: MAINTAINER_REVIEWED_APPROVAL_PINS.reviewerClassification,
       contentFingerprint,
       rangeFingerprint,
-      packageIdentityKey: packageIdentity(),
+      packageIdentityKey: packageIdentity(packageName),
       vulnerabilityId: vulnerability.id,
       sourceLicensePolicyId: MAINTAINER_REVIEWED_APPROVAL_PINS.licensePolicyId,
       sourceLicensePolicyVersion: MAINTAINER_REVIEWED_APPROVAL_PINS.licensePolicyVersion,
@@ -211,25 +221,34 @@ export async function seedControlledFindingEvidence(
   if (approval.kind !== 'recorded') {
     throw new Error(`approval was ${approval.kind}`);
   }
-  const asset = await createAsset(prisma, input.organizationId, `asset-${input.label}`);
-  const sbomSha = digest(`sbom:${input.label}:${randomUUID()}`);
-  const sbom = await createSbom(prisma, {
-    organizationId: input.organizationId,
-    assetId: asset.id,
-    sha256: sbomSha,
-    receivedAt: new Date('2026-10-02T12:00:00.000Z'),
-  });
-  const ingestion = await createProcessingIngestion(prisma, {
-    organizationId: input.organizationId,
-    sbomId: sbom.id,
-    assetId: asset.id,
-  });
+  const asset =
+    input.attach === undefined
+      ? await createAsset(prisma, input.organizationId, `asset-${input.label}`)
+      : { id: input.attach.assetId };
+  const sbomSha = input.attach?.sbomSha256 ?? digest(`sbom:${input.label}:${randomUUID()}`);
+  const sbom =
+    input.attach === undefined
+      ? await createSbom(prisma, {
+          organizationId: input.organizationId,
+          assetId: asset.id,
+          sha256: sbomSha,
+          receivedAt: new Date('2026-10-02T12:00:00.000Z'),
+        })
+      : { id: input.attach.sbomId };
+  const ingestion =
+    input.attach === undefined
+      ? await createProcessingIngestion(prisma, {
+          organizationId: input.organizationId,
+          sbomId: sbom.id,
+          assetId: asset.id,
+        })
+      : { id: input.attach.ingestionId };
   const first = input.versions[0];
   if (first === undefined) {
     throw new Error('controlled finding seed requires a version');
   }
   const componentInput = resolvedComponent({
-    name: PACKAGE_NAME,
+    name: packageName,
     bomRef: first.bomRef,
     version: first.version,
   });
@@ -240,7 +259,7 @@ export async function seedControlledFindingEvidence(
       purl: componentInput.versionlessPurl,
       ecosystem: 'npm',
       namespace: null,
-      name: PACKAGE_NAME,
+      name: packageName,
       identityState: 'resolved',
     },
   });
@@ -276,12 +295,12 @@ export async function seedControlledFindingEvidence(
         componentIdentityKey: component.identityKey,
         ecosystem: 'npm',
         namespace: null,
-        name: PACKAGE_NAME,
+        name: packageName,
         rawObservedVersion: version.version,
         versionKnown: true,
         sbomSha256: sbomSha,
       }),
-      expectedNpmPackageIdentity: packageIdentity(),
+      expectedNpmPackageIdentity: packageIdentity(packageName),
       expectedRawObservedVersion: version.version,
       advisoryRevisionId: revision.id,
       approvalEvidenceId: approval.projection.approvalId,
@@ -305,19 +324,21 @@ export async function seedControlledFindingEvidence(
       version: version.version,
     });
   }
-  await prisma.sbomIngestion.update({
-    where: { id: ingestion.id },
-    data: {
-      state: 'completed',
-      normalizationVersion: '2',
-      completedAt: new Date('2026-10-02T13:00:00.000Z'),
-      graphCompleteness: 'no_dependencies',
-      componentCount: input.versions.length,
-      dependencyEdgeCount: 0,
-      warningCount: 0,
-      stage: null,
-    },
-  });
+  if (input.attach === undefined) {
+    await prisma.sbomIngestion.update({
+      where: { id: ingestion.id },
+      data: {
+        state: 'completed',
+        normalizationVersion: '2',
+        completedAt: new Date('2026-10-02T13:00:00.000Z'),
+        graphCompleteness: 'no_dependencies',
+        componentCount: input.versions.length,
+        dependencyEdgeCount: 0,
+        warningCount: 0,
+        stage: null,
+      },
+    });
+  }
   await prisma.asset.update({
     where: { id: asset.id },
     data: { lastSuccessfulSbomIngestionId: ingestion.id },
@@ -327,6 +348,8 @@ export async function seedControlledFindingEvidence(
     componentId: component.id,
     vulnerabilityId: vulnerability.id,
     ingestionId: ingestion.id,
+    sbomId: sbom.id,
+    sbomSha256: sbomSha,
     evidence,
   };
 }
@@ -335,12 +358,12 @@ function digest(label: string): string {
   return createHash('sha256').update(label).digest('hex');
 }
 
-function packageIdentity(): string {
+function packageIdentity(packageName: string): string {
   const identity = classifyNpmPackageIdentityFromParts({
     ecosystem: SELECTED_FIRST_ECOSYSTEM,
     observedNamespace: null,
-    observedName: PACKAGE_NAME,
-    observedIdentity: PACKAGE_NAME,
+    observedName: packageName,
+    observedIdentity: packageName,
   });
   if (identity.classification !== 'valid') {
     throw new Error('package identity was rejected');

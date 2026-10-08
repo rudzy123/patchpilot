@@ -1081,3 +1081,22 @@ export {
   controlledFindingOperatorPermissionsForRole,
   type ControlledFindingOperatorPermission,
 } from './findings/controlled-operator/permissions.js';
+
+export {
+  FINDING_DISCOVER_CONTROLLED_PERMISSION,
+  controlledFindingDiscoveryPermissionsForRole,
+} from './findings/controlled-discovery/permissions.js';
+
+export {
+  FINDING_DISCOVERY_AFFECTED_VERSION_DISPLAY_LIMIT,
+  FINDING_DISCOVERY_CLASSIFICATIONS,
+  FINDING_DISCOVERY_EXPLANATION_CODES,
+  FINDING_DISCOVERY_LIFECYCLE_UPDATE,
+  FINDING_DISCOVERY_MAX_CURSOR_LENGTH,
+  FINDING_DISCOVERY_MAX_EVIDENCE_SET_SIZE,
+  FINDING_DISCOVERY_MAX_OVERSIZED_COUNT,
+  FINDING_DISCOVERY_MAX_PAGE_SIZE,
+  FINDING_DISCOVERY_PUBLIC_ID_MAX_LENGTH,
+  type FindingDiscoveryClassification,
+  type FindingDiscoveryExplanationCode,
+} from './findings/controlled-discovery/policy.js';

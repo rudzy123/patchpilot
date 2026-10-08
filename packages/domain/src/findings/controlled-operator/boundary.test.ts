@@ -76,7 +76,11 @@ describe('controlled finding operator public surface', () => {
     const packageJson = JSON.parse(
       readFileSync(path.join(repoRoot, 'packages/domain/package.json'), 'utf8'),
     ) as { exports: Record<string, unknown> };
-    expect(Object.keys(packageJson.exports).sort()).toEqual(['.', './controlled-finding-operator']);
+    expect(Object.keys(packageJson.exports).sort()).toEqual([
+      '.',
+      './controlled-finding-discovery',
+      './controlled-finding-operator',
+    ]);
     const operatorExport = packageJson.exports['./controlled-finding-operator'];
     expect(operatorExport).toMatchObject({
       import: './dist/findings/controlled-operator/index.js',
@@ -88,6 +92,7 @@ describe('controlled finding operator public surface', () => {
     expect(barrel).not.toContain('findings/controlled-operator/creation');
     expect(barrel).not.toContain('findings/controlled-operator/inspection');
     expect(barrel).not.toContain('findings/controlled-operator/index');
+    expect(barrel).not.toContain('createControlledFindingDiscoveryApplication');
     const feature = readFileSync(path.join(here, 'index.ts'), 'utf8');
     expect(feature).toContain('createControlledFindingCreationApplication');
     expect(feature).toContain('createControlledFindingInspectionApplication');
