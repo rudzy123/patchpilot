@@ -11,6 +11,12 @@ route. Merge to `main` remains subject to normal pull-request review. This ADR d
 not implement the route, register it, add a permission constant, add a migration, or
 authorize any Finding lifecycle power.
 
+Further amended on 2026-10-08. [ADR 0038](0038-controlled-finding-web-workflow.md) admits
+one nested browser workflow over this discovery route and the existing creation and
+inspection routes. The workflow is not implemented by this amendment. Discovery remains
+read-only. This amendment does not return Finding ids, add a Finding list, or authorize
+a lifecycle transition.
+
 ## Context
 
 [ADR 0035](0035-controlled-finding-creation.md) accepts creation-only Finding
@@ -53,7 +59,9 @@ This decision does not authorize:
 - a second preview route;
 - arbitrary search or a filter language;
 - cross-asset discovery;
-- a web UI;
+- a web UI, except the nested workflow later admitted by
+  [ADR 0038](0038-controlled-finding-web-workflow.md), which this decision does not
+  implement;
 - a CLI;
 - create-all;
 - preview-and-create;
@@ -500,7 +508,9 @@ The following remain unavailable:
 - cross-asset discovery;
 - arbitrary search;
 - a second preview route;
-- web UI;
+- web UI, except the nested workflow admitted only by
+  [ADR 0038](0038-controlled-finding-web-workflow.md), which this decision does not
+  implement;
 - CLI;
 - repeated observations;
 - lifecycle transitions;

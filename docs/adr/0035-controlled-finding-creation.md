@@ -25,6 +25,12 @@ not weaken creation authority, exact replay, explicit evidence acknowledgement, 
 isolation, inspection confidentiality, anti-automation, or lifecycle deferrals. It does
 not implement that route.
 
+Further amended on 2026-10-08. [ADR 0038](0038-controlled-finding-web-workflow.md) admits
+one nested browser workflow over the composed discovery, creation, and inspection
+routes. The amendment does not change the creation transaction, acknowledgement
+equality, replay, or lifecycle deferrals. It does not implement the workflow. Web
+startup still does not construct the creation command.
+
 ## Context
 
 [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md) accepts Finding identity
@@ -183,9 +189,12 @@ production uncomposed until the API-process composition authorized by
 register only `POST /findings` and `GET /findings/:findingId`.
 [ADR 0037](0037-controlled-finding-target-discovery.md) may later register only
 `GET /assets/:assetId/controlled-finding-targets` as a read-only discovery route. This ADR
-still authorizes no web action, CLI, worker, scheduler, queue, Outbox consumer, BullMQ
-processor, upload trigger, evaluator trigger, provider trigger, bulk command, Finding list,
-second preview, cross-asset discovery, or create-all. The discovery route is not a writer.
+still authorizes no CLI, worker, scheduler, queue, Outbox consumer, BullMQ processor,
+upload trigger, evaluator trigger, provider trigger, bulk command, Finding list, second
+preview, cross-asset discovery, or create-all. The nested browser client in
+[ADR 0038](0038-controlled-finding-web-workflow.md) is the only web workflow this boundary
+admits. It calls the existing API routes and is not implemented here. The discovery route
+is not a writer.
 Worker, web, scheduler, and queue startup do not construct the creation command. API startup
 does not construct it in this amendment. Seed and migration do not insert Findings.
 

@@ -21,6 +21,12 @@ lifecycle deferrals. It does not implement that route. Sentences in this ADR tha
 production startup does not construct the two operator routes describe the decision
 before that composition.
 
+Further amended on 2026-10-08. [ADR 0038](0038-controlled-finding-web-workflow.md) admits
+one nested browser workflow over the existing controlled Finding APIs. The workflow is
+not implemented by this amendment. It does not add an API route, a Finding list, a
+lifecycle transition, or web-server Finding authority. Sentences in this ADR that
+withhold every web UI describe the decision before that admission.
+
 ## Context
 
 [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md) section 10A admits
@@ -65,11 +71,11 @@ API-process implementation:
 this decision admits: `GET /assets/:assetId/controlled-finding-targets`. That route
 is read-only, asset-scoped, and not implemented by this amendment.
 
-This decision does not authorize a CLI, web action, worker command, queue, scheduler,
+This decision does not authorize a CLI, worker command, queue, scheduler,
 upload trigger, evaluator trigger, provider trigger, bulk route, Finding list route,
 global discovery route, second preview route, arbitrary search, cross-asset discovery,
 create-all, or preview-and-create. `GET /findings` is not authorized. No other method
-or path is authorized besides the discovery route named above. This ADR does not register either creation or inspection route.
+or path is authorized besides the discovery route named above. This ADR does not register either creation or inspection route. The nested browser workflow in [ADR 0038](0038-controlled-finding-web-workflow.md) is a client of these routes. It is not another API path and is not implemented by this amendment.
 
 ### 2. Creation route
 
@@ -357,10 +363,14 @@ This ADR authorizes only API-process composition of:
 - the safe inspection service and persistence adapter;
 - the existing session, permission, CSRF, Origin, rate-limit, and audit dependencies.
 
-It does not authorize worker, web-server action, scheduler, queue, matching, provider,
-evaluator, or lifecycle composition. Production startup today does not construct these
-routes. Seed and migration do not insert Findings. Acceptance of this ADR does not
-perform the composition.
+It does not authorize worker, web-server Finding authority, scheduler, queue, matching,
+provider, evaluator, or lifecycle composition. Web-server Finding authority means
+constructing the creation or inspection services in the web process.
+[ADR 0038](0038-controlled-finding-web-workflow.md) admits a browser client of the
+existing API routes and does not change this composition boundary. API startup
+constructs the creation and inspection routes. Web startup does not. Seed and
+migration do not insert Findings.
+Acceptance of this ADR does not perform the composition.
 
 ### 16. Explicit deferrals
 
@@ -370,7 +380,9 @@ The following remain unavailable:
   [ADR 0037](0037-controlled-finding-target-discovery.md), which this amendment does
   not implement;
 - Finding list;
-- web UI;
+- web UI, except the nested workflow admitted only by
+  [ADR 0038](0038-controlled-finding-web-workflow.md), which this amendment does not
+  implement;
 - CLI;
 - automatic matching;
 - automatic and bulk Finding creation;
