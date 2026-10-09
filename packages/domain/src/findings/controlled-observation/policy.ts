@@ -521,9 +521,9 @@ export const FINDING_REPEATED_OBSERVATION_INVARIANTS = Object.freeze({
   findingTimestampCanBeUpdated: true,
   findingObservedAuditCanBeWritten: true,
   sliceComplete: false,
-  session: 'controlled_finding_repeated_observation_session_2',
+  session: 'controlled_finding_repeated_observation_session_3',
   authorityReview: 'controlled_finding_repeated_observation_session_1r',
-  nextSession: 'controlled_finding_repeated_observation_session_2r',
+  nextSession: 'controlled_finding_repeated_observation_session_3r',
 } as const);
 
 export const FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY = Object.freeze({

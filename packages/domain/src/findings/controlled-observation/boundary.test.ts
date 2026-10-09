@@ -109,6 +109,7 @@ describe('repeated observation production exclusion', () => {
     ];
     const allowedDatabase = new Set([
       'packages/database/src/controlled-finding-repeated-observation-persistence.ts',
+      'packages/database/src/controlled-finding-inspection-repeated-validation.ts',
     ]);
     const offenders: string[] = [];
     for (const root of roots) {
@@ -235,7 +236,17 @@ describe('repeated observation inspection and checkpoint', () => {
     expect(checkpoint).toContain(
       'Controlled Finding Repeated Observation Session 2-R reviewed the uncomposed PostgreSQL transaction.',
     );
-    expect(checkpoint).toContain('Session 3 inspection compatibility is next.');
+    expect(checkpoint).toContain('Current inspection tolerates legal repeated observations.');
+    expect(checkpoint).toContain('Public inspection remains creation based.');
+    expect(checkpoint).toContain('Repeated-observation history is not publicly exposed.');
+    expect(checkpoint).toContain('The writer remains production uncomposed.');
+    expect(checkpoint).toContain('Inspection performs no mutation.');
+    expect(checkpoint).toContain(
+      'Controlled Finding Repeated Observation Session 3-R reviewed the creation-based read path.',
+    );
+    expect(checkpoint).toContain('Repeated-observation branch closure remains the open review.');
+    expect(checkpoint).not.toContain('Repeated Observation Session 3-R read-path review is next.');
+    expect(checkpoint).not.toContain('Session 3 inspection compatibility is next.');
     expect(checkpoint).toContain('All lifecycle powers remain unavailable.');
     expect(checkpoint).toContain('Frozen migrations: 25.');
     expect(checkpoint).not.toContain('repeated-observation slice is complete');

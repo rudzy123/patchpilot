@@ -925,7 +925,7 @@ describe('repeated observation public surface and inspection boundary', () => {
       'controlled_finding_repeated_observation_session_1r',
     );
     expect(FINDING_REPEATED_OBSERVATION_INVARIANTS.nextSession).toBe(
-      'controlled_finding_repeated_observation_session_2r',
+      'controlled_finding_repeated_observation_session_3r',
     );
     const disclosure = persistence.repeatedObservationTenantDisclosure();
     expect(disclosure.foreignResourceRevealed).toBe(false);

@@ -4,6 +4,7 @@
  * The API finding operator runtime is the only production constructor.
  * Web, worker, seed, and the package barrel do not construct this adapter.
  * The read does not insert, update, or delete a Finding.
+ * Legal repeated observations stay internal and do not enter the projection.
  */
 
 import { createHash } from 'node:crypto';
@@ -22,6 +23,7 @@ import {
   type FindingInspectionPort,
 } from '@patchpilot/domain';
 
+import { repeatedObservationInspectionAgrees } from './controlled-finding-inspection-repeated-validation.js';
 import { isRootPrismaClient } from './guards.js';
 
 const UUID_LOWER_PATTERN =
@@ -74,6 +76,9 @@ async function loadInTransaction(
       id: true,
       state: true,
       createdAt: true,
+      firstObservedAt: true,
+      lastObservedAt: true,
+      updatedAt: true,
       assetId: true,
       componentId: true,
       vulnerabilityId: true,
@@ -160,7 +165,6 @@ async function loadInTransaction(
   ]);
 
   const creationRows = [];
-  const laterRows = [];
   for (const row of observations) {
     const shape = classifyInspectionObservationShape({
       method: row.method,
@@ -177,38 +181,38 @@ async function loadInTransaction(
     });
     if (shape.role === 'creation_observation') {
       creationRows.push(row);
-    } else if (shape.role === 'later_observation') {
-      laterRows.push(row);
-    } else {
+    } else if (shape.role !== 'later_observation') {
       return { status: 'malformed_persisted_state' };
     }
   }
-  if (laterRows.length > 0) {
-    const repeatedLinks = await tx.findingRepeatedObservationEvidenceLink.findMany({
-      where: {
-        organizationId,
-        findingObservationId: { in: laterRows.map((row) => row.id) },
-      },
-      select: { findingObservationId: true },
-    });
-    for (const row of laterRows) {
-      const linkCount = repeatedLinks.filter((link) => link.findingObservationId === row.id).length;
-      if (linkCount !== row.evidenceLinkCount) {
-        return { status: 'malformed_persisted_state' };
-      }
-    }
+  if (creationRows.length !== 1) {
+    return { status: 'malformed_persisted_state' };
   }
-  const observation = creationRows.length === 1 ? creationRows[0] : undefined;
-  const occurrenceScope =
-    observation === undefined
-      ? { creationIngestionOccurrenceCount: 0, otherOccurrenceCount: 0 }
-      : await countOccurrences(tx, {
-          organizationId,
-          assetId: finding.assetId,
-          componentId: finding.componentId,
-          sbomIngestionId: observation.sbomIngestionId,
-          linkedOccurrenceIds: links.map((link) => link.componentOccurrenceId),
-        });
+  const repeatedAgrees = await repeatedObservationInspectionAgrees(tx, {
+    organizationId,
+    findingId: finding.id,
+    assetId: finding.assetId,
+    componentId: finding.componentId,
+    vulnerabilityId: finding.vulnerabilityId,
+    firstObservedAt: finding.firstObservedAt,
+    lastObservedAt: finding.lastObservedAt,
+    createdAt: finding.createdAt,
+    updatedAt: finding.updatedAt,
+  });
+  if (!repeatedAgrees) {
+    return { status: 'malformed_persisted_state' };
+  }
+  const observation = creationRows[0];
+  if (observation === undefined) {
+    return { status: 'malformed_persisted_state' };
+  }
+  const occurrenceScope = await countOccurrences(tx, {
+    organizationId,
+    assetId: finding.assetId,
+    componentId: finding.componentId,
+    sbomIngestionId: observation.sbomIngestionId,
+    linkedOccurrenceIds: links.map((link) => link.componentOccurrenceId),
+  });
 
   const evidenceRows =
     links.length === 0

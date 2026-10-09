@@ -1,8 +1,7 @@
 /**
- * Future inspection compatibility for a legal repeated observation.
- * Session 1 does not change safe Finding inspection.
- * A legal later observation must not invalidate the creation observation.
- * The existing projection remains creation based. Later history stays unavailable.
+ * Inspection compatibility for a legal repeated observation.
+ * The read path validates repeated-observation shape internally.
+ * The public projection remains creation based. Later history stays unavailable.
  * A missing or malformed creation observation remains malformed persisted state.
  */
 
