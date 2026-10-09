@@ -244,7 +244,12 @@ describe('repeated observation inspection and checkpoint', () => {
     expect(checkpoint).toContain(
       'Controlled Finding Repeated Observation Session 3-R reviewed the creation-based read path.',
     );
-    expect(checkpoint).toContain('Repeated-observation branch closure remains the open review.');
+    expect(checkpoint).toContain(
+      'Controlled Finding Repeated Observation branch closure reviewed the uncomposed persistence slice. The next activity is the pull request.',
+    );
+    expect(checkpoint).not.toContain(
+      'Repeated-observation branch closure remains the open review.',
+    );
     expect(checkpoint).not.toContain('Repeated Observation Session 3-R read-path review is next.');
     expect(checkpoint).not.toContain('Session 3 inspection compatibility is next.');
     expect(checkpoint).toContain('All lifecycle powers remain unavailable.');
