@@ -2,7 +2,7 @@
 
 Use this when an owner or admin reviews controlled Finding targets for one asset in the web application, or opens a Finding that is already known.
 
-The web application is a client of the existing API. It does not create Findings by itself. Authentication, tenancy, permissions, creation, exact replay, and inspection remain API decisions.
+The web application is a client of the existing API. It does not create Findings by itself. Authentication, tenancy, permissions, creation, exact replay, and inspection remain API decisions. Inspection shows creation evidence only. [ADR 0039](../adr/0039-controlled-finding-repeated-observation.md) does not add a page or an observation control.
 
 ## Pages
 

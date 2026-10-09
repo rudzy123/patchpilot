@@ -27,6 +27,11 @@ not implemented by this amendment. It does not add an API route, a Finding list,
 lifecycle transition, or web-server Finding authority. Sentences in this ADR that
 withhold every web UI describe the decision before that admission.
 
+Further amended on 2026-10-09. [ADR 0039](0039-controlled-finding-repeated-observation.md)
+accepts repeated-observation architecture and does not implement it. This amendment
+adds no route, permission, or audit writer. `GET /findings/:findingId` remains the
+creation projection.
+
 ## Context
 
 [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md) section 10A admits
@@ -386,7 +391,8 @@ The following remain unavailable:
 - CLI;
 - automatic matching;
 - automatic and bulk Finding creation;
-- repeated observations;
+- repeated-observation implementation and reachability; architecture is accepted by
+  [ADR 0039](0039-controlled-finding-repeated-observation.md) and is not implemented here;
 - lifecycle transitions;
 - risk and priority;
 - assignment and due dates;

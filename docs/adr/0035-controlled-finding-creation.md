@@ -31,6 +31,15 @@ routes. The amendment does not change the creation transaction, acknowledgement
 equality, replay, or lifecycle deferrals. It does not implement the workflow. Web
 startup still does not construct the creation command.
 
+Further amended on 2026-10-09. [ADR 0039](0039-controlled-finding-repeated-observation.md)
+accepts one persistence-only repeated observation for an existing open Finding. The
+amendment does not change creation authority, creation evidence, or the exact-replay
+result `already_applied`. The later persistence implementation must ignore a legal
+repeated observation when it judges creation well-formedness, so that row does not
+turn creation replay into malformed state. Lifecycle deferrals stay in force. This
+amendment does not implement the observation. Creation eligibility remains
+affected-only.
+
 ## Context
 
 [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md) accepts Finding identity
@@ -209,7 +218,8 @@ The following remain unavailable:
 
 - automatic matching;
 - automatic and bulk Finding creation;
-- repeated observations;
+- repeated-observation implementation and reachability; architecture is accepted by
+  [ADR 0039](0039-controlled-finding-repeated-observation.md) and is not implemented here;
 - risk and priority;
 - assignment and due dates;
 - suppression;

@@ -11,6 +11,10 @@ controlled Finding APIs. Merge to `main` remains subject to normal pull-request 
 This ADR does not implement pages, components, Next.js configuration, API routes, or a
 migration, and it does not authorize a Finding lifecycle power.
 
+Further amended on 2026-10-09. [ADR 0039](0039-controlled-finding-repeated-observation.md)
+accepts repeated-observation architecture and does not implement it. This workflow
+does not gain an observation control, a history page, or a lifecycle action.
+
 ## Context
 
 [ADR 0035](0035-controlled-finding-creation.md) accepts creation-only Finding architecture.
@@ -481,7 +485,8 @@ The following remain unavailable:
 - multi-select creation;
 - automatic creation;
 - lifecycle transitions;
-- repeated observations;
+- repeated-observation implementation and reachability; architecture is accepted by
+  [ADR 0039](0039-controlled-finding-repeated-observation.md) and is not implemented here;
 - risk and priority;
 - assignment and due dates;
 - suppression;
