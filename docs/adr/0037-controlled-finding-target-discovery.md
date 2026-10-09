@@ -17,6 +17,11 @@ inspection routes. The workflow is not implemented by this amendment. Discovery 
 read-only. This amendment does not return Finding ids, add a Finding list, or authorize
 a lifecycle transition.
 
+Further amended on 2026-10-09. [ADR 0039](0039-controlled-finding-repeated-observation.md)
+accepts repeated-observation architecture. Discovery stays read-only. This amendment
+does not implement observation, return later observation history, or authorize a
+lifecycle transition.
+
 ## Context
 
 [ADR 0035](0035-controlled-finding-creation.md) accepts creation-only Finding
@@ -512,7 +517,8 @@ The following remain unavailable:
   [ADR 0038](0038-controlled-finding-web-workflow.md), which this decision does not
   implement;
 - CLI;
-- repeated observations;
+- repeated-observation implementation and reachability; architecture is accepted by
+  [ADR 0039](0039-controlled-finding-repeated-observation.md) and is not implemented here;
 - lifecycle transitions;
 - risk and priority;
 - assignment and due dates;

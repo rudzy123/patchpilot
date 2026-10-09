@@ -477,7 +477,7 @@ Per-**SBOMIngestion** compare result for whether the finding's **versionless** c
 | `method` | Closed, versioned catalog at implementation. Architectural examples: `affected_version_match`, `explicit_version_match`, `version_out_of_affected_range`, `component_not_observed`, `unsupported_ecosystem`, `unknown_version`, `insufficient_coverage`, `withdrawn_advisory` |
 | `observedAt` | UTC |
 
-`resolved` on the finding is a conclusion over the **current** ingestion's observation (`Asset.lastSuccessfulSbomIngestionId`: latest SBOM `receivedAt` among `completed` ingestions), not a ticket field and not whichever ingestion finished last.
+`resolved` on the finding is a conclusion over the **current** ingestion's observation (`Asset.lastSuccessfulSbomIngestionId`: greatest SBOM `receivedAt` among `completed` ingestions, then ingestion `createdAt`, then ingestion `id`), not a ticket field and not whichever ingestion finished last. [ADR 0039](../adr/0039-controlled-finding-repeated-observation.md) accepts one later observation and does not implement it. That observation does not set `resolved`. Its method is `controlled_finding_repeated_observation`. The method examples in the table above are not that closed value. The natural key stays `(organizationId, findingId, sbomIngestionId)`. The result enum stays `present`, `absent`, and `inconclusive`. A separate aggregate classification is part of that accepted decision and is not stored yet.
 
 ## VulnerabilityMatchEvaluation (future)
 

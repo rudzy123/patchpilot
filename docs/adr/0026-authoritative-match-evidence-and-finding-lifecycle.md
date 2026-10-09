@@ -526,6 +526,17 @@ creation-only write. The 2026-10-07 reachability amendment does not add a second
 does not waive section 10 or the blocked-until list in section 11 for any power section 10A
 does not name.
 
+Further amended on 2026-10-09. [ADR 0039](0039-controlled-finding-repeated-observation.md)
+admits one persistence-only repeated observation for an existing open Finding and one
+later latest successful ingestion. The observation is evidence only. It does not satisfy
+section 20, does not change Finding state, and does not authorize automatic closure,
+reopening, resolution, or verification. Section 18's later-ingestion rule is governed for
+this slice by ADR 0039. Section 17's Finding-version increment is not used:
+`finding_creation_initial_state_chk` keeps `version` at 1, and this slice
+serializes on the asset advisory lock. The writer stays production uncomposed.
+This amendment does not change the frozen migration count and does not waive
+section 10 or section 11 for any power ADR 0039 does not name.
+
 ### 12. Future positive-match transaction
 
 Design for a later tenant-scoped PostgreSQL transaction after pure evaluation has already produced
@@ -749,6 +760,12 @@ When an existing Finding is present again in a later authoritative ingestion:
 - do not duplicate audit on replay
 - do not change risk acceptance automatically
 - do not change `dueAt` from provider data
+
+Amended on 2026-10-09. The first repeated-observation slice is
+[ADR 0039](0039-controlled-finding-repeated-observation.md). It records one immutable
+later observation and updates only `lastObservedAt` and `updatedAt`. It does not
+increment `Finding.version`. It leaves Finding state `open`. Section 20 is not
+implemented by that slice.
 
 ### 19. Version-change behavior
 
