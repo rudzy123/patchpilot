@@ -51,7 +51,7 @@ export const FINDING_REPEATED_OBSERVATION_INSPECTION_COMPATIBILITY = Object.free
   creationObservationIdentifiedByStrictCreationShape: true,
   missingOrMalformedCreationObservation: 'malformed_persisted_state',
   observationCountOtherThanOneIsMalformationWhenLaterRowsAreLegal: false,
-  sessionImplementsInspectionCorrection: false,
+  sessionImplementsInspectionCorrection: true,
 } as const);
 
 export type FindingObservationInspectionShape =

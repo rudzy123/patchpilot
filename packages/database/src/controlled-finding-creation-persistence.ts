@@ -17,6 +17,7 @@ import {
   FINDING_CREATION_REPLAY_COMPARISON_SCHEMA_VERSION,
   FINDING_CREATION_TRANSACTION_SCHEMA_VERSION,
   classifyFindingCreationReplay,
+  classifyInspectionObservationShape,
   findingCreationOutcomeForReason,
   parseTrustedFindingCreationContext,
   presentFindingCreationAuthorization,
@@ -114,6 +115,10 @@ type StoredObservation = {
   creation_policy_version: number | null;
   replay_fingerprint: string | null;
   affected_evidence_count: number | null;
+  observation_purpose: string | null;
+  observation_policy_id: string | null;
+  observation_policy_version: number | null;
+  aggregate_classification: string | null;
 };
 
 type CommandBinding = {
@@ -495,12 +500,48 @@ async function classifyStored(
       "creation_policy_id",
       "creation_policy_version",
       "replay_fingerprint",
-      "affected_evidence_count"
+      "affected_evidence_count",
+      "observation_purpose",
+      "observation_policy_id",
+      "observation_policy_version",
+      "aggregate_classification"::text AS aggregate_classification
     FROM "finding_observation"
     WHERE "organization_id" = ${organizationId}::uuid
       AND "finding_id" = ${finding.id}::uuid
   `;
-  const observation = observations.length === 1 ? observations[0] : undefined;
+  const creationObservations = observations.filter(
+    (row) =>
+      classifyInspectionObservationShape({
+        method: row.method,
+        result: row.result,
+        occurrenceId: row.occurrence_id,
+        transitionClassification: row.transition_classification,
+        creationPurpose: row.creation_purpose,
+        creationPolicyId: row.creation_policy_id,
+        creationPolicyVersion: row.creation_policy_version,
+        observationPurpose: row.observation_purpose,
+        observationPolicyId: row.observation_policy_id,
+        observationPolicyVersion: row.observation_policy_version,
+        aggregate: row.aggregate_classification,
+      }).role === 'creation_observation',
+  );
+  const laterWellFormed = observations.every((row) => {
+    const role = classifyInspectionObservationShape({
+      method: row.method,
+      result: row.result,
+      occurrenceId: row.occurrence_id,
+      transitionClassification: row.transition_classification,
+      creationPurpose: row.creation_purpose,
+      creationPolicyId: row.creation_policy_id,
+      creationPolicyVersion: row.creation_policy_version,
+      observationPurpose: row.observation_purpose,
+      observationPolicyId: row.observation_policy_id,
+      observationPolicyVersion: row.observation_policy_version,
+      aggregate: row.aggregate_classification,
+    }).role;
+    return role === 'creation_observation' || role === 'later_observation';
+  });
+  const observation = creationObservations.length === 1 ? creationObservations[0] : undefined;
   const links =
     observation === undefined
       ? []
@@ -549,7 +590,8 @@ async function classifyStored(
     linkSetAgrees: sameIds(linkIds, command.evidenceIds),
     persistedStateWellFormed:
       findingWellFormed &&
-      observations.length <= 1 &&
+      laterWellFormed &&
+      creationObservations.length <= 1 &&
       (observation === undefined || linksMatchStoredFingerprint || !observationPresent),
   });
   if (comparison.classification === 'already_applied') {

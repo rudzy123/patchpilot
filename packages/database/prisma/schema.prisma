@@ -218,6 +218,15 @@ enum FindingObservationResult {
   @@map("finding_observation_result")
 }
 
+enum FindingRepeatedObservationAggregate {
+  affected
+  unaffected
+  unknown
+  component_absent
+
+  @@map("finding_repeated_observation_aggregate")
+}
+
 enum RiskPolicyStatus {
   draft
   published
@@ -1358,6 +1367,7 @@ model SbomIngestion {
   componentOccurrences           ComponentOccurrence[]
   dependencyEdges                DependencyRelationship[]
   observations                   FindingObservation[]
+  repeatedObservationEvidenceLinks FindingRepeatedObservationEvidenceLink[]
   riskCalculations               RiskCalculation[]
   matchEvaluationEvidence        MatchEvaluationEvidence[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
@@ -1417,6 +1427,7 @@ model ComponentOccurrence {
   incomingEdges                  DependencyRelationship[]         @relation("DependencyTo")
   findings                       Finding[]
   observations                   FindingObservation[]
+  repeatedObservationEvidenceLinks FindingRepeatedObservationEvidenceLink[]
   matchEvaluationEvidence        MatchEvaluationEvidence[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
@@ -1572,6 +1583,7 @@ model Finding {
   currentRiskCalculation RiskCalculation?              @relation("FindingCurrentCalculation", fields: [organizationId, currentRiskCalculationId], references: [organizationId, id], onDelete: Restrict)
   observations           FindingObservation[]
   creationEvidenceLinks  FindingCreationEvidenceLink[]
+  repeatedObservationEvidenceLinks FindingRepeatedObservationEvidenceLink[]
   calculations           RiskCalculation[]             @relation("FindingCalculations")
   remediationTasks       RemediationTask[]
   riskAcceptances        RiskAcceptance[]
@@ -1609,6 +1621,14 @@ model FindingObservation {
   correlationId            String?                  @map("correlation_id") @db.Uuid
   replayFingerprint        String?                  @map("replay_fingerprint") @db.Char(64)
   affectedEvidenceCount    Int?                     @map("affected_evidence_count")
+  observationPurpose       String?                  @map("observation_purpose") @db.VarChar(80)
+  observationPolicyId      String?                  @map("observation_policy_id") @db.VarChar(80)
+  observationPolicyVersion Int?                     @map("observation_policy_version") @db.SmallInt
+  aggregateClassification  FindingRepeatedObservationAggregate? @map("aggregate_classification")
+  evidenceLinkCount        Int?                     @map("evidence_link_count")
+  absenceGraphCompleteness SbomGraphCompleteness?   @map("absence_graph_completeness")
+  absenceComponentCount    Int?                     @map("absence_component_count")
+  absenceDependencyEdgeCount Int?                   @map("absence_dependency_edge_count")
 
   organization          Organization                  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   finding               Finding                       @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
@@ -1617,6 +1637,7 @@ model FindingObservation {
   occurrence            ComponentOccurrence?          @relation(fields: [organizationId, occurrenceId], references: [organizationId, id], onDelete: Restrict)
   actorMembership       Membership?                   @relation("FindingObservationActorMembership", fields: [organizationId, actorMembershipId], references: [organizationId, id], onDelete: Restrict, map: "finding_observation_actor_membership_fkey")
   creationEvidenceLinks FindingCreationEvidenceLink[]
+  repeatedObservationEvidenceLinks FindingRepeatedObservationEvidenceLink[]
 
   @@unique([organizationId, findingId, sbomIngestionId], map: "finding_observation_identity_key")
   @@unique([organizationId, id], map: "finding_observation_org_id_key")
@@ -1649,6 +1670,36 @@ model FindingCreationEvidenceLink {
   @@unique([organizationId, productMatchEvaluationEvidenceId], map: "finding_creation_evidence_link_evidence_uidx")
   @@unique([organizationId, findingObservationId, productMatchEvaluationEvidenceId], map: "finding_creation_evidence_link_observation_evidence_uidx")
   @@map("finding_creation_evidence_link")
+}
+
+/// Append-only support for one later observation.
+/// One row is one occurrence: legal Product Match Evidence, or an unknown-version proof.
+/// A component-absent observation has zero rows. Non-null evidence uniqueness is SQL-only.
+model FindingRepeatedObservationEvidenceLink {
+  id                               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId                   String                  @map("organization_id") @db.Uuid
+  findingId                        String                  @map("finding_id") @db.Uuid
+  findingObservationId             String                  @map("finding_observation_id") @db.Uuid
+  sbomId                           String                  @map("sbom_id") @db.Uuid
+  productMatchEvaluationEvidenceId String?                 @map("product_match_evaluation_evidence_id") @db.Uuid
+  assetId                          String                  @map("asset_id") @db.Uuid
+  componentId                      String                  @map("component_id") @db.Uuid
+  vulnerabilityId                  String                  @map("vulnerability_id") @db.Uuid
+  sbomIngestionId                  String                  @map("sbom_ingestion_id") @db.Uuid
+  componentOccurrenceId            String                  @map("component_occurrence_id") @db.Uuid
+  supportKind                      String                  @map("support_kind") @db.VarChar(64)
+  outcome                          MatchEvaluationOutcome?
+  createdAt                        DateTime                @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  finding     Finding                         @relation(fields: [organizationId, findingId, assetId, componentId, vulnerabilityId], references: [organizationId, id, assetId, componentId, vulnerabilityId], onDelete: Restrict, map: "finding_repeated_observation_evidence_link_finding_fkey")
+  observation FindingObservation              @relation(fields: [organizationId, findingObservationId, findingId, sbomIngestionId], references: [organizationId, id, findingId, sbomIngestionId], onDelete: Restrict, map: "finding_repeated_observation_evidence_link_observation_fkey")
+  evidence    ProductMatchEvaluationEvidence? @relation(fields: [organizationId, productMatchEvaluationEvidenceId, assetId, componentId, vulnerabilityId, sbomIngestionId, componentOccurrenceId], references: [organizationId, id, assetId, componentId, vulnerabilityId, sbomIngestionId, componentOccurrenceId], onDelete: Restrict, map: "finding_repeated_observation_evidence_link_evidence_fkey")
+  occurrence  ComponentOccurrence             @relation(fields: [organizationId, componentOccurrenceId, assetId, componentId], references: [organizationId, id, assetId, componentId], onDelete: Restrict, map: "finding_repeated_observation_evidence_link_occurrence_fkey")
+  ingestion   SbomIngestion                   @relation(fields: [organizationId, sbomIngestionId, sbomId], references: [organizationId, id, sbomId], onDelete: Restrict, map: "finding_repeated_observation_evidence_link_ingestion_fkey")
+
+  @@unique([organizationId, id], map: "finding_repeated_observation_evidence_link_org_id_key")
+  @@unique([organizationId, findingObservationId, componentOccurrenceId], map: "finding_repeated_observation_evidence_link_occurrence_uidx")
+  @@map("finding_repeated_observation_evidence_link")
 }
 
 model RiskPolicy {
@@ -3760,8 +3811,9 @@ model ProductMatchEvaluationEvidence {
   revision              AdvisoryRevision                    @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_revision_fkey")
   approval              MaintainerReviewedAdvisoryApproval  @relation(fields: [approvalId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_approval_fkey")
   vulnerability         Vulnerability                       @relation(fields: [vulnerabilityId], references: [id], onDelete: Restrict, map: "product_match_evaluation_evidence_vulnerability_fkey")
-  explanations          ProductMatchEvaluationExplanation[]
-  creationEvidenceLinks FindingCreationEvidenceLink[]
+  explanations                      ProductMatchEvaluationExplanation[]
+  creationEvidenceLinks             FindingCreationEvidenceLink[]
+  repeatedObservationEvidenceLinks FindingRepeatedObservationEvidenceLink[]
 
   @@unique([organizationId, id], map: "product_match_evaluation_evidence_org_id_key")
   @@unique([organizationId, id, assetId, componentId, vulnerabilityId, sbomIngestionId, componentOccurrenceId], map: "product_match_evaluation_evidence_alignment_key")

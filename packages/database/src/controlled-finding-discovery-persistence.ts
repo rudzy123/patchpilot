@@ -6,6 +6,7 @@
  */
 
 import { Prisma, type PrismaClient } from '@prisma/client';
+import { classifyInspectionObservationShape } from '@patchpilot/domain';
 import {
   FINDING_DISCOVERY_MAX_EVIDENCE_SET_SIZE,
   FINDING_DISCOVERY_MAX_EXAMINED_PAIRS,
@@ -75,6 +76,11 @@ type ObservationRow = {
   replay_fingerprint: string | null;
   affected_evidence_count: number | null;
   sbom_ingestion_id: string;
+  observation_purpose: string | null;
+  observation_policy_id: string | null;
+  observation_policy_version: number | null;
+  aggregate_classification: string | null;
+  evidence_link_count: number | null;
 };
 
 type LinkRow = {
@@ -467,7 +473,12 @@ async function loadLineage(
            "creation_policy_version",
            "replay_fingerprint",
            "affected_evidence_count",
-           "sbom_ingestion_id"::text AS sbom_ingestion_id
+           "sbom_ingestion_id"::text AS sbom_ingestion_id,
+           "observation_purpose",
+           "observation_policy_id",
+           "observation_policy_version",
+           "aggregate_classification"::text AS aggregate_classification,
+           "evidence_link_count"
     FROM "finding_observation"
     WHERE "organization_id" = ${organizationId}::uuid
       AND "finding_id" IN (${Prisma.join(findingIds.map((id) => Prisma.sql`${id}::uuid`))})
@@ -494,7 +505,20 @@ async function loadLineage(
   }
   for (const finding of findings) {
     const storedObservations = observationsByFinding.get(finding.id) ?? [];
-    const observation = storedObservations.length === 1 ? storedObservations[0] : undefined;
+    const creationObservations = storedObservations.filter(
+      (row) => observationRole(row) === 'creation_observation',
+    );
+    const laterObservations = storedObservations.filter(
+      (row) => observationRole(row) === 'later_observation',
+    );
+    const malformedObservation =
+      storedObservations.some((row) => observationRole(row) === 'malformed_persisted_state') ||
+      laterObservations.some((row) => row.evidence_link_count === null) ||
+      (storedObservations.length > 0 && creationObservations.length !== 1);
+    const observation = creationObservations.length === 1 ? creationObservations[0] : undefined;
+    const observationCount = malformedObservation
+      ? storedObservations.length + 1
+      : creationObservations.length;
     const fact: FindingDiscoveryLineageFact = {
       findingId: finding.id,
       state: finding.state,
@@ -506,7 +530,7 @@ async function loadLineage(
       dueAt: instant(finding.due_at),
       currentRiskCalculationId: finding.current_risk_calculation_id,
       version: finding.version,
-      observationCount: storedObservations.length,
+      observationCount,
       observation: observation === undefined ? null : observationFact(observation),
       linkEvidenceIds: [...(linksByFinding.get(finding.id) ?? [])].sort(compareUtf16),
     };
@@ -517,6 +541,24 @@ async function loadLineage(
     lineage.set(key, fact);
   }
   return lineage;
+}
+
+function observationRole(
+  observation: ObservationRow,
+): 'creation_observation' | 'later_observation' | 'malformed_persisted_state' {
+  return classifyInspectionObservationShape({
+    method: observation.method,
+    result: observation.result,
+    occurrenceId: observation.occurrence_id,
+    transitionClassification: observation.transition_classification,
+    creationPurpose: observation.creation_purpose,
+    creationPolicyId: observation.creation_policy_id,
+    creationPolicyVersion: observation.creation_policy_version,
+    observationPurpose: observation.observation_purpose,
+    observationPolicyId: observation.observation_policy_id,
+    observationPolicyVersion: observation.observation_policy_version,
+    aggregate: observation.aggregate_classification,
+  }).role;
 }
 
 function observationFact(observation: ObservationRow): FindingDiscoveryObservationFact {

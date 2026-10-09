@@ -14,6 +14,7 @@ import {
   FINDING_CREATION_POLICY_ID,
   FINDING_CREATION_POLICY_VERSION,
   FINDING_CREATION_PURPOSE,
+  classifyInspectionObservationShape,
   type FindingInspectionEvidenceBundle,
   type FindingInspectionLinkRecord,
   type FindingInspectionLoad,
@@ -132,6 +133,11 @@ async function loadInTransaction(
         affectedEvidenceCount: true,
         replayFingerprint: true,
         evidence: true,
+        observationPurpose: true,
+        observationPolicyId: true,
+        observationPolicyVersion: true,
+        aggregateClassification: true,
+        evidenceLinkCount: true,
       },
     }),
     tx.findingCreationEvidenceLink.findMany({
@@ -153,7 +159,46 @@ async function loadInTransaction(
     tx.evidence.count({ where: { organizationId, findingId: finding.id } }),
   ]);
 
-  const observation = observations.length === 1 ? observations[0] : undefined;
+  const creationRows = [];
+  const laterRows = [];
+  for (const row of observations) {
+    const shape = classifyInspectionObservationShape({
+      method: row.method,
+      result: row.result,
+      occurrenceId: row.occurrenceId,
+      transitionClassification: row.transitionClassification,
+      creationPurpose: row.creationPurpose,
+      creationPolicyId: row.creationPolicyId,
+      creationPolicyVersion: row.creationPolicyVersion,
+      observationPurpose: row.observationPurpose,
+      observationPolicyId: row.observationPolicyId,
+      observationPolicyVersion: row.observationPolicyVersion,
+      aggregate: row.aggregateClassification,
+    });
+    if (shape.role === 'creation_observation') {
+      creationRows.push(row);
+    } else if (shape.role === 'later_observation') {
+      laterRows.push(row);
+    } else {
+      return { status: 'malformed_persisted_state' };
+    }
+  }
+  if (laterRows.length > 0) {
+    const repeatedLinks = await tx.findingRepeatedObservationEvidenceLink.findMany({
+      where: {
+        organizationId,
+        findingObservationId: { in: laterRows.map((row) => row.id) },
+      },
+      select: { findingObservationId: true },
+    });
+    for (const row of laterRows) {
+      const linkCount = repeatedLinks.filter((link) => link.findingObservationId === row.id).length;
+      if (linkCount !== row.evidenceLinkCount) {
+        return { status: 'malformed_persisted_state' };
+      }
+    }
+  }
+  const observation = creationRows.length === 1 ? creationRows[0] : undefined;
   const occurrenceScope =
     observation === undefined
       ? { creationIngestionOccurrenceCount: 0, otherOccurrenceCount: 0 }
@@ -248,7 +293,7 @@ async function loadInTransaction(
   );
   const evidenceIds = [...linkRecords.map((link) => link.evidenceId)].sort(compareUuid);
   const fingerprint = creationEvidenceFingerprint(evidenceIds);
-  const mappedObservations: FindingInspectionObservationRecord[] = observations.map((row) => ({
+  const mappedObservations: FindingInspectionObservationRecord[] = creationRows.map((row) => ({
     id: row.id,
     sbomIngestionId: row.sbomIngestionId,
     occurrenceId: row.occurrenceId,

@@ -83,6 +83,13 @@ export {
 } from './authorization.js';
 
 export {
+  FINDING_REPEATED_OBSERVATION_REPLAY_FINGERPRINT_SCHEMA,
+  canonicalRepeatedObservationAbsenceFingerprint,
+  canonicalRepeatedObservationEvidenceFingerprint,
+  canonicalRepeatedObservationReplayFingerprint,
+} from './support.js';
+
+export {
   deriveComponentAbsenceClassification,
   deriveRepeatedObservationAggregate,
   type ComponentAbsenceClassification,

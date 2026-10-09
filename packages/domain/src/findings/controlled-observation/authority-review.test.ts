@@ -913,9 +913,9 @@ describe('repeated observation public surface and inspection boundary', () => {
       'FINDING_REPEATED_OBSERVATION_PORT_EXCLUSIONS',
       'repeatedObservationTenantDisclosure',
     ]);
-    expect(persistence.FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.implemented).toBe(false);
+    expect(persistence.FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.implemented).toBe(true);
     expect(persistence.FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.canWriteObservation).toBe(
-      false,
+      true,
     );
     expect(FINDING_REPEATED_OBSERVATION_INVARIANTS.issuerPackageExport).toBe('absent');
     expect(FINDING_REPEATED_OBSERVATION_INVARIANTS.internalIssuerTrustBoundary).toBe(
@@ -925,7 +925,7 @@ describe('repeated observation public surface and inspection boundary', () => {
       'controlled_finding_repeated_observation_session_1r',
     );
     expect(FINDING_REPEATED_OBSERVATION_INVARIANTS.nextSession).toBe(
-      'controlled_finding_repeated_observation_session_2',
+      'controlled_finding_repeated_observation_session_2r',
     );
     const disclosure = persistence.repeatedObservationTenantDisclosure();
     expect(disclosure.foreignResourceRevealed).toBe(false);

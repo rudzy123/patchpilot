@@ -130,6 +130,10 @@ export const FROZEN_MIGRATIONS = [
     directory: '20261006120000_controlled_finding_creation',
     sha256: 'b646ceb889e68ab76154fded3f3c6a9b186f82be28d34a7574cb17136d1aadb1',
   },
+  {
+    directory: '20261009120000_controlled_finding_repeated_observation',
+    sha256: 'bf0ea1d161912827dd2a6ee4d814730eb8d519552145a9d2581d927786d6b491',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
@@ -180,6 +184,9 @@ export const PRODUCT_MATCH_EVIDENCE_CARDINALITY =
 
 export const CONTROLLED_FINDING_CREATION = '20261006120000_controlled_finding_creation' as const;
 
+export const CONTROLLED_FINDING_REPEATED_OBSERVATION =
+  '20261009120000_controlled_finding_repeated_observation' as const;
+
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
   '20260827120000_tenant_model',
@@ -205,6 +212,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   REVIEWER_CAPABILITY_ISSUANCE,
   PRODUCT_MATCH_EVIDENCE_CARDINALITY,
   CONTROLLED_FINDING_CREATION,
+  CONTROLLED_FINDING_REPEATED_OBSERVATION,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
@@ -552,4 +560,9 @@ export async function applyThroughReviewerCapability(databaseUrl: string): Promi
 export async function applyThroughProductMatchCardinality(databaseUrl: string): Promise<void> {
   await applyThroughReviewerCapability(databaseUrl);
   await applyMigrationSqlAndResolve(databaseUrl, PRODUCT_MATCH_EVIDENCE_CARDINALITY);
+}
+
+export async function applyThroughControlledFindingCreation(databaseUrl: string): Promise<void> {
+  await applyThroughProductMatchCardinality(databaseUrl);
+  await applyMigrationSqlAndResolve(databaseUrl, CONTROLLED_FINDING_CREATION);
 }

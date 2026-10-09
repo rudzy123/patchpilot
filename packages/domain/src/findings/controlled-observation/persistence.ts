@@ -1,8 +1,9 @@
 /**
- * Future repeated-observation persistence port.
- * No adapter implements this type. The port accepts trusted context and a
- * sealed command, and returns a bounded outcome. It does not expose a
- * database client, raw rows, authority internals, or a persistence callback.
+ * Repeated-observation persistence port.
+ * The database adapter implements the transaction outside this package.
+ * The port accepts trusted context and a sealed command, and returns a
+ * bounded outcome. It does not expose a database client, raw rows,
+ * authority internals, or a persistence callback.
  */
 
 import type { FindingObservationResult } from '../../lifecycle.js';
@@ -73,12 +74,12 @@ export type FindingRepeatedObservationTransactionRequest = {
 };
 
 /**
- * Future port. Session 1 does not implement it and does not register it.
+ * Persistence port. Production registration stays absent.
  * A missing row and a foreign-organization row share `not_found`.
  */
 export type FutureFindingRepeatedObservationPort = {
   readonly portId: typeof FINDING_REPEATED_OBSERVATION_TRANSACTION_SCHEMA_VERSION;
-  readonly implemented: false;
+  readonly implemented: true;
   readonly productionRegistration: 'absent';
   readonly boundary: typeof FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY;
   observe(

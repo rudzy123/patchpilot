@@ -753,13 +753,15 @@ describe('repeated observation nonauthority', () => {
     expect(FINDING_REPEATED_OBSERVATION_WITHHELD_POWERS.findingClosure).toBe('unavailable');
     expect(FINDING_REPEATED_OBSERVATION_WITHHELD_POWERS.automaticObservation).toBe('unavailable');
     expect(FINDING_REPEATED_OBSERVATION_WITHHELD_POWERS.evaluatorExecution).toBe('unavailable');
-    expect(FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.implemented).toBe(false);
-    expect(FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.canWriteObservation).toBe(false);
-    expect(FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.canUpdateFindingTimestamp).toBe(false);
+    expect(FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.implemented).toBe(true);
+    expect(FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.canWriteObservation).toBe(true);
+    expect(FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.canUpdateFindingTimestamp).toBe(true);
     expect(FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.canWriteFindingObservedAudit).toBe(
-      false,
+      true,
     );
-    expect(FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.frozenMigrationCount).toBe(24);
+    expect(FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.canUpdateFinding).toBe(false);
+    expect(FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.productionComposition).toBe('absent');
+    expect(FINDING_REPEATED_OBSERVATION_PERSISTENCE_BOUNDARY.frozenMigrationCount).toBe(25);
     expect(FINDING_REPEATED_OBSERVATION_OUTCOMES).not.toContain('authorized');
     expect(FINDING_REPEATED_OBSERVATION_AGGREGATES).not.toContain('absent');
     expect(mapRepeatedObservationAggregate('affected')).toBe('present');
@@ -775,8 +777,8 @@ describe('repeated observation nonauthority', () => {
     expect(FINDING_REPEATED_OBSERVATION_INVARIANTS.storedAbsentAloneIsProductAggregate).toBe(false);
     expect(FINDING_REPEATED_OBSERVATION_INVARIANTS.unaffectedEqualsComponentAbsent).toBe(false);
     expect(FINDING_REPEATED_OBSERVATION_INVARIANTS.genericSuccessBoolean).toBe(false);
-    expect(FINDING_REPEATED_OBSERVATION_INVARIANTS.observationCanBeWritten).toBe(false);
-    expect(FINDING_REPEATED_OBSERVATION_INVARIANTS.persistenceImplemented).toBe(false);
+    expect(FINDING_REPEATED_OBSERVATION_INVARIANTS.observationCanBeWritten).toBe(true);
+    expect(FINDING_REPEATED_OBSERVATION_INVARIANTS.persistenceImplemented).toBe(true);
     expect(FINDING_REPEATED_OBSERVATION_INVARIANTS.sliceComplete).toBe(false);
   });
 });

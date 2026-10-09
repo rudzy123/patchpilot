@@ -458,7 +458,7 @@ describe('inspection compatibility', () => {
     ).toBe('malformed_persisted_state');
     expect(
       FINDING_REPEATED_OBSERVATION_INSPECTION_COMPATIBILITY.sessionImplementsInspectionCorrection,
-    ).toBe(false);
+    ).toBe(true);
     expect(FINDING_REPEATED_OBSERVATION_INSPECTION_COMPATIBILITY.laterHistoryAvailable).toBe(false);
   });
 });

@@ -96,20 +96,25 @@ describe('Finding generic-write containment', () => {
   });
 
   it('keeps direct Prisma Finding writes out of production sources', () => {
-    const allowedRawSql = 'packages/database/src/controlled-finding-creation-persistence.ts';
+    const allowedRawSql = new Set([
+      'packages/database/src/controlled-finding-creation-persistence.ts',
+      'packages/database/src/controlled-finding-repeated-observation-persistence.ts',
+    ]);
     const offenders: string[] = [];
     for (const filePath of productionSources()) {
       const relative = path.relative(repoRoot, filePath);
       const source = readFileSync(filePath, 'utf8');
       if (FINDING_WRITE.test(source)) {
         offenders.push(relative);
-      } else if (FINDING_RAW_SQL.test(source) && relative !== allowedRawSql) {
+      } else if (FINDING_RAW_SQL.test(source) && !allowedRawSql.has(relative)) {
         offenders.push(relative);
       }
     }
-    const adapter = readFileSync(path.join(repoRoot, allowedRawSql), 'utf8');
-    expect(adapter).not.toMatch(FINDING_WRITE);
-    expect(adapter).toMatch(FINDING_RAW_SQL);
+    for (const relative of allowedRawSql) {
+      const adapter = readFileSync(path.join(repoRoot, relative), 'utf8');
+      expect(adapter).not.toMatch(FINDING_WRITE);
+      expect(adapter).toMatch(FINDING_RAW_SQL);
+    }
     expect(offenders).toEqual([]);
   });
 

@@ -13,6 +13,9 @@ import {
   FINDING_REPEATED_OBSERVATION_EVIDENCE_SUPPORT_SCHEMA_VERSION,
   FINDING_REPEATED_OBSERVATION_MAX_SUPPORT_FACTS,
   FINDING_REPEATED_OBSERVATION_NORMALIZATION_VERSION,
+  FINDING_REPEATED_OBSERVATION_POLICY_ID,
+  FINDING_REPEATED_OBSERVATION_POLICY_VERSION,
+  FINDING_REPEATED_OBSERVATION_PURPOSE,
   type FindingRepeatedObservationReason,
 } from './policy.js';
 import { closedRecord, isHostileProxy, ownDataProperties, ownNames } from './plain.js';
@@ -268,6 +271,58 @@ function parseAbsenceSupport(
     callerEstablishesAbsence: false,
   });
   return { ok: true, support };
+}
+
+export function canonicalRepeatedObservationEvidenceFingerprint(
+  evidenceIds: readonly string[],
+  unknownVersionOccurrenceIds: readonly string[],
+  supportCount: number,
+): string {
+  return fingerprintEvidenceSupport(evidenceIds, unknownVersionOccurrenceIds, supportCount);
+}
+
+export function canonicalRepeatedObservationAbsenceFingerprint(input: {
+  readonly sbomIngestionId: string;
+  readonly graphCompleteness: FindingRepeatedObservationAbsenceGraph;
+  readonly componentCount: number;
+  readonly occurrenceCardinality: number;
+  readonly dependencyEdgeCount: number;
+}): string {
+  return fingerprintAbsenceSupport(input);
+}
+
+export const FINDING_REPEATED_OBSERVATION_REPLAY_FINGERPRINT_SCHEMA =
+  'finding_repeated_observation_replay_v1' as const;
+
+export function canonicalRepeatedObservationReplayFingerprint(input: {
+  readonly organizationId: string;
+  readonly findingId: string;
+  readonly assetId: string;
+  readonly componentId: string;
+  readonly vulnerabilityId: string;
+  readonly sbomIngestionId: string;
+  readonly aggregate: string;
+  readonly mappedResult: string;
+  readonly supportFingerprint: string;
+  readonly supportCount: number;
+}): string {
+  const fields = [
+    lengthPrefixed('schema', FINDING_REPEATED_OBSERVATION_REPLAY_FINGERPRINT_SCHEMA),
+    lengthPrefixed('organization', input.organizationId),
+    lengthPrefixed('finding', input.findingId),
+    lengthPrefixed('asset', input.assetId),
+    lengthPrefixed('component', input.componentId),
+    lengthPrefixed('vulnerability', input.vulnerabilityId),
+    lengthPrefixed('ingestion', input.sbomIngestionId),
+    lengthPrefixed('purpose', FINDING_REPEATED_OBSERVATION_PURPOSE),
+    lengthPrefixed('policy', FINDING_REPEATED_OBSERVATION_POLICY_ID),
+    lengthPrefixed('policyVersion', String(FINDING_REPEATED_OBSERVATION_POLICY_VERSION)),
+    lengthPrefixed('aggregate', input.aggregate),
+    lengthPrefixed('result', input.mappedResult),
+    lengthPrefixed('support', input.supportFingerprint),
+    lengthPrefixed('count', String(input.supportCount)),
+  ];
+  return sha256(fields.join('|'));
 }
 
 function fingerprintEvidenceSupport(

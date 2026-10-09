@@ -107,12 +107,19 @@ describe('repeated observation production exclusion', () => {
       'presentFindingRepeatedObservationAuthorization',
       'record_finding_repeated_observation',
     ];
+    const allowedDatabase = new Set([
+      'packages/database/src/controlled-finding-repeated-observation-persistence.ts',
+    ]);
     const offenders: string[] = [];
     for (const root of roots) {
       for (const filePath of walk(root).filter(isProductionSource)) {
+        const relative = path.relative(repoRoot, filePath);
+        if (allowedDatabase.has(relative)) {
+          continue;
+        }
         const source = readFileSync(filePath, 'utf8');
         if (forbidden.some((needle) => source.includes(needle))) {
-          offenders.push(path.relative(repoRoot, filePath));
+          offenders.push(relative);
         }
       }
     }
@@ -154,13 +161,13 @@ describe('repeated observation production exclusion', () => {
     }
     const migrationRoot = path.join(repoRoot, 'packages/database/prisma/migrations');
     const migrations = readdirSync(migrationRoot).filter((name) => name !== 'migration_lock.toml');
-    expect(migrations).toHaveLength(24);
+    expect(migrations).toHaveLength(25);
     const schema = readFileSync(
       path.join(repoRoot, 'packages/database/prisma/schema.prisma'),
       'utf8',
     );
-    expect(schema).not.toContain('controlled_finding_repeated_observation');
-    expect(schema).not.toContain('finding_repeated_observation_evidence_link');
+    expect(schema).toContain('finding_repeated_observation_evidence_link');
+    expect(schema).toContain('finding_repeated_observation_aggregate');
   });
 
   it('keeps the issuer inside its module', () => {
@@ -207,7 +214,7 @@ describe('repeated observation inspection and checkpoint', () => {
       path.join(repoRoot, 'packages/domain/src/findings/controlled-inspection/projection.ts'),
       'utf8',
     );
-    expect(projection).toContain('bundle.observations.length !== 1');
+    expect(projection).toContain('creationObservations.length !== 1');
     expect(projection).not.toContain('record_finding_repeated_observation');
   });
 
@@ -215,18 +222,22 @@ describe('repeated observation inspection and checkpoint', () => {
     const checkpoint = readFileSync(path.join(repoRoot, 'docs/project/current-state.md'), 'utf8');
     expect(checkpoint).toContain('Repeated-observation contracts are implemented.');
     expect(checkpoint).toContain('Process-local observation authority is implemented.');
-    expect(checkpoint).toContain('Persistence is not implemented.');
-    expect(checkpoint).toContain('The migration is not implemented.');
-    expect(checkpoint).toContain('No repeated observation can be written.');
-    expect(checkpoint).toContain('No Finding timestamp can be updated.');
-    expect(checkpoint).toContain('finding.observed is not written.');
+    expect(checkpoint).toContain('The additive migration is implemented.');
+    expect(checkpoint).toContain('The atomic repeated-observation transaction is implemented.');
+    expect(checkpoint).toContain('Persistence remains production uncomposed.');
+    expect(checkpoint).toContain('Only last_observed_at and updated_at may change.');
+    expect(checkpoint).toContain('Creation inspection remains creation based.');
+    expect(checkpoint).toContain('Later history is not publicly exposed.');
     expect(checkpoint).toContain('Production composition is absent.');
     expect(checkpoint).toContain(
       'Controlled Finding Repeated Observation Session 1-R reviewed the process-local observation authority.',
     );
-    expect(checkpoint).toContain('Session 2 migration and atomic observation is next.');
+    expect(checkpoint).toContain(
+      'Controlled Finding Repeated Observation Session 2-R reviewed the uncomposed PostgreSQL transaction.',
+    );
+    expect(checkpoint).toContain('Session 3 inspection compatibility is next.');
     expect(checkpoint).toContain('All lifecycle powers remain unavailable.');
-    expect(checkpoint).toContain('Frozen migrations: 24.');
+    expect(checkpoint).toContain('Frozen migrations: 25.');
     expect(checkpoint).not.toContain('repeated-observation slice is complete');
     expect(checkpoint).not.toContain('repeated observation is production composed');
   });

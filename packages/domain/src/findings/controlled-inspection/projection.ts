@@ -102,7 +102,7 @@ export function projectFindingInspection(
   if (structural !== null) {
     return failure(structural);
   }
-  const observation = bundle.observations[0];
+  const observation = bundle.observations.find(isCreationObservation);
   if (observation === undefined) {
     return failure('malformed_persisted_state');
   }
@@ -223,10 +223,11 @@ function structuralFailure(
   if (!isCount(bundle.otherOccurrenceCount) || !isCount(bundle.creationIngestionOccurrenceCount)) {
     return 'malformed_persisted_state';
   }
-  if (bundle.observations.length !== 1) {
+  const creationObservations = bundle.observations.filter(isCreationObservation);
+  if (creationObservations.length !== 1) {
     return 'malformed_persisted_state';
   }
-  const observation = bundle.observations[0];
+  const observation = creationObservations[0];
   if (observation === undefined || !observationWellFormed(observation)) {
     return 'malformed_persisted_state';
   }
@@ -253,6 +254,18 @@ function structuralFailure(
     occurrenceIds.add(link.componentOccurrenceId);
   }
   return null;
+}
+
+function isCreationObservation(observation: FindingInspectionObservationRecord): boolean {
+  return (
+    observation.method === FINDING_INSPECTION_CREATION_METHOD &&
+    observation.result === 'present' &&
+    observation.occurrenceId === null &&
+    observation.transitionClassification === FINDING_INSPECTION_CREATION_TRANSITION &&
+    observation.creationPurpose === FINDING_INSPECTION_CREATION_PURPOSE &&
+    observation.creationPolicyId === FINDING_INSPECTION_CREATION_POLICY_ID &&
+    observation.creationPolicyVersion === FINDING_INSPECTION_CREATION_POLICY_VERSION
+  );
 }
 
 function observationWellFormed(observation: FindingInspectionObservationRecord): boolean {
