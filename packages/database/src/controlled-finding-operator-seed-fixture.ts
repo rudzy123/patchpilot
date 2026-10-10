@@ -59,11 +59,33 @@ export type ControlledFindingSeedEvidence = {
 export type ControlledFindingSeedTarget = {
   readonly assetId: string;
   readonly componentId: string;
+  readonly componentIdentityKey: string;
+  readonly packageName: string;
   readonly vulnerabilityId: string;
+  readonly revisionId: string;
+  readonly approvalId: string;
+  readonly contentFingerprint: string;
+  readonly rangeFingerprint: string;
   readonly ingestionId: string;
   readonly sbomId: string;
   readonly sbomSha256: string;
   readonly evidence: readonly ControlledFindingSeedEvidence[];
+};
+
+export type LaterControlledFindingIngestion = {
+  readonly ingestionId: string;
+  readonly sbomId: string;
+  readonly graphCompleteness: 'empty' | 'no_dependencies' | 'partial' | 'complete';
+  readonly componentCount: number;
+  readonly dependencyEdgeCount: number;
+  readonly occurrenceCardinality: number;
+  readonly evidence: readonly {
+    readonly evidenceId: string;
+    readonly outcome: string;
+    readonly occurrenceId: string;
+    readonly version: string;
+  }[];
+  readonly unknownVersionOccurrenceIds: readonly string[];
 };
 
 export async function seedControlledFindingEvidence(
@@ -346,11 +368,211 @@ export async function seedControlledFindingEvidence(
   return {
     assetId: asset.id,
     componentId: component.id,
+    componentIdentityKey: component.identityKey,
+    packageName,
     vulnerabilityId: vulnerability.id,
+    revisionId: revision.id,
+    approvalId: approval.projection.approvalId,
+    contentFingerprint,
+    rangeFingerprint,
     ingestionId: ingestion.id,
     sbomId: sbom.id,
     sbomSha256: sbomSha,
     evidence,
+  };
+}
+
+export async function seedLaterControlledFindingIngestion(
+  prisma: PrismaClient,
+  input: {
+    readonly label: string;
+    readonly organizationId: string;
+    readonly target: ControlledFindingSeedTarget;
+    readonly receivedAt: Date;
+    readonly versions?: readonly { readonly version: string; readonly bomRef: string }[];
+    readonly unknownVersions?: readonly { readonly version: string; readonly bomRef: string }[];
+    readonly otherComponent?: {
+      readonly name: string;
+      readonly version: string;
+      readonly bomRef: string;
+    };
+    readonly state?:
+      | 'accepted'
+      | 'queued'
+      | 'processing'
+      | 'completed'
+      | 'rejected'
+      | 'quarantined'
+      | 'failed'
+      | 'duplicate';
+    readonly normalizationVersion?: '1' | '2';
+    readonly graphCompleteness?: 'empty' | 'no_dependencies' | 'partial' | 'complete';
+    readonly componentCount?: number;
+    readonly dependencyEdgeCount?: number;
+    readonly moveLatestPointer?: boolean;
+  },
+): Promise<LaterControlledFindingIngestion> {
+  const versions = input.versions ?? [];
+  const unknownVersions = input.unknownVersions ?? [];
+  const sbomSha = digest(`later-sbom:${input.label}:${randomUUID()}`);
+  const sbom = await createSbom(prisma, {
+    organizationId: input.organizationId,
+    assetId: input.target.assetId,
+    sha256: sbomSha,
+    receivedAt: input.receivedAt,
+  });
+  const ingestion = await createProcessingIngestion(prisma, {
+    organizationId: input.organizationId,
+    sbomId: sbom.id,
+    assetId: input.target.assetId,
+  });
+  const evidence: LaterControlledFindingIngestion['evidence'][number][] = [];
+  const unknownVersionOccurrenceIds: string[] = [];
+  const composition = createProductMatchEvaluationComposition({
+    port: createProductMatchEvaluationPersistence(prisma),
+  });
+  for (const version of versions) {
+    const occurrence = await prisma.componentOccurrence.create({
+      data: {
+        organizationId: input.organizationId,
+        assetId: input.target.assetId,
+        sbomId: sbom.id,
+        sbomIngestionId: ingestion.id,
+        componentId: input.target.componentId,
+        bomRef: version.bomRef,
+        version: version.version,
+        versionKnown: true,
+        isDirect: true,
+      },
+    });
+    const executed = await composition.execute({
+      commandSchemaVersion: PRODUCT_MATCH_EVALUATION_COMMAND_SCHEMA_VERSION,
+      organizationId: input.organizationId,
+      componentOccurrenceId: occurrence.id,
+      expectedComponentEvidenceFingerprint: componentEvidenceFingerprint({
+        organizationId: input.organizationId,
+        componentOccurrenceId: occurrence.id,
+        assetId: input.target.assetId,
+        sbomId: sbom.id,
+        sbomIngestionId: ingestion.id,
+        componentId: input.target.componentId,
+        componentIdentityKey: input.target.componentIdentityKey,
+        ecosystem: 'npm',
+        namespace: null,
+        name: input.target.packageName,
+        rawObservedVersion: version.version,
+        versionKnown: true,
+        sbomSha256: sbomSha,
+      }),
+      expectedNpmPackageIdentity: packageIdentity(input.target.packageName),
+      expectedRawObservedVersion: version.version,
+      advisoryRevisionId: input.target.revisionId,
+      approvalEvidenceId: input.target.approvalId,
+      expectedContentFingerprint: input.target.contentFingerprint,
+      expectedRangeFingerprint: input.target.rangeFingerprint,
+      expectedVulnerabilityId: input.target.vulnerabilityId,
+      evaluatorId: PRODUCT_MATCH_EVALUATOR_ID,
+      evaluatorVersion: PRODUCT_MATCH_EVALUATOR_VERSION,
+      matchingPolicyId: PRODUCT_MATCH_MATCHING_POLICY_ID,
+      matchingPolicyVersion: PRODUCT_MATCH_MATCHING_POLICY_VERSION,
+      productEvidencePolicyId: PRODUCT_MATCH_EVALUATION_POLICY_ID,
+      productEvidencePolicyVersion: PRODUCT_MATCH_EVALUATION_POLICY_VERSION,
+      correlationId: randomUUID(),
+    });
+    if (executed.kind !== 'recorded') {
+      throw new Error(`later evaluation was ${executed.kind}`);
+    }
+    evidence.push({
+      evidenceId: executed.projection.matchEvidenceId,
+      outcome: executed.projection.outcome,
+      occurrenceId: occurrence.id,
+      version: version.version,
+    });
+  }
+  for (const version of unknownVersions) {
+    const occurrence = await prisma.componentOccurrence.create({
+      data: {
+        organizationId: input.organizationId,
+        assetId: input.target.assetId,
+        sbomId: sbom.id,
+        sbomIngestionId: ingestion.id,
+        componentId: input.target.componentId,
+        bomRef: version.bomRef,
+        version: '',
+        versionKnown: false,
+        isDirect: false,
+      },
+    });
+    unknownVersionOccurrenceIds.push(occurrence.id);
+  }
+  if (input.otherComponent !== undefined) {
+    const other = resolvedComponent({
+      name: input.otherComponent.name,
+      bomRef: input.otherComponent.bomRef,
+      version: input.otherComponent.version,
+    });
+    const component = await prisma.component.create({
+      data: {
+        organizationId: input.organizationId,
+        identityKey: other.identityKey,
+        purl: other.versionlessPurl,
+        ecosystem: 'npm',
+        namespace: null,
+        name: input.otherComponent.name,
+        identityState: 'resolved',
+      },
+    });
+    await prisma.componentOccurrence.create({
+      data: {
+        organizationId: input.organizationId,
+        assetId: input.target.assetId,
+        sbomId: sbom.id,
+        sbomIngestionId: ingestion.id,
+        componentId: component.id,
+        bomRef: input.otherComponent.bomRef,
+        version: input.otherComponent.version,
+        versionKnown: true,
+        isDirect: true,
+      },
+    });
+  }
+  const occurrenceCardinality =
+    versions.length + unknownVersions.length + (input.otherComponent === undefined ? 0 : 1);
+  const completed = input.state === undefined || input.state === 'completed';
+  const graphCompleteness = input.graphCompleteness ?? 'no_dependencies';
+  const componentCount = input.componentCount ?? occurrenceCardinality;
+  const dependencyEdgeCount = input.dependencyEdgeCount ?? 0;
+  await prisma.sbomIngestion.update({
+    where: { id: ingestion.id },
+    data: {
+      state: input.state ?? 'completed',
+      normalizationVersion: input.normalizationVersion ?? '2',
+      completedAt: completed ? input.receivedAt : null,
+      graphCompleteness: completed ? graphCompleteness : null,
+      componentCount: completed ? componentCount : null,
+      dependencyEdgeCount: completed ? dependencyEdgeCount : null,
+      warningCount: completed ? 0 : null,
+      stage: completed ? null : 'persist_graph',
+    },
+  });
+  if (
+    input.moveLatestPointer !== false &&
+    (input.state === undefined || input.state === 'completed')
+  ) {
+    await prisma.asset.update({
+      where: { id: input.target.assetId },
+      data: { lastSuccessfulSbomIngestionId: ingestion.id },
+    });
+  }
+  return {
+    ingestionId: ingestion.id,
+    sbomId: sbom.id,
+    graphCompleteness,
+    componentCount,
+    dependencyEdgeCount,
+    occurrenceCardinality,
+    evidence,
+    unknownVersionOccurrenceIds,
   };
 }
 
