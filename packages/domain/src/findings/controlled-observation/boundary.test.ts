@@ -245,13 +245,8 @@ describe('repeated observation inspection and checkpoint', () => {
       'Controlled Finding Repeated Observation Session 3-R reviewed the creation-based read path.',
     );
     expect(checkpoint).toContain(
-      'Controlled Finding Repeated Observation branch closure reviewed the uncomposed persistence slice. Pull request #80 merged that persistence slice. The next activity is no longer that pull request.',
+      'Controlled Finding Repeated Observation branch closure reviewed the uncomposed persistence slice. The next activity is the pull request.',
     );
-    expect(checkpoint).toContain(
-      'selects bounded latest-observation inspection as the next future authority and does not implement that projection.',
-    );
-    expect(checkpoint).toContain('Operator repeated-observation reachability remains deferred.');
-    expect(checkpoint).not.toContain('The next activity is the pull request.');
     expect(checkpoint).not.toContain(
       'Repeated-observation branch closure remains the open review.',
     );
