@@ -4,7 +4,7 @@ Session 15 Batch 1 architecture. Policy `osv_product_evidence_provenance_archite
 Contract `osv_product_evidence_provenance_contract_v1`. Batch 1 admission
 persistence remains `not_implemented` for that Batch 1 admission API. Later batches persist advisory facts and compose eligibility in memory. Those later steps do not store a product-eligible evaluation. Session 15 Batch 2 stores the immutable
 facts in uncomposed PostgreSQL tables and does not calculate eligibility.
-Production registration is `absent`. The Session 15 checkpoint recorded Finding creation as unavailable. Owner `POST /findings` is now composed. [ADR 0039](../adr/0039-controlled-finding-repeated-observation.md) accepts repeated-observation architecture and does not implement it. Product-evidence eligibility composition, described below, is production uncomposed and is not product matching.
+Production registration is `absent`. The Session 15 checkpoint recorded Finding creation as unavailable. Owner `POST /findings` is now composed. [ADR 0039](../adr/0039-controlled-finding-repeated-observation.md) accepts repeated-observation architecture. Persistence is implemented and remains production uncomposed. [ADR 0040](../adr/0040-controlled-finding-latest-observation-inspection-boundary.md) selects bounded latest-observation inspection as the next future authority and does not implement that projection. Operator repeated-observation reachability remains deferred. Product-evidence eligibility composition, described below, is production uncomposed and is not product matching.
 
 Session 14 is merged. Its npm evaluator and immutable match-evaluation evidence
 stay authoritative. This document does not change those semantics and does not
@@ -163,7 +163,7 @@ with classification `ineligible_synthetic`.
 Product-eligible affected evidence is necessary and insufficient for Finding
 creation. Owner creation is composed. This batch did not design the later
 observation. [ADR 0039](../adr/0039-controlled-finding-repeated-observation.md)
-accepts that observation as evidence only and does not implement it.
+accepts that observation as evidence only. Persistence is implemented and remains production uncomposed. It does not resolve a Finding. [ADR 0040](../adr/0040-controlled-finding-latest-observation-inspection-boundary.md) selects bounded latest-observation inspection as the next future authority and does not implement that projection.
 
 ```text
 protected listing observation
