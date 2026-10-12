@@ -11,6 +11,16 @@ existing open Finding. Merge to `main` remains subject to normal pull-request re
 This ADR does not implement the transaction, add a migration, compose production, or
 authorize a Finding lifecycle power.
 
+Further amended on 2026-10-12.
+[ADR 0040](0040-controlled-finding-latest-observation-inspection-boundary.md)
+selects bounded latest-observation inspection as the next future observation
+authority and defers operator repeated-observation reachability. This amendment
+does not implement that projection, export the writer, add a route or
+permission, or adopt a lifecycle transition. The persistence implementation
+named in the original follow-up is merged and remains production uncomposed.
+Sentences that say this ADR does not implement the transaction describe the
+governance decision before that implementation merged.
+
 ## Context
 
 [ADR 0035](0035-controlled-finding-creation.md) accepts one creation-only Finding.
