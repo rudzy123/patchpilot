@@ -2,6 +2,7 @@ import type {
   ControlledFindingCreationRequest,
   ControlledFindingDiscoveryResponse,
   ControlledFindingInspectionResponse,
+  ControlledFindingLatestObservationResponse,
 } from '@patchpilot/contracts';
 
 import { ASSET_ID } from './auth-fixtures';
@@ -14,6 +15,8 @@ export const INGESTION_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 export const EVIDENCE_A = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 export const EVIDENCE_B = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 export const FINDING_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+export const FINDING_ID_2 = 'ffffffff-ffff-4fff-8fff-fffffffffffe';
+export const LATEST_OBSERVED_AT = '2026-10-08T12:00:00.000000Z';
 
 export const acknowledgementFixture: ControlledFindingCreationRequest = {
   assetId: ASSET_ID,
@@ -124,3 +127,73 @@ export const inspectionFixture: ControlledFindingInspectionResponse = {
   ],
   creationEvidenceApplicability: 'historical',
 };
+
+export function latestOccurrenceObservation(input: {
+  findingId?: string;
+  observationSource: 'creation' | 'latest_repeated';
+  aggregate: 'affected' | 'unaffected' | 'unknown';
+  observedAt?: string;
+  affectedSupportCount?: number;
+  unaffectedSupportCount?: number;
+  unknownSupportCount?: number;
+  unknownVersionSupportCount?: number;
+  knownVersions?: {
+    values: string[];
+    truncated: boolean;
+    omittedDistinctCount: number;
+    distinctCount: number;
+  };
+}): ControlledFindingLatestObservationResponse {
+  const observation = {
+    schemaVersion: 'finding_latest_observation_transport_v1' as const,
+    findingId: input.findingId ?? FINDING_ID,
+    observationSource: input.observationSource,
+    observedAt: input.observedAt ?? LATEST_OBSERVED_AT,
+    aggregate: input.aggregate,
+    evidence: {
+      kind: 'occurrence_support' as const,
+      affectedSupportCount: input.affectedSupportCount ?? 0,
+      unaffectedSupportCount: input.unaffectedSupportCount ?? 0,
+      unknownSupportCount: input.unknownSupportCount ?? 0,
+      unknownVersionSupportCount: input.unknownVersionSupportCount ?? 0,
+      knownVersions: input.knownVersions ?? {
+        values: [],
+        truncated: false,
+        omittedDistinctCount: 0,
+        distinctCount: 0,
+      },
+    },
+  };
+  return observation as ControlledFindingLatestObservationResponse;
+}
+
+export function creationLatestObservation(
+  findingId = FINDING_ID,
+): ControlledFindingLatestObservationResponse {
+  return latestOccurrenceObservation({
+    findingId,
+    observationSource: 'creation',
+    aggregate: 'affected',
+    affectedSupportCount: 1,
+    knownVersions: {
+      values: ['1.0.0'],
+      truncated: false,
+      omittedDistinctCount: 0,
+      distinctCount: 1,
+    },
+  });
+}
+
+export function componentAbsentLatestObservation(
+  graphCompleteness: 'complete' | 'no_dependencies' = 'complete',
+  findingId = FINDING_ID,
+): ControlledFindingLatestObservationResponse {
+  return {
+    schemaVersion: 'finding_latest_observation_transport_v1',
+    findingId,
+    observationSource: 'latest_repeated',
+    observedAt: LATEST_OBSERVED_AT,
+    aggregate: 'component_absent',
+    evidence: { kind: 'component_absence', graphCompleteness },
+  };
+}

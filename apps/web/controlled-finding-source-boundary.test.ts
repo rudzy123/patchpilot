@@ -10,6 +10,7 @@ const SOURCE_FILES = [
   'lib/auth-api.ts',
   'lib/finding-permissions.ts',
   'lib/finding-workflow.ts',
+  'lib/finding-latest-observation.ts',
   'lib/resource-id.ts',
   'components/controlled-finding-confirmation-dialog.tsx',
   'components/affected-version-summary.tsx',
@@ -19,6 +20,7 @@ const SOURCE_FILES = [
   'app/assets/[assetId]/findings/targets/controlled-finding-targets-page-client.tsx',
   'app/findings/[findingId]/page.tsx',
   'app/findings/[findingId]/finding-inspection-page-client.tsx',
+  'app/findings/[findingId]/finding-latest-observation-section.tsx',
   'next.config.ts',
 ];
 
@@ -37,6 +39,13 @@ const FORBIDDEN = [
   'worker_threads',
   'from "next/server"',
   "from 'next/server'",
+  'setInterval',
+  'setTimeout',
+  'useSearchParams',
+  'pushState',
+  'finding:inspect_latest_observation',
+  '@patchpilot/vulnerability-intelligence',
+  'PrismaClient',
 ];
 
 describe('controlled Finding web source boundary', () => {

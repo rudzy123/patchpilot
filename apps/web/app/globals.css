@@ -105,8 +105,15 @@ nav[aria-label='Account'] {
 }
 
 .finding-candidate,
+.finding-latest-observation,
 .asset-dialog {
   overflow-wrap: anywhere;
+}
+
+.finding-latest-observation {
+  border: 1px solid currentColor;
+  margin: 1rem 0;
+  padding: 1rem;
 }
 
 .asset-dialog h2:focus,
@@ -117,7 +124,8 @@ nav[aria-label='Account'] {
 
 @media (prefers-reduced-motion: reduce) {
   .asset-dialog,
-  .finding-candidate {
+  .finding-candidate,
+  .finding-latest-observation {
     animation: none;
     scroll-behavior: auto;
     transition: none;

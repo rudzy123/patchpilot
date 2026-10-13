@@ -18,6 +18,7 @@ import {
   type ControlledFindingCreationResponse,
   type ControlledFindingDiscoveryResponse,
   type ControlledFindingInspectionResponse,
+  type ControlledFindingLatestObservationResponse,
   type EnvironmentOption,
   type MembershipOption,
   type OrganizationsResponse,
@@ -25,6 +26,7 @@ import {
   type TeamOption,
 } from '@patchpilot/contracts';
 
+import { readLatestObservation } from './finding-latest-observation';
 import { isCanonicalUuid } from './resource-id';
 
 /** Synchronizer token header. Must match `AUTH_CSRF_HEADER_NAME` / ADR 0019. */
@@ -254,6 +256,32 @@ export function createAuthApi(apiBaseUrl: string) {
         path: `/findings/${findingId}`,
         method: 'GET',
         parse: (value) => controlledFindingInspectionResponseSchema.parse(value),
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+        unavailableMessage: FINDING_SERVICE_UNAVAILABLE,
+      });
+    },
+
+    inspectControlledFindingLatestObservation(
+      findingId: string,
+    ): Promise<ControlledFindingLatestObservationResponse> {
+      if (!isCanonicalUuid(findingId)) {
+        return Promise.reject(createAuthRequestError(404, 'not_found', 'Not found.'));
+      }
+      return sendJson({
+        baseUrl,
+        path: `/findings/${findingId}/latest-observation`,
+        method: 'GET',
+        parse: (value) => {
+          const observation = readLatestObservation(value, findingId);
+          if (observation === null) {
+            throw createAuthRequestError(
+              503,
+              'internal',
+              'Finding operator is temporarily unavailable.',
+            );
+          }
+          return observation;
+        },
         unauthorizedMessage: GENERIC_SESSION_EXPIRED,
         unavailableMessage: FINDING_SERVICE_UNAVAILABLE,
       });
