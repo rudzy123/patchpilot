@@ -18,9 +18,14 @@ production uncomposed. [ADR 0041](0041-controlled-finding-latest-observation-tra
 governs one future route, `GET /findings/:findingId/latest-observation`, and
 one later independent web section. This amendment does not implement that
 route or section. Sentences that say this ADR does not implement the projection
-describe this decision before those internal slices merged. Public inspection
-remains creation based until that later transport implementation is composed.
-Operator repeated-observation reachability remains deferred.
+describe this decision before those internal slices merged. Those slices are
+internal and production uncomposed. `GET /findings/:findingId` remains creation
+based after the later transport route is composed. That route supplements
+creation inspection and does not replace it. The decision sentence that says
+public inspection remains creation-observation based until a later
+implementation branch is production-composed does not authorize a change to
+`GET /findings/:findingId`. Operator repeated-observation reachability remains
+deferred.
 
 ## Context
 
@@ -298,7 +303,11 @@ implementation change updates that tested bookkeeping constant. Leaving it
 unchanged does not select Session 3-R as the next activity.
 
 The 2026-10-13 amendment records that the internal read slices named above are
-merged. Their transport is [ADR 0041](0041-controlled-finding-latest-observation-transport.md).
+merged. The earlier follow-up that names Controlled Finding Latest-Observation
+Inspection as the single successor describes this decision before those slices
+merged. It is not the next activity. Their transport is
+[ADR 0041](0041-controlled-finding-latest-observation-transport.md).
 The implementation branch after that governance merges is
 `feat/controlled-finding-latest-observation-reachability`. That branch is not
-authorized to add repeated-observation write reachability.
+authorized to change `GET /findings/:findingId` or to add repeated-observation
+write reachability.
