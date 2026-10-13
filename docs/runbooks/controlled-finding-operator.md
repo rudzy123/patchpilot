@@ -56,11 +56,17 @@ This runbook does not operate a Finding list, a second preview, a CLI, a worker,
 
 Web startup, workers, schedulers, queues, upload processing, evaluator processing, provider synchronization, seeds, and migrations do not construct discovery.
 
+## Latest observation
+
+[ADR 0041](../adr/0041-controlled-finding-latest-observation-transport.md) governs `GET /findings/:findingId/latest-observation`. That route is not implemented. Do not call it, and do not treat creation inspection as a substitute that failed closed into a latest observation. When the route exists, it is read-only, owner and admin only, and limited to 30 direct-peer requests per 60 seconds on each API process. A 503 does not say whether persistence is malformed or the database is unavailable. Creation inspection remains a separate request. This route writes no `finding.inspected` or `observation.viewed` audit event. Repeated-observation writes remain unavailable.
+
 ## Related
 
 - [ADR 0036](../adr/0036-controlled-finding-operator-api.md)
 - [ADR 0037](../adr/0037-controlled-finding-target-discovery.md)
 - [ADR 0038](../adr/0038-controlled-finding-web-workflow.md)
+- [ADR 0040](../adr/0040-controlled-finding-latest-observation-inspection-boundary.md)
+- [ADR 0041](../adr/0041-controlled-finding-latest-observation-transport.md)
 - [Authentication failure](authentication-failure.md)
 - [Tenant isolation incident](tenant-isolation-incident.md)
 - [Audit integrity failure](audit-integrity-failure.md)

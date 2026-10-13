@@ -32,6 +32,17 @@ accepts repeated-observation architecture and does not implement it. This amendm
 adds no route, permission, or audit writer. `GET /findings/:findingId` remains the
 creation projection.
 
+Further amended on 2026-10-13. [ADR 0041](0041-controlled-finding-latest-observation-transport.md)
+admits one later read-only route, `GET /findings/:findingId/latest-observation`,
+under the existing `finding:inspect` permission. This amendment does not implement
+that route, and it does not add a permission. `GET /findings/:findingId` remains the
+creation-based inspection projection. The later route does not change that contract.
+Sentences in this ADR that name [ADR 0037](0037-controlled-finding-target-discovery.md)
+as the only additional route, and sentences that say no other path is authorized
+besides creation, inspection, and that discovery route, describe this decision
+before this admission. The section 4 meaning of `finding:inspect` still describes
+creation inspection. ADR 0041 reuses that same permission for the later route.
+
 ## Context
 
 [ADR 0026](0026-authoritative-match-evidence-and-finding-lifecycle.md) section 10A admits

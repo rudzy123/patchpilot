@@ -21,6 +21,12 @@ named in the original follow-up is merged and remains production uncomposed.
 Sentences that say this ADR does not implement the transaction describe the
 governance decision before that implementation merged.
 
+Further amended on 2026-10-13.
+[ADR 0041](0041-controlled-finding-latest-observation-transport.md) governs
+read transport for one selected latest observation. This amendment does not
+authorize repeated-observation writes, observation history, or a lifecycle
+transition. The writer remains production uncomposed.
+
 ## Context
 
 [ADR 0035](0035-controlled-finding-creation.md) accepts one creation-only Finding.
