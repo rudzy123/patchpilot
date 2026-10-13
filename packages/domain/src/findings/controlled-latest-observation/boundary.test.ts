@@ -63,6 +63,7 @@ describe('controlled finding latest-observation application surface', () => {
     expect(Object.keys(packageJson.exports).sort()).toEqual([
       '.',
       './controlled-finding-discovery',
+      './controlled-finding-latest-observation',
       './controlled-finding-operator',
     ]);
     const encoded = JSON.stringify(packageJson.exports);
@@ -120,10 +121,11 @@ describe('controlled finding latest-observation application surface', () => {
 });
 
 describe('controlled finding latest-observation production exclusion', () => {
-  it('is not constructed by API, web, worker, seed, or startup sources', () => {
+  it('is constructed only by the API finding runtime', () => {
     const roots = ['apps/api', 'apps/web', 'apps/worker', 'packages/database/src/seed'].map(
       (root) => path.join(repoRoot, root),
     );
+    const composition = 'apps/api/src/finding-runtime.ts';
     const forbidden = [
       'createControlledFindingLatestObservationApplication',
       'controlled-latest-observation',
@@ -132,20 +134,36 @@ describe('controlled finding latest-observation production exclusion', () => {
       'selectFindingLatestObservation',
       'latest-observation-selection',
     ];
+    const runtimeOnly = [
+      'createControlledFindingLatestObservationApplication',
+      'createControlledFindingLatestObservationRead',
+    ];
     const offenders: string[] = [];
     for (const root of roots) {
       for (const filePath of walk(root).filter(isProductionSource)) {
+        const relative = path.relative(repoRoot, filePath);
         const source = readFileSync(filePath, 'utf8');
-        if (forbidden.some((needle) => source.includes(needle))) {
-          offenders.push(path.relative(repoRoot, filePath));
+        const needles =
+          relative === composition
+            ? forbidden.filter((needle) => !runtimeOnly.includes(needle))
+            : forbidden;
+        if (needles.some((needle) => source.includes(needle))) {
+          offenders.push(relative);
         }
       }
     }
     expect(offenders).toEqual([]);
+    const runtime = readFileSync(path.join(repoRoot, composition), 'utf8');
+    expect(runtime).toContain('createControlledFindingLatestObservationApplication');
+    expect(runtime).toContain('createControlledFindingLatestObservationRead');
+    expect(runtime).not.toContain('selectFindingLatestObservation');
+    expect(runtime).not.toContain('loadControlledFindingLatestObservationSnapshot');
+    expect(runtime).not.toContain('latest-observation-selection');
+    expect(runtime).not.toContain('createControlledFindingRepeatedObservationPersistence');
     const closed = [
       'apps/api/src/server.ts',
-      'apps/api/src/finding-runtime.ts',
       'apps/api/src/finding-routes.ts',
+      'apps/api/src/finding-latest-observation-routes.ts',
       'apps/worker/src/main.ts',
       'apps/worker/src/queue-job-router.ts',
       'apps/worker/src/bullmq-outbox-publisher.ts',

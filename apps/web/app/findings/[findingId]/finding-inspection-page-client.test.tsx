@@ -10,7 +10,11 @@ import {
   secondOrganizationFixture,
   sessionFixture,
 } from '../../../test/auth-fixtures';
-import { FINDING_ID, inspectionFixture } from '../../../test/finding-fixtures';
+import {
+  FINDING_ID,
+  creationLatestObservation,
+  inspectionFixture,
+} from '../../../test/finding-fixtures';
 import { renderWithAuth } from '../../../test/render-with-auth';
 import { navigationMocks } from '../../../test/router-mock';
 
@@ -20,6 +24,7 @@ function ownerApi(overrides: Parameters<typeof createFakeAuthApi>[0] = {}) {
   return createFakeAuthApi({
     readSession: vi.fn(async () => sessionFixture({ organization: ownerOrganizationFixture })),
     inspectControlledFinding: vi.fn(async () => inspectionFixture),
+    inspectControlledFindingLatestObservation: vi.fn(async () => creationLatestObservation()),
     ...overrides,
   });
 }
@@ -72,6 +77,7 @@ describe('FindingInspectionPageClient', () => {
         }),
       ),
       inspectControlledFinding: vi.fn(async () => inspectionFixture),
+      inspectControlledFindingLatestObservation: vi.fn(async () => creationLatestObservation()),
     });
     const adminView = renderWithAuth(<FindingInspectionPageClient findingId={FINDING_ID} />, {
       authApi: adminApi,
@@ -96,6 +102,7 @@ describe('FindingInspectionPageClient', () => {
       ).toBeInTheDocument();
       await waitFor(() => {
         expect(authApi.inspectControlledFinding).not.toHaveBeenCalled();
+        expect(authApi.inspectControlledFindingLatestObservation).not.toHaveBeenCalled();
       });
       expect(screen.queryByText('<component>')).not.toBeInTheDocument();
       view.unmount();
@@ -119,6 +126,7 @@ describe('FindingInspectionPageClient', () => {
     renderWithAuth(<FindingInspectionPageClient findingId="not-a-uuid" />, { authApi: invalid });
     expect(await screen.findByRole('alert')).toHaveTextContent('Not found.');
     expect(invalid.inspectControlledFinding).not.toHaveBeenCalled();
+    expect(invalid.inspectControlledFindingLatestObservation).not.toHaveBeenCalled();
   });
 
   it('shows the same unavailable state for an inspection 403 without partial data', async () => {

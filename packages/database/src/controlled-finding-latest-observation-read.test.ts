@@ -151,11 +151,12 @@ describe('controlled finding latest-observation read boundary', () => {
   });
 
   it('is not imported by production inspection, startup, web, or worker code', () => {
-    const forbidden = [
-      'createControlledFindingLatestObservationRead',
+    const everywhere = [
       'loadControlledFindingLatestObservationSnapshot',
       'controlled-finding-latest-observation-read',
     ];
+    const factory = 'createControlledFindingLatestObservationRead';
+    const allowedFactory = 'apps/api/src/finding-runtime.ts';
     const roots = ['apps/api', 'apps/web', 'apps/worker', 'packages/database/src/seed'].map(
       (root) => path.join(repoRoot, root),
     );
@@ -165,20 +166,32 @@ describe('controlled finding latest-observation read boundary', () => {
         if (!filePath.endsWith('.ts') && !filePath.endsWith('.tsx')) {
           continue;
         }
+        const relative = path.relative(repoRoot, filePath);
         const source = readFileSync(filePath, 'utf8');
-        if (forbidden.some((needle) => source.includes(needle))) {
-          offenders.push(path.relative(repoRoot, filePath));
+        if (everywhere.some((needle) => source.includes(needle))) {
+          offenders.push(relative);
+        }
+        if (source.includes(factory) && relative !== allowedFactory) {
+          offenders.push(relative);
         }
       }
     }
     expect(offenders).toEqual([]);
+    const runtime = readFileSync(path.join(repoRoot, allowedFactory), 'utf8');
+    expect(runtime).toContain(factory);
+    expect(runtime).toContain(
+      '@patchpilot/database/controlled-finding-latest-observation-persistence',
+    );
+    expect(runtime).not.toContain('controlled-finding-latest-observation-read');
+    expect(runtime).not.toContain('loadControlledFindingLatestObservationSnapshot');
     const closed = [
       'packages/database/src/index.ts',
       'packages/database/src/controlled-finding-persistence.ts',
       'packages/database/src/controlled-finding-inspection-persistence.ts',
       'packages/database/src/repositories.ts',
-      'apps/api/src/finding-runtime.ts',
       'apps/api/src/server.ts',
+      'apps/api/src/finding-routes.ts',
+      'apps/api/src/finding-latest-observation-routes.ts',
       'packages/domain/src/index.ts',
       'packages/domain/src/findings/controlled-inspection/index.ts',
       'packages/domain/src/findings/controlled-inspection/service.ts',
@@ -186,7 +199,7 @@ describe('controlled finding latest-observation read boundary', () => {
     ];
     for (const relative of closed) {
       const source = readFileSync(path.join(repoRoot, relative), 'utf8');
-      for (const needle of forbidden) {
+      for (const needle of [...everywhere, factory]) {
         expect(source, `${relative} ${needle}`).not.toContain(needle);
       }
     }

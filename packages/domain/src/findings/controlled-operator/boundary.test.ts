@@ -79,6 +79,7 @@ describe('controlled finding operator public surface', () => {
     expect(Object.keys(packageJson.exports).sort()).toEqual([
       '.',
       './controlled-finding-discovery',
+      './controlled-finding-latest-observation',
       './controlled-finding-operator',
     ]);
     const operatorExport = packageJson.exports['./controlled-finding-operator'];

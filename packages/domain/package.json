@@ -17,6 +17,10 @@
     "./controlled-finding-discovery": {
       "types": "./dist/findings/controlled-discovery/index.d.ts",
       "import": "./dist/findings/controlled-discovery/index.js"
+    },
+    "./controlled-finding-latest-observation": {
+      "types": "./dist/findings/controlled-finding-latest-observation.d.ts",
+      "import": "./dist/findings/controlled-finding-latest-observation.js"
     }
   },
   "main": "./dist/index.js",

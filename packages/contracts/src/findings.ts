@@ -105,6 +105,112 @@ export type ControlledFindingInspectionResponse = z.infer<
   typeof controlledFindingInspectionResponseSchema
 >;
 
+export const FINDING_LATEST_OBSERVATION_TRANSPORT_SCHEMA_VERSION =
+  'finding_latest_observation_transport_v1' as const;
+
+const LATEST_OBSERVATION_VERSION_LIMIT = 256;
+const LATEST_OBSERVATION_DISPLAY_LIMIT = 8;
+const LATEST_OBSERVATION_DISTINCT_LIMIT = 16;
+const LATEST_OBSERVATION_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
+
+const latestObservationVersionSchema = z
+  .string()
+  .min(1)
+  .max(LATEST_OBSERVATION_VERSION_LIMIT)
+  .refine((value) => !value.includes('\u0000'));
+
+const latestObservationKnownVersionsSchema = z
+  .strictObject({
+    values: z.array(latestObservationVersionSchema).max(LATEST_OBSERVATION_DISPLAY_LIMIT),
+    truncated: z.boolean(),
+    omittedDistinctCount: z.number().int().min(0).max(LATEST_OBSERVATION_DISTINCT_LIMIT),
+    distinctCount: z.number().int().min(0).max(LATEST_OBSERVATION_DISTINCT_LIMIT),
+  })
+  .superRefine((summary, context) => {
+    if (summary.values.length + summary.omittedDistinctCount !== summary.distinctCount) {
+      context.addIssue({ code: 'custom', message: 'version summary disagrees' });
+    }
+    if (summary.truncated !== summary.omittedDistinctCount > 0) {
+      context.addIssue({ code: 'custom', message: 'truncated disagrees' });
+    }
+    for (let index = 1; index < summary.values.length; index += 1) {
+      const previous = summary.values[index - 1];
+      const current = summary.values[index];
+      if (previous === undefined || current === undefined || previous >= current) {
+        context.addIssue({ code: 'custom', message: 'versions are not ordered' });
+        return;
+      }
+    }
+  });
+
+const latestObservationSupportCountSchema = z.number().int().min(0).max(16);
+
+const latestObservationOccurrenceEvidenceSchema = z.strictObject({
+  kind: z.literal('occurrence_support'),
+  affectedSupportCount: latestObservationSupportCountSchema,
+  unaffectedSupportCount: latestObservationSupportCountSchema,
+  unknownSupportCount: latestObservationSupportCountSchema,
+  unknownVersionSupportCount: latestObservationSupportCountSchema,
+  knownVersions: latestObservationKnownVersionsSchema,
+});
+
+const latestObservationAbsenceEvidenceSchema = z.strictObject({
+  kind: z.literal('component_absence'),
+  graphCompleteness: z.enum(['complete', 'no_dependencies']),
+});
+
+const latestObservationBase = {
+  schemaVersion: z.literal(FINDING_LATEST_OBSERVATION_TRANSPORT_SCHEMA_VERSION),
+  findingId: lowercaseUuidSchema,
+  observedAt: z.string().regex(LATEST_OBSERVATION_TIMESTAMP),
+};
+
+export const controlledFindingLatestObservationResponseSchema = z.discriminatedUnion('aggregate', [
+  z
+    .strictObject({
+      ...latestObservationBase,
+      observationSource: z.enum(['creation', 'latest_repeated']),
+      aggregate: z.literal('affected'),
+      evidence: latestObservationOccurrenceEvidenceSchema,
+    })
+    .superRefine((value, context) => {
+      if (value.observationSource !== 'creation') {
+        return;
+      }
+      const evidence = value.evidence;
+      if (
+        evidence.affectedSupportCount < 1 ||
+        evidence.unaffectedSupportCount !== 0 ||
+        evidence.unknownSupportCount !== 0 ||
+        evidence.unknownVersionSupportCount !== 0
+      ) {
+        context.addIssue({ code: 'custom', message: 'creation evidence disagrees' });
+      }
+    }),
+  z.strictObject({
+    ...latestObservationBase,
+    observationSource: z.literal('latest_repeated'),
+    aggregate: z.literal('unaffected'),
+    evidence: latestObservationOccurrenceEvidenceSchema,
+  }),
+  z.strictObject({
+    ...latestObservationBase,
+    observationSource: z.literal('latest_repeated'),
+    aggregate: z.literal('unknown'),
+    evidence: latestObservationOccurrenceEvidenceSchema,
+  }),
+  z.strictObject({
+    ...latestObservationBase,
+    observationSource: z.literal('latest_repeated'),
+    aggregate: z.literal('component_absent'),
+    evidence: latestObservationAbsenceEvidenceSchema,
+  }),
+]);
+
+export type ControlledFindingLatestObservationResponse = z.infer<
+  typeof controlledFindingLatestObservationResponseSchema
+>;
+
 const discoveryVersionSummarySchema = z.strictObject({
   values: z.array(z.string().min(1).max(256)).max(FINDING_DISCOVERY_AFFECTED_VERSION_DISPLAY_LIMIT),
   truncated: z.boolean(),

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   controlledFindingCreationRequestSchema,
   controlledFindingIdParamSchema,
+  controlledFindingLatestObservationResponseSchema,
 } from './findings.js';
 
 const ASSET = '44444444-4444-4444-8444-444444444444';
@@ -62,4 +63,116 @@ describe('controlled finding creation request', () => {
 
 function FINDING_UPPER(): string {
   return 'ABABABAB-ABAB-4BAB-8BAB-ABABABABABAB';
+}
+
+const FINDING = 'abababab-abab-4bab-8bab-abababababab';
+
+describe('controlled finding latest-observation response', () => {
+  it('accepts creation fallback and the four public aggregates', () => {
+    expect(controlledFindingLatestObservationResponseSchema.safeParse(creationBody()).success).toBe(
+      true,
+    );
+    expect(
+      controlledFindingLatestObservationResponseSchema.safeParse(
+        occurrenceBody('affected', 'latest_repeated', { affectedSupportCount: 2 }),
+      ).success,
+    ).toBe(true);
+    expect(
+      controlledFindingLatestObservationResponseSchema.safeParse(
+        occurrenceBody('unaffected', 'latest_repeated', { unaffectedSupportCount: 1 }),
+      ).success,
+    ).toBe(true);
+    expect(
+      controlledFindingLatestObservationResponseSchema.safeParse(
+        occurrenceBody('unknown', 'latest_repeated', { unknownSupportCount: 1 }),
+      ).success,
+    ).toBe(true);
+    expect(
+      controlledFindingLatestObservationResponseSchema.safeParse({
+        schemaVersion: 'finding_latest_observation_transport_v1',
+        findingId: FINDING,
+        observationSource: 'latest_repeated',
+        observedAt: '2026-10-08T12:00:00.000000Z',
+        aggregate: 'component_absent',
+        evidence: { kind: 'component_absence', graphCompleteness: 'no_dependencies' },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects mapped results, hybrids, creation mismatches, and version-summary drift', () => {
+    expect(
+      controlledFindingLatestObservationResponseSchema.safeParse({
+        ...creationBody(),
+        mappedResult: 'present',
+      }).success,
+    ).toBe(false);
+    expect(
+      controlledFindingLatestObservationResponseSchema.safeParse({
+        ...creationBody(),
+        evidence: {
+          ...creationBody().evidence,
+          graphCompleteness: 'complete',
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      controlledFindingLatestObservationResponseSchema.safeParse({
+        ...occurrenceBody('unaffected', 'creation', { unaffectedSupportCount: 1 }),
+      }).success,
+    ).toBe(false);
+    expect(
+      controlledFindingLatestObservationResponseSchema.safeParse({
+        ...creationBody(),
+        evidence: {
+          ...creationBody().evidence,
+          affectedSupportCount: 0,
+        },
+      }).success,
+    ).toBe(false);
+    const drifted = occurrenceBody('affected', 'latest_repeated', { affectedSupportCount: 1 });
+    drifted.evidence.knownVersions.truncated = false;
+    drifted.evidence.knownVersions.omittedDistinctCount = 1;
+    expect(controlledFindingLatestObservationResponseSchema.safeParse(drifted).success).toBe(false);
+    expect(
+      controlledFindingLatestObservationResponseSchema.safeParse({
+        ...creationBody(),
+        assetId: '44444444-4444-4444-8444-444444444444',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+function creationBody() {
+  return occurrenceBody('affected', 'creation', { affectedSupportCount: 1 });
+}
+
+function occurrenceBody(
+  aggregate: 'affected' | 'unaffected' | 'unknown',
+  observationSource: 'creation' | 'latest_repeated',
+  counts: {
+    affectedSupportCount?: number;
+    unaffectedSupportCount?: number;
+    unknownSupportCount?: number;
+  },
+) {
+  return {
+    schemaVersion: 'finding_latest_observation_transport_v1' as const,
+    findingId: FINDING,
+    observationSource,
+    observedAt: '2026-10-08T12:00:00.000000Z',
+    aggregate,
+    evidence: {
+      kind: 'occurrence_support' as const,
+      affectedSupportCount: counts.affectedSupportCount ?? 0,
+      unaffectedSupportCount: counts.unaffectedSupportCount ?? 0,
+      unknownSupportCount: counts.unknownSupportCount ?? 0,
+      unknownVersionSupportCount: 0,
+      knownVersions: {
+        values: [] as string[],
+        truncated: false,
+        omittedDistinctCount: 0,
+        distinctCount: 0,
+      },
+    },
+  };
 }

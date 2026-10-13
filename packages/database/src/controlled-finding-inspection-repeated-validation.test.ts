@@ -401,7 +401,11 @@ describe('repeated observation inspection facts', () => {
       path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'apps'),
     );
     const offenders = apps.filter((filePath) => {
-      if (!/\.(ts|tsx)$/.test(filePath)) {
+      if (
+        !/\.(ts|tsx)$/.test(filePath) ||
+        filePath.endsWith('.test.ts') ||
+        filePath.endsWith('.test.tsx')
+      ) {
         return false;
       }
       const text = readFileSync(filePath, 'utf8');

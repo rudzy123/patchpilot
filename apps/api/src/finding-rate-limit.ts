@@ -28,6 +28,18 @@ export const FINDING_INSPECTION_PEER_LIMIT = Object.freeze({
   windowMs: 60_000,
 });
 
+/**
+ * Process-local latest-observation ceiling. Each API process allows this many
+ * reads per direct peer per window. Several processes multiply the ceiling.
+ * That multiplication is an accepted residual. Restarting the process clears
+ * the window. There is no Redis store and no rate-limit migration. This
+ * counter is independent of creation, inspection, and discovery.
+ */
+export const FINDING_LATEST_OBSERVATION_PEER_LIMIT = Object.freeze({
+  max: 30,
+  windowMs: 60_000,
+});
+
 export const FINDING_DISCOVERY_PEER_LIMIT = Object.freeze({
   max: 30,
   windowMs: 60_000,

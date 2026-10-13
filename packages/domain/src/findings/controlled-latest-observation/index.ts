@@ -1,6 +1,7 @@
 /**
- * Internal latest-observation application contracts.
- * Production inspection does not import this module.
+ * Latest-observation application contracts.
+ * The API composition root is the only production importer.
+ * Creation inspection does not import this module.
  */
 
 export {

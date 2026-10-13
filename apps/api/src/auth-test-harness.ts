@@ -42,6 +42,7 @@ import {
 } from '@patchpilot/domain';
 import { createLogger, type Logger } from '@patchpilot/logger';
 import { createFoundationTestEnv } from '@patchpilot/test-utils';
+import type { FastifyRequest } from 'fastify';
 
 import { buildApi } from './app.js';
 import type { AssetRuntime } from './asset-runtime.js';
@@ -95,6 +96,7 @@ export async function buildTestApi(options?: {
   intelligence?: IntelligenceRuntime;
   findings?: FindingOperatorRuntime;
   findingOrganizationLimiter?: FindingOrganizationRateLimiter;
+  latestObservationPeerKey?: (request: FastifyRequest) => string;
   discovery?: FindingDiscoveryRuntime;
   discoveryOrganizationLimiter?: FindingOrganizationRateLimiter;
 }) {
@@ -112,6 +114,9 @@ export async function buildTestApi(options?: {
     ...(options?.findingOrganizationLimiter === undefined
       ? {}
       : { findingOrganizationLimiter: options.findingOrganizationLimiter }),
+    ...(options?.latestObservationPeerKey === undefined
+      ? {}
+      : { latestObservationPeerKey: options.latestObservationPeerKey }),
     ...(options?.discovery === undefined
       ? { discovery: denyFindingDiscoveryRuntime() }
       : { discovery: options.discovery }),

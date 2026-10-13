@@ -180,6 +180,9 @@ export function createFakeAuthApi(overrides: Partial<FakeAuthApi> = {}): FakeAut
     inspectControlledFinding: vi.fn(async () => {
       throw new Error('inspectControlledFinding was not stubbed');
     }),
+    inspectControlledFindingLatestObservation: vi.fn(async () => {
+      throw new Error('inspectControlledFindingLatestObservation was not stubbed');
+    }),
     ...overrides,
   };
 }

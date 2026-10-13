@@ -121,15 +121,18 @@ export {
   type IntelligencePublicFailureCodeContract,
 } from './intelligence.js';
 export {
+  FINDING_LATEST_OBSERVATION_TRANSPORT_SCHEMA_VERSION,
   controlledFindingCreationRequestSchema,
   controlledFindingCreationResponseSchema,
   controlledFindingDiscoveryResponseSchema,
   controlledFindingIdParamSchema,
   controlledFindingInspectionResponseSchema,
+  controlledFindingLatestObservationResponseSchema,
   type ControlledFindingCreationRequest,
   type ControlledFindingCreationResponse,
   type ControlledFindingDiscoveryResponse,
   type ControlledFindingInspectionResponse,
+  type ControlledFindingLatestObservationResponse,
 } from './findings.js';
 
 export const healthServiceSchema = z.enum(['api', 'web', 'worker']);

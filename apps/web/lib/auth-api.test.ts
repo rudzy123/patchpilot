@@ -454,6 +454,131 @@ describe('createAuthApi', () => {
       .catch((caught: unknown) => caught);
     expect(discovery).toMatchObject({ status: 404, code: 'not_found' });
     expect(inspection).toMatchObject({ status: 404, code: 'not_found' });
+    const latest = await api
+      .inspectControlledFindingLatestObservation('FFFFFFFF-FFFF-4FFF-8FFF-FFFFFFFFFFFF')
+      .catch((caught: unknown) => caught);
+    expect(latest).toMatchObject({ status: 404, code: 'not_found' });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('reads one latest observation without a body, query, or mutation header', async () => {
+    const findingId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+    const body = {
+      schemaVersion: 'finding_latest_observation_transport_v1',
+      findingId,
+      observationSource: 'creation',
+      observedAt: '2026-10-08T12:00:00.000000Z',
+      aggregate: 'affected',
+      evidence: {
+        kind: 'occurrence_support',
+        affectedSupportCount: 1,
+        unaffectedSupportCount: 0,
+        unknownSupportCount: 0,
+        unknownVersionSupportCount: 0,
+        knownVersions: {
+          values: ['10.0.0', '2.0.0'],
+          truncated: false,
+          omittedDistinctCount: 0,
+          distinctCount: 2,
+        },
+      },
+    };
+    const fetchMock = vi.fn(async () => jsonResponse(200, body));
+    vi.stubGlobal('fetch', fetchMock);
+    const api = createAuthApi(API_BASE);
+    const observation = await api.inspectControlledFindingLatestObservation(findingId);
+    const call = fetchCall(fetchMock, 0);
+    expect(observation.observationSource).toBe('creation');
+    if (observation.evidence.kind === 'occurrence_support') {
+      expect(observation.evidence.knownVersions.values).toEqual(['10.0.0', '2.0.0']);
+    }
+    expect(call.url).toBe(`${API_BASE}/findings/${findingId}/latest-observation`);
+    expect(call.url).not.toContain('?');
+    expect(call.url).not.toContain('organization');
+    expect(call.init.method).toBe('GET');
+    expect(call.init.credentials).toBe('include');
+    expect(call.init.cache).toBe('no-store');
+    expect(call.init.body).toBeUndefined();
+    expect((call.init.headers as Headers).get(CSRF_HEADER_NAME)).toBeNull();
+    expect((call.init.headers as Headers).get('origin')).toBeNull();
+  });
+
+  it('turns a malformed latest-observation success into a bounded unavailable error', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(200, {
+        schemaVersion: 'finding_latest_observation_transport_v1',
+        findingId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        observationSource: 'latest_repeated',
+        observedAt: '2026-10-08T12:00:00.000000Z',
+        aggregate: 'affected',
+        mappedResult: 'present',
+        observations: ['secret-history-version'],
+        evidence: {
+          kind: 'occurrence_support',
+          affectedSupportCount: 1,
+          unaffectedSupportCount: 0,
+          unknownSupportCount: 0,
+          unknownVersionSupportCount: 0,
+          knownVersions: {
+            values: ['1.0.0'],
+            truncated: false,
+            omittedDistinctCount: 0,
+            distinctCount: 1,
+          },
+          secretMarker: 'secret-marker-value',
+        },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = createAuthApi(API_BASE);
+    const error = await api
+      .inspectControlledFindingLatestObservation('ffffffff-ffff-4fff-8fff-ffffffffffff')
+      .catch((caught: unknown) => caught);
+    expect(error).toEqual({
+      status: 503,
+      code: 'internal',
+      message: 'Finding operator is temporarily unavailable.',
+    });
+    expect(JSON.stringify(error)).not.toContain('secret-history-version');
+    expect(JSON.stringify(error)).not.toContain('secret-marker-value');
+    expect(JSON.stringify(error)).not.toContain('mappedResult');
+  });
+
+  it('preserves latest-observation status codes without copying failure internals', async () => {
+    const cases = [
+      { status: 401, code: 'unauthorized', message: 'Authentication required.' },
+      { status: 403, code: 'forbidden', message: 'Permission denied.' },
+      { status: 404, code: 'not_found', message: 'Not found.' },
+      { status: 429, code: 'rate_limited', message: 'Too many requests. Try again later.' },
+      { status: 503, code: 'internal', message: 'Finding operator is temporarily unavailable.' },
+    ];
+    for (const entry of cases) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          jsonResponse(entry.status, {
+            error: {
+              code: entry.code,
+              message: entry.message,
+              requestId: 'req-safe',
+              correlationId: 'corr-safe',
+              stack: 'SELECT secret FROM finding',
+            },
+          }),
+        ),
+      );
+      const api = createAuthApi(API_BASE);
+      const error = await api
+        .inspectControlledFindingLatestObservation('ffffffff-ffff-4fff-8fff-ffffffffffff')
+        .catch((caught: unknown) => caught);
+      expect(error).toMatchObject({
+        status: entry.status,
+        code: entry.code,
+        requestId: 'req-safe',
+        correlationId: 'corr-safe',
+      });
+      expect(JSON.stringify(error)).not.toContain('SELECT');
+      vi.unstubAllGlobals();
+    }
   });
 });
