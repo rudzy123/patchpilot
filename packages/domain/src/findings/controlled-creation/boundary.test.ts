@@ -72,6 +72,7 @@ describe('controlled finding creation public surface', () => {
     expect(Object.keys(packageJson.exports).sort()).toEqual([
       '.',
       './controlled-finding-discovery',
+      './controlled-finding-latest-observation',
       './controlled-finding-operator',
     ]);
   });

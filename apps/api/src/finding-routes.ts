@@ -27,6 +27,7 @@ import {
   type ResolvedAuthRequest,
 } from './auth-plugin.js';
 import type { AuthRuntime } from './auth-runtime.js';
+import { registerFindingLatestObservationRoutes } from './finding-latest-observation-routes.js';
 import type { FindingOperatorRuntime } from './finding-runtime.js';
 import {
   creationFailureError,
@@ -67,6 +68,7 @@ export async function registerFindingRoutes(
     auth: AuthRuntime;
     findings: FindingOperatorRuntime;
     findingOrganizationLimiter?: FindingOrganizationRateLimiter;
+    latestObservationPeerKey?: (request: FastifyRequest) => string;
   },
 ): Promise<void> {
   const { config, logger, auth, findings } = dependencies;
@@ -275,6 +277,16 @@ export async function registerFindingRoutes(
         return reply.status(200).send(body.data);
       });
     });
+  });
+
+  await registerFindingLatestObservationRoutes(app, {
+    config,
+    logger,
+    auth,
+    findings,
+    ...(dependencies.latestObservationPeerKey === undefined
+      ? {}
+      : { latestObservationPeerKey: dependencies.latestObservationPeerKey }),
   });
 }
 

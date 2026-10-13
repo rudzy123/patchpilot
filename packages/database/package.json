@@ -17,6 +17,10 @@
     "./controlled-finding-discovery-persistence": {
       "types": "./dist/controlled-finding-discovery-persistence.d.ts",
       "import": "./dist/controlled-finding-discovery-persistence.js"
+    },
+    "./controlled-finding-latest-observation-persistence": {
+      "types": "./dist/controlled-finding-latest-observation-persistence.d.ts",
+      "import": "./dist/controlled-finding-latest-observation-persistence.js"
     }
   },
   "main": "./dist/index.js",

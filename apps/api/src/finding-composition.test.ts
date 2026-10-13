@@ -20,11 +20,23 @@ describe('controlled finding API composition', () => {
     expect(runtime).toContain('createControlledFindingInspectionApplication');
     expect(runtime).toContain('createControlledFindingCreationPersistence');
     expect(runtime).toContain('createControlledFindingInspectionPersistence');
+    expect(runtime).toContain('createControlledFindingLatestObservationApplication');
+    expect(runtime).toContain(`createControlledFindingLatestObservation${'Read'}`);
     expect(runtime).not.toContain('issueFindingCreationAuthorization');
+    expect(runtime).not.toContain(`selectFindingLatest${'Observation'}`);
+    expect(runtime).not.toContain('createControlledFindingRepeatedObservationPersistence');
     expect(runtime).not.toContain('openFindingInspection');
     expect(routes).not.toContain('issueFindingCreationAuthorization');
     expect(routes).not.toContain('createControlledFindingCreationPersistence');
     expect(routes).not.toContain('@patchpilot/database');
+    const latest = source('apps/api/src/finding-latest-observation-routes.ts');
+    const latestHttp = source('apps/api/src/finding-latest-observation-http.ts');
+    expect(latestHttp).toContain("'/findings/:findingId/latest-observation'");
+    expect(latest).not.toContain('@patchpilot/database');
+    expect(latest).not.toContain(`selectFindingLatest${'Observation'}`);
+    expect(latest).not.toContain(`createControlledFindingLatestObservation${'Read'}`);
+    expect(latest).not.toContain('createControlledFindingRepeatedObservationPersistence');
+    expect(latest).not.toContain('@prisma/client');
     expect(routes).not.toContain('vulnerability-intelligence');
     expect(runtime).not.toContain('bullmq');
     expect(runtime).not.toContain('osv.dev');
@@ -41,6 +53,7 @@ describe('controlled finding API composition', () => {
       expect(text, relative).not.toContain('composeControlledFindingOperatorRuntime');
       expect(text, relative).not.toContain('createControlledFindingCreationApplication');
       expect(text, relative).not.toContain('createControlledFindingInspectionApplication');
+      expect(text, relative).not.toContain('createControlledFindingLatestObservationApplication');
       expect(text, relative).not.toContain('/findings');
     }
   });

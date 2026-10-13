@@ -134,6 +134,11 @@ function scriptedFindings(status: string = 'created'): {
           };
         },
       },
+      latestObservation: {
+        async execute() {
+          return { status: 'authority_required' };
+        },
+      },
     },
   };
 }
@@ -778,6 +783,11 @@ describe('controlled finding operator adversarial review', () => {
           };
         },
       },
+      latestObservation: {
+        async execute() {
+          return { status: 'authority_required' };
+        },
+      },
     };
     const unavailable = await boot('admin', { findings: runtime });
     const down = await get(unavailable.app, unavailable.session, findingId, '198.51.100.240');
@@ -797,6 +807,11 @@ describe('controlled finding operator adversarial review', () => {
             schemaVersion: FINDING_INSPECTION_RESULT_SCHEMA_VERSION,
             status: 'malformed_persisted_state' as const,
           };
+        },
+      },
+      latestObservation: {
+        async execute() {
+          return { status: 'authority_required' };
         },
       },
     };

@@ -1,7 +1,7 @@
 /**
- * API-process composition root for controlled Finding creation and inspection.
- * Route modules receive the constructed services. They do not import the
- * creation issuer or the persistence factories.
+ * API-process composition root for controlled Finding creation, creation
+ * inspection, and latest-observation inspection. Route modules receive the
+ * constructed services. They do not import persistence factories.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -10,6 +10,12 @@ import {
   createControlledFindingCreationPersistence,
   createControlledFindingInspectionPersistence,
 } from '@patchpilot/database/controlled-finding-persistence';
+import { createControlledFindingLatestObservationRead } from '@patchpilot/database/controlled-finding-latest-observation-persistence';
+import {
+  createControlledFindingLatestObservationApplication,
+  type ControlledFindingLatestObservationApplicationResult,
+  type InspectControlledFindingLatestObservationCommand,
+} from '@patchpilot/domain/controlled-finding-latest-observation';
 import {
   createControlledFindingCreationApplication,
   createControlledFindingInspectionApplication,
@@ -31,6 +37,11 @@ export type FindingInspectionExecuteInput = {
   readonly findingId: unknown;
 };
 
+export type FindingLatestObservationExecuteInput = {
+  readonly actor: ControlledFindingOperatorActor;
+  readonly command: InspectControlledFindingLatestObservationCommand;
+};
+
 export type FindingOperatorRuntime = {
   readonly creation: {
     execute(
@@ -42,6 +53,11 @@ export type FindingOperatorRuntime = {
       input: FindingInspectionExecuteInput,
     ): Promise<ControlledFindingInspectionApplicationResult>;
   };
+  readonly latestObservation: {
+    execute(
+      input: FindingLatestObservationExecuteInput,
+    ): Promise<ControlledFindingLatestObservationApplicationResult>;
+  };
 };
 
 export function composeControlledFindingOperatorRuntime(
@@ -50,6 +66,9 @@ export function composeControlledFindingOperatorRuntime(
   const creationPersistence = createControlledFindingCreationPersistence(client);
   const inspection = createControlledFindingInspectionApplication({
     inspection: createControlledFindingInspectionPersistence(client),
+  });
+  const latestObservation = createControlledFindingLatestObservationApplication({
+    read: createControlledFindingLatestObservationRead(client),
   });
   return {
     creation: {
@@ -67,6 +86,7 @@ export function composeControlledFindingOperatorRuntime(
       },
     },
     inspection,
+    latestObservation,
   };
 }
 
@@ -78,6 +98,11 @@ export function denyFindingOperatorRuntime(): FindingOperatorRuntime {
       },
     },
     inspection: {
+      async execute() {
+        return { status: 'authority_required' };
+      },
+    },
+    latestObservation: {
       async execute() {
         return { status: 'authority_required' };
       },

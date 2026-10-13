@@ -2,7 +2,7 @@
 
 Use this when an owner or admin reviews controlled Finding targets for one asset in the web application, or opens a Finding that is already known.
 
-The web application is a client of the existing API. It does not create Findings by itself. Authentication, tenancy, permissions, creation, exact replay, and inspection remain API decisions. Inspection shows creation evidence only. [ADR 0039](../adr/0039-controlled-finding-repeated-observation.md) does not add a page or an observation control. [ADR 0041](../adr/0041-controlled-finding-latest-observation-transport.md) admits one later read-only section on `/findings/:findingId`. That section is not implemented. It will call `GET /findings/:findingId/latest-observation` independently and will not replace creation inspection.
+The web application is a client of the existing API. It does not create Findings by itself. Authentication, tenancy, permissions, creation, exact replay, and inspection remain API decisions. Inspection shows creation evidence only. [ADR 0039](../adr/0039-controlled-finding-repeated-observation.md) does not add a page or an observation control. [ADR 0041](../adr/0041-controlled-finding-latest-observation-transport.md) admits one later read-only section on `/findings/:findingId`. That section is not implemented. The API route is implemented. The section will call `GET /findings/:findingId/latest-observation` independently and will not replace creation inspection. Controlled Finding Latest-Observation Reachability Session 1-R reviewed the API route. The latest-observation web section remains unimplemented.
 
 ## Pages
 

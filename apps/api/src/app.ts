@@ -13,7 +13,7 @@ import {
   type HealthReadyResponse,
 } from '@patchpilot/contracts';
 import { type Logger, createChildLogger } from '@patchpilot/logger';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import type { SessionRecord } from '@patchpilot/domain';
 
 import { registerAssetRoutes } from './asset-routes.js';
@@ -46,6 +46,7 @@ export type ApiDependencies = {
   intelligence: IntelligenceRuntime;
   findings: FindingOperatorRuntime;
   findingOrganizationLimiter?: FindingOrganizationRateLimiter;
+  latestObservationPeerKey?: (request: FastifyRequest) => string;
   discovery?: FindingDiscoveryRuntime;
   discoveryOrganizationLimiter?: FindingOrganizationRateLimiter;
   now?: () => string;
@@ -232,6 +233,9 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     ...(dependencies.findingOrganizationLimiter === undefined
       ? {}
       : { findingOrganizationLimiter: dependencies.findingOrganizationLimiter }),
+    ...(dependencies.latestObservationPeerKey === undefined
+      ? {}
+      : { latestObservationPeerKey: dependencies.latestObservationPeerKey }),
   });
 
   await registerFindingDiscoveryRoutes(app, {
