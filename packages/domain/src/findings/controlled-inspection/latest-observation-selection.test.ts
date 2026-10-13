@@ -16,7 +16,8 @@ import {
   canonicalRepeatedObservationEvidenceFingerprint,
   canonicalRepeatedObservationReplayFingerprint,
 } from '../controlled-observation/support.js';
-import { projectFindingInspection, type FindingInspectionEvidenceBundle } from './projection.js';
+import { type FindingInspectionEvidenceBundle } from './port.js';
+import { projectFindingInspection } from './projection.js';
 import {
   FINDING_LATEST_OBSERVATION_EXTERNAL_SCHEMA_VERSION,
   FINDING_LATEST_OBSERVATION_EXTERNAL_UNAVAILABLE,
@@ -758,28 +759,42 @@ describe('evidence and support hostility', () => {
   });
 
   it.each([
-    ['missing support', (row: Record<string, unknown>) => { row['supports'] = []; }],
-    ['missing evidence', (row: Record<string, unknown>) => {
-      const supports = row['supports'] as Record<string, unknown>[];
-      const first = supports[0];
-      if (first !== undefined) {
-        first['evidencePresent'] = false;
-      }
-    }],
-    ['cross-finding support', (row: Record<string, unknown>) => {
-      const supports = row['supports'] as Record<string, unknown>[];
-      const first = supports[0];
-      if (first !== undefined) {
-        first['findingId'] = OTHER_FINDING;
-      }
-    }],
-    ['wrong observation', (row: Record<string, unknown>) => {
-      const supports = row['supports'] as Record<string, unknown>[];
-      const first = supports[0];
-      if (first !== undefined) {
-        first['findingObservationId'] = CREATION_OBSERVATION;
-      }
-    }],
+    [
+      'missing support',
+      (row: Record<string, unknown>) => {
+        row['supports'] = [];
+      },
+    ],
+    [
+      'missing evidence',
+      (row: Record<string, unknown>) => {
+        const supports = row['supports'] as Record<string, unknown>[];
+        const first = supports[0];
+        if (first !== undefined) {
+          first['evidencePresent'] = false;
+        }
+      },
+    ],
+    [
+      'cross-finding support',
+      (row: Record<string, unknown>) => {
+        const supports = row['supports'] as Record<string, unknown>[];
+        const first = supports[0];
+        if (first !== undefined) {
+          first['findingId'] = OTHER_FINDING;
+        }
+      },
+    ],
+    [
+      'wrong observation',
+      (row: Record<string, unknown>) => {
+        const supports = row['supports'] as Record<string, unknown>[];
+        const first = supports[0];
+        if (first !== undefined) {
+          first['findingObservationId'] = CREATION_OBSERVATION;
+        }
+      },
+    ],
     [
       'contradictory aggregate',
       (row: Record<string, unknown>) => {
@@ -787,28 +802,37 @@ describe('evidence and support hostility', () => {
         row['result'] = 'absent';
       },
     ],
-    ['invalid component', (row: Record<string, unknown>) => {
-      const supports = row['supports'] as Record<string, unknown>[];
-      const first = supports[0];
-      if (first !== undefined) {
-        first['componentId'] = FOREIGN;
-      }
-    }],
-    ['invalid version', (row: Record<string, unknown>) => {
-      const supports = row['supports'] as Record<string, unknown>[];
-      const first = supports[0];
-      if (first !== undefined) {
-        first['evidenceRawObservedVersion'] = 'other';
-      }
-    }],
-    ['duplicate support', (row: Record<string, unknown>) => {
-      const supports = row['supports'] as Record<string, unknown>[];
-      const first = supports[0];
-      if (first !== undefined) {
-        row['supports'] = [first, { ...first }];
-        row['evidenceLinkCount'] = 2;
-      }
-    }],
+    [
+      'invalid component',
+      (row: Record<string, unknown>) => {
+        const supports = row['supports'] as Record<string, unknown>[];
+        const first = supports[0];
+        if (first !== undefined) {
+          first['componentId'] = FOREIGN;
+        }
+      },
+    ],
+    [
+      'invalid version',
+      (row: Record<string, unknown>) => {
+        const supports = row['supports'] as Record<string, unknown>[];
+        const first = supports[0];
+        if (first !== undefined) {
+          first['evidenceRawObservedVersion'] = 'other';
+        }
+      },
+    ],
+    [
+      'duplicate support',
+      (row: Record<string, unknown>) => {
+        const supports = row['supports'] as Record<string, unknown>[];
+        const first = supports[0];
+        if (first !== undefined) {
+          row['supports'] = [first, { ...first }];
+          row['evidenceLinkCount'] = 2;
+        }
+      },
+    ],
   ])('rejects %s', (_name, mutate) => {
     const row = legalRepeated();
     mutate(row);
@@ -1069,9 +1093,10 @@ describe('compatibility and non-composition', () => {
     );
     expect(FINDING_LATEST_OBSERVATION_INSPECTION_INVARIANTS).toMatchObject({
       productionRegistration: 'absent',
-      persistenceReadImplemented: false,
+      persistenceReadImplemented: true,
+      postgresqlReadImplemented: true,
       productionInspection: 'creation_based',
-      nextSession: 'controlled_finding_latest_observation_inspection_session_1r2',
+      nextSession: 'controlled_finding_latest_observation_inspection_successor_boundary_review',
       writes: 0,
     });
     const selector = readFileSync(path.join(here, 'latest-observation-selection.ts'), 'utf8');
@@ -1102,7 +1127,15 @@ describe('compatibility and non-composition', () => {
     }
     expect(domainIndex).not.toContain('mapFindingLatestObservationInspectionResult');
     expect(inspectionIndex).not.toContain('mapFindingLatestObservationInspectionResult');
-    expect(offenders).toEqual([]);
+    const allowedPersistence = new Set([
+      'packages/database/src/controlled-finding-latest-observation-read.ts',
+      'packages/database/src/controlled-finding-latest-observation-read.test.ts',
+      'packages/database/src/controlled-finding-latest-observation-read.integration.test.ts',
+    ]);
+    expect(offenders.filter((file) => !allowedPersistence.has(file))).toEqual([]);
+    expect(offenders).toContain(
+      'packages/database/src/controlled-finding-latest-observation-read.ts',
+    );
   });
 });
 
@@ -1161,20 +1194,14 @@ describe('microsecond observation order', () => {
     ['invalid month', '2026-13-01T00:00:00.000000Z'],
     ['leap second', '2026-10-08T16:00:60.000000Z'],
   ])('rejects %s', (_name, observedAt) => {
-    const result = select(
-      selection([
-        at(observedAt, INGESTION_A, OBSERVATION_A, 'rejected', 1),
-      ]),
-    );
+    const result = select(selection([at(observedAt, INGESTION_A, OBSERVATION_A, 'rejected', 1)]));
     expect(result.status).toBe('malformed_persisted_state');
     expect(result).not.toHaveProperty('projection');
   });
 
   it('accepts a real leap day at six-digit precision', () => {
     const projection = found(
-      selection([
-        at('2028-02-29T00:00:00.000001Z', INGESTION_A, OBSERVATION_A, 'leap', 1),
-      ]),
+      selection([at('2028-02-29T00:00:00.000001Z', INGESTION_A, OBSERVATION_A, 'leap', 1)]),
     );
     expect(projection.observedAt).toBe('2028-02-29T00:00:00.000001Z');
   });
@@ -1192,18 +1219,8 @@ describe('uuid byte order', () => {
   }
 
   it('follows PostgreSQL byte order rather than RFC 4122 timestamp order', () => {
-    const byteLater = tied(
-      'ffffffff-0000-1000-8000-000000000000',
-      OBSERVATION_A,
-      'byte-later',
-      1,
-    );
-    const rfcLater = tied(
-      '00000000-0000-1fff-8000-000000000000',
-      OBSERVATION_B,
-      'rfc-later',
-      2,
-    );
+    const byteLater = tied('ffffffff-0000-1000-8000-000000000000', OBSERVATION_A, 'byte-later', 1);
+    const rfcLater = tied('00000000-0000-1fff-8000-000000000000', OBSERVATION_B, 'rfc-later', 2);
     expect(found(selection([rfcLater, byteLater])).evidence).toMatchObject({
       knownVersions: ['byte-later'],
     });
@@ -1213,12 +1230,7 @@ describe('uuid byte order', () => {
   });
 
   it('uses the digit before a hyphen and the digit after a hyphen', () => {
-    const beforeLow = tied(
-      'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      OBSERVATION_A,
-      'before-low',
-      1,
-    );
+    const beforeLow = tied('aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', OBSERVATION_A, 'before-low', 1);
     const beforeHigh = tied(
       'aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       OBSERVATION_B,
@@ -1228,39 +1240,17 @@ describe('uuid byte order', () => {
     expect(found(selection([beforeLow, beforeHigh])).evidence).toMatchObject({
       knownVersions: ['before-high'],
     });
-    const afterLow = tied(
-      'aaaaaaaa-aaa1-4aaa-8aaa-aaaaaaaaaaaa',
-      OBSERVATION_A,
-      'after-low',
-      1,
-    );
-    const afterHigh = tied(
-      'aaaaaaaa-aaa2-4aaa-8aaa-aaaaaaaaaaaa',
-      OBSERVATION_B,
-      'after-high',
-      2,
-    );
+    const afterLow = tied('aaaaaaaa-aaa1-4aaa-8aaa-aaaaaaaaaaaa', OBSERVATION_A, 'after-low', 1);
+    const afterHigh = tied('aaaaaaaa-aaa2-4aaa-8aaa-aaaaaaaaaaaa', OBSERVATION_B, 'after-high', 2);
     expect(found(selection([afterHigh, afterLow])).evidence).toMatchObject({
       knownVersions: ['after-high'],
     });
   });
 
   it('does not stop at the first character when later bytes differ', () => {
-    const tailLow = tied(
-      'a0000000-0000-4000-8000-000000000000',
-      OBSERVATION_A,
-      'tail-low',
-      1,
-    );
-    const tailHigh = tied(
-      'a0000000-0000-4000-8000-000000000001',
-      OBSERVATION_B,
-      'tail-high',
-      2,
-    );
-    expect(found(selection([tailLow, tailHigh]))).toEqual(
-      found(selection([tailHigh, tailLow])),
-    );
+    const tailLow = tied('a0000000-0000-4000-8000-000000000000', OBSERVATION_A, 'tail-low', 1);
+    const tailHigh = tied('a0000000-0000-4000-8000-000000000001', OBSERVATION_B, 'tail-high', 2);
+    expect(found(selection([tailLow, tailHigh]))).toEqual(found(selection([tailHigh, tailLow])));
     expect(found(selection([tailLow, tailHigh])).evidence).toMatchObject({
       knownVersions: ['tail-high'],
     });
@@ -1272,11 +1262,7 @@ describe('uuid byte order', () => {
     ['invalid version', 'aaaaaaaa-aaaa-0aaa-8aaa-aaaaaaaaaaaa'],
     ['invalid variant', 'aaaaaaaa-aaaa-4aaa-0aaa-aaaaaaaaaaaa'],
   ])('rejects %s ingestion identity', (_name, ingestionId) => {
-    const result = select(
-      selection([
-        tied(ingestionId, OBSERVATION_A, 'rejected', 1),
-      ]),
-    );
+    const result = select(selection([tied(ingestionId, OBSERVATION_A, 'rejected', 1)]));
     expect(result.status).toBe('malformed_persisted_state');
     expect(JSON.stringify(result)).not.toContain(ingestionId);
   });
@@ -1385,12 +1371,7 @@ describe('ingestion tuple order', () => {
   const higherThanCreation = '66666666-6666-4666-8666-666666666667';
   const lowerThanCreation = '66666666-6666-4666-8666-666666666665';
 
-  function withTuple(
-    ingestionId: string,
-    receivedAt: string,
-    createdAt: string,
-    version: string,
-  ) {
+  function withTuple(ingestionId: string, receivedAt: string, createdAt: string, version: string) {
     const row = repeatedObservation({
       observationId: OBSERVATION_A,
       ingestionId,
@@ -1415,18 +1396,14 @@ describe('ingestion tuple order', () => {
 
   it('treats a one-microsecond later created_at as strictly later when received_at ties', () => {
     const projection = found(
-      selection([
-        withTuple(lowIngestion, CREATED, '2026-10-06T16:00:00.000001Z', 'created-later'),
-      ]),
+      selection([withTuple(lowIngestion, CREATED, '2026-10-06T16:00:00.000001Z', 'created-later')]),
     );
     expect(projection.evidence).toMatchObject({ knownVersions: ['created-later'] });
   });
 
   it('lets the ingestion id decide when both timestamps tie', () => {
     expect(
-      found(
-        selection([withTuple(higherThanCreation, CREATED, CREATED, 'id-later')]),
-      ).evidence,
+      found(selection([withTuple(higherThanCreation, CREATED, CREATED, 'id-later')])).evidence,
     ).toMatchObject({ knownVersions: ['id-later'] });
     expect(
       select(selection([withTuple(lowerThanCreation, CREATED, CREATED, 'id-earlier')])).status,
@@ -1442,19 +1419,12 @@ describe('ingestion tuple order', () => {
       ).evidence,
     ).toMatchObject({ knownVersions: ['millisecond-later'] });
     expect(
-      select(
-        selection([withTuple(CREATION_INGESTION, CREATED, CREATED, 'equal-tuple')]),
-      ).status,
+      select(selection([withTuple(CREATION_INGESTION, CREATED, CREATED, 'equal-tuple')])).status,
     ).toBe('malformed_persisted_state');
   });
 
   it('does not change a legal pair when the candidate array is reversed', () => {
-    const received = withTuple(
-      INGESTION_A,
-      '2026-10-06T16:00:00.000001Z',
-      CREATED,
-      'received',
-    );
+    const received = withTuple(INGESTION_A, '2026-10-06T16:00:00.000001Z', CREATED, 'received');
     received['observationId'] = OBSERVATION_A;
     received['observedAt'] = EARLY;
     received['createdAt'] = EARLY;
@@ -1468,9 +1438,7 @@ describe('ingestion tuple order', () => {
     const ingestion = created['ingestion'] as Record<string, unknown>;
     ingestion['receivedAt'] = CREATED;
     ingestion['createdAt'] = '2026-10-06T16:00:00.000002Z';
-    expect(found(selection([received, created]))).toEqual(
-      found(selection([created, received])),
-    );
+    expect(found(selection([received, created]))).toEqual(found(selection([created, received])));
   });
 });
 
@@ -1536,9 +1504,9 @@ describe('current evidence legality', () => {
     });
     patchSupport(row, 1, { quarantine: 'quarantined' });
     expect(select(selection([row])).status).toBe('integrity_failure');
-    expect(mapFindingLatestObservationInspectionResult(select(selection([row])))).not.toHaveProperty(
-      'projection',
-    );
+    expect(
+      mapFindingLatestObservationInspectionResult(select(selection([row]))),
+    ).not.toHaveProperty('projection');
   });
 
   it('does not replace an illegal newest observation with an older legal one', () => {
@@ -1797,28 +1765,27 @@ describe('mutation and aliasing', () => {
     const snapshot = JSON.stringify(input);
     const projection = found(input);
     expect(JSON.stringify(input)).toBe(snapshot);
-    expect(projection.evidence.kind).toBe('occurrence_support');
-    if (projection.evidence.kind !== 'occurrence_support') {
+    const evidence = projection.evidence;
+    expect(evidence.kind).toBe('occurrence_support');
+    if (evidence.kind !== 'occurrence_support') {
       throw new Error('fixture');
     }
-    expect(Object.isFrozen(projection.evidence)).toBe(true);
-    expect(Object.isFrozen(projection.evidence.knownVersions)).toBe(true);
+    expect(Object.isFrozen(evidence)).toBe(true);
+    expect(Object.isFrozen(evidence.knownVersions)).toBe(true);
     expect(() => {
-      (projection.evidence as { knownVersions: string[] }).knownVersions.push('mutated');
+      (evidence.knownVersions as unknown as string[]).push('mutated');
     }).toThrow();
-    const supports = (
-      (input['repeated'] as Record<string, unknown>[])[0]?.['supports'] as Record<
-        string,
-        unknown
-      >[]
-    );
+    const supports = (input['repeated'] as Record<string, unknown>[])[0]?.['supports'] as Record<
+      string,
+      unknown
+    >[];
     const first = supports[0];
     if (first === undefined) {
       throw new Error('fixture');
     }
     first['occurrenceVersion'] = 'changed-after-selection';
-    expect(projection.evidence.knownVersions).toEqual(['1.0.0', '9.0.0']);
-    expect(projection.evidence.knownVersions).not.toBe(supports);
+    expect(evidence.knownVersions).toEqual(['1.0.0', '9.0.0']);
+    expect(evidence.knownVersions).not.toBe(supports);
   });
 
   it('accepts frozen nested candidates', () => {

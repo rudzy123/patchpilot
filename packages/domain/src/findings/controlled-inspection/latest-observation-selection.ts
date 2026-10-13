@@ -41,9 +41,7 @@
 import type { FindingObservationResult } from '../../lifecycle.js';
 import { parseFindingCreationEvidenceSet } from '../controlled-creation/evidence-set.js';
 import { FINDING_CREATION_MAX_EVIDENCE_SET_SIZE } from '../controlled-creation/policy.js';
-import {
-  classifyInspectionObservationShape,
-} from '../controlled-observation/inspection-compatibility.js';
+import { classifyInspectionObservationShape } from '../controlled-observation/inspection-compatibility.js';
 import {
   closedRecord,
   isHostileProxy,
@@ -84,8 +82,7 @@ import {
 
 const UUID_LOWER_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const TIMESTAMP_PATTERN =
-  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{6})Z$/;
+const TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{6})Z$/;
 const MONTH_LENGTHS: readonly number[] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/;
 const COUNT_LIMIT = 100_000;
@@ -124,11 +121,11 @@ export const FINDING_LATEST_OBSERVATION_SELECTION_ORDER = Object.freeze({
 });
 
 export const FINDING_LATEST_OBSERVATION_INSPECTION_INVARIANTS = Object.freeze({
-  session: 'controlled_finding_latest_observation_inspection_session_1',
-  nextSession: 'controlled_finding_latest_observation_inspection_session_1r2',
+  session: 'controlled_finding_latest_observation_inspection_session_2',
+  nextSession: 'controlled_finding_latest_observation_inspection_successor_boundary_review',
   productionRegistration: 'absent',
-  persistenceReadImplemented: false,
-  postgresqlReadImplemented: false,
+  persistenceReadImplemented: true,
+  postgresqlReadImplemented: true,
   productionInspection: 'creation_based',
   productAvailability: 'unavailable',
   repeatedObservationWritesReachable: false,
@@ -401,8 +398,7 @@ type NestedFailure =
   | 'integrity_failure';
 
 type Parsed<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly status: NestedFailure };
+  { readonly ok: true; readonly value: T } | { readonly ok: false; readonly status: NestedFailure };
 
 type Instant = { readonly text: string };
 
@@ -455,8 +451,7 @@ export type FindingLatestObservationAbsenceEvidence = {
 };
 
 export type FindingLatestObservationEvidenceProjection =
-  | FindingLatestObservationOccurrenceEvidence
-  | FindingLatestObservationAbsenceEvidence;
+  FindingLatestObservationOccurrenceEvidence | FindingLatestObservationAbsenceEvidence;
 
 export type FindingLatestObservationProjection = {
   readonly schemaVersion: typeof FINDING_LATEST_OBSERVATION_PROJECTION_SCHEMA_VERSION;
