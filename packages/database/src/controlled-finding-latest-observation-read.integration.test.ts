@@ -1521,10 +1521,8 @@ describe('controlled finding latest-observation PostgreSQL read', () => {
 
   it('observes a coherent snapshot across a concurrent repeated-observation commit', async () => {
     const preparedFinding = await prepare('snapshot');
-    const next = await later(preparedFinding, 'snapshot-later', {
-      receivedAt: new Date('2026-10-08T12:00:00.000Z'),
-      versions: [{ version: '1.1.0', bomRef: 'component-1' }],
-    });
+    const before = projectionOf(await read(preparedFinding));
+    expect(before.observationSource).toBe('creation');
     const readerClient = new PrismaClient({
       datasources: { db: { url: database.databaseUrl } },
     });
@@ -1550,15 +1548,19 @@ describe('controlled finding latest-observation PostgreSQL read', () => {
     );
     try {
       await readerReady;
+      const next = await later(preparedFinding, 'snapshot-later', {
+        receivedAt: new Date('2026-10-08T12:00:00.000Z'),
+        versions: [{ version: '1.1.0', bomRef: 'component-1' }],
+      });
       await observe(preparedFinding, next);
     } finally {
       releaseReader();
     }
-    const snapshot = await during;
-    const after = await read(preparedFinding);
-    expect(snapshot.safe.status).not.toBe('found');
-    expect(snapshot.diagnostic).not.toBe('found');
-    expect(projectionOf(after).observationSource).toBe('latest_repeated');
+    const snapshot = projectionOf(await during);
+    const after = projectionOf(await read(preparedFinding));
+    expect(snapshot).toEqual(before);
+    expect(after.observationSource).toBe('latest_repeated');
+    expect(after.observedAt).not.toBe(before.observedAt);
     await readerClient.$disconnect();
   });
 
