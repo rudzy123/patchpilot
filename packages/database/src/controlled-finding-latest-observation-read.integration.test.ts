@@ -31,6 +31,8 @@ import {
   issueFindingCreationAuthorization,
   openFindingCreationCommand,
 } from '../../domain/dist/findings/controlled-creation/authorization.js';
+import { INSPECT_CONTROLLED_FINDING_LATEST_OBSERVATION_COMMAND_SCHEMA_VERSION } from '../../domain/dist/findings/controlled-latest-observation/command.js';
+import { createControlledFindingLatestObservationApplication } from '../../domain/dist/findings/controlled-latest-observation/service.js';
 import {
   issueFindingRepeatedObservationAuthorization,
   openFindingRepeatedObservationCommand,
@@ -1863,6 +1865,205 @@ describe('controlled finding latest-observation PostgreSQL read', () => {
     } finally {
       await unreachable.$disconnect();
     }
+    expect(await fingerprint(preparedFinding.organizationId)).toBe(before);
+  });
+});
+
+describe('controlled finding latest-observation application on PostgreSQL', () => {
+  function trustedActor(context: Actor, role: 'owner' | 'admin' | 'member' | 'viewer') {
+    return {
+      userId: context.actorId,
+      sessionId: `latest-observation-${role}`,
+      organizationId: context.organizationId,
+      membershipId: context.membershipId,
+      role,
+      membershipStatus: 'active' as const,
+    };
+  }
+
+  function inspectedApplication(client: PrismaClient = prisma) {
+    const calls: Array<{ readonly organizationId: string; readonly findingId: string }> = [];
+    const inner = createControlledFindingLatestObservationRead(client);
+    const application = createControlledFindingLatestObservationApplication({
+      read: {
+        async read(query) {
+          calls.push({ organizationId: query.organizationId, findingId: query.findingId });
+          return inner.read(query);
+        },
+      },
+    });
+    return { application, calls };
+  }
+
+  function inspectCommand(findingId: string) {
+    return {
+      schemaVersion: INSPECT_CONTROLLED_FINDING_LATEST_OBSERVATION_COMMAND_SCHEMA_VERSION,
+      findingId,
+    };
+  }
+
+  it('maps creation fallback through the committed adapter and writes nothing', async () => {
+    const preparedFinding = await prepare('service-creation');
+    const before = await fingerprint(preparedFinding.organizationId);
+    const queries: string[] = [];
+    const logging = new PrismaClient({
+      datasources: { db: { url: database.databaseUrl } },
+      log: [{ emit: 'event', level: 'query' }],
+    });
+    logging.$on('query', (event) => {
+      queries.push(event.query);
+    });
+    try {
+      const recorded = inspectedApplication(logging);
+      const result = await recorded.application.execute({
+        actor: trustedActor(preparedFinding, 'owner'),
+        command: inspectCommand(preparedFinding.findingId),
+      });
+      expect(recorded.calls).toEqual([
+        {
+          organizationId: preparedFinding.organizationId,
+          findingId: preparedFinding.findingId,
+        },
+      ]);
+      expect(result).toMatchObject({
+        status: 'found',
+        projection: {
+          observationSource: 'creation',
+          aggregate: 'affected',
+          mappedResult: 'present',
+          findingId: preparedFinding.findingId,
+        },
+      });
+      const encoded = JSON.stringify(result);
+      expect(encoded).not.toContain('latest_repeated');
+      expect(encoded).not.toContain('stale');
+      expect(encoded).not.toContain('resolved');
+      expect(encoded).not.toContain('replayFingerprint');
+      expect(encoded).not.toContain('observationId');
+      if (result.status === 'found') {
+        expect(result.projection.evidence.kind).toBe('occurrence_support');
+      }
+      const joined = queries.join('\n').toLowerCase();
+      expect(joined).not.toMatch(/\binsert\s+into\b/);
+      expect(joined).not.toMatch(/\bdelete\s+from\b/);
+      expect(joined).not.toMatch(/\bupdate\s+"/);
+    } finally {
+      await logging.$disconnect();
+    }
+    expect(await fingerprint(preparedFinding.organizationId)).toBe(before);
+  });
+
+  it('maps a legal latest repeated observation through the committed selector', async () => {
+    const preparedFinding = await prepare('service-repeated');
+    const next = await later(preparedFinding, 'service-repeated-later', {
+      receivedAt: new Date('2026-10-08T12:00:00.000Z'),
+      versions: [{ version: '1.1.0', bomRef: 'component-1' }],
+    });
+    await observe(preparedFinding, next);
+    const before = await fingerprint(preparedFinding.organizationId);
+    const recorded = inspectedApplication();
+    const result = await recorded.application.execute({
+      actor: trustedActor(preparedFinding, 'admin'),
+      command: inspectCommand(preparedFinding.findingId),
+    });
+    expect(recorded.calls).toEqual([
+      {
+        organizationId: preparedFinding.organizationId,
+        findingId: preparedFinding.findingId,
+      },
+    ]);
+    expect(result).toMatchObject({
+      status: 'found',
+      projection: {
+        observationSource: 'latest_repeated',
+        findingId: preparedFinding.findingId,
+      },
+    });
+    const encoded = JSON.stringify(result);
+    expect(encoded).not.toContain('resolved');
+    expect(encoded).not.toContain('reopen');
+    expect(encoded).not.toContain('remediat');
+    expect(encoded).not.toContain('replayFingerprint');
+    expect(encoded).not.toContain('observationId');
+    expect(await fingerprint(preparedFinding.organizationId)).toBe(before);
+  });
+
+  it('does not read for a member or a viewer', async () => {
+    const preparedFinding = await prepare('service-denied');
+    const before = await fingerprint(preparedFinding.organizationId);
+    const recorded = inspectedApplication();
+    for (const role of ['member', 'viewer'] as const) {
+      const result = await recorded.application.execute({
+        actor: trustedActor(preparedFinding, role),
+        command: inspectCommand(preparedFinding.findingId),
+      });
+      expect(result).toEqual({ status: 'authority_required' });
+      expect(JSON.stringify(result)).not.toContain(preparedFinding.findingId);
+      expect(JSON.stringify(result)).not.toContain(preparedFinding.organizationId);
+    }
+    expect(recorded.calls).toEqual([]);
+    expect(await fingerprint(preparedFinding.organizationId)).toBe(before);
+  });
+
+  it('returns one not_found result for an absent Finding and a foreign Finding', async () => {
+    const preparedFinding = await prepare('service-scope');
+    const foreign = await actor('service-foreign');
+    const missingId = '12121212-1212-4121-8121-121212121212';
+    const before = await fingerprint(preparedFinding.organizationId);
+    const foreignBefore = await fingerprint(foreign.organizationId);
+    const recorded = inspectedApplication();
+    const absent = await recorded.application.execute({
+      actor: trustedActor(preparedFinding, 'owner'),
+      command: inspectCommand(missingId),
+    });
+    const foreignResult = await recorded.application.execute({
+      actor: trustedActor(foreign, 'admin'),
+      command: inspectCommand(preparedFinding.findingId),
+    });
+    expect(absent).toEqual(foreignResult);
+    expect(absent).toEqual({
+      schemaVersion: 'finding_latest_observation_external_result_v1',
+      status: 'not_found',
+    });
+    const encoded = `${JSON.stringify(absent)}${JSON.stringify(foreignResult)}`;
+    expect(encoded).not.toContain(preparedFinding.findingId);
+    expect(encoded).not.toContain(missingId);
+    expect(encoded).not.toContain(preparedFinding.organizationId);
+    expect(encoded).not.toContain(foreign.organizationId);
+    expect(recorded.calls).toEqual([
+      { organizationId: preparedFinding.organizationId, findingId: missingId },
+      { organizationId: foreign.organizationId, findingId: preparedFinding.findingId },
+    ]);
+    expect(await fingerprint(preparedFinding.organizationId)).toBe(before);
+    expect(await fingerprint(foreign.organizationId)).toBe(foreignBefore);
+  });
+
+  it('maps malformed persisted state to unavailable and writes nothing', async () => {
+    const preparedFinding = await prepare('service-malformed');
+    await withTriggers(['finding_creation_evidence_link'], async () => {
+      await prisma.$executeRaw`
+        DELETE FROM "finding_creation_evidence_link"
+        WHERE "organization_id" = ${preparedFinding.organizationId}::uuid
+          AND "finding_id" = ${preparedFinding.findingId}::uuid
+      `;
+    });
+    const before = await fingerprint(preparedFinding.organizationId);
+    const recorded = inspectedApplication();
+    const result = await recorded.application.execute({
+      actor: trustedActor(preparedFinding, 'owner'),
+      command: inspectCommand(preparedFinding.findingId),
+    });
+    expect(result).toEqual({
+      schemaVersion: 'finding_latest_observation_external_result_v1',
+      status: 'unavailable',
+    });
+    expect(result).not.toHaveProperty('diagnostic');
+    expect(result).not.toHaveProperty('projection');
+    const encoded = JSON.stringify(result);
+    expect(encoded).not.toContain('malformed');
+    expect(encoded).not.toContain(preparedFinding.findingId);
+    expect(encoded).not.toContain(preparedFinding.organizationId);
+    expect(recorded.calls).toHaveLength(1);
     expect(await fingerprint(preparedFinding.organizationId)).toBe(before);
   });
 });
