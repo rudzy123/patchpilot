@@ -15,6 +15,12 @@ Further amended on 2026-10-09. [ADR 0039](0039-controlled-finding-repeated-obser
 accepts repeated-observation architecture and does not implement it. This workflow
 does not gain an observation control, a history page, or a lifecycle action.
 
+Further amended on 2026-10-13. [ADR 0041](0041-controlled-finding-latest-observation-transport.md)
+admits one later read-only section on `/findings/:findingId`. This amendment does
+not implement that section. The existing inspection page remains creation based.
+When the section is implemented, it calls `GET /findings/:findingId/latest-observation`
+independently and does not replace creation inspection.
+
 ## Context
 
 [ADR 0035](0035-controlled-finding-creation.md) accepts creation-only Finding architecture.
