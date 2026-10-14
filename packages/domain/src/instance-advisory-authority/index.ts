@@ -1,6 +1,7 @@
 /**
- * Narrow contracts for a later migration, persistence adapter, and
- * deployment-local command. No grant writer, issuer, or production factory.
+ * Instance advisory authority contracts and the deployment-local command parser.
+ * PostgreSQL composition stays in the command entrypoint.
+ * This package does not insert audit events or export a grant writer factory.
  */
 
 export {
@@ -102,3 +103,21 @@ export {
 } from './audit.js';
 
 export { INSTANCE_ADVISORY_AUTHORITY_EXECUTION_BOUNDARY } from './execution.js';
+
+export {
+  INSTANCE_ADVISORY_AUTHORITY_COMMAND_USAGE,
+  parseInstanceAdvisoryAuthorityArgv,
+  type InstanceAdvisoryAuthorityArgvParse,
+} from './argv.js';
+
+export {
+  INSTANCE_ADVISORY_AUTHORITY_COMMAND_ACKNOWLEDGEMENTS,
+  INSTANCE_ADVISORY_AUTHORITY_COMMAND_EXIT,
+  INSTANCE_ADVISORY_AUTHORITY_COMMAND_RESULT_SCHEMA_VERSION,
+  executeInstanceAdvisoryAuthorityDeploymentCommand,
+  instanceAdvisoryAuthorityCommandAcknowledgement,
+  instanceAdvisoryAuthorityCommandExitCode,
+  presentInstanceAdvisoryAuthorityCommandResult,
+  type InstanceAdvisoryAuthorityCommandAcknowledgement,
+  type InstanceAdvisoryAuthorityCommandPresentation,
+} from './deployment-command.js';

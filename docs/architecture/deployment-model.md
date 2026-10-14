@@ -67,6 +67,8 @@ No AI provider in default deploy. If optional AI is enabled later, users supply 
 
 No Go CLI in v0.1 ([ADR 0018](../adr/0018-go-cli-deferred.md)).
 
+The instance advisory authority command is not that product CLI. It is one explicit deployment-local process, `pnpm instance-advisory-authority`, and it is the sole supported writer for instance advisory grants and for the user disable and enable operations that command owns. API, web, worker, scheduler, queue, seed, and migration startup do not invoke it. The procedure and exit codes are in [the instance advisory authority runbook](../runbooks/instance-advisory-authority-command.md).
+
 ## Related documents
 
 - [Container architecture](container-architecture.md)

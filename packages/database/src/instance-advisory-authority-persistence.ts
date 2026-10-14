@@ -1,6 +1,7 @@
 /**
  * PostgreSQL instance advisory authority persistence.
- * Test reachable only. No deployment-local command, route, or package barrel.
+ * The deployment-local command is the only supported caller.
+ * This module is not an API route, a package barrel, or a worker.
  *
  * Lock order for grant, revoke, disable, and enable:
  * 1. Validate the strict command.

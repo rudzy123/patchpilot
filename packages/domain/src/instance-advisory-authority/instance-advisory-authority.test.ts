@@ -1180,15 +1180,15 @@ describe('instance advisory audit and nonauthority', () => {
     expect(INSTANCE_ADVISORY_AUTHORITY_INVARIANTS).toMatchObject({
       persistenceImplemented: true,
       migration26Implemented: true,
-      deploymentLocalCommandImplemented: false,
-      grantsCanBeCreated: false,
-      grantsCanBeRevoked: false,
+      deploymentLocalCommandImplemented: true,
+      grantsCanBeCreated: true,
+      grantsCanBeRevoked: true,
       advisorySubmissionAvailable: false,
       advisoryApprovalAvailable: false,
       productMatchEvidenceProductionAvailable: false,
       organizationRolesGrantAdvisoryAuthority: false,
-      productionComposition: 'absent',
-      nextSession: 'instance_advisory_authority_foundation_session_3',
+      productionComposition: 'deployment_local_command_only',
+      nextSession: 'instance_advisory_authority_foundation_branch_closure',
       frozenMigrationCount: 26,
       authorityFoundationComplete: false,
       genericInstanceRbac: false,
@@ -1199,7 +1199,7 @@ describe('instance advisory audit and nonauthority', () => {
     expect(INSTANCE_ADVISORY_PERSISTENCE_INVARIANTS.frozenMigrationCount).toBe(26);
     expect(INSTANCE_ADVISORY_PERSISTENCE_INVARIANTS.exposesTransactionCallback).toBe(false);
     expect(INSTANCE_ADVISORY_AUTHORITY_EXECUTION_BOUNDARY).toMatchObject({
-      implemented: false,
+      implemented: true,
       callerSuppliedUserIdIsPrincipal: false,
       permitsExactlyOneStrictOperation: true,
       exposesGenericRepository: false,

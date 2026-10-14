@@ -22,6 +22,7 @@
     "db:migrate:deploy": "node scripts/run-database-command.mjs migrate:deploy",
     "db:reset": "node scripts/run-database-command.mjs reset",
     "db:seed": "node scripts/run-database-command.mjs seed",
+    "instance-advisory-authority": "node scripts/run-instance-advisory-authority.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint . && turbo run lint",

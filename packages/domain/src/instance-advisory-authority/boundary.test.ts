@@ -33,8 +33,12 @@ const PUBLIC_VALUE_EXPORTS = [
   'INSTANCE_ADVISORY_AUDIT_FORBIDDEN_PAYLOAD_FIELDS',
   'INSTANCE_ADVISORY_AUDIT_REPLAY',
   'INSTANCE_ADVISORY_AUTHORITIES',
+  'INSTANCE_ADVISORY_AUTHORITY_COMMAND_ACKNOWLEDGEMENTS',
+  'INSTANCE_ADVISORY_AUTHORITY_COMMAND_EXIT',
   'INSTANCE_ADVISORY_AUTHORITY_COMMAND_OUTCOMES',
+  'INSTANCE_ADVISORY_AUTHORITY_COMMAND_RESULT_SCHEMA_VERSION',
   'INSTANCE_ADVISORY_AUTHORITY_COMMAND_SCHEMA_VERSION',
+  'INSTANCE_ADVISORY_AUTHORITY_COMMAND_USAGE',
   'INSTANCE_ADVISORY_AUTHORITY_EXECUTION_BOUNDARY',
   'INSTANCE_ADVISORY_AUTHORITY_INVARIANTS',
   'INSTANCE_ADVISORY_AUTHORITY_SNAPSHOT_SCHEMA_VERSION',
@@ -75,7 +79,10 @@ const PUBLIC_VALUE_EXPORTS = [
   'classifyInstanceAdvisoryGrantLifecycleMutation',
   'collapseInstanceAdvisoryAuthorizationForExternalBoundary',
   'compareInstanceAdvisoryPrincipals',
+  'executeInstanceAdvisoryAuthorityDeploymentCommand',
   'instanceAdvisoryAuditIntent',
+  'instanceAdvisoryAuthorityCommandAcknowledgement',
+  'instanceAdvisoryAuthorityCommandExitCode',
   'instanceAdvisoryGrantLifecycle',
   'isCanonicalInstanceAdvisoryPrincipalId',
   'isInstanceAdvisoryAuthority',
@@ -83,7 +90,9 @@ const PUBLIC_VALUE_EXPORTS = [
   'isInstanceAdvisoryAuthorityOperation',
   'isInstanceAdvisoryIssuanceClassification',
   'parseInstanceAdvisoryAuthorizationReadRequest',
+  'parseInstanceAdvisoryAuthorityArgv',
   'parseInstanceAdvisoryAuthorityCommand',
+  'presentInstanceAdvisoryAuthorityCommandResult',
 ] as const;
 
 function walk(directory: string, files: string[] = []): string[] {
@@ -160,6 +169,7 @@ describe('instance advisory authority production exclusion', () => {
     ].map((root) => path.join(repoRoot, root));
     const allowed = new Set([
       'packages/database/src/instance-advisory-authority-persistence.ts',
+      'packages/database/src/instance-advisory-authority-command-main.ts',
       'packages/database/prisma/schema.prisma',
       'packages/database/prisma/migrations/20261014120000_instance_advisory_authority_grant/migration.sql',
     ]);
