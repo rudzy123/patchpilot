@@ -1188,9 +1188,9 @@ describe('instance advisory audit and nonauthority', () => {
       productMatchEvidenceProductionAvailable: false,
       organizationRolesGrantAdvisoryAuthority: false,
       productionComposition: 'deployment_local_command_only',
-      nextSession: 'instance_advisory_authority_foundation_branch_closure',
+      nextSession: 'instance_advisory_authority_foundation_pull_request',
       frozenMigrationCount: 26,
-      authorityFoundationComplete: false,
+      authorityFoundationComplete: true,
       genericInstanceRbac: false,
       capabilityIssuerExposed: false,
     });

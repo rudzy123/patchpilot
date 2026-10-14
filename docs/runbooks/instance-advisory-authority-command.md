@@ -4,7 +4,7 @@ The deployment-local command is the sole supported writer for instance advisory 
 
 Advisory submission and approval remain unavailable. The command does not issue an approval capability, generate Product Match Evidence, or create a Finding. Organization roles cannot invoke or control it. No grants are seeded.
 
-Instance Advisory Authority Foundation Session 3-R reviewed the deployment-local command. Branch closure follows this review. This branch is not complete.
+Instance Advisory Authority Foundation Session 3-R reviewed the deployment-local command. Instance Advisory Authority Foundation branch closure reviewed this branch. The pull request is next. The branch is not merged.
 
 Build `@patchpilot/database` before the first invocation. The script runs `packages/database/dist/instance-advisory-authority-command-main.js`.
 
