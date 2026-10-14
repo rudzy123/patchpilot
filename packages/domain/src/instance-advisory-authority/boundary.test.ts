@@ -37,9 +37,11 @@ const PUBLIC_VALUE_EXPORTS = [
   'INSTANCE_ADVISORY_AUTHORITY_COMMAND_SCHEMA_VERSION',
   'INSTANCE_ADVISORY_AUTHORITY_EXECUTION_BOUNDARY',
   'INSTANCE_ADVISORY_AUTHORITY_INVARIANTS',
+  'INSTANCE_ADVISORY_AUTHORITY_SNAPSHOT_SCHEMA_VERSION',
   'INSTANCE_ADVISORY_AUTHORITY_OPERATIONS',
   'INSTANCE_ADVISORY_AUTHORITY_POWERS',
   'INSTANCE_ADVISORY_AUTHORIZATION_EXTERNAL_COLLAPSE',
+  'INSTANCE_ADVISORY_AUTHORIZATION_FACTS_SCHEMA_VERSION',
   'INSTANCE_ADVISORY_AUTHORIZATION_READ_OUTCOMES',
   'INSTANCE_ADVISORY_AUTHORIZATION_READ_SCHEMA_VERSION',
   'INSTANCE_ADVISORY_CONCURRENT_GRANT_CONTRACT',
@@ -156,6 +158,11 @@ describe('instance advisory authority production exclusion', () => {
       'packages/database/prisma',
       'packages/auth/src',
     ].map((root) => path.join(repoRoot, root));
+    const allowed = new Set([
+      'packages/database/src/instance-advisory-authority-persistence.ts',
+      'packages/database/prisma/schema.prisma',
+      'packages/database/prisma/migrations/20261014120000_instance_advisory_authority_grant/migration.sql',
+    ]);
     const forbidden = [
       'instance-advisory-authority',
       'instance_advisory_authority_command_v1',
@@ -167,13 +174,26 @@ describe('instance advisory authority production exclusion', () => {
     const offenders: string[] = [];
     for (const root of roots) {
       for (const filePath of walk(root).filter(isProductionSource)) {
+        const relative = path.relative(repoRoot, filePath);
+        if (allowed.has(relative)) {
+          continue;
+        }
         const source = readFileSync(filePath, 'utf8');
         if (forbidden.some((needle) => source.includes(needle))) {
-          offenders.push(path.relative(repoRoot, filePath));
+          offenders.push(relative);
         }
       }
     }
     expect(offenders).toEqual([]);
+    const databaseIndex = readFileSync(
+      path.join(repoRoot, 'packages/database/src/index.ts'),
+      'utf8',
+    );
+    expect(databaseIndex).not.toContain('instance-advisory-authority');
+    const databasePackage = JSON.parse(
+      readFileSync(path.join(repoRoot, 'packages/database/package.json'), 'utf8'),
+    ) as { exports: Record<string, unknown> };
+    expect(databasePackage.exports['./instance-advisory-authority']).toBeUndefined();
   });
 
   it('is absent from startup, queue, seed, and migration entrypoints', () => {

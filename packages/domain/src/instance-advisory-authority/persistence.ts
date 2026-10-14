@@ -28,9 +28,9 @@ export const INSTANCE_ADVISORY_PERSISTENCE_INVARIANTS = {
   unknownIssuanceIsMalformed: true,
   unknownAuthorityIsMalformed: true,
   twoActiveGrantsAreMalformed: true,
-  implemented: false,
-  migrationImplemented: false,
-  frozenMigrationCount: 25,
+  implemented: true,
+  migrationImplemented: true,
+  frozenMigrationCount: 26,
   exposesTransactionCallback: false,
   exposesGenericRepository: false,
 } as const;

@@ -1045,7 +1045,7 @@ describe('instance advisory authorization read', () => {
   it('requires the later mutation to reload authority inside the same transaction', () => {
     expect(INSTANCE_ADVISORY_MUTATION_TRANSACTION_REQUIREMENTS).toMatchObject({
       priorAuthorizationReadOutsideTransactionSufficient: false,
-      implemented: false,
+      implemented: true,
     });
     expect(
       INSTANCE_ADVISORY_MUTATION_TRANSACTION_REQUIREMENTS.reloadsInsideMutationTransaction,
@@ -1178,8 +1178,8 @@ describe('instance advisory audit and nonauthority', () => {
       expect(value).toBe(false);
     }
     expect(INSTANCE_ADVISORY_AUTHORITY_INVARIANTS).toMatchObject({
-      persistenceImplemented: false,
-      migration26Implemented: false,
+      persistenceImplemented: true,
+      migration26Implemented: true,
       deploymentLocalCommandImplemented: false,
       grantsCanBeCreated: false,
       grantsCanBeRevoked: false,
@@ -1188,13 +1188,15 @@ describe('instance advisory audit and nonauthority', () => {
       productMatchEvidenceProductionAvailable: false,
       organizationRolesGrantAdvisoryAuthority: false,
       productionComposition: 'absent',
-      nextSession: 'instance_advisory_authority_foundation_session_2',
-      frozenMigrationCount: 25,
+      nextSession: 'instance_advisory_authority_foundation_session_3',
+      frozenMigrationCount: 26,
       authorityFoundationComplete: false,
       genericInstanceRbac: false,
       capabilityIssuerExposed: false,
     });
-    expect(INSTANCE_ADVISORY_PERSISTENCE_INVARIANTS.implemented).toBe(false);
+    expect(INSTANCE_ADVISORY_PERSISTENCE_INVARIANTS.implemented).toBe(true);
+    expect(INSTANCE_ADVISORY_PERSISTENCE_INVARIANTS.migrationImplemented).toBe(true);
+    expect(INSTANCE_ADVISORY_PERSISTENCE_INVARIANTS.frozenMigrationCount).toBe(26);
     expect(INSTANCE_ADVISORY_PERSISTENCE_INVARIANTS.exposesTransactionCallback).toBe(false);
     expect(INSTANCE_ADVISORY_AUTHORITY_EXECUTION_BOUNDARY).toMatchObject({
       implemented: false,

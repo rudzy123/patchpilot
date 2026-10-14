@@ -35,7 +35,7 @@ Exports are tenant-owned. Default: `member` and above may export. An organizatio
 
 Instance operator ([OD-10](open-decisions.md)) may manage **system** integrations and shared catalogs only. Session 9 Batch 9B does not create that operator identity. Authenticated members with `intelligence:read` may read **sanitized global** provider status ([ADR 0022](../adr/0022-intelligence-provider-status-authorization.md)). The active Organization is required product-access context and is not an `organizationId` predicate on those global rows. Two Organizations receive the same payload when global status is unchanged. This is not a tenant-evidence dump and not a dashboard.
 
-Instance advisory authority is a separate check ([ADR 0043](../adr/0043-instance-advisory-authority-grants.md)). The grant relation has no organization column. Organization roles do not grant or revoke it, and an advisory grant does not grant tenant asset or Finding access. A user may hold organization membership and one instance advisory grant. Organization switching does not change the grant. The relation is not implemented.
+Instance advisory authority is a separate check ([ADR 0043](../adr/0043-instance-advisory-authority-grants.md)). The grant relation has no organization column. Organization roles do not grant or revoke it, and an advisory grant does not grant tenant asset or Finding access. A user may hold organization membership and one instance advisory grant. Organization switching does not change the grant. The relation is implemented and production uncomposed. Session 2-R reviewed that persistence. It has no production caller. The deployment-local command is not implemented.
 
 ## How repository methods require organization scope
 

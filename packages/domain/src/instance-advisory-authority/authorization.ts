@@ -82,7 +82,7 @@ export const INSTANCE_ADVISORY_MUTATION_TRANSACTION_REQUIREMENTS = {
     'exact_required_authority',
   ],
   priorAuthorizationReadOutsideTransactionSufficient: false,
-  implemented: false,
+  implemented: true,
 } as const;
 
 export type InstanceAdvisoryAuthorizationReadParse =

@@ -22,6 +22,19 @@ enum UserStatus {
   @@map("user_status")
 }
 
+enum InstanceAdvisoryAuthority {
+  advisory_submit_local
+  advisory_approve_for_product_evaluation
+
+  @@map("instance_advisory_authority")
+}
+
+enum InstanceAdvisoryIssuanceClassification {
+  deployment_local_command
+
+  @@map("instance_advisory_issuance_classification")
+}
+
 enum MembershipRole {
   owner
   admin
@@ -1032,15 +1045,35 @@ model User {
   createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships     Membership[]
-  assetOwners     AssetOwner[]
-  teamMemberships TeamMembership[]
-  localCredential LocalCredential?
-  sessions        Session[]
-  auditEvents     AuditEvent[]     @relation("AuditActorUser")
+  memberships                     Membership[]
+  assetOwners                     AssetOwner[]
+  teamMemberships                 TeamMembership[]
+  localCredential                 LocalCredential?
+  sessions                        Session[]
+  auditEvents                     AuditEvent[]                      @relation("AuditActorUser")
+  instanceAdvisoryAuthorityGrants InstanceAdvisoryAuthorityGrant[]
 
   @@index([status], map: "user_status_idx")
   @@map("user")
+}
+
+/// Instance-owned advisory authority. No organization column.
+/// One active row per user is enforced by the partial unique index
+/// instance_advisory_authority_grant_one_active_user_idx in SQL.
+model InstanceAdvisoryAuthorityGrant {
+  id                     String                                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                 String                                 @map("user_id") @db.Uuid
+  authority              InstanceAdvisoryAuthority
+  issuanceClassification InstanceAdvisoryIssuanceClassification @map("issuance_classification")
+  issuedAt               DateTime                               @default(now()) @map("issued_at") @db.Timestamptz(6)
+  revokedAt              DateTime?                              @map("revoked_at") @db.Timestamptz(6)
+  commandCorrelationId   String                                 @map("command_correlation_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, id], map: "instance_advisory_authority_grant_user_alignment_key")
+  @@index([userId], map: "instance_advisory_authority_grant_user_idx")
+  @@map("instance_advisory_authority_grant")
 }
 
 model LocalCredential {
