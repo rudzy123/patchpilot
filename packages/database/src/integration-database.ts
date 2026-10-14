@@ -134,6 +134,10 @@ export const FROZEN_MIGRATIONS = [
     directory: '20261009120000_controlled_finding_repeated_observation',
     sha256: 'bf0ea1d161912827dd2a6ee4d814730eb8d519552145a9d2581d927786d6b491',
   },
+  {
+    directory: '20261014120000_instance_advisory_authority_grant',
+    sha256: '7e0f02207cac42b067afd8be41fa515c58f8b3e123fd0fbfc82e1741c2f18a45',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
@@ -187,6 +191,9 @@ export const CONTROLLED_FINDING_CREATION = '20261006120000_controlled_finding_cr
 export const CONTROLLED_FINDING_REPEATED_OBSERVATION =
   '20261009120000_controlled_finding_repeated_observation' as const;
 
+export const INSTANCE_ADVISORY_AUTHORITY_GRANT =
+  '20261014120000_instance_advisory_authority_grant' as const;
+
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
   '20260827120000_tenant_model',
@@ -213,6 +220,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   PRODUCT_MATCH_EVIDENCE_CARDINALITY,
   CONTROLLED_FINDING_CREATION,
   CONTROLLED_FINDING_REPEATED_OBSERVATION,
+  INSTANCE_ADVISORY_AUTHORITY_GRANT,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {

@@ -77,6 +77,7 @@ describe('repeated observation public surface', () => {
       './controlled-finding-discovery',
       './controlled-finding-latest-observation',
       './controlled-finding-operator',
+      './instance-advisory-authority',
     ]);
   });
 });
@@ -163,7 +164,7 @@ describe('repeated observation production exclusion', () => {
     }
     const migrationRoot = path.join(repoRoot, 'packages/database/prisma/migrations');
     const migrations = readdirSync(migrationRoot).filter((name) => name !== 'migration_lock.toml');
-    expect(migrations).toHaveLength(25);
+    expect(migrations).toHaveLength(26);
     const schema = readFileSync(
       path.join(repoRoot, 'packages/database/prisma/schema.prisma'),
       'utf8',
@@ -254,7 +255,7 @@ describe('repeated observation inspection and checkpoint', () => {
     expect(checkpoint).not.toContain('Repeated Observation Session 3-R read-path review is next.');
     expect(checkpoint).not.toContain('Session 3 inspection compatibility is next.');
     expect(checkpoint).toContain('All lifecycle powers remain unavailable.');
-    expect(checkpoint).toContain('Frozen migrations: 25.');
+    expect(checkpoint).toContain('Frozen migrations: 26.');
     expect(checkpoint).not.toContain('repeated-observation slice is complete');
     expect(checkpoint).not.toContain('repeated observation is production composed');
   });

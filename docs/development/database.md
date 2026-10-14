@@ -13,6 +13,8 @@ PostgreSQL is the system of record ([ADR 0005](../adr/0005-postgresql-prisma.md)
 | `pnpm db:reset` | Destructive reset; refused in production and without confirmation |
 | `pnpm db:seed` | Idempotent synthetic development seed; refused in production |
 
+`pnpm db:seed` does not grant instance advisory authority. The deployment-local grant command is separate and is documented in [the instance advisory authority runbook](../runbooks/instance-advisory-authority-command.md).
+
 `DATABASE_URL` is never printed by these scripts.
 
 ## Destructive command guards

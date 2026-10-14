@@ -81,6 +81,7 @@ describe('controlled finding operator public surface', () => {
       './controlled-finding-discovery',
       './controlled-finding-latest-observation',
       './controlled-finding-operator',
+      './instance-advisory-authority',
     ]);
     const operatorExport = packageJson.exports['./controlled-finding-operator'];
     expect(operatorExport).toMatchObject({

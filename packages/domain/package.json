@@ -14,6 +14,10 @@
       "types": "./dist/findings/controlled-operator/index.d.ts",
       "import": "./dist/findings/controlled-operator/index.js"
     },
+    "./instance-advisory-authority": {
+      "types": "./dist/instance-advisory-authority/index.d.ts",
+      "import": "./dist/instance-advisory-authority/index.js"
+    },
     "./controlled-finding-discovery": {
       "types": "./dist/findings/controlled-discovery/index.d.ts",
       "import": "./dist/findings/controlled-discovery/index.js"
