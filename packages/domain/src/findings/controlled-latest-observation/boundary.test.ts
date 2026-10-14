@@ -65,6 +65,7 @@ describe('controlled finding latest-observation application surface', () => {
       './controlled-finding-discovery',
       './controlled-finding-latest-observation',
       './controlled-finding-operator',
+      './instance-advisory-authority',
     ]);
     const encoded = JSON.stringify(packageJson.exports);
     expect(encoded).not.toContain('controlled-latest-observation');

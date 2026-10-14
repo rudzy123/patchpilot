@@ -172,7 +172,7 @@ A person who can authenticate to the instance.
 
 Password hashes live on **LocalCredential**. Opaque sessions live on **Session**. See those entities below.
 
-A user without membership cannot access tenant-owned data. Instance operator bootstrap is separate ([OD-10](open-decisions.md)). Instance advisory authority is also separate ([ADR 0043](../adr/0043-instance-advisory-authority-grants.md)). The principal is the canonical lowercase `User.id`. Organization membership does not grant it. The grant relation is not implemented. The frozen migration count remains 25.
+A user without membership cannot access tenant-owned data. Instance operator bootstrap is separate ([OD-10](open-decisions.md)). Instance advisory authority is also separate ([ADR 0043](../adr/0043-instance-advisory-authority-grants.md)). The principal is the canonical lowercase `User.id`. Organization membership does not grant it. Session 1 contracts are implemented and production uncomposed. The grant relation, migration 26, and the deployment-local command are not implemented. No grants can be created or revoked. Instance Advisory Authority Foundation Session 1-R reviewed the contracts. Revocation names the expected grant and authority. Session 2 migration and persistence is next. The frozen migration count remains 25.
 
 ## LocalCredential
 

@@ -77,6 +77,7 @@ describe('repeated observation public surface', () => {
       './controlled-finding-discovery',
       './controlled-finding-latest-observation',
       './controlled-finding-operator',
+      './instance-advisory-authority',
     ]);
   });
 });
