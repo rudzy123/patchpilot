@@ -1,6 +1,7 @@
 /**
  * PostgreSQL maintainer-reviewed advisory submission.
- * Production uncomposed: no API, web, worker, seed, or package barrel constructs this.
+ * Constructed only by the API mutation application. Web, worker, seed,
+ * the package barrel, and route handlers do not construct this adapter.
  *
  * Lock order, held to the end of the transaction:
  * 1. Submitter User FOR UPDATE.
