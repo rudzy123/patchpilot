@@ -256,6 +256,11 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   evidence remains after a successor revision. Finding identity stays
   organization, asset, versionless component, and vulnerability. Automatic
   matching remains unavailable. Finding creation remains unavailable.
+  [ADR 0044](../adr/0044-deliberate-product-match-evidence-evaluation.md)
+  governs the first deliberate, owner-initiated writer of this evidence: one
+  approved revision, one asset, the asset's latest successful ingestion, a cap
+  of 16 evaluated occurrences, and the frozen evaluator and policy identities.
+  It is not implemented and adds no migration.
   Suppression authority remains false. New graphs use normalization version
   `2` and preserve distinct observed versions. Historical version `1` graphs
   are not reprocessed.
