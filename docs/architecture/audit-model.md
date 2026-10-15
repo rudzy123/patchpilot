@@ -147,6 +147,8 @@ The other per-positive lifecycle actions remain future except the architecture a
 
 A per-job aggregate `vulnerability.match_evaluated` may later record bounded IDs, counts, versions, and statuses. Do not create one **AuditEvent** per negative comparison. Positive match evidence is not replaced by an audit event.
 
+[ADR 0044](../adr/0044-deliberate-product-match-evidence-evaluation.md) governs the first writer of `vulnerability.match_evaluated`. It is a single per-operation event, actor type `user`, subject type `asset`, written in the same transaction as the evidence inserts only when at least one new evidence row is inserted. The payload carries IDs, policy identity, and counts only, and no per-component data, version strings, advisory ranges, or SBOM content. Replay uniqueness stays `(organizationId, action, subjectId, correlationId)`. The writer is not implemented.
+
 Payloads must not contain provider prose, package inventories, affected-version arrays, raw provider records, SBOM bodies, CVE lists, KEV bodies, raw comparator errors, credentials, or URLs. Full PURLs appear only if internal policy explicitly permits them. Evidence ids stay out of `finding.created` and out of route logs. Replay uniqueness remains tenant `(organizationId, action, subjectId, correlationId)`.
 
 ## Integrity properties
