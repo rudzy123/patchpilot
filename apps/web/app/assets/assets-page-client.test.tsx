@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import {
@@ -122,9 +122,20 @@ describe('AssetsPageClient', () => {
   });
 
   it('is operable from the keyboard on the create-asset link', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     renderWithAuth(<AssetsPageClient />, { authApi: adminApi() });
     const payments = await screen.findByRole('link', { name: 'Payments' });
+    const heading = screen.getByRole('heading', { name: 'Assets' });
+    // The list-ready effect moves focus to the heading on a later turn.
+    // Flush that move before tabbing so the assertion does not race it.
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    await waitFor(() => {
+      expect(heading).toHaveFocus();
+    });
     const create = screen.getByRole('link', { name: 'Create asset' });
     create.focus();
     expect(create).toHaveFocus();

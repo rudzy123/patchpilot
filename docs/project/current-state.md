@@ -154,10 +154,6 @@ Generalized product matching is not live. The nested web workflow is not a lifec
 
 Recorded here and not implemented in this checkpoint.
 
-### High priority
-
-1. Main CI verification. If a later main Quality rerun fails on the keyboard-focus test, suggested branch: `test/web-keyboard-focus-hermeticity`.
-
 ### Controlled Finding implementation boundary
 
 The additive evidence-link migration is present. [ADR 0036](../adr/0036-controlled-finding-operator-api.md) is the accepted composition: API-process reachability for owner `POST /findings` and owner or admin `GET /findings/:findingId`. That composition is implemented only in the API process. The commands must not be composed into the worker, web server, scheduler, queue, or any route other than those two. They must not gain lifecycle transitions. Exact replay is publicly reachable. [ADR 0037](../adr/0037-controlled-finding-target-discovery.md) is implemented as one read-only API route, `GET /assets/:assetId/controlled-finding-targets`. It does not construct the creation command. No schema change, migration, durable acknowledgement, rate-limit table, or read-optimization index was added. The organization discovery limit is process-local. [ADR 0038](../adr/0038-controlled-finding-web-workflow.md) adds no schema change, migration, backend API change, dependency, Finding-authority change, or worker composition. The web workflow is implemented as an API client. Web startup does not construct the creation command.
