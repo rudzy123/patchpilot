@@ -2,9 +2,9 @@
 
 The deployment-local command is the sole supported writer for instance advisory authority grants. It also disables and re-enables one existing User. It is explicit. Application startup, seed, migration, the API, and the web do not invoke it.
 
-Advisory submission and approval remain unavailable. The command does not issue an approval capability, generate Product Match Evidence, or create a Finding. Organization roles cannot invoke or control it. No grants are seeded.
+Advisory submission persistence is constructed only by the API submission route. An authenticated User with advisory_submit_local can submit through the API. Independent approval is composed only by the API approval route and remains eligibility only. POST /intelligence/maintainer-reviewed-advisories/:revisionId/approval is implemented in the API process. The command does not issue an approval capability, generate Product Match Evidence, or create a Finding. Organization roles cannot invoke or control it. No grants are seeded.
 
-Instance Advisory Authority Foundation Session 3-R reviewed the deployment-local command. Instance Advisory Authority Foundation branch closure reviewed this branch. The pull request is next. The branch is not merged.
+Instance Advisory Authority Foundation Session 3-R reviewed the deployment-local command. Instance Advisory Authority Foundation branch closure reviewed this branch. Instance Advisory Authority Foundation pull request #92 is merged. Maintainer-reviewed advisory submission contracts and the submission authority boundary are implemented and production uncomposed. Advisory submission persistence is constructed only by the API submission route. POST /intelligence/maintainer-reviewed-advisories is implemented in the API process. An authenticated User with advisory_submit_local can submit through the API. Independent approval is composed only by the API approval route. Internal capability issuance stays private to that approval transaction. Approval remains eligibility only. POST /intelligence/maintainer-reviewed-advisories/:revisionId/approval is implemented in the API process. No approval web UI exists. Approval creates eligibility only. Product Match Evidence generation remains unavailable. Organization roles remain irrelevant. Instance advisory grants remain the required authority. API startup is the only production composition for the two mutation routes. Maintainer-Reviewed Advisory Production Composition Session 3-R reviewed the uncomposed approval and capability transaction. Maintainer-Reviewed Advisory Production Composition Session 4 implements the two API routes. Session 4-R reviewed the protected API. Maintainer-Reviewed Advisory Production Composition branch closure reviewed this branch. The pull request is next.
 
 Build `@patchpilot/database` before the first invocation. The script runs `packages/database/dist/instance-advisory-authority-command-main.js`.
 
@@ -28,6 +28,8 @@ pnpm instance-advisory-authority -- help
 - `advisory_approve_for_product_evaluation`
 
 Issuance is the deployment-local command. The operator cannot select another issuance classification. There is no prompt. One invocation performs one operation for one User.
+
+Canonical `User.id` is the only separation principal. Another session, membership, organization, email, or display name does not make that User someone else. PatchPilot cannot prove that two User accounts are controlled by two different people, and it does not match email or display name to try. Grant `advisory_submit_local` and `advisory_approve_for_product_evaluation` only to accounts controlled by different people. One person controlling both accounts is an accepted operational residual, not a solved identity check.
 
 Revoke names the expected active grant and its authority. That identity distinguishes a first revocation, exact replay, a missing grant, and a replaced grant.
 

@@ -21,6 +21,10 @@
     "./controlled-finding-latest-observation-persistence": {
       "types": "./dist/controlled-finding-latest-observation-persistence.d.ts",
       "import": "./dist/controlled-finding-latest-observation-persistence.js"
+    },
+    "./maintainer-reviewed-advisory-mutation": {
+      "types": "./dist/maintainer-reviewed-advisory-mutation-application.d.ts",
+      "import": "./dist/maintainer-reviewed-advisory-mutation-application.js"
     }
   },
   "main": "./dist/index.js",

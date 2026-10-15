@@ -50,6 +50,7 @@ import type { AuthRuntime } from './auth-runtime.js';
 import type { DatabaseReadyCheck } from './app.js';
 import type { FindingOrganizationRateLimiter } from './finding-rate-limit.js';
 import { denyFindingOperatorRuntime, type FindingOperatorRuntime } from './finding-runtime.js';
+import type { MaintainerReviewedAdvisoryRuntime } from './maintainer-reviewed-advisory-runtime.js';
 import {
   denyFindingDiscoveryRuntime,
   type FindingDiscoveryRuntime,
@@ -95,6 +96,9 @@ export async function buildTestApi(options?: {
   sboms?: SbomRuntime;
   intelligence?: IntelligenceRuntime;
   findings?: FindingOperatorRuntime;
+  advisories?: MaintainerReviewedAdvisoryRuntime;
+  submissionPeerKey?: (request: FastifyRequest) => string;
+  approvalPeerKey?: (request: FastifyRequest) => string;
   findingOrganizationLimiter?: FindingOrganizationRateLimiter;
   latestObservationPeerKey?: (request: FastifyRequest) => string;
   discovery?: FindingDiscoveryRuntime;
@@ -111,6 +115,11 @@ export async function buildTestApi(options?: {
     intelligence:
       options?.intelligence ?? emptyIntelligenceRuntime(options?.config ?? harness.config),
     findings: options?.findings ?? denyFindingOperatorRuntime(),
+    ...(options?.advisories === undefined ? {} : { advisories: options.advisories }),
+    ...(options?.submissionPeerKey === undefined
+      ? {}
+      : { submissionPeerKey: options.submissionPeerKey }),
+    ...(options?.approvalPeerKey === undefined ? {} : { approvalPeerKey: options.approvalPeerKey }),
     ...(options?.findingOrganizationLimiter === undefined
       ? {}
       : { findingOrganizationLimiter: options.findingOrganizationLimiter }),

@@ -11,10 +11,10 @@ Accepted for the maintainer-reviewed advisory authority architecture and its pro
 
 ## Implementation status
 
-Status is **Accepted** on 2026-10-06. The proposal date remains 2026-10-02. Acceptance records that the decisions below are implemented and production uncomposed. It does not add a writer, a route, or a worker. Current checkpoint: [current-state.md](../project/current-state.md).
+Status is **Accepted** on 2026-10-06. The proposal date remains 2026-10-02. The authority decisions below remain in force. Submission and approval are the two API routes from [ADR 0042](0042-maintainer-reviewed-advisory-production-composition.md). This ADR does not add a worker or a web UI. Current checkpoint: [current-state.md](../project/current-state.md).
 
 - Architecture contracts exist and remain production uncomposed (`maintainer_reviewed_advisory_architecture_v1`).
-- Immutable approval persistence exists (`20261002120000_maintainer_reviewed_advisory_approval`, SHA-256 `9f4ae2a6402952ff0ecca27a88cb15859a2164d89591fe2afe64e7e9ddbfb380`). The adapter is production uncomposed. No approval is seeded. Update and delete are rejected. Parent deletion is restricted.
+- Immutable approval persistence exists (`20261002120000_maintainer_reviewed_advisory_approval`, SHA-256 `9f4ae2a6402952ff0ecca27a88cb15859a2164d89591fe2afe64e7e9ddbfb380`). The approval adapter is constructed only by the API approval route. No approval is seeded. Update and delete are rejected. Parent deletion is restricted.
 - Author and reviewer separation exists. Exact distinct identities are required. Self-approval fails closed.
 - An approval binds the exact revision, content and range fingerprints, npm package identity, one `Vulnerability.id`, the approval purpose `approve_maintainer_reviewed_advisory_for_product_evaluation`, the approval policy, and the accepted `CC-BY-4.0` license evidence.
 - Decision 3 is implemented. Reviewer authority is an issued capability under `reviewer_approval_capability_policy_v1`. The public package entry does not export an issuer. `reviewer_capability_issuance` stores one immutable issuance row. `reviewer_capability_lifecycle_observation` stores one append-only terminal observation (`consumed`, `revoked`, or `cancelled`) in `20261003120000_reviewer_capability_issuance` (SHA-256 `08f18ce42ba19165f6d0a1bf872e5973bf74e26888e7f052c70c53779656dfbd`). The natural identity is the approval-claim fingerprint. Correlation does not mint a second capability.
@@ -22,9 +22,9 @@ Status is **Accepted** on 2026-10-06. The proposal date remains 2026-10-02. Acce
 - Approval insertion and capability consumption commit in one transaction (`persistMaintainerReviewedAdvisoryApprovalWithCapability`). The consumed observation must match the stored approval target. `recordMaintainerReviewedAdvisoryApproval` returns `capability_authority_required` and does not write. A consumed or revoked capability cannot mint another approval.
 - Exact issuance and approval replay return `already_applied`, insert nothing, and do not renew authority. An immutable conflict overwrites nothing. Concurrent issuance converges on one row. Concurrent consumption has one recorded winner and one `already_applied` result.
 - Product Match Evidence evaluation is one explicit command, implemented and production uncomposed. It does not return the eligibility-registry result `eligible`. The active registries that admit `eligible` remain empty. Persistent product-eligible evaluation count: 0. The command does not create a Finding.
-- Decision 11 still holds for production. Production startup does not submit, approve, evaluate, or persist these advisories. The explicit command is not production composition.
+- Decision 11 still holds for evaluation and Findings. API startup can submit and approve one local advisory. It does not evaluate those advisories, generate Product Match Evidence, or create a Finding.
 - Decision 10 remains in force. Corrections are the next revision in the same family, with the prior revision digest and the same npm package identity and `Vulnerability.id`. Withdrawal is an explicit revision fact. Absence is not withdrawal. Withdrawal does not close a Finding.
-- The capability grants no evaluator, product-match, or Finding authority. User-facing reviewer approval is not operational. Batches 1, 1-R, 2, and 2-R are committed. Branch-closure review is complete.
+- The capability grants no evaluator, product-match, or Finding authority. The API approval route is implemented and remains eligibility only. No approval web UI exists. Batches 1, 1-R, 2, and 2-R are committed. Branch-closure review is complete.
 - Real product-eligible evaluation count: 0
 - Production OSV acquisition: disabled
 - Finding creation: unavailable

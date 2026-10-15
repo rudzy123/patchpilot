@@ -28,6 +28,11 @@ import type { FindingDiscoveryRuntime } from './finding-discovery-runtime.js';
 import type { FindingOrganizationRateLimiter } from './finding-rate-limit.js';
 import { registerIntelligenceRoutes } from './intelligence-routes.js';
 import type { IntelligenceRuntime } from './intelligence-runtime.js';
+import { registerMaintainerReviewedAdvisoryRoutes } from './maintainer-reviewed-advisory-routes.js';
+import {
+  denyMaintainerReviewedAdvisoryRuntime,
+  type MaintainerReviewedAdvisoryRuntime,
+} from './maintainer-reviewed-advisory-runtime.js';
 import { registerSbomRoutes } from './sbom-routes.js';
 import type { SbomRuntime } from './sbom-runtime.js';
 import { readSingleHeader } from './headers.js';
@@ -45,6 +50,9 @@ export type ApiDependencies = {
   sboms: SbomRuntime;
   intelligence: IntelligenceRuntime;
   findings: FindingOperatorRuntime;
+  advisories?: MaintainerReviewedAdvisoryRuntime;
+  submissionPeerKey?: (request: FastifyRequest) => string;
+  approvalPeerKey?: (request: FastifyRequest) => string;
   findingOrganizationLimiter?: FindingOrganizationRateLimiter;
   latestObservationPeerKey?: (request: FastifyRequest) => string;
   discovery?: FindingDiscoveryRuntime;
@@ -223,6 +231,19 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     config: dependencies.config,
     auth: dependencies.auth,
     intelligence: dependencies.intelligence,
+  });
+
+  await registerMaintainerReviewedAdvisoryRoutes(app, {
+    config: dependencies.config,
+    logger: dependencies.logger,
+    auth: dependencies.auth,
+    advisories: dependencies.advisories ?? denyMaintainerReviewedAdvisoryRuntime(),
+    ...(dependencies.submissionPeerKey === undefined
+      ? {}
+      : { submissionPeerKey: dependencies.submissionPeerKey }),
+    ...(dependencies.approvalPeerKey === undefined
+      ? {}
+      : { approvalPeerKey: dependencies.approvalPeerKey }),
   });
 
   await registerFindingRoutes(app, {

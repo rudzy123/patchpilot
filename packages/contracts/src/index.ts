@@ -121,6 +121,15 @@ export {
   type IntelligencePublicFailureCodeContract,
 } from './intelligence.js';
 export {
+  MAINTAINER_REVIEWED_ADVISORY_APPROVAL_TRANSPORT_SCHEMA_VERSION,
+  MAINTAINER_REVIEWED_ADVISORY_SUBMISSION_TRANSPORT_SCHEMA_VERSION,
+  maintainerReviewedAdvisoryApprovalResponseSchema,
+  maintainerReviewedAdvisoryRevisionParamSchema,
+  maintainerReviewedAdvisorySubmissionResponseSchema,
+  type MaintainerReviewedAdvisoryApprovalResponse,
+  type MaintainerReviewedAdvisorySubmissionResponse,
+} from './maintainer-reviewed-advisories.js';
+export {
   FINDING_LATEST_OBSERVATION_TRANSPORT_SCHEMA_VERSION,
   controlledFindingCreationRequestSchema,
   controlledFindingCreationResponseSchema,

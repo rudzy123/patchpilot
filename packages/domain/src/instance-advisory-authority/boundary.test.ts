@@ -167,9 +167,14 @@ describe('instance advisory authority production exclusion', () => {
       'packages/database/prisma',
       'packages/auth/src',
     ].map((root) => path.join(repoRoot, root));
+    // The submission adapter reloads advisory_submit_local. The approval adapter
+    // reloads advisory_approve_for_product_evaluation. Both are production uncomposed
+    // and neither is a grant writer. Every other database source stays excluded.
     const allowed = new Set([
       'packages/database/src/instance-advisory-authority-persistence.ts',
       'packages/database/src/instance-advisory-authority-command-main.ts',
+      'packages/database/src/maintainer-reviewed-advisory-submission-persistence.ts',
+      'packages/database/src/maintainer-reviewed-advisory-approval-application-persistence.ts',
       'packages/database/prisma/schema.prisma',
       'packages/database/prisma/migrations/20261014120000_instance_advisory_authority_grant/migration.sql',
     ]);

@@ -23,6 +23,7 @@ They do not include exploit payloads. They do not claim compliance.
 | [Audit integrity failure](audit-integrity-failure.md) | Missing, altered, or cascade-deleted audit or evidence |
 | [Authentication failure](authentication-failure.md) | Login, session, CSRF, cookie, or login-limiter problems |
 | [Instance advisory authority command](instance-advisory-authority-command.md) | Explicit deployment-local grant, revoke, disable, and enable operations |
+| [Maintainer-reviewed advisory API](maintainer-reviewed-advisory-api.md) | Authenticated local advisory submission and independent approval through the API |
 | [Controlled Finding operator](controlled-finding-operator.md) | Owner creation, owner or admin inspection, and owner or admin target discovery through the API |
 | [Controlled Finding web workflow](controlled-finding-web-workflow.md) | Nested target review and direct Finding inspection in the web application |
 | [CI failure](ci-failure.md) | GitHub Actions or local quality gates fail |
