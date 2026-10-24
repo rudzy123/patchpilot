@@ -19,7 +19,7 @@
     "@patchpilot/config": "workspace:*",
     "@patchpilot/contracts": "workspace:*",
     "next": "16.3.8",
-    "react": "19.2.4",
+    "react": "19.3.1",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
@@ -30,7 +30,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.6",
     "@types/node": "^24.10.1",
-    "@types/react": "^19.2.2",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^19.2.2",
     "eslint": "^9.39.1",
     "eslint-config-next": "16.3.8",
