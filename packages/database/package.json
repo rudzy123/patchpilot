@@ -37,7 +37,7 @@
     "build": "prisma generate && tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "typecheck": "prisma generate && tsc --noEmit -p tsconfig.json",
-    "test:unit": "prisma generate && vitest run --config vitest.config.ts",
+    "test:unit": "vitest run --config vitest.config.ts",
     "test:integration": "prisma generate && vitest run --config vitest.integration.config.ts",
     "generate": "prisma generate",
     "validate": "node ../../scripts/run-with-database-url.mjs prisma validate",

@@ -82,6 +82,8 @@ The `Quality` job uses Node.js from `.nvmrc` (24), Corepack, `packageManager` pn
 
 The job runs `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm db:validate`, `pnpm db:generate`, and `pnpm build`. Failures are not masked with `continue-on-error` or `|| true`.
 
+`pnpm test:unit` runs `pnpm db:generate` before Turbo starts package unit tests. Package unit tests wait for `@patchpilot/database#build`. The database unit-test script does not run `prisma generate` again. A parallel generate deletes `.prisma/client` while API tests import it. Cached database build logs can replay an earlier generate without writing the client on a fresh runner, so the unit-test command generates it immediately before tests.
+
 It does **not** run `pnpm test:e2e`. That command is a local placeholder only (see [End-to-end testing](#end-to-end-testing)).
 
 ## Integration testing

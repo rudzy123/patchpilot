@@ -28,7 +28,7 @@
       "outputs": ["coverage/**"]
     },
     "test:unit": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@patchpilot/database#build"],
       "outputs": []
     },
     "test:integration": {
