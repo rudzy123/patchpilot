@@ -39,6 +39,6 @@
     "ajv-formats": "3.0.1",
     "packageurl-js": "2.0.1",
     "secure-json-parse": "4.1.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   }
 }
