@@ -3,8 +3,12 @@
  * reviewed Vulnerability bindings. Construction performs no I/O.
  * The adapter does not contact a provider, parse a body, activate a catalog,
  * evaluate affectedness, or create a Finding.
+ * Offline npm GHSA files are one transaction: range events, explicit versions,
+ * provenance, same-package supersession, and one file audit. The GCS command
+ * still stores zero range rows.
  */
 
+import { JSON_SCHEMA_VERSION_V1 } from '@patchpilot/domain';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import {
   ADVISORY_ALIAS_POLICY_VERSION,
@@ -16,7 +20,14 @@ import {
   ADVISORY_REVISION_ZERO_COUNTS,
   ADVISORY_VULNERABILITY_BINDING_INSPECTION_SCHEMA_VERSION,
   EXACT_MAPPING_METHOD,
+  OFFLINE_IMPORT_PROVIDER_GENERATION,
+  OFFLINE_IMPORT_RETRIEVAL_EVIDENCE_ID,
+  OFFLINE_NPM_ADVISORY_REVISION_IDENTITY_SCHEMA_VERSION,
+  OFFLINE_NPM_LICENSE_ADMISSION_REASON,
+  OFFLINE_NPM_OSV_NORMALIZATION_IDENTITY,
+  OFFLINE_OSV_IMPORT_RETRIEVAL_POLICY_ID,
   OSV_SOURCE_LICENSE_REGISTRY_IDENTIFIER,
+  SUPERSESSION_NONE,
   VULNERABILITY_MAPPING_POLICY_ID,
   advisoryFamilyDigest,
   advisoryRevisionDigest,
@@ -26,13 +37,18 @@ import {
   aliasSetDigest,
   classifyAdvisoryRevisionAgreement,
   classifyMappingAgreement,
+  classifyOfflineNpmAdvisoryRevisionAgreement,
   deriveRevisionDisposition,
   mappingEvidenceFingerprint,
   mappingReplayFingerprint,
+  offlineNpmAdvisoryRevisionDigest,
+  offlineNpmAdvisoryRevisionReplayFingerprint,
   parseAdvisoryBindingCommand,
   parseAdvisoryBindingInspection,
   parseAdvisoryRevisionCommand,
   parseAdvisoryRevisionInspection,
+  parseOfflineNpmAdvisoryFileCommand,
+  session14RangeFingerprint,
   trustMatchesDisposition,
   type AdvisoryBindingClassification,
   type AdvisoryRevisionIdentityFields,
@@ -41,20 +57,27 @@ import {
   type AdvisoryRevisionRejectionCode,
   type AdvisoryVulnerabilityBindingProjection,
   type ParsedAdvisoryRevisionCommand,
+  type ParsedOfflineNpmAdvisoryFileCommand,
   type PersistAdvisoryBindingResult,
   type PersistAdvisoryRevisionResult,
+  type PersistOfflineNpmAdvisoryFileResult,
 } from '@patchpilot/vulnerability-intelligence';
 
 import {
   isAdvisoryRevisionUniqueViolation,
   translateAdvisoryRevisionPersistenceFailure,
 } from './advisory-revision-persistence-errors.js';
-import { isRootPrismaClient } from './guards.js';
+import { asJsonObject, isRootPrismaClient } from './guards.js';
 
 const ROOT_CLIENT_REQUIRED = 'Advisory revision persistence requires the root database client.';
 const FAMILY_SCHEMA_VERSION = 'osv_advisory_family_identity_v1';
 const REVISION_SCHEMA_VERSION = 'osv_advisory_revision_identity_v1';
 const BINDING_SCHEMA_VERSION = 'osv_advisory_vulnerability_binding_v1';
+const OFFLINE_NPM_FILE_AUDIT_ACTION = 'intelligence.offline_npm_osv_file_imported';
+const OFFLINE_NPM_FILE_AUDIT_SUBJECT = 'advisory_family';
+const OFFLINE_IMPORT_LOCK_PREFIX = 'offline-npm-osv:';
+/** Lets one file insert every affected package before the client aborts the transaction. */
+const OFFLINE_NPM_FILE_TRANSACTION_TIMEOUT_MS = 120_000;
 
 const REVISION_SELECT = {
   id: true,
@@ -109,6 +132,43 @@ const REVISION_SELECT = {
   },
   binding: {
     select: { id: true },
+  },
+  sourceProvenance: {
+    select: {
+      source: true,
+      sourceLicenseRegistryVersion: true,
+      advisoryId: true,
+      packageIdentityKey: true,
+      rawContentSha256: true,
+      parserId: true,
+      parserResourcePolicy: true,
+      advisorySchemaVersion: true,
+      advisorySchemaCommit: true,
+      normalizationIdentity: true,
+      retrievedAt: true,
+      modifiedAt: true,
+      publishedAt: true,
+      withdrawnAt: true,
+      purl: true,
+      licenseAdmissionReason: true,
+      offlineAdvisoryImportBatchId: true,
+    },
+  },
+  rangeEvents: {
+    orderBy: [{ rangeOrdinal: 'asc' as const }, { eventOrdinal: 'asc' as const }],
+    select: {
+      rangeOrdinal: true,
+      eventOrdinal: true,
+      eventName: true,
+      eventValue: true,
+    },
+  },
+  explicitVersions: {
+    orderBy: { ordinal: 'asc' as const },
+    select: {
+      ordinal: true,
+      versionText: true,
+    },
   },
 } satisfies Prisma.AdvisoryRevisionSelect;
 
@@ -294,7 +354,25 @@ function identityFromRow(row: RevisionRow): AdvisoryRevisionIdentityFields & {
   };
 }
 
+function isStoredOfflineRevision(row: RevisionRow): boolean {
+  return (
+    row.origin === 'provider_derived' &&
+    row.source === 'github_advisory_database' &&
+    row.retrievalClassification === 'local_not_retrieved' &&
+    row.retrievalEvidenceId === OFFLINE_IMPORT_RETRIEVAL_EVIDENCE_ID &&
+    row.providerGeneration === OFFLINE_IMPORT_PROVIDER_GENERATION &&
+    row.retrievalPolicyId === OFFLINE_OSV_IMPORT_RETRIEVAL_POLICY_ID &&
+    row.revisionSchemaVersion === OFFLINE_NPM_ADVISORY_REVISION_IDENTITY_SCHEMA_VERSION
+  );
+}
+
 function projectRevision(row: RevisionRow): AdvisoryRevisionProjection {
+  if (isStoredOfflineRevision(row)) {
+    return projectOfflineRevision(row);
+  }
+  if (row.sourceProvenance !== null || row.explicitVersions.length > 0) {
+    throw new AdvisoryRevisionRowError();
+  }
   if (row.ecosystem !== 'npm') {
     throw new AdvisoryRevisionRowError();
   }
@@ -410,6 +488,457 @@ function projectRevision(row: RevisionRow): AdvisoryRevisionProjection {
   };
 }
 
+type StoredRangeRow = {
+  readonly rangeOrdinal: number;
+  readonly events: readonly {
+    readonly eventOrdinal: number;
+    readonly name: 'introduced' | 'fixed' | 'last_affected' | 'limit';
+    readonly value: string;
+  }[];
+};
+
+function eventName(value: string): 'introduced' | 'fixed' | 'last_affected' | 'limit' | null {
+  if (
+    value === 'introduced' ||
+    value === 'fixed' ||
+    value === 'last_affected' ||
+    value === 'limit'
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function storedRangeRows(row: RevisionRow): readonly StoredRangeRow[] | null {
+  const ranges: Array<{
+    rangeOrdinal: number;
+    events: Array<{
+      eventOrdinal: number;
+      name: 'introduced' | 'fixed' | 'last_affected' | 'limit';
+      value: string;
+    }>;
+  }> = [];
+  for (const event of row.rangeEvents) {
+    const name = eventName(event.eventName);
+    const current = ranges[ranges.length - 1];
+    if (name === null) {
+      return null;
+    }
+    if (current === undefined || current.rangeOrdinal !== event.rangeOrdinal) {
+      if (event.eventOrdinal !== 0 || event.rangeOrdinal !== ranges.length) {
+        return null;
+      }
+      ranges.push({
+        rangeOrdinal: event.rangeOrdinal,
+        events: [{ eventOrdinal: event.eventOrdinal, name, value: event.eventValue }],
+      });
+      continue;
+    }
+    if (current.events.length !== event.eventOrdinal) {
+      return null;
+    }
+    current.events.push({ eventOrdinal: event.eventOrdinal, name, value: event.eventValue });
+  }
+  return ranges;
+}
+
+function storedVersionRows(
+  row: RevisionRow,
+): readonly { ordinal: number; versionText: string }[] | null {
+  const versions: Array<{ ordinal: number; versionText: string }> = [];
+  for (const version of row.explicitVersions) {
+    if (version.ordinal !== versions.length || version.versionText.length === 0) {
+      return null;
+    }
+    versions.push({ ordinal: version.ordinal, versionText: version.versionText });
+  }
+  return versions;
+}
+
+function sameRangeRows(
+  left: readonly StoredRangeRow[],
+  right: ParsedAdvisoryRevisionCommand['rangeRows'],
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  for (let index = 0; index < left.length; index += 1) {
+    const stored = left[index];
+    const command = right[index];
+    if (
+      stored === undefined ||
+      command === undefined ||
+      stored.rangeOrdinal !== command.rangeOrdinal ||
+      stored.events.length !== command.events.length
+    ) {
+      return false;
+    }
+    for (let eventIndex = 0; eventIndex < stored.events.length; eventIndex += 1) {
+      const storedEvent = stored.events[eventIndex];
+      const commandEvent = command.events[eventIndex];
+      if (
+        storedEvent === undefined ||
+        commandEvent === undefined ||
+        storedEvent.eventOrdinal !== commandEvent.eventOrdinal ||
+        storedEvent.name !== commandEvent.name ||
+        storedEvent.value !== commandEvent.value
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function sameVersionRows(
+  left: readonly { readonly ordinal: number; readonly versionText: string }[],
+  right: ParsedAdvisoryRevisionCommand['explicitVersionRows'],
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  for (let index = 0; index < left.length; index += 1) {
+    const stored = left[index];
+    const command = right[index];
+    if (
+      stored === undefined ||
+      command === undefined ||
+      stored.ordinal !== command.ordinal ||
+      stored.versionText !== command.versionText
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function offlineInstants(row: RevisionRow): {
+  readonly modifiedAt: string;
+  readonly publishedAt: string | null;
+  readonly withdrawnAt: string | null;
+  readonly rawContentSha256: string;
+} {
+  const provenance = row.sourceProvenance;
+  if (provenance === null) {
+    throw new AdvisoryRevisionRowError();
+  }
+  return {
+    modifiedAt: provenance.modifiedAt.toISOString(),
+    publishedAt: provenance.publishedAt === null ? null : provenance.publishedAt.toISOString(),
+    withdrawnAt: provenance.withdrawnAt === null ? null : provenance.withdrawnAt.toISOString(),
+    rawContentSha256: provenance.rawContentSha256,
+  };
+}
+
+function projectOfflineRevision(row: RevisionRow): AdvisoryRevisionProjection {
+  if (row.ecosystem !== 'npm' || row.sourceProvenance === null) {
+    throw new AdvisoryRevisionRowError();
+  }
+  assertRevisionLifecycle(row);
+  const provenance = row.sourceProvenance;
+  const instants = offlineInstants(row);
+  const ranges = storedRangeRows(row);
+  const versions = storedVersionRows(row);
+  if (ranges === null || versions === null || (ranges.length === 0 && versions.length === 0)) {
+    throw new AdvisoryRevisionRowError();
+  }
+  if (
+    provenance.source !== row.source ||
+    provenance.advisoryId !== row.advisoryId ||
+    provenance.packageIdentityKey !== row.packageIdentityKey ||
+    provenance.parserId !== row.parserId ||
+    provenance.parserResourcePolicy !== row.parserResourcePolicy ||
+    provenance.advisorySchemaVersion !== row.advisorySchemaVersion ||
+    provenance.advisorySchemaCommit !== row.advisorySchemaCommit ||
+    provenance.sourceLicenseRegistryVersion !== row.sourceLicenseRegistryVersion ||
+    provenance.normalizationIdentity !== OFFLINE_NPM_OSV_NORMALIZATION_IDENTITY ||
+    provenance.licenseAdmissionReason !== OFFLINE_NPM_LICENSE_ADMISSION_REASON ||
+    (row.withdrawalClassification === 'withdrawn' && instants.withdrawnAt === null) ||
+    (row.withdrawalClassification !== 'withdrawn' && instants.withdrawnAt !== null)
+  ) {
+    throw new AdvisoryRevisionRowError();
+  }
+  const source = session15Source(row.source);
+  const origin = session15Origin(row.origin);
+  if (advisoryFamilyDigest(source, row.advisoryId) !== row.familyDigest) {
+    throw new AdvisoryRevisionRowError();
+  }
+  if (
+    session14RangeFingerprint(
+      ranges.map((range) => ({
+        type: 'SEMVER' as const,
+        events: range.events.map((event) => ({ name: event.name, value: event.value })),
+      })),
+      versions.map((version) => version.versionText),
+    ) !== row.session14RangeFingerprint
+  ) {
+    throw new AdvisoryRevisionRowError();
+  }
+  if (
+    offlineNpmAdvisoryRevisionDigest({
+      familyDigest: row.familyDigest,
+      contentFingerprint: row.contentFingerprint,
+      session14RangeFingerprint: row.session14RangeFingerprint,
+      productRangeFingerprint: row.productRangeFingerprint,
+      parserId: row.parserId,
+      parserResourcePolicy: row.parserResourcePolicy,
+      advisorySchemaVersion: row.advisorySchemaVersion,
+      advisorySchemaCommit: row.advisorySchemaCommit,
+      sourceLicenseRegistryVersion: row.sourceLicenseRegistryVersion,
+      spdxLicenseId: row.spdxLicenseId,
+      withdrawalClassification: row.withdrawalClassification,
+      quarantineClassification: row.quarantineClassification,
+      supersedesRevisionDigest: row.supersedesRevisionDigest,
+      modifiedAt: instants.modifiedAt,
+      publishedAt: instants.publishedAt,
+      withdrawnAt: instants.withdrawnAt,
+      rawContentSha256: instants.rawContentSha256,
+    }) !== row.revisionDigest
+  ) {
+    throw new AdvisoryRevisionRowError();
+  }
+  const aliases = row.aliases.map((alias) => ({
+    ordinal: alias.ordinal,
+    aliasType: alias.aliasType,
+    aliasValue: alias.aliasValue,
+    reviewClassification: alias.reviewClassification,
+    sourceClassification: session15Origin(alias.sourceClassification),
+    replayFingerprint: alias.replayFingerprint,
+  }));
+  if (
+    offlineNpmAdvisoryRevisionReplayFingerprint({
+      source,
+      advisoryId: row.advisoryId,
+      providerGeneration: row.providerGeneration,
+      contentFingerprint: row.contentFingerprint,
+      session14RangeFingerprint: row.session14RangeFingerprint,
+      productRangeFingerprint: row.productRangeFingerprint,
+      parserId: row.parserId,
+      parserResourcePolicy: row.parserResourcePolicy,
+      advisorySchemaVersion: row.advisorySchemaVersion,
+      advisorySchemaCommit: row.advisorySchemaCommit,
+      sourceLicenseRegistryVersion: row.sourceLicenseRegistryVersion,
+      sourceLicensePolicyVersion: row.sourceLicensePolicyVersion,
+      spdxLicenseId: row.spdxLicenseId,
+      origin,
+      trustClassification: row.trustClassification,
+      revisionDisposition: row.revisionDisposition,
+      withdrawalClassification: row.withdrawalClassification,
+      quarantineClassification: row.quarantineClassification,
+      supersedesRevisionDigest: row.supersedesRevisionDigest,
+      retrievalClassification: 'local_not_retrieved',
+      retrievalEvidenceId: row.retrievalEvidenceId,
+      ecosystem: 'npm',
+      packageIdentityKey: row.packageIdentityKey,
+      evaluatorVersion: row.evaluatorVersion,
+      matchingPolicyId: row.matchingPolicyId,
+      aliases,
+      familyDigest: row.familyDigest,
+      revisionDigest: row.revisionDigest,
+      modifiedAt: instants.modifiedAt,
+      publishedAt: instants.publishedAt,
+      withdrawnAt: instants.withdrawnAt,
+      rawContentSha256: instants.rawContentSha256,
+    }) !== row.replayFingerprint
+  ) {
+    throw new AdvisoryRevisionRowError();
+  }
+  const aliasValues = row.aliases.map((alias) => alias.aliasValue);
+  if (aliasSetDigest(aliasValues) !== row.aliasSetDigest || row.aliases.length !== row.aliasCount) {
+    throw new AdvisoryRevisionRowError();
+  }
+  const cveCount = row.aliases.filter((alias) => alias.aliasType === 'canonical_cve').length;
+  if (cveCount !== row.cveAliasCount) {
+    throw new AdvisoryRevisionRowError();
+  }
+  for (let index = 0; index < row.aliases.length; index += 1) {
+    const alias = row.aliases[index];
+    if (alias === undefined || alias.ordinal !== index + 1) {
+      throw new AdvisoryRevisionRowError();
+    }
+    if (alias.aliasPolicyVersion !== ADVISORY_ALIAS_POLICY_VERSION) {
+      throw new AdvisoryRevisionRowError();
+    }
+    if (
+      alias.replayFingerprint !==
+      aliasReplayFingerprint({
+        revisionDigest: row.revisionDigest,
+        ordinal: alias.ordinal,
+        aliasType: alias.aliasType,
+        aliasValue: alias.aliasValue,
+        reviewClassification: alias.reviewClassification,
+        sourceClassification: session15Origin(alias.sourceClassification),
+      })
+    ) {
+      throw new AdvisoryRevisionRowError();
+    }
+  }
+  if (
+    row.sourceLicenseRegistryVersion !== OSV_SOURCE_LICENSE_REGISTRY_IDENTIFIER ||
+    row.sourceLicensePolicyVersion !== OSV_SOURCE_LICENSE_REGISTRY_IDENTIFIER
+  ) {
+    throw new AdvisoryRevisionRowError();
+  }
+  const mappingCount = row.binding === null ? 0 : 1;
+  return {
+    inspectionSchemaVersion: ADVISORY_REVISION_INSPECTION_SCHEMA_VERSION,
+    revisionId: row.id,
+    familyId: row.advisoryFamilyId,
+    source,
+    advisoryId: row.advisoryId,
+    familyDigest: row.familyDigest,
+    revisionDigest: row.revisionDigest,
+    contentFingerprint: row.contentFingerprint,
+    session14RangeFingerprint: row.session14RangeFingerprint,
+    productRangeFingerprint: row.productRangeFingerprint,
+    parserId: row.parserId,
+    parserResourcePolicy: row.parserResourcePolicy,
+    advisorySchemaVersion: row.advisorySchemaVersion,
+    advisorySchemaCommit: row.advisorySchemaCommit,
+    sourceLicenseRegistryVersion: row.sourceLicenseRegistryVersion,
+    sourceLicensePolicyVersion: row.sourceLicensePolicyVersion,
+    spdxLicenseId: row.spdxLicenseId,
+    origin,
+    trustClassification: row.trustClassification,
+    revisionDisposition: row.revisionDisposition,
+    withdrawalClassification: row.withdrawalClassification,
+    quarantineClassification: row.quarantineClassification,
+    supersedesRevisionDigest: row.supersedesRevisionDigest,
+    retrievalClassification: 'local_not_retrieved',
+    providerGeneration: row.providerGeneration,
+    retrievalPolicyId: row.retrievalPolicyId,
+    revisionSchemaVersion: row.revisionSchemaVersion,
+    ecosystem: 'npm',
+    packageNamespace: row.packageNamespace,
+    packageName: row.packageName,
+    packageIdentityKey: row.packageIdentityKey,
+    replayFingerprint: row.replayFingerprint,
+    aliasCount: row.aliasCount,
+    cveAliasCount: row.cveAliasCount,
+    mappingCountClassification: mappingCount === 0 ? 'none' : 'one_reviewed',
+    createdAt: row.createdAt.toISOString(),
+    findingCreation: ADVISORY_REVISION_FINDING_CREATION,
+    productEligibilityStored: false,
+    catalogActivationStored: false,
+  };
+}
+
+function offlineRevisionAgrees(
+  row: RevisionRow,
+  command: ParsedAdvisoryRevisionCommand,
+  purl: string | null,
+): boolean {
+  if (
+    !isStoredOfflineRevision(row) ||
+    command.modifiedAt === null ||
+    command.rawContentSha256 === null
+  ) {
+    return false;
+  }
+  projectOfflineRevision(row);
+  const instants = offlineInstants(row);
+  const ranges = storedRangeRows(row);
+  const versions = storedVersionRows(row);
+  if (ranges === null || versions === null) {
+    throw new AdvisoryRevisionRowError();
+  }
+  const source = session15Source(row.source);
+  const origin = session15Origin(row.origin);
+  const agreement = classifyOfflineNpmAdvisoryRevisionAgreement(
+    {
+      source,
+      advisoryId: row.advisoryId,
+      providerGeneration: row.providerGeneration,
+      contentFingerprint: row.contentFingerprint,
+      session14RangeFingerprint: row.session14RangeFingerprint,
+      productRangeFingerprint: row.productRangeFingerprint,
+      parserId: row.parserId,
+      parserResourcePolicy: row.parserResourcePolicy,
+      advisorySchemaVersion: row.advisorySchemaVersion,
+      advisorySchemaCommit: row.advisorySchemaCommit,
+      sourceLicenseRegistryVersion: row.sourceLicenseRegistryVersion,
+      sourceLicensePolicyVersion: row.sourceLicensePolicyVersion,
+      spdxLicenseId: row.spdxLicenseId,
+      origin,
+      trustClassification: row.trustClassification,
+      revisionDisposition: row.revisionDisposition,
+      withdrawalClassification: row.withdrawalClassification,
+      quarantineClassification: row.quarantineClassification,
+      supersedesRevisionDigest: row.supersedesRevisionDigest,
+      retrievalClassification: 'local_not_retrieved',
+      retrievalEvidenceId: row.retrievalEvidenceId,
+      ecosystem: 'npm',
+      packageIdentityKey: row.packageIdentityKey,
+      evaluatorVersion: row.evaluatorVersion,
+      matchingPolicyId: row.matchingPolicyId,
+      aliases: row.aliases.map((alias) => ({
+        ordinal: alias.ordinal,
+        aliasType: alias.aliasType,
+        aliasValue: alias.aliasValue,
+        reviewClassification: alias.reviewClassification,
+        sourceClassification: session15Origin(alias.sourceClassification),
+        replayFingerprint: alias.replayFingerprint,
+      })),
+      familyDigest: row.familyDigest,
+      revisionDigest: row.revisionDigest,
+      replayFingerprint: row.replayFingerprint,
+      modifiedAt: instants.modifiedAt,
+      publishedAt: instants.publishedAt,
+      withdrawnAt: instants.withdrawnAt,
+      rawContentSha256: instants.rawContentSha256,
+    },
+    {
+      ...command,
+      modifiedAt: command.modifiedAt,
+      publishedAt: command.publishedAt,
+      withdrawnAt: command.withdrawnAt,
+      rawContentSha256: command.rawContentSha256,
+    },
+  );
+  return (
+    agreement === 'agree' &&
+    (row.sourceProvenance?.purl ?? null) === purl &&
+    sameRangeRows(ranges, command.rangeRows) &&
+    sameVersionRows(versions, command.explicitVersionRows)
+  );
+}
+
+function recordedCounts(inserts: number): {
+  readonly inserts: number;
+  readonly updates: 0;
+  readonly deletes: 0;
+  readonly timestampChanges: 0;
+  readonly stateChanges: 0;
+  readonly parserCalls: 0;
+  readonly providerCalls: 0;
+} {
+  return {
+    inserts,
+    updates: 0,
+    deletes: 0,
+    timestampChanges: 0,
+    stateChanges: 0,
+    parserCalls: 0,
+    providerCalls: 0,
+  };
+}
+
+function rejectedFile(code: AdvisoryRevisionRejectionCode): PersistOfflineNpmAdvisoryFileResult {
+  return { kind: 'rejected', code, counts: ADVISORY_REVISION_ZERO_COUNTS };
+}
+
+function fileResultFromRevisionDecision(
+  result: PersistAdvisoryRevisionResult,
+): PersistOfflineNpmAdvisoryFileResult {
+  if (result.kind === 'immutable_conflict') {
+    return { kind: 'immutable_conflict', counts: ADVISORY_REVISION_ZERO_COUNTS };
+  }
+  if (result.kind === 'rejected') {
+    return rejectedFile(result.code);
+  }
+  return rejectedFile('internal_failure');
+}
+
 function projectBinding(row: BindingRow): AdvisoryVulnerabilityBindingProjection {
   const aliasCanonical = aliasSetCanonical(row.revision.aliases.map((alias) => alias.aliasValue));
   const evidence = mappingEvidenceFingerprint({
@@ -488,6 +1017,9 @@ class PrismaAdvisoryRevisionPersistence implements AdvisoryRevisionPersistencePo
     if (!parsed.accepted) {
       return rejectedRevision(parsed.code);
     }
+    if (parsed.command.normalizationIdentity !== null) {
+      return rejectedRevision('invalid_command');
+    }
     try {
       const existing = await this.findRevision(this.client, parsed.command.revisionDigest);
       if (existing !== null) {
@@ -515,13 +1047,15 @@ class PrismaAdvisoryRevisionPersistence implements AdvisoryRevisionPersistencePo
           where: { revisionDigest: parsed.command.supersedesRevisionDigest },
           select: {
             advisoryFamilyId: true,
+            packageIdentityKey: true,
             family: { select: { source: true, advisoryId: true } },
           },
         });
         if (
           prior === null ||
           prior.family.source !== parsed.command.source ||
-          prior.family.advisoryId !== parsed.command.advisoryId
+          prior.family.advisoryId !== parsed.command.advisoryId ||
+          prior.packageIdentityKey !== parsed.command.packageIdentityKey
         ) {
           return rejectedRevision('supersession_rejected');
         }
@@ -538,6 +1072,32 @@ class PrismaAdvisoryRevisionPersistence implements AdvisoryRevisionPersistencePo
         return this.reloadRevision(parsed.command);
       }
       return rejectedRevision(translateAdvisoryRevisionPersistenceFailure(error));
+    }
+  }
+
+  public async persistOfflineNpmAdvisoryFile(
+    command: unknown,
+  ): Promise<PersistOfflineNpmAdvisoryFileResult> {
+    const parsed = parseOfflineNpmAdvisoryFileCommand(command);
+    if (!parsed.accepted) {
+      return rejectedFile(parsed.code);
+    }
+    try {
+      return await this.client.$transaction((tx) => this.writeOfflineFile(tx, parsed.command), {
+        maxWait: 5_000,
+        timeout: OFFLINE_NPM_FILE_TRANSACTION_TIMEOUT_MS,
+      });
+    } catch (error) {
+      if (error instanceof AdvisoryRevisionDecision) {
+        return fileResultFromRevisionDecision(error.result);
+      }
+      if (error instanceof AdvisoryRevisionRowError) {
+        return rejectedFile('malformed_persisted_state');
+      }
+      if (isAdvisoryRevisionUniqueViolation(error)) {
+        return this.reloadOfflineFile(parsed.command);
+      }
+      return rejectedFile(translateAdvisoryRevisionPersistenceFailure(error));
     }
   }
 
@@ -729,65 +1289,18 @@ class PrismaAdvisoryRevisionPersistence implements AdvisoryRevisionPersistencePo
       if (raced !== null) {
         return this.classifyRevision(raced, command);
       }
-      let family = await tx.advisoryFamily.findUnique({
-        where: {
-          source_advisoryId: { source: command.source, advisoryId: command.advisoryId },
-        },
-        select: {
-          id: true,
-          familyDigest: true,
-          familySchemaVersion: true,
-          sourceRegistryVersion: true,
-        },
-      });
-      let familyInserted = 0;
-      if (family === null) {
-        familyInserted = await tx.$executeRaw`
-          INSERT INTO "advisory_family" (
-            "family_schema_version",
-            "source",
-            "advisory_id",
-            "family_digest",
-            "source_registry_version"
-          ) VALUES (
-            ${command.familySchemaVersion},
-            ${command.source}::"advisory_evidence_source",
-            ${command.advisoryId},
-            ${command.familyDigest},
-            ${command.sourceLicenseRegistryVersion}
-          )
-          ON CONFLICT ("source", "advisory_id") DO NOTHING
-        `;
-        family = await tx.advisoryFamily.findUnique({
-          where: {
-            source_advisoryId: { source: command.source, advisoryId: command.advisoryId },
-          },
-          select: {
-            id: true,
-            familyDigest: true,
-            familySchemaVersion: true,
-            sourceRegistryVersion: true,
-          },
-        });
-      }
-      if (
-        family === null ||
-        family.familyDigest !== command.familyDigest ||
-        family.familySchemaVersion !== FAMILY_SCHEMA_VERSION ||
-        family.sourceRegistryVersion !== OSV_SOURCE_LICENSE_REGISTRY_IDENTIFIER
-      ) {
-        throw new AdvisoryRevisionDecision({
-          kind: 'immutable_conflict',
-          counts: ADVISORY_REVISION_ZERO_COUNTS,
-        });
-      }
+      const family = await this.ensureFamily(tx, command);
       let supersedesId: string | null = null;
-      if (command.supersedesRevisionDigest !== 'none') {
+      if (command.supersedesRevisionDigest !== SUPERSESSION_NONE) {
         const prior = await tx.advisoryRevision.findUnique({
           where: { revisionDigest: command.supersedesRevisionDigest },
-          select: { id: true, advisoryFamilyId: true },
+          select: { id: true, advisoryFamilyId: true, packageIdentityKey: true },
         });
-        if (prior === null || prior.advisoryFamilyId !== family.id) {
+        if (
+          prior === null ||
+          prior.advisoryFamilyId !== family.id ||
+          prior.packageIdentityKey !== command.packageIdentityKey
+        ) {
           throw new AdvisoryRevisionDecision(rejectedRevision('supersession_rejected'));
         }
         supersedesId = prior.id;
@@ -849,7 +1362,7 @@ class PrismaAdvisoryRevisionPersistence implements AdvisoryRevisionPersistencePo
         kind: 'recorded' as const,
         projection: projectRevision(created),
         counts: {
-          inserts: familyInserted + 1 + command.aliasCount,
+          inserts: family.inserted + 1 + command.aliasCount,
           updates: 0 as const,
           deletes: 0 as const,
           timestampChanges: 0 as const,
@@ -1030,5 +1543,365 @@ class PrismaAdvisoryRevisionPersistence implements AdvisoryRevisionPersistencePo
         },
       };
     });
+  }
+
+  private async ensureFamily(
+    tx: Prisma.TransactionClient,
+    command: ParsedAdvisoryRevisionCommand,
+  ): Promise<{ readonly id: string; readonly inserted: number }> {
+    let family = await tx.advisoryFamily.findUnique({
+      where: {
+        source_advisoryId: { source: command.source, advisoryId: command.advisoryId },
+      },
+      select: {
+        id: true,
+        familyDigest: true,
+        familySchemaVersion: true,
+        sourceRegistryVersion: true,
+      },
+    });
+    let inserted = 0;
+    if (family === null) {
+      inserted = await tx.$executeRaw`
+        INSERT INTO "advisory_family" (
+          "family_schema_version",
+          "source",
+          "advisory_id",
+          "family_digest",
+          "source_registry_version"
+        ) VALUES (
+          ${command.familySchemaVersion},
+          ${command.source}::"advisory_evidence_source",
+          ${command.advisoryId},
+          ${command.familyDigest},
+          ${command.sourceLicenseRegistryVersion}
+        )
+        ON CONFLICT ("source", "advisory_id") DO NOTHING
+      `;
+      family = await tx.advisoryFamily.findUnique({
+        where: {
+          source_advisoryId: { source: command.source, advisoryId: command.advisoryId },
+        },
+        select: {
+          id: true,
+          familyDigest: true,
+          familySchemaVersion: true,
+          sourceRegistryVersion: true,
+        },
+      });
+    }
+    if (
+      family === null ||
+      family.familyDigest !== command.familyDigest ||
+      family.familySchemaVersion !== FAMILY_SCHEMA_VERSION ||
+      family.sourceRegistryVersion !== OSV_SOURCE_LICENSE_REGISTRY_IDENTIFIER
+    ) {
+      throw new AdvisoryRevisionDecision({
+        kind: 'immutable_conflict',
+        counts: ADVISORY_REVISION_ZERO_COUNTS,
+      });
+    }
+    return { id: family.id, inserted };
+  }
+
+  private async writeOfflineFile(
+    tx: Prisma.TransactionClient,
+    command: ParsedOfflineNpmAdvisoryFileCommand,
+  ): Promise<PersistOfflineNpmAdvisoryFileResult> {
+    const first = command.revisions[0];
+    if (first === undefined) {
+      return rejectedFile('invalid_command');
+    }
+    const batch = await tx.offlineAdvisoryImportBatch.findUnique({
+      where: { id: command.batchId },
+      select: { id: true, retrievedAt: true, sourceLicenseRegistryVersion: true },
+    });
+    if (
+      batch === null ||
+      batch.sourceLicenseRegistryVersion !== OSV_SOURCE_LICENSE_REGISTRY_IDENTIFIER
+    ) {
+      throw new AdvisoryRevisionDecision(rejectedRevision('foreign_key_violation'));
+    }
+    await tx.$queryRaw`
+      SELECT 1::int AS locked
+      FROM (
+        SELECT pg_advisory_xact_lock(
+          hashtextextended(
+            ${`${OFFLINE_IMPORT_LOCK_PREFIX}${first.command.source}:${first.command.advisoryId}`},
+            0
+          )
+        )
+      ) AS taken
+    `;
+    const family = await this.ensureFamily(tx, first.command);
+    await tx.$queryRaw`
+      SELECT "id"
+      FROM "advisory_family"
+      WHERE "id" = ${family.id}::uuid
+      FOR UPDATE
+    `;
+    const projections: AdvisoryRevisionProjection[] = [];
+    let inserts = family.inserted;
+    let accepted = 0;
+    let skipped = 0;
+    for (const revision of command.revisions) {
+      const existing = await this.findRevision(tx, revision.command.revisionDigest);
+      if (existing !== null) {
+        if (!offlineRevisionAgrees(existing, revision.command, revision.purl)) {
+          throw new AdvisoryRevisionDecision({
+            kind: 'immutable_conflict',
+            counts: ADVISORY_REVISION_ZERO_COUNTS,
+          });
+        }
+        projections.push(projectOfflineRevision(existing));
+        skipped += 1;
+        continue;
+      }
+      const created = await this.insertOfflineRevision(
+        tx,
+        revision,
+        family.id,
+        batch.retrievedAt,
+        command.batchId,
+      );
+      projections.push(created.projection);
+      inserts += created.inserts;
+      accepted += 1;
+    }
+    const familyId = projections[0]?.familyId;
+    if (familyId === undefined) {
+      throw new AdvisoryRevisionRowError();
+    }
+    if (accepted === 0) {
+      return {
+        kind: 'already_applied',
+        familyId,
+        projections,
+        counts: ADVISORY_REVISION_ZERO_COUNTS,
+        auditEventAdded: false,
+      };
+    }
+    const rawContentSha256 = first.command.rawContentSha256;
+    if (rawContentSha256 === null) {
+      throw new AdvisoryRevisionDecision(rejectedRevision('invalid_command'));
+    }
+    const reasonCodes = ['recorded'];
+    if (skipped > 0) {
+      reasonCodes.push('already_applied');
+      reasonCodes.sort();
+    }
+    const existingAudit = await tx.auditEvent.findFirst({
+      where: {
+        organizationId: null,
+        action: OFFLINE_NPM_FILE_AUDIT_ACTION,
+        subjectType: OFFLINE_NPM_FILE_AUDIT_SUBJECT,
+        subjectId: familyId,
+        correlationId: command.correlationId,
+      },
+      select: { id: true },
+    });
+    if (existingAudit !== null) {
+      throw new AdvisoryRevisionDecision({
+        kind: 'immutable_conflict',
+        counts: ADVISORY_REVISION_ZERO_COUNTS,
+      });
+    }
+    await tx.auditEvent.create({
+      data: {
+        actorType: 'system',
+        action: OFFLINE_NPM_FILE_AUDIT_ACTION,
+        subjectType: OFFLINE_NPM_FILE_AUDIT_SUBJECT,
+        subjectId: familyId,
+        correlationId: command.correlationId,
+        schemaVersion: JSON_SCHEMA_VERSION_V1,
+        retentionCategory: 'security',
+        payload: asJsonObject(
+          {
+            schemaVersion: JSON_SCHEMA_VERSION_V1,
+            registryId: OSV_SOURCE_LICENSE_REGISTRY_IDENTIFIER,
+            rawContentSha256,
+            byteLength: command.byteLength,
+            advisoryIds: [first.command.advisoryId],
+            reasonCodes,
+            counts: {
+              accepted,
+              skipped,
+              rejected: 0,
+              failed: 0,
+            },
+          },
+          'offline npm import audit',
+        ),
+      },
+    });
+    return {
+      kind: 'recorded',
+      familyId,
+      projections,
+      counts: recordedCounts(inserts + 1),
+      auditEventAdded: true,
+    };
+  }
+
+  private async insertOfflineRevision(
+    tx: Prisma.TransactionClient,
+    revision: ParsedOfflineNpmAdvisoryFileCommand['revisions'][number],
+    familyId: string,
+    retrievedAt: Date,
+    batchId: string,
+  ): Promise<{ readonly projection: AdvisoryRevisionProjection; readonly inserts: number }> {
+    const command = revision.command;
+    if (
+      command.modifiedAt === null ||
+      command.rawContentSha256 === null ||
+      command.normalizationIdentity === null
+    ) {
+      throw new AdvisoryRevisionDecision(rejectedRevision('invalid_command'));
+    }
+    const tips = await tx.$queryRaw<Array<{ id: string; revision_digest: string }>>`
+      SELECT revision."id" AS "id", revision."revision_digest" AS "revision_digest"
+      FROM "advisory_revision" revision
+      WHERE revision."advisory_family_id" = ${familyId}::uuid
+        AND revision."package_identity_key" = ${command.packageIdentityKey}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "advisory_revision" successor
+          WHERE successor."advisory_family_id" = revision."advisory_family_id"
+            AND successor."package_identity_key" = revision."package_identity_key"
+            AND successor."supersedes_advisory_revision_id" = revision."id"
+        )
+    `;
+    if (tips.length > 1) {
+      throw new AdvisoryRevisionDecision(rejectedRevision('malformed_persisted_state'));
+    }
+    const tip = tips[0];
+    if (tip === undefined && command.supersedesRevisionDigest !== SUPERSESSION_NONE) {
+      throw new AdvisoryRevisionDecision(rejectedRevision('supersession_rejected'));
+    }
+    if (tip !== undefined && command.supersedesRevisionDigest !== tip.revision_digest) {
+      throw new AdvisoryRevisionDecision(rejectedRevision('supersession_rejected'));
+    }
+    const supersedesId = tip === undefined ? null : tip.id;
+    const rangeEvents = command.rangeRows.flatMap((range) =>
+      range.events.map((event) => ({
+        rangeOrdinal: range.rangeOrdinal,
+        eventOrdinal: event.eventOrdinal,
+        eventName: event.name,
+        eventValue: event.value,
+      })),
+    );
+    const created = await tx.advisoryRevision.create({
+      data: {
+        revisionSchemaVersion: command.revisionSchemaVersion,
+        advisoryFamilyId: familyId,
+        source: command.source,
+        advisoryId: command.advisoryId,
+        familyDigest: command.familyDigest,
+        revisionDigest: command.revisionDigest,
+        providerGeneration: command.providerGeneration,
+        contentFingerprint: command.contentFingerprint,
+        session14RangeFingerprint: command.session14RangeFingerprint,
+        productRangeFingerprint: command.productRangeFingerprint,
+        parserId: command.parserId,
+        parserResourcePolicy: command.parserResourcePolicy,
+        advisorySchemaVersion: command.advisorySchemaVersion,
+        advisorySchemaCommit: command.advisorySchemaCommit,
+        sourceLicenseRegistryVersion: command.sourceLicenseRegistryVersion,
+        sourceLicensePolicyVersion: command.sourceLicensePolicyVersion,
+        spdxLicenseId: command.spdxLicenseId,
+        origin: command.origin,
+        trustClassification: command.trustClassification,
+        revisionDisposition: command.revisionDisposition,
+        withdrawalClassification: command.withdrawalClassification,
+        quarantineClassification: command.quarantineClassification,
+        supersedesRevisionDigest: command.supersedesRevisionDigest,
+        supersedesAdvisoryRevisionId: supersedesId,
+        retrievalClassification: command.retrievalClassification,
+        retrievalEvidenceId: command.retrievalEvidenceId,
+        retrievalPolicyId: command.retrievalPolicyId,
+        ecosystem: command.ecosystem,
+        packageNamespace: command.packageNamespace,
+        packageName: command.packageName,
+        packageIdentityKey: command.packageIdentityKey,
+        evaluatorVersion: command.evaluatorVersion,
+        matchingPolicyId: command.matchingPolicyId,
+        aliasCount: command.aliasCount,
+        cveAliasCount: command.cveAliasCount,
+        aliasSetDigest: command.aliasSetDigest,
+        replayFingerprint: command.replayFingerprint,
+        aliases: {
+          create: command.aliases.map((alias) => ({
+            ordinal: alias.ordinal,
+            aliasType: alias.aliasType,
+            aliasValue: alias.aliasValue,
+            aliasPolicyVersion: command.aliasPolicyVersion,
+            sourceClassification: session15Origin(alias.sourceClassification),
+            reviewClassification: alias.reviewClassification,
+            replayFingerprint: alias.replayFingerprint,
+          })),
+        },
+        ...(rangeEvents.length > 0 ? { rangeEvents: { create: rangeEvents } } : {}),
+        ...(command.explicitVersionRows.length > 0
+          ? {
+              explicitVersions: {
+                create: command.explicitVersionRows.map((version) => ({
+                  ordinal: version.ordinal,
+                  versionText: version.versionText,
+                })),
+              },
+            }
+          : {}),
+        sourceProvenance: {
+          create: {
+            source: command.source,
+            sourceLicenseRegistryVersion: command.sourceLicenseRegistryVersion,
+            advisoryId: command.advisoryId,
+            packageIdentityKey: command.packageIdentityKey,
+            rawContentSha256: command.rawContentSha256,
+            parserId: command.parserId,
+            parserResourcePolicy: command.parserResourcePolicy,
+            advisorySchemaVersion: command.advisorySchemaVersion,
+            advisorySchemaCommit: command.advisorySchemaCommit,
+            normalizationIdentity: command.normalizationIdentity,
+            retrievedAt,
+            modifiedAt: new Date(command.modifiedAt),
+            publishedAt: command.publishedAt === null ? null : new Date(command.publishedAt),
+            withdrawnAt: command.withdrawnAt === null ? null : new Date(command.withdrawnAt),
+            purl: revision.purl,
+            licenseAdmissionReason: OFFLINE_NPM_LICENSE_ADMISSION_REASON,
+            offlineAdvisoryImportBatchId: batchId,
+          },
+        },
+      },
+      select: REVISION_SELECT,
+    });
+    return {
+      projection: projectOfflineRevision(created),
+      inserts: 1 + command.aliasCount + rangeEvents.length + command.explicitVersionRows.length + 1,
+    };
+  }
+
+  private async reloadOfflineFile(
+    command: ParsedOfflineNpmAdvisoryFileCommand,
+  ): Promise<PersistOfflineNpmAdvisoryFileResult> {
+    const projections: AdvisoryRevisionProjection[] = [];
+    for (const revision of command.revisions) {
+      const row = await this.findRevision(this.client, revision.command.revisionDigest);
+      if (row === null || !offlineRevisionAgrees(row, revision.command, revision.purl)) {
+        return { kind: 'immutable_conflict', counts: ADVISORY_REVISION_ZERO_COUNTS };
+      }
+      projections.push(projectOfflineRevision(row));
+    }
+    const familyId = projections[0]?.familyId;
+    if (familyId === undefined) {
+      return rejectedFile('internal_failure');
+    }
+    return {
+      kind: 'already_applied',
+      familyId,
+      projections,
+      counts: ADVISORY_REVISION_ZERO_COUNTS,
+      auditEventAdded: false,
+    };
   }
 }
