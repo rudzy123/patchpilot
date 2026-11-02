@@ -2,7 +2,7 @@
   "name": "@patchpilot/policy-engine",
   "version": "0.0.0",
   "private": true,
-  "description": "Framework-independent policy-engine boundary. No scoring in this iteration.",
+  "description": "Pure, dependency-free P1-P4 priority engine (ADR 0045). Production uncomposed.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
