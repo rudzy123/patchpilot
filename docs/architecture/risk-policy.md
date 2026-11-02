@@ -1,6 +1,6 @@
 # Risk policy
 
-This is the canonical design for explainable, versioned **priority** calculation. Engine decision: [ADR 0012](../adr/0012-explainable-policy-engine.md).
+This is the canonical design for explainable, versioned **priority** calculation. Engine decision: [ADR 0012](../adr/0012-explainable-policy-engine.md). Numerical policy and engine contract: [ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md) (Proposed). The engine is implemented in `packages/policy-engine` and is production uncomposed. No **RiskCalculation** is written and Prioritization remains unavailable ([current state](../project/current-state.md)).
 
 Until a later ADR splits the terms, **priority** and **risk score** mean the same stored ranking ([glossary](../product/glossary.md), [OD-7](open-decisions.md)).
 
@@ -19,15 +19,14 @@ AI must not set authoritative scores. Optional AI, if added later, may only draf
 | Direct vs transitive when the SBOM recorded it | |
 | Fix available / affected range from OSV when present | |
 | Finding age (`firstObservedAt` vs now, frozen in tests) | |
-| Compensating control present (boolean if schema-checked evidence exists; default unused) | |
 | Advisory withdrawn flag | |
 | Policy version identifier used | Copied onto the calculation as evidence |
 
 The engine must not treat **RemediationTask** state as a fact about the component. Completing work does not change inputs until a new SBOM observation exists.
 
-Missing evidence is recorded as `unavailable` with **zero** favorable contribution. It must not be treated as "not internet facing" or "not KEV."
+Missing evidence is recorded as `unknown` or `unavailable` with **zero** contribution. It must not be treated as "not internet facing" or "not KEV."
 
-Default built-in policy does **not** treat compensating-control prose as a numeric factor. A future published policy may add a named factor only if the **Evidence** row matches a defined schema.
+Compensating controls are not an engine input. The ADR 0045 fact input rejects a `compensating_control` key and any remediation-task field. A future policy may add a named factor only through a new ADR and policy version, and only if the **Evidence** row matches a defined schema.
 
 **Risk acceptance** does not rewrite **RiskCalculation**. It changes finding workflow state and default queue filters.
 
@@ -51,17 +50,9 @@ UI, exports, and logs must not label priority as "CVSS" or as "exploitability pr
 
 ## Contributing factors
 
-Every calculation persists the **full set** of factors the engine received, including those with zero contribution and those marked `unavailable`.
+Every calculation persists the **full set** of factors the engine received, including those with zero contribution and those marked `unknown` or `unavailable`.
 
-Example shape (illustrative, not a live schema):
-
-```text
-factor_id, input_kind (observed|unavailable), raw_value, contribution, notes
-source_severity, observed, CVSS 9.8, 35, from osv record uuid
-kev_listed, observed, true, 40, catalog date and snapshot hash
-environment, observed, production, 15, environment id
-dependency_direct, unavailable, null, 0, SBOM omitted dependency section
-```
+The engine emits exactly 10 factor rows in catalog order, each with `factorId`, `ordinal`, `inputState`, `observedValue`, `normalizedPercent`, `weight`, `contributionCenti`, `status`, and a closed `explanationCode`, plus two rule rows. Free-text notes are not used. The row contract is [ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md) section 6. The v2 factors document that will carry those rows, together with intel source record ids, is reserved for the persistence session (ADR 0045 section 9) and is not yet a domain type.
 
 Factors are the explanation. Do not persist only the final number.
 
@@ -71,7 +62,7 @@ The API must be able to compare two findings in the same organization by:
 
 1. Same policy version (if versions differ, say so first).
 2. Ordered factor contributions (highest absolute contribution first).
-3. Tie-breakers defined in the policy (for example KEV then severity then finding id) so order is deterministic.
+3. Deterministic tie-breakers. ADR 0045 section 5 fixes them: priority, then escalation, then KEV listed, then source-severity percent, then the caller's `Finding.firstObservedAt` and `Finding.id`. The engine comparator returns `incomparable` across policy keys.
 
 A comparison response is a **calculated** artifact. It cites stored factors; it does not call an LLM.
 
@@ -79,7 +70,7 @@ A comparison response is a **calculated** artifact. It cites stored factors; it 
 
 Insert a new **RiskCalculation**. Reasons: `initial`, `rescan`, `intel_refresh`, `policy_change`, `asset_change`, `manual_recalc`, `manual_override`.
 
-Never UPDATE factor blobs or priority in place. `currentRiskCalculationId` on the finding moves forward. History remains queryable. Users can diff two calculations to see why a score changed.
+Never UPDATE factor blobs or priority in place. History remains queryable. Users can diff two calculations to see why a score changed. The frozen schema currently forces `Finding.currentRiskCalculationId` to NULL and rejects changes to it, so the persistence session must either derive the current calculation at read time or add a forward-only migration (ADR 0045 section 9).
 
 ```mermaid
 sequenceDiagram
@@ -98,7 +89,7 @@ If the diagram is not rendered: triggers write an outbox event; the worker reloa
 
 ## Organization overrides
 
-An organization `admin`/`owner` may publish an override **RiskPolicy** (tenant-owned) that clones the builtin factor catalog and changes weights within validated bounds.
+An organization `admin`/`owner` may publish an override **RiskPolicy** (tenant-owned) that clones the builtin factor catalog and changes weights within validated bounds. ADR 0045 section 8 sets those bounds and lists what cannot be overridden: only weights may change, the sum stays 100, and catalog, normalization, thresholds, due days, and both KEV rules are fixed. `validatePolicyOverride` enforces this. No override publication path exists yet.
 
 Rules:
 
@@ -112,36 +103,19 @@ Rules:
 
 `packages/policy-engine` is deterministic, pure, and side-effect free. Given the same facts and definition, tests must get the same priority.
 
-It does not import Prisma, HTTP, or AI SDKs.
+It does not import Prisma, HTTP, AI SDKs, `@patchpilot/domain`, `@patchpilot/config`, or `node:*` modules. It has zero runtime dependencies and reads no clock or random source. A package-boundary test and package-local lint rules enforce this.
 
-## v0.1 builtin factor catalog
+## Built-in policy
 
-The first published builtin version includes at least:
+The built-in factor catalog, weights, normalization tables, bands, due-date recommendations, KEV rules, and explanation codes are defined by [ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md). The engine exports them as the deep-frozen `BUILTIN_PRIORITY_POLICY_DEFINITION` (policy key `patchpilot.builtin.v0`, `schemaVersion` 2). This document does not restate the numbers; the ADR and the golden tests in `packages/policy-engine` are the reference.
 
-| Factor | Input | Contribution idea |
-| --- | --- | --- |
-| `source_severity` | Mapped from CVSS base when present; else OSV severity label; else `unavailable` | Dominant but not exclusive |
-| `kev_listed` | Boolean from current KEV enrichment | Large boost when true; labeled enrichment |
-| `environment_sensitivity` | `production` vs `non_production` vs `unavailable` | Environmental |
-| `internet_exposure` | Vocabulary or `unavailable` | Environmental |
-| `business_criticality` | Vocabulary or `unavailable` | Environmental |
-| `asset_data_classification` | Vocabulary or `unavailable` | Environmental |
-| `direct_dependency` | Boolean or `unavailable` | Tie-break / modest boost when direct |
-| `fix_available` | Boolean or `unavailable` from OSV | Modest boost when a fix exists (actionable), not a "safe" reduction |
-| `finding_age_days` | Observed first-seen age | Modest boost when old; `unavailable` if unknown |
-| `advisory_withdrawn` | Boolean | Reduction or flag; does not delete the finding |
+The earlier illustrative sketch in this section (contribution ideas, "~100 capped", and the two example Findings) is superseded. ADR 0045 adopts the sketch's thresholds and due days, rejects capping in favor of rejection, and reproduces the two example Findings as golden cases: Finding A is priority 80 (P1) and Finding B is priority 50 (P3).
 
-Exact weights ship with the policy definition JSON and tests. **Weights and thresholds below are initial policy proposals, not universal security truth.** They must be validated with operators and can change only via a new policy version.
+**Weights and thresholds are initial policy proposals, not universal security truth** ([risk register](../security/risk-register.md) R13). They must be validated with operators before production composition and can change only via a new policy version.
 
-### Example calculations (illustrative)
+The development seed still publishes `patchpilot.builtin.v0` version 1 as a v1 placeholder with an empty catalog. That placeholder fails v2 validation by design. Seeding the ADR 0045 definition is a persistence-session task.
 
-Assumptions for the sketch: priority 0–100; band `P1` ≥ 80, `P2` ≥ 60, `P3` ≥ 40, `P4` < 40. Due-date recommendation sketch: P1 7 days, P2 30 days, P3 90 days, P4 180 days. Escalation recommendation: true when `kev_listed` and environment is production. **Not** a contractual SLA.
-
-**Finding A:** CVSS 9.8 (contrib 35), KEV true (40), production (15), internet_facing (8), direct (5) → ~100 capped, band P1. Ranks above B because of KEV (+40) despite similar severity.
-
-**Finding B:** CVSS 9.8 (35), KEV false (0), production (15), exposure `unavailable` (0, not treated as internal), transitive `unavailable` (0) → ~50, band P3.
-
-Unavailable exposure did **not** subtract risk.
+Unknown and unavailable evidence never subtracts risk.
 
 ## Incorrect prioritization as a product risk
 
