@@ -22,7 +22,11 @@ export type OfflineNpmImportAdmittedFile = {
 };
 
 export type OfflineNpmImportDirectoryRead =
-  | { readonly ok: true; readonly files: readonly OfflineNpmImportAdmittedFile[] }
+  | {
+      readonly ok: true;
+      readonly files: readonly OfflineNpmImportAdmittedFile[];
+      readonly unreadable: readonly string[];
+    }
   | { readonly ok: false; readonly reason: 'directory_rejected' | 'unreadable_file' };
 
 const DIRECTORY_FLAGS = constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW;
@@ -61,14 +65,19 @@ export async function readOfflineNpmImportDirectory(
       }
     }
     const files: OfflineNpmImportAdmittedFile[] = [];
+    const unreadable: string[] = [];
     for (const name of [...names].sort(compareOfflineNpmImportNames)) {
       const read = await readAdmittedFile(directoryFdPath, name);
       if (!read.ok) {
+        if (read.reason === 'unreadable_file') {
+          unreadable.push(name);
+          continue;
+        }
         return read;
       }
       files.push(read.file);
     }
-    return { ok: true, files };
+    return { ok: true, files, unreadable };
   } catch {
     return { ok: false, reason: 'directory_rejected' };
   } finally {

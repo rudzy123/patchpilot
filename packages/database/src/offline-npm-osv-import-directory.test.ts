@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -55,7 +55,11 @@ describe('offline npm OSV import directory preflight', () => {
     const hidden = temporaryDirectory();
     const fifo = temporaryDirectory();
     try {
-      await expect(readOfflineNpmImportDirectory(empty)).resolves.toEqual({ ok: true, files: [] });
+      await expect(readOfflineNpmImportDirectory(empty)).resolves.toEqual({
+        ok: true,
+        files: [],
+        unreadable: [],
+      });
       mkdirSync(path.join(nested, 'npm'));
       const nestedRead = await readOfflineNpmImportDirectory(nested);
       expect(nestedRead).toEqual({ ok: false, reason: 'directory_rejected' });
@@ -90,6 +94,27 @@ describe('offline npm OSV import directory preflight', () => {
       rmSync(oversized, { recursive: true, force: true });
       rmSync(real, { recursive: true, force: true });
       rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps a readable sibling when one file cannot be read', async () => {
+    const directory = temporaryDirectory();
+    try {
+      writeFileSync(path.join(directory, 'readable.json'), '{"id":"A"}');
+      const locked = path.join(directory, 'locked.json');
+      writeFileSync(locked, '{"id":"B"}');
+      chmodSync(locked, 0);
+      const read = await readOfflineNpmImportDirectory(directory);
+      expect(read.ok).toBe(true);
+      if (!read.ok) {
+        return;
+      }
+      expect(read.unreadable).toEqual(['locked.json']);
+      expect(read.files).toHaveLength(1);
+      expect(read.files[0]?.name).toBe('readable.json');
+      expect(Buffer.from(read.files[0]?.bytes ?? []).toString('utf8')).toBe('{"id":"A"}');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
     }
   });
 

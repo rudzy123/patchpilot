@@ -397,10 +397,23 @@ describe('offline npm advisory file persistence', () => {
         ],
       }),
     );
-    expect(sameCorrelation.kind).toBe('immutable_conflict');
+    expect(sameCorrelation.kind).toBe('recorded');
+    if (sameCorrelation.kind !== 'recorded') {
+      return;
+    }
+    expect(sameCorrelation.auditEventAdded).toBe(false);
     expect(
       await prisma.advisoryRevision.count({ where: { advisoryId: 'GHSA-SYN0-FILE-0004' } }),
-    ).toBe(2);
+    ).toBe(3);
+    expect(
+      await prisma.auditEvent.count({
+        where: {
+          action: 'intelligence.offline_npm_osv_file_imported',
+          correlationId,
+          subjectId: projection.familyId,
+        },
+      }),
+    ).toBe(1);
   });
 
   it('rolls back every package revision in a rejected file', async () => {
@@ -442,6 +455,80 @@ describe('offline npm advisory file persistence', () => {
     expect(
       await prisma.advisoryRevision.count({ where: { advisoryId: 'GHSA-SYN0-FILE-0005' } }),
     ).toBe(0);
+  });
+
+  it('keeps an earlier file when a later file transaction rolls back', async () => {
+    const earlierId = 'GHSA-SYN0-FILE-0011';
+    const laterId = 'GHSA-SYN0-FILE-0012';
+    const earlier = acceptDocument(document(earlierId));
+    const recorded = await port.persistOfflineNpmAdvisoryFile(
+      fileCommand({ ...earlier, batchId, correlationId: randomUUID() }),
+    );
+    expect(recorded.kind).toBe('recorded');
+    if (recorded.kind !== 'recorded') {
+      return;
+    }
+    const earlierRevisionId = recorded.projections[0]?.revisionId;
+    if (earlierRevisionId === undefined) {
+      throw new Error('expected the earlier revision');
+    }
+
+    const value = document(laterId, {
+      affected: [affectedPackage('aaa'), affectedPackage('zzz')],
+    });
+    const accepted = acceptDocument(value);
+    const parsed = accepted.normalized.revisions.map((revision) => revision.persistenceCommand);
+    const first = parsed[0];
+    const second = parsed[1];
+    if (first === undefined || second === undefined) {
+      throw new Error('expected two packages');
+    }
+    const identity = parseAdvisoryRevisionCommand(first);
+    if (!identity.accepted) {
+      throw new Error(identity.code);
+    }
+    const auditsBefore = await prisma.auditEvent.count();
+    const rejected = await port.persistOfflineNpmAdvisoryFile(
+      fileCommand({
+        ...accepted,
+        batchId,
+        correlationId: randomUUID(),
+        revisions: [
+          { command: first, purl: null },
+          {
+            command: { ...second, supersedesRevisionDigest: identity.command.revisionDigest },
+            purl: null,
+          },
+        ],
+      }),
+    );
+    expect(rejected.kind).toBe('rejected');
+    if (rejected.kind === 'rejected') {
+      expect(rejected.code).toBe('supersession_rejected');
+    }
+    expect(await prisma.auditEvent.count()).toBe(auditsBefore);
+    expect(await prisma.advisoryRevision.count({ where: { advisoryId: earlierId } })).toBe(1);
+    expect(
+      await prisma.advisoryRevisionRangeEvent.count({
+        where: { advisoryRevisionId: earlierRevisionId },
+      }),
+    ).toBe(2);
+    expect(
+      await prisma.advisoryRevisionSourceProvenance.count({
+        where: { advisoryRevisionId: earlierRevisionId },
+      }),
+    ).toBe(1);
+    expect(await prisma.advisoryFamily.count({ where: { advisoryId: laterId } })).toBe(0);
+    expect(await prisma.advisoryRevision.count({ where: { advisoryId: laterId } })).toBe(0);
+    expect(
+      await prisma.advisoryRevisionSourceProvenance.count({ where: { advisoryId: laterId } }),
+    ).toBe(0);
+    expect(
+      await prisma.advisoryRevisionExplicitVersion.count({
+        where: { revision: { advisoryId: laterId } },
+      }),
+    ).toBe(0);
+    expect(await prisma.finding.count()).toBe(0);
   });
 
   it('commits every package revision from one file under one family', async () => {

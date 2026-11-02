@@ -71,7 +71,7 @@ async function run(
     openBoundary: () => {
       throw new Error(DATABASE_URL);
     },
-    readDirectory: () => Promise.resolve({ ok: true, files: [] }),
+    readDirectory: () => Promise.resolve({ ok: true, files: [], unreadable: [] }),
     ...input,
   });
   return { exitCode, stdout: stdout.text, stderr: stderr.text };
@@ -211,7 +211,11 @@ describe('offline npm OSV import command runner', () => {
     const result = await run({
       argv: commandArgv(),
       readDirectory: () =>
-        Promise.resolve({ ok: true, files: [admitted('cmd-secret-segment.json', document)] }),
+        Promise.resolve({
+          ok: true,
+          files: [admitted('cmd-secret-segment.json', document)],
+          unreadable: [],
+        }),
       loadDatabaseUrl: () => DATABASE_URL,
       openBoundary: () =>
         Promise.resolve(
@@ -262,12 +266,65 @@ describe('offline npm OSV import command runner', () => {
     expect(result.stdout).not.toContain(DIRECTORY);
   });
 
+  it('rejects one unreadable file and still records the readable sibling', async () => {
+    let persisted = 0;
+    const document =
+      '{"id":"GHSA-SYN0-CMD-0002","modified":"2026-01-01T00:00:00Z","affected":[{"package":{"ecosystem":"npm","name":"left-pad"},"ranges":[{"type":"SEMVER","events":[{"introduced":"0"}]}]}]}';
+    const result = await run({
+      argv: commandArgv(),
+      readDirectory: () =>
+        Promise.resolve({
+          ok: true,
+          files: [admitted('readable.json', document)],
+          unreadable: ['locked.json'],
+        }),
+      loadDatabaseUrl: () => DATABASE_URL,
+      openBoundary: () =>
+        Promise.resolve(
+          session(
+            port({
+              persistFile() {
+                persisted += 1;
+                return Promise.resolve({
+                  kind: 'recorded',
+                  familyId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+                  projections: [],
+                  counts: {
+                    inserts: 1,
+                    updates: 0,
+                    deletes: 0,
+                    timestampChanges: 0,
+                    stateChanges: 0,
+                    parserCalls: 0,
+                    providerCalls: 0,
+                  },
+                  auditEventAdded: true,
+                });
+              },
+            }),
+            { value: false },
+          ),
+        ),
+    });
+    expect(persisted).toBe(1);
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      outcome: 'completed',
+      accepted: { count: 1, advisoryIds: ['GHSA-SYN0-CMD-0002'] },
+      rejected: { count: 1, advisoryIds: [], reasonCodes: ['unreadable_file'] },
+    });
+    expect(result.stdout).not.toContain('locked.json');
+    expect(result.stdout).not.toContain('readable.json');
+  });
+
   it('keeps a record rejection in rejected and still completes', async () => {
     let completed = false;
     let persisted = false;
     const result = await run({
       argv: commandArgv(),
-      readDirectory: () => Promise.resolve({ ok: true, files: [admitted('bad.json', '{]')] }),
+      readDirectory: () =>
+        Promise.resolve({ ok: true, files: [admitted('bad.json', '{]')], unreadable: [] }),
       loadDatabaseUrl: () => DATABASE_URL,
       openBoundary: () =>
         Promise.resolve(
@@ -309,6 +366,7 @@ describe('offline npm OSV import command runner', () => {
               '{"id":"GHSA-SYN0-CMD-0001","modified":"2026-01-01T00:00:00Z","affected":[{"package":{"ecosystem":"npm","name":"left-pad"},"ranges":[{"type":"SEMVER","events":[{"introduced":"0"}]}]}]}',
             ),
           ],
+          unreadable: [],
         }),
       loadDatabaseUrl: () => DATABASE_URL,
       openBoundary: () =>

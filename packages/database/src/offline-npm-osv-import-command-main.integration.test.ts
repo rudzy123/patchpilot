@@ -304,6 +304,36 @@ describe('offline npm OSV import deployment command', () => {
     expect(secretFree(`${second.stdout}${second.stderr}`, secondDirectory)).toBe(true);
   });
 
+  it('appends a later file for the same advisory in one directory', async () => {
+    const advisoryId = 'GHSA-SYN0-CMD-2001';
+    const directory = writeDirectory({
+      'a-first.json': document(advisoryId, { modified: '2026-01-01T00:00:00Z' }),
+      'b-second.json': document(advisoryId, { modified: '2026-02-01T00:00:00Z' }),
+    });
+    const correlationId = randomUUID();
+    const result = await invoke(databaseUrl, directory, correlationId);
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.body).toMatchObject({
+      outcome: 'completed',
+      accepted: { count: 2, advisoryIds: [advisoryId], reasonCodes: [] },
+      skipped: { count: 0 },
+      rejected: { count: 0 },
+      failed: { count: 0 },
+    });
+    const revisions = await prisma.advisoryRevision.findMany({
+      where: { advisoryId },
+      select: { id: true, supersedesAdvisoryRevisionId: true },
+    });
+    expect(revisions).toHaveLength(2);
+    const prior = revisions.find((row) => row.supersedesAdvisoryRevisionId === null);
+    const tip = revisions.find((row) => row.supersedesAdvisoryRevisionId !== null);
+    expect(tip?.supersedesAdvisoryRevisionId).toBe(prior?.id);
+    const batchId = String(result.body['batchId']);
+    await expectAuditShape(prisma, correlationId, batchId, 1, 1, 1);
+    expect(secretFree(result.stdout, directory)).toBe(true);
+  });
+
   it('accepts an empty directory as a zero-file batch', async () => {
     const directory = writeDirectory({});
     const result = await invoke(databaseUrl, directory, randomUUID());

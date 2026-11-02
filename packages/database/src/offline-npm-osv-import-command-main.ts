@@ -176,6 +176,7 @@ export async function runOfflineNpmOsvImportCommand(
   }
 
   const prepared = prepareDirectory(directory.files);
+  const unreadable = directory.unreadable ?? [];
   if (prepared === null) {
     return finish(
       io,
@@ -232,6 +233,11 @@ export async function runOfflineNpmOsvImportCommand(
       parsed.correlationId,
       prepared,
       concealed,
+      unreadable.map(() => ({
+        advisoryId: null,
+        group: 'rejected' as const,
+        reasonCode: 'unreadable_file',
+      })),
     );
   } catch {
     return finish(
@@ -258,6 +264,7 @@ async function importPreparedDirectory(
   correlationId: string,
   prepared: PreparedDirectory,
   concealed: readonly string[],
+  unreadable: readonly OfflineNpmImportFileOutcome[],
 ): Promise<number> {
   const begun = await port.beginBatch({
     correlationId,
@@ -306,7 +313,7 @@ async function importPreparedDirectory(
     );
   }
 
-  const reports: OfflineNpmImportFileOutcome[] = [];
+  const reports: OfflineNpmImportFileOutcome[] = [...unreadable];
   let failed = false;
   for (const file of prepared.files) {
     let report: OfflineNpmImportFileOutcome;

@@ -481,7 +481,11 @@ Actions:
 | `intelligence.offline_npm_osv_import_completed` | Terminal transaction after the files | Batch id |
 
 Exact batch replay writes no second started event. Full-file replay writes no
-second file event. A new correlation id writes a new terminal event. The same
+second file event. The frozen system audit replay index allows one
+`intelligence.offline_npm_osv_file_imported` row for a family and correlation.
+A later file in that same correlation that inserts another revision still
+commits the revision and does not write a second file audit. A new correlation
+id writes its own file audit and a new terminal event. The same
 correlation id and the same batch write no second terminal event. The same
 correlation id already used for a different batch is `immutable_conflict`
 before file processing.

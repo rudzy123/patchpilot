@@ -1700,46 +1700,44 @@ class PrismaAdvisoryRevisionPersistence implements AdvisoryRevisionPersistencePo
       },
       select: { id: true },
     });
-    if (existingAudit !== null) {
-      throw new AdvisoryRevisionDecision({
-        kind: 'immutable_conflict',
-        counts: ADVISORY_REVISION_ZERO_COUNTS,
+    // audit_event_system_replay_idx allows one system event per action, subject, and correlation.
+    // A later file in the same run still commits its new revision.
+    if (existingAudit === null) {
+      await tx.auditEvent.create({
+        data: {
+          actorType: 'system',
+          action: OFFLINE_NPM_FILE_AUDIT_ACTION,
+          subjectType: OFFLINE_NPM_FILE_AUDIT_SUBJECT,
+          subjectId: familyId,
+          correlationId: command.correlationId,
+          schemaVersion: JSON_SCHEMA_VERSION_V1,
+          retentionCategory: 'security',
+          payload: asJsonObject(
+            {
+              schemaVersion: JSON_SCHEMA_VERSION_V1,
+              registryId: OSV_SOURCE_LICENSE_REGISTRY_IDENTIFIER,
+              rawContentSha256,
+              byteLength: command.byteLength,
+              advisoryIds: [first.command.advisoryId],
+              reasonCodes,
+              counts: {
+                accepted,
+                skipped,
+                rejected: 0,
+                failed: 0,
+              },
+            },
+            'offline npm import audit',
+          ),
+        },
       });
     }
-    await tx.auditEvent.create({
-      data: {
-        actorType: 'system',
-        action: OFFLINE_NPM_FILE_AUDIT_ACTION,
-        subjectType: OFFLINE_NPM_FILE_AUDIT_SUBJECT,
-        subjectId: familyId,
-        correlationId: command.correlationId,
-        schemaVersion: JSON_SCHEMA_VERSION_V1,
-        retentionCategory: 'security',
-        payload: asJsonObject(
-          {
-            schemaVersion: JSON_SCHEMA_VERSION_V1,
-            registryId: OSV_SOURCE_LICENSE_REGISTRY_IDENTIFIER,
-            rawContentSha256,
-            byteLength: command.byteLength,
-            advisoryIds: [first.command.advisoryId],
-            reasonCodes,
-            counts: {
-              accepted,
-              skipped,
-              rejected: 0,
-              failed: 0,
-            },
-          },
-          'offline npm import audit',
-        ),
-      },
-    });
     return {
       kind: 'recorded',
       familyId,
       projections,
-      counts: recordedCounts(inserts + 1),
-      auditEventAdded: true,
+      counts: recordedCounts(inserts + (existingAudit === null ? 1 : 0)),
+      auditEventAdded: existingAudit === null,
     };
   }
 
