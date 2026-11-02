@@ -218,6 +218,75 @@ export type RuleExplanationCode = (typeof RULE_EXPLANATION_CODES)[number];
 export const EXPLANATION_CODES = [...FACTOR_EXPLANATION_CODES, ...RULE_EXPLANATION_CODES] as const;
 export type ExplanationCode = (typeof EXPLANATION_CODES)[number];
 
+const MISSING_EVIDENCE = 'It contributes nothing to priority and does not indicate low risk.';
+const KEV_ENRICHMENT = 'This is catalog enrichment, not proof of exploitation or affectedness.';
+
+/**
+ * Static human-readable text for every explanation code. Only codes are
+ * persisted. Text has no interpolation and never carries tenant data, and it
+ * avoids numbers the versioned definition controls.
+ */
+export const EXPLANATION_TEXT: Readonly<Record<ExplanationCode, string>> = Object.freeze({
+  severity_critical: 'The highest source severity rating is critical.',
+  severity_high: 'The highest source severity rating is high.',
+  severity_medium: 'The highest source severity rating is medium.',
+  severity_low: 'The highest source severity rating is low.',
+  severity_none: 'The highest source severity rating is none.',
+  severity_unrated: `Source severity records exist, but none maps to a rating. ${MISSING_EVIDENCE}`,
+  severity_unavailable: `No source severity record is available. ${MISSING_EVIDENCE}`,
+  kev_listed_catalog_current: `Listed in the current CISA KEV catalog snapshot. ${KEV_ENRICHMENT}`,
+  kev_listed_catalog_stale: `Listed in a stale CISA KEV catalog snapshot. The listing counts until a later accepted snapshot removes it. ${KEV_ENRICHMENT}`,
+  kev_listed_catalog_disabled_with_history: `Listed in the last retained CISA KEV catalog snapshot while synchronization is disabled. The listing counts until a later accepted snapshot removes it. ${KEV_ENRICHMENT}`,
+  kev_not_listed_catalog_current: 'Not listed in the current CISA KEV catalog snapshot.',
+  kev_absent_catalog_stale: `Not listed in a stale CISA KEV catalog snapshot, so absence is unconfirmed. ${MISSING_EVIDENCE}`,
+  kev_absent_catalog_disabled_with_history: `Not listed in the last retained CISA KEV catalog snapshot while synchronization is disabled, so absence is unconfirmed. ${MISSING_EVIDENCE}`,
+  kev_unavailable_no_canonical_cve: `No canonical CVE is linked, so CISA KEV membership cannot be determined. ${MISSING_EVIDENCE}`,
+  kev_unavailable_no_active_generation: `No active CISA KEV catalog snapshot exists, so membership cannot be determined. ${MISSING_EVIDENCE}`,
+  environment_production: 'The asset environment is production.',
+  environment_non_production: 'The asset environment is non-production.',
+  environment_unavailable: `The asset has no environment. ${MISSING_EVIDENCE}`,
+  exposure_internet_facing: 'The asset is recorded as internet facing.',
+  exposure_internal: 'The asset is recorded as internal.',
+  exposure_unknown: `The asset internet exposure is recorded as unknown. ${MISSING_EVIDENCE}`,
+  exposure_unavailable: `No asset internet exposure evidence is available. ${MISSING_EVIDENCE}`,
+  criticality_critical: 'The asset business criticality is critical.',
+  criticality_high: 'The asset business criticality is high.',
+  criticality_medium: 'The asset business criticality is medium.',
+  criticality_low: 'The asset business criticality is low.',
+  criticality_unspecified: `The asset business criticality is unspecified. ${MISSING_EVIDENCE}`,
+  criticality_unavailable: `No asset business criticality evidence is available. ${MISSING_EVIDENCE}`,
+  data_restricted: 'The asset data classification is restricted.',
+  data_confidential: 'The asset data classification is confidential.',
+  data_internal: 'The asset data classification is internal.',
+  data_public: 'The asset data classification is public.',
+  data_unspecified: `The asset data classification is unspecified. ${MISSING_EVIDENCE}`,
+  data_unavailable: `No asset data classification evidence is available. ${MISSING_EVIDENCE}`,
+  dependency_direct: 'The component occurrence is a direct dependency.',
+  dependency_transitive: 'The component occurrence is a transitive dependency.',
+  dependency_unavailable: `Whether the component occurrence is a direct dependency is not recorded. ${MISSING_EVIDENCE}`,
+  fix_available: 'The matched advisory range closes with a fixed version.',
+  fix_not_available:
+    'The matched advisory range is open ended, so no fixed version is recorded. This does not reduce priority.',
+  fix_undetermined: `The matched advisory range closes only with a last affected version, so fix availability is undetermined. ${MISSING_EVIDENCE}`,
+  fix_unavailable: `No fix availability evidence is available. ${MISSING_EVIDENCE}`,
+  age_under_30_days: 'First observed fewer than 30 days ago.',
+  age_30_to_89_days: 'First observed between 30 and 89 days ago.',
+  age_90_days_or_more: 'First observed 90 or more days ago.',
+  age_unavailable: `No first observation time is available. ${MISSING_EVIDENCE}`,
+  advisory_withdrawn_review_required:
+    'The advisory is withdrawn. Review is required. Withdrawal does not change priority.',
+  advisory_not_withdrawn: 'The advisory is not withdrawn.',
+  advisory_withdrawal_unavailable: 'No advisory withdrawal status is available.',
+  kev_minimum_band_raised: `CISA KEV listing raised priority to the minimum of the policy floor band. ${KEV_ENRICHMENT}`,
+  kev_minimum_band_already_met: `CISA KEV listed, and the weighted score already meets the policy floor band. ${KEV_ENRICHMENT}`,
+  kev_minimum_band_not_triggered: 'Not CISA KEV listed, so the minimum band rule does not apply.',
+  kev_escalation_recommended:
+    'Escalation is recommended because the vulnerability is CISA KEV listed with observed production or internet-facing context. Escalation does not change priority, band, or due date.',
+  kev_escalation_context_not_observed:
+    'CISA KEV listed, but neither production nor internet-facing context is observed, so escalation is not recommended.',
+  kev_escalation_not_triggered: 'Not CISA KEV listed, so escalation is not recommended.',
+} satisfies Record<ExplanationCode, string>);
+
 /** Age explanation codes describe the fact, independent of the definition's buckets. */
 export const AGE_EXPLANATION_THRESHOLDS = { under30: 30, under90: 90 } as const;
 

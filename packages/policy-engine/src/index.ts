@@ -14,6 +14,7 @@ export {
   ENVIRONMENT_SENSITIVITY_TOKENS,
   ESCALATION_REASONS,
   EXPLANATION_CODES,
+  EXPLANATION_TEXT,
   FACTOR_EXPLANATION_CODES,
   FACTOR_IDS,
   FACTOR_INPUT_STATES,
@@ -114,3 +115,18 @@ export {
   type PriorityFactorRow,
   type PriorityRuleRow,
 } from './evaluate.js';
+
+export {
+  compareForRemediationQueue,
+  rankFactorsByContribution,
+  type RemediationQueueComparison,
+} from './ordering.js';
+
+export {
+  CANONICAL_JSON_ISSUE_CODES,
+  CANONICAL_JSON_MAX_ARRAY_LENGTH,
+  CANONICAL_JSON_MAX_DEPTH,
+  canonicalJson,
+  type CanonicalJsonError,
+  type CanonicalJsonIssueCode,
+} from './canonical-json.js';

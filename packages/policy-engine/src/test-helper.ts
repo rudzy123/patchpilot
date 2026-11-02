@@ -1,6 +1,11 @@
 import type { FactorId } from './catalog.js';
-import type { PriorityPolicyDefinition } from './definition.js';
-import type { PriorityFactInput } from './facts.js';
+import {
+  validatePolicyDefinition,
+  type PriorityPolicyDefinition,
+  type ValidatedPriorityPolicyDefinition,
+} from './definition.js';
+import { evaluatePriority, type PriorityEvaluation } from './evaluate.js';
+import { parseFactInput, type PriorityFactInput } from './facts.js';
 
 /** A fresh, mutable copy of the ADR 0045 numbers for tests. */
 export function adrPolicyDefinitionInput(): PriorityPolicyDefinition {
@@ -94,6 +99,32 @@ export const BASE_FACTS: PriorityFactInput = {
 
 export function factsWith(overrides: Partial<PriorityFactInput>): PriorityFactInput {
   return { ...BASE_FACTS, ...overrides };
+}
+
+export function validatedDefinition(
+  input: PriorityPolicyDefinition = adrPolicyDefinitionInput(),
+): ValidatedPriorityPolicyDefinition {
+  const result = validatePolicyDefinition(input);
+  if (!result.ok) {
+    throw new Error('test definition must validate');
+  }
+  return result.value;
+}
+
+/** Evaluates BASE facts with `overrides` applied; throws on any error. */
+export function evaluateWith(
+  overrides: Partial<PriorityFactInput>,
+  definition: ValidatedPriorityPolicyDefinition = validatedDefinition(),
+): PriorityEvaluation {
+  const facts = parseFactInput(factsWith(overrides));
+  if (!facts.ok) {
+    throw new Error('test facts must parse');
+  }
+  const result = evaluatePriority(definition, facts.value);
+  if (!result.ok) {
+    throw new Error(`evaluation failed: ${result.error.kind}`);
+  }
+  return result.value;
 }
 
 type JsonPath = readonly (string | number)[];

@@ -11,6 +11,10 @@ describe('@patchpilot/policy-engine', () => {
     expect(typeof policyEngine.validatePolicyOverride).toBe('function');
     expect(typeof policyEngine.parseFactInput).toBe('function');
     expect(typeof policyEngine.evaluatePriority).toBe('function');
+    expect(typeof policyEngine.compareForRemediationQueue).toBe('function');
+    expect(typeof policyEngine.rankFactorsByContribution).toBe('function');
+    expect(typeof policyEngine.canonicalJson).toBe('function');
+    expect(Object.isFrozen(policyEngine.EXPLANATION_TEXT)).toBe(true);
   });
 
   it('keeps internal guards and helpers off the public surface', () => {
