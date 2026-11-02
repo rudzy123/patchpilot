@@ -15,6 +15,8 @@ describe('@patchpilot/policy-engine', () => {
     expect(typeof policyEngine.rankFactorsByContribution).toBe('function');
     expect(typeof policyEngine.canonicalJson).toBe('function');
     expect(Object.isFrozen(policyEngine.EXPLANATION_TEXT)).toBe(true);
+    expect(policyEngine.BUILTIN_PRIORITY_POLICY_DEFINITION.policyKey).toBe('patchpilot.builtin.v0');
+    expect(Object.isFrozen(policyEngine.BUILTIN_PRIORITY_POLICY_DEFINITION)).toBe(true);
   });
 
   it('keeps internal guards and helpers off the public surface', () => {

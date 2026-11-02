@@ -64,6 +64,8 @@ export {
 
 export type { Result } from './result.js';
 
+export { BUILTIN_PRIORITY_POLICY_DEFINITION } from './builtin-definition.js';
+
 export {
   POLICY_DEFINITION_ISSUE_CODES,
   POLICY_OVERRIDE_ISSUE_CODES,
