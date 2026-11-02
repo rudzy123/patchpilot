@@ -164,7 +164,7 @@ Payloads must not contain provider prose, package inventories, affected-version 
 
 ### Offline npm OSV import events
 
-[ADR 0046](../adr/0046-offline-npm-osv-import.md) (Proposed) names three future `system` actions with null user, organization, and membership: `intelligence.offline_npm_osv_import_started`, `intelligence.offline_npm_osv_file_imported`, and `intelligence.offline_npm_osv_import_completed`. Payloads carry counts, reason codes, grammar-valid advisory ids, SHA-256, registry id, and byte length. They omit document text, paths, filenames, stacks, and secrets. The command is not implemented, so these actions are not emitted. The frozen migration count stays 26.
+[ADR 0046](../adr/0046-offline-npm-osv-import.md) (Proposed) names three `system` actions with null user, organization, and membership: `intelligence.offline_npm_osv_import_started`, `intelligence.offline_npm_osv_file_imported`, and `intelligence.offline_npm_osv_import_completed`. Payloads carry counts, reason codes, grammar-valid advisory ids, SHA-256, registry id, and byte length. They omit document text, paths, filenames, stacks, and secrets. The deployment-local import command is the only writer. Migration 27 is implemented and seeds no audit rows. The frozen migration count is 27.
 
 ## What audit is not
 

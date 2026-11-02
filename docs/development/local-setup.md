@@ -105,6 +105,7 @@ pnpm workflows:lint
 | `pnpm db:reset` | Reset the local database (destructive; requires loopback host, `patchpilot` database name, and `PATCHPILOT_ALLOW_DESTRUCTIVE_DATABASE=true`; refused in production) |
 | `pnpm db:seed` | Idempotent synthetic development seed (refused in production) |
 | `pnpm instance-advisory-authority -- help` | Explicit deployment-local grant command. Not part of setup, seed, migrate, or application startup. Requires a built database package. See [the runbook](../runbooks/instance-advisory-authority-command.md) |
+| `pnpm offline-npm-osv-import -- help` | Explicit deployment-local npm GHSA directory import. Production uncomposed. Not part of setup, seed, migrate, or application startup. Requires a built database package. See [the runbook](../runbooks/offline-npm-osv-import.md) |
 
 Environment variables are documented in [environment-variables.md](environment-variables.md). Test labels are in [testing.md](testing.md). Failures: [troubleshooting.md](troubleshooting.md) and [local infrastructure runbook](../runbooks/local-infrastructure-failure.md). GitHub Actions: [ci.md](ci.md).
 

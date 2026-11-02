@@ -14,10 +14,11 @@ operator acquisition mode. It does not supersede
 [ADR 0032](0032-maintainer-reviewed-advisory-authority.md). It does not accept
 [ADR 0027](0027-osv-acquisition-persistence-and-catalog-activation.md).
 
-This ADR does not implement the command, the script, or migration 27. It adds
-no route, web action, worker job, seed, Outbox row, Finding, Product Match
-Evidence row, or RiskCalculation. The frozen migration count stays 26 until the
-migration slice lands. Production OSV acquisition stays disabled.
+The command and script are implemented and production uncomposed. This ADR remains Proposed. Migration 27 is
+`packages/database/prisma/migrations/20261102120000_offline_npm_osv_import/migration.sql`.
+The frozen migration count is 27. This ADR adds no route, web action, worker job,
+seed, Outbox row, Finding, Product Match Evidence row, or RiskCalculation.
+Production OSV acquisition stays disabled.
 
 ## Context
 
@@ -95,8 +96,8 @@ vulnerability-intelligence contracts:
   user enablement. It is not a general operator identity.
 
 Putting these bytes through the GCS generation tables, a maintainer approval
-row, or `Vulnerability.osvId` would forge source identity. Editing any of the
-26 frozen migrations is forbidden.
+row, or `Vulnerability.osvId` would forge source identity. Editing a frozen
+migration is forbidden.
 
 ## Decision
 
@@ -395,7 +396,7 @@ Migration 27 is a new file,
 `packages/database/prisma/migrations/20261102120000_offline_npm_osv_import/migration.sql`.
 Frozen SQL is untouched. The same change updates `FROZEN_MIGRATIONS`, the
 migration integration test, [docs/development/migrations.md](../development/migrations.md),
-and the checkpoint. This ADR does not apply that migration.
+and the checkpoint. The migration file applies it. This ADR text does not contain that SQL.
 
 The migration creates three instance-owned tables. None has `organization_id`.
 Update and delete are forbidden by append-only triggers. Foreign keys are
@@ -616,11 +617,10 @@ The operator procedure is
 
 ## Follow-up
 
-- Implement normalization, the composition result, migration 27, the command,
-  and the script in later slices. Update the checkpoint in the migration slice:
-  command implemented and production-uncomposed, production OSV acquisition
-  still disabled, frozen count 27, ADR 0044 still the unimplemented
-  product-match slice.
+- Migration 27 is implemented. The command and script are implemented and
+  production uncomposed. Production OSV acquisition stays disabled. The frozen migration count is 27.
+  [ADR 0044](0044-deliberate-product-match-evidence-evaluation.md) remains the
+  unimplemented product-match slice.
 - Independent verification by an agent that did not write the implementation.
   That review reports discrepancies and does not silently rewrite them.
 - Later correlation selects a revision by family, package, and `modified_at`.

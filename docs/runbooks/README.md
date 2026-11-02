@@ -23,7 +23,7 @@ They do not include exploit payloads. They do not claim compliance.
 | [Audit integrity failure](audit-integrity-failure.md) | Missing, altered, or cascade-deleted audit or evidence |
 | [Authentication failure](authentication-failure.md) | Login, session, CSRF, cookie, or login-limiter problems |
 | [Instance advisory authority command](instance-advisory-authority-command.md) | Explicit deployment-local grant, revoke, disable, and enable operations |
-| [Offline npm OSV import](offline-npm-osv-import.md) | Deployment-local npm GHSA directory import decided by ADR 0046. The command and migration 27 are not installed. Production OSV acquisition stays disabled |
+| [Offline npm OSV import](offline-npm-osv-import.md) | Explicit deployment-local npm GHSA directory import. Production uncomposed. Migration 27 is implemented and seeds no rows. Production OSV acquisition stays disabled |
 | [Maintainer-reviewed advisory API](maintainer-reviewed-advisory-api.md) | Authenticated local advisory submission and independent approval through the API |
 | [Controlled Finding operator](controlled-finding-operator.md) | Owner creation, owner or admin inspection, and owner or admin target discovery through the API |
 | [Controlled Finding web workflow](controlled-finding-web-workflow.md) | Nested target review and direct Finding inspection in the web application |

@@ -2,9 +2,9 @@
 
 The deployment-local command decided by [ADR 0046](../adr/0046-offline-npm-osv-import.md) imports one non-recursive directory of npm GHSA OSV JSON files into the instance advisory model.
 
-The command, migration 27, and `scripts/run-offline-npm-osv-import.mjs` are not in the tree. Do not invent an invocation and do not point a shell script at PostgreSQL. Production OSV acquisition stays disabled. `INTELLIGENCE_OSV_ENABLED=true` stays rejected. `intelligence.osv.sync` stays unregistered.
+Migration 27 is implemented. The command and `scripts/run-offline-npm-osv-import.mjs` are implemented and production uncomposed. Invocation is explicit. API, web, worker, scheduler, queue, seed, and migration startup do not run it. Production OSV acquisition stays disabled. `INTELLIGENCE_OSV_ENABLED=true` stays rejected. `intelligence.osv.sync` stays unregistered.
 
-When the script is installed, build `@patchpilot/database` before the first invocation. The wrapper runs `packages/database/dist/offline-npm-osv-import-command-main.js`. A missing build writes `offline_npm_osv_import_not_built` and exits 1.
+Build `@patchpilot/database` before the first invocation. The wrapper runs `packages/database/dist/offline-npm-osv-import-command-main.js`. A missing build writes `offline_npm_osv_import_not_built` and exits 1. The summary object uses camelCase fields: `schemaVersion`, `correlationId`, `batchId`, `manifestSha256`, `registryId`, `retrievedAt`, `outcome`, `accepted`, `skipped`, `rejected`, and `failed`.
 
 Imported rows are not proof an asset is affected. The command writes no Finding, Product Match Evidence, Vulnerability binding, approval, or P1 to P4 calculation. A directory is not a complete OSV catalog. Files that are absent are not withdrawals and do not delete revisions.
 
