@@ -103,3 +103,9 @@ Batches 1, 1-R, 2, and 2-R are committed on `fix/reviewer-approval-capability`. 
 Current checkpoint authority: [current-state.md](current-state.md).
 
 On 2026-10-06 the governance session accepted ADR 0032 from the committed reviewer-capability implementation, amended ADR 0026 with the creation-only exception `controlled_maintainer_reviewed_finding_creation_v1`, and accepted ADR 0035 for the controlled Finding creation slice. No migration was added. The frozen count remains 23. Finding creation remains unavailable. Production composition remains absent. Entries above that say ADR 0032 stays Proposed record earlier checkpoints. This ledger is not the current repository authority.
+
+## Priority policy Session 2 — pure P1-P4 engine
+
+Current checkpoint authority: [current-state.md](current-state.md).
+
+On 2026-11-02 Session 2 implemented the [ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md) engine in `packages/policy-engine` while ADR 0045 remained Proposed. The engine covers definition and override validation, closed fact parsing, centipoint evaluation with the two KEV rules, counterfactual decisive status, closed explanation codes, queue ordering, canonical JSON, and the frozen built-in definition. At this checkpoint the package unit suite reported 14 files and 330 tests passing. The package has zero runtime dependencies and no app or package depends on it. No domain port, seed, adapter, worker job, route, or web UI was added. No RiskCalculation is written. No migration was added. The frozen count remains 26. Prioritization remains unavailable. The ADR 0044 implementation remains the named next slice. The risk-policy sketch was replaced by an ADR reference and R13 was updated. This ledger is not the current repository authority.
