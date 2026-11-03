@@ -4,6 +4,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { Prisma, PrismaClient } from '@prisma/client';
 import { JSON_SCHEMA_VERSION_V1 } from '@patchpilot/domain';
+import {
+  BUILTIN_PRIORITY_POLICY_DEFINITION,
+  canonicalJson as canonicalizePriorityPolicy,
+} from '@patchpilot/policy-engine';
 import { createFoundationTestEnv } from '@patchpilot/test-utils';
 
 import {
@@ -18,6 +22,20 @@ import { seedDevelopmentData, developmentSeedIds } from './seed/development.js';
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+const EMPTY_BUILTIN_V1 = {
+  schemaVersion: JSON_SCHEMA_VERSION_V1,
+  policyKey: 'patchpilot.builtin.v0',
+  factorCatalog: [],
+  weights: {},
+};
+
+function priorityCanonicalJson(value: unknown): string {
+  const result = canonicalizePriorityPolicy(value);
+  if (!result.ok) {
+    throw new Error(`Builtin priority policy could not be canonicalized (${result.error.code}).`);
+  }
+  return result.value;
+}
 
 describe('tenant model persistence', () => {
   let databaseUrl: string;
@@ -885,8 +903,14 @@ describe('tenant model persistence', () => {
 
   it('runs the development seed twice without duplicating synthetic tenants', async () => {
     const env = createFoundationTestEnv();
-    await seedDevelopmentData({ env, client: prisma });
-    await seedDevelopmentData({ env, client: prisma });
+    const seedInput = {
+      env,
+      client: prisma,
+      builtinPriorityDefinition: BUILTIN_PRIORITY_POLICY_DEFINITION,
+      canonicalJson: priorityCanonicalJson,
+    };
+    await seedDevelopmentData(seedInput);
+    await seedDevelopmentData(seedInput);
     expect(await prisma.organization.count({ where: { slug: 'synthetic-org-a' } })).toBe(1);
     expect(await prisma.organization.count({ where: { slug: 'synthetic-org-b' } })).toBe(1);
     expect(await prisma.user.count({ where: { email: 'owner-a@synthetic.patchpilot.test' } })).toBe(
@@ -919,8 +943,36 @@ describe('tenant model persistence', () => {
     const builtin = await prisma.riskPolicy.findFirst({
       where: { scope: 'builtin', policyKey: 'patchpilot.builtin.v0', version: 1 },
     });
+    expect(builtin?.id).toBe(developmentSeedIds.builtinRiskPolicy);
+    expect(builtin?.version).toBe(1);
     expect(builtin?.createdByMembershipId).toBeNull();
     expect(builtin?.organizationId).toBeNull();
+    expect(builtin?.definition).toEqual(EMPTY_BUILTIN_V1);
+
+    const version2Rows = await prisma.riskPolicy.findMany({
+      where: { scope: 'builtin', policyKey: 'patchpilot.builtin.v0', version: 2 },
+    });
+    expect(version2Rows).toHaveLength(1);
+    expect(version2Rows[0]?.id).toBe(developmentSeedIds.builtinPriorityPolicyVersion2);
+    expect(version2Rows[0]?.organizationId).toBeNull();
+    expect(version2Rows[0]?.createdByMembershipId).toBeNull();
+    expect(priorityCanonicalJson(version2Rows[0]?.definition)).toBe(
+      priorityCanonicalJson(BUILTIN_PRIORITY_POLICY_DEFINITION),
+    );
+
+    await expect(
+      seedDevelopmentData({
+        env: { ...env, NODE_ENV: 'production' },
+        client: prisma,
+        builtinPriorityDefinition: BUILTIN_PRIORITY_POLICY_DEFINITION,
+        canonicalJson: priorityCanonicalJson,
+      }),
+    ).rejects.toThrow(/Development seed is disabled/);
+    expect(
+      await prisma.riskPolicy.count({
+        where: { scope: 'builtin', policyKey: 'patchpilot.builtin.v0', version: 2 },
+      }),
+    ).toBe(1);
 
     const orgPolicy = await prisma.riskPolicy.findFirst({
       where: {

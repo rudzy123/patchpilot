@@ -68,7 +68,7 @@ A comparison response is a **calculated** artifact. It cites stored factors; it 
 
 ## Recalculation without erasure
 
-The uncomposed writer inserts a new **RiskCalculation**. On the first row it records `initial`. A later row records `policy_change` when the policy definition hash changes, `intel_refresh` when the KEV fact changes, `asset_change` when only asset context changes, and `rescan` otherwise. The schema enum also contains `manual_recalc` and `manual_override` for later design.
+The uncomposed writer inserts a new **RiskCalculation** in the same database transaction that locks the Finding and reads facts, KEV membership, and the selected policy. On the first row it records `initial`. A later row records `policy_change` when the policy definition hash changes, `intel_refresh` when the KEV fact changes, `asset_change` when only asset context changes, and `rescan` otherwise. The schema enum also contains `manual_recalc` and `manual_override` for later design.
 
 Never UPDATE factor blobs or priority in place. History remains queryable. Users can diff two calculations to see why a score changed. Current selection is read-time: the latest row by `calculated_at`, then `id`. `Finding.currentRiskCalculationId` and `Finding.dueAt` stay null. No migration selects the current row.
 

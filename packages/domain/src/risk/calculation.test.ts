@@ -37,7 +37,6 @@ import {
   createPublishOrganizationPriorityOverrideUseCase,
   createReadCurrentFindingRiskUseCase,
   ORGANIZATION_PRIORITY_OVERRIDE_PERMISSION,
-  type CalculateFindingRiskDependencies,
 } from './calculation.js';
 import type { PriorityEnginePort } from './engine-port.js';
 import type { FindingRiskCreationEvidence, FindingRiskSourceSnapshot } from './fact-assembly.js';
@@ -46,6 +45,10 @@ import {
   BUILTIN_PRIORITY_POLICY_KEY,
   BUILTIN_PRIORITY_POLICY_VERSION,
   type CurrentRiskCalculationRead,
+  type LockedPriorityCalculationContext,
+  type LockedPriorityCalculationDecision,
+  type LockedPriorityCalculationOutcome,
+  type LockedPriorityCalculationScope,
   type PersistFindingRiskCalculationCommand,
   type PersistFindingRiskCalculationResult,
   type PriorityPolicyLookup,
@@ -377,7 +380,15 @@ function createHarness(options: HarnessOptions = {}) {
   const overrideLookups: string[] = [];
   const publishCalls: PublishOrganizationPriorityOverrideCommand[] = [];
   const canonicalInputs: unknown[] = [];
+  const lockedScopes: Array<{
+    readonly organizationId: string;
+    readonly actorUserId: string;
+    readonly membershipId: string;
+    readonly findingId: string;
+  }> = [];
   let parsedFacts: ParsedFacts | undefined;
+  let insideLock = false;
+  let membershipInsideLock: boolean | null = null;
 
   const engine: PriorityEnginePort<Validated, ParsedFacts> = {
     parseFactInput(input) {
@@ -410,82 +421,113 @@ function createHarness(options: HarnessOptions = {}) {
     },
   };
 
-  const persistence: CalculateFindingRiskDependencies<Validated, ParsedFacts>['persistence'] & {
-    publishOrganizationPriorityOverride: (
-      input: PublishOrganizationPriorityOverrideCommand,
-    ) => Promise<{
-      readonly kind: 'published';
-      readonly policy: { readonly id: string; readonly version: number };
-    }>;
-  } = {
-    async loadPriorityCalculationFactGraph(input) {
-      graphInputs.push(input);
-      return (
-        options.graph ?? {
-          kind: 'found',
-          asOf: AS_OF,
-          snapshot: snapshot(),
-        }
-      );
-    },
-    async findPublishedBuiltinPriorityPolicy() {
-      return (
-        options.builtin ?? {
-          kind: 'found',
-          policy: {
-            id: POLICY_ID,
-            policyKey: BUILTIN_PRIORITY_POLICY_KEY,
-            version: BUILTIN_PRIORITY_POLICY_VERSION,
-            definition: BUILTIN,
-          },
-        }
-      );
-    },
-    async findSelectedOrganizationPriorityOverride(organizationId) {
-      overrideLookups.push(organizationId);
-      return options.override ?? { kind: 'not_found' };
-    },
-    async findCurrentRiskCalculation() {
-      return options.current ?? { kind: 'not_found' };
-    },
-    async persistRiskCalculation(command) {
-      persistCalls.push(command);
-      if (options.persist) {
-        return options.persist(command);
+  async function loadPriorityCalculationFactGraph(input: RiskCalculationScope) {
+    graphInputs.push(input);
+    return (
+      options.graph ?? {
+        kind: 'found' as const,
+        asOf: AS_OF,
+        snapshot: snapshot(),
       }
-      return {
-        kind: 'persisted',
-        calculation: storedCalculation({
-          riskPolicyId: command.riskPolicyId,
-          policyDefinitionSha256: command.policyDefinitionSha256,
-          calculatedAt: command.calculatedAt,
-          factors: command.factors,
-          result: command.result,
-          calculationReason: command.calculationReason,
-          inputFingerprint: command.inputFingerprint,
-        }),
-      };
-    },
-    async publishOrganizationPriorityOverride(input) {
-      publishCalls.push(input);
-      return { kind: 'published', policy: { id: OVERRIDE_ID, version: 1 } };
-    },
-  };
+    );
+  }
 
-  const kevMembership = {
-    async queryActiveKevMembership(input: unknown) {
-      membershipInputs.push(input);
-      if (options.membership) {
-        return options.membership(input);
+  async function findPublishedBuiltinPriorityPolicy() {
+    return (
+      options.builtin ?? {
+        kind: 'found' as const,
+        policy: {
+          id: POLICY_ID,
+          policyKey: BUILTIN_PRIORITY_POLICY_KEY,
+          version: BUILTIN_PRIORITY_POLICY_VERSION,
+          definition: BUILTIN,
+        },
       }
-      return ok(LISTED);
+    );
+  }
+
+  async function findSelectedOrganizationPriorityOverride(organizationId: string) {
+    overrideLookups.push(organizationId);
+    return options.override ?? { kind: 'not_found' as const };
+  }
+
+  async function findCurrentRiskCalculation() {
+    return options.current ?? { kind: 'not_found' as const };
+  }
+
+  async function persistRiskCalculation(command: PersistFindingRiskCalculationCommand) {
+    persistCalls.push(command);
+    if (options.persist) {
+      return options.persist(command);
+    }
+    return {
+      kind: 'persisted' as const,
+      calculation: storedCalculation({
+        riskPolicyId: command.riskPolicyId,
+        policyDefinitionSha256: command.policyDefinitionSha256,
+        calculatedAt: command.calculatedAt,
+        factors: command.factors,
+        result: command.result,
+        calculationReason: command.calculationReason,
+        inputFingerprint: command.inputFingerprint,
+      }),
+    };
+  }
+
+  const persistence = {
+    loadPriorityCalculationFactGraph,
+    findPublishedBuiltinPriorityPolicy,
+    findSelectedOrganizationPriorityOverride,
+    findCurrentRiskCalculation,
+    persistRiskCalculation,
+    async executeLockedPriorityCalculation<TStop>(
+      scope: LockedPriorityCalculationScope,
+      work: (
+        context: LockedPriorityCalculationContext,
+      ) => Promise<LockedPriorityCalculationDecision<TStop>>,
+    ): Promise<LockedPriorityCalculationOutcome<TStop>> {
+      lockedScopes.push(scope);
+      insideLock = true;
+      try {
+        const graph = await loadPriorityCalculationFactGraph({
+          organizationId: scope.organizationId,
+          findingId: scope.findingId,
+        });
+        const builtin = await findPublishedBuiltinPriorityPolicy();
+        const override = await findSelectedOrganizationPriorityOverride(scope.organizationId);
+        const current = await findCurrentRiskCalculation();
+        const decision = await work({
+          asOf: graph.kind === 'found' ? graph.asOf : null,
+          graph,
+          builtin,
+          override,
+          current,
+          async queryActiveKevMembership(input: unknown) {
+            membershipInsideLock = insideLock;
+            membershipInputs.push(input);
+            if (options.membership) {
+              return options.membership(input);
+            }
+            return ok(LISTED);
+          },
+        });
+        if (decision.kind === 'stop') {
+          return { kind: 'stop' as const, result: decision.result };
+        }
+        return { kind: 'write' as const, result: await persistRiskCalculation(decision.command) };
+      } finally {
+        insideLock = false;
+      }
+    },
+    async publishOrganizationPriorityOverride(input: PublishOrganizationPriorityOverrideCommand) {
+      publishCalls.push(input);
+      return { kind: 'published' as const, policy: { id: OVERRIDE_ID, version: 1 } };
     },
   };
 
   const dependencies = {
     engine,
     persistence,
-    kevMembership,
     builtinDefinition: options.builtinDefinition ?? BUILTIN,
     createCorrelationId: () => CORRELATION,
   };
@@ -505,6 +547,8 @@ function createHarness(options: HarnessOptions = {}) {
     overrideLookups,
     publishCalls,
     canonicalInputs,
+    lockedScopes,
+    membershipInsideLock: () => membershipInsideLock,
     parsedFacts: () => parsedFacts,
     input: {
       actor: actor(
@@ -547,6 +591,15 @@ describe('createCalculateFindingRiskUseCase', () => {
       expect(result.kind).toBe('calculated');
       expect(harness.evaluateCalls).toHaveLength(1);
       expect(harness.parseInputs).toHaveLength(1);
+      expect(harness.lockedScopes).toEqual([
+        {
+          organizationId: ORG,
+          actorUserId: ACTOR,
+          membershipId: MEMBERSHIP,
+          findingId: FINDING,
+        },
+      ]);
+      expect(harness.membershipInsideLock()).toBe(true);
       expect(harness.membershipInputs).toEqual([{ cve: 'CVE-1900-00001' }]);
       expect(harness.graphInputs).toEqual([{ organizationId: ORG, findingId: FINDING }]);
       expect(harness.overrideLookups).toEqual([ORG]);

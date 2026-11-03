@@ -11,10 +11,11 @@
  * `calculationReason`. `policyDefinitionSha256` is the SHA-256 of
  * `canonicalJson` of the selected validated definition.
  *
- * Age and `calculatedAt` both use the fact-graph `asOf`. This module does not
- * call `Date.now()`. The insert transaction reloads membership. KEV reads use
- * the injected membership use case and stay outside that insert because the
- * existing adapter does not accept a caller transaction.
+ * Age and `calculatedAt` both use the fact-graph `asOf` from the locked
+ * transaction. This module does not call `Date.now()`. Eligibility, fact
+ * reads, KEV reads, policy selection, the engine call, the fingerprint, and
+ * the insert all run inside `executeLockedPriorityCalculation`. The adapter
+ * reloads membership in that same transaction.
  */
 
 import { createHash, randomUUID } from 'node:crypto';
@@ -45,7 +46,6 @@ import {
   ACTIVE_KEV_MEMBERSHIP_INCONSISTENT,
   type ActiveKevCatalogFreshness,
   type ActiveKevMembership,
-  type QueryActiveKevMembershipUseCase,
 } from '../vulnerability/kev-membership.js';
 import {
   PRIORITY_CALCULATION_ENGINE_VERSION,
@@ -83,6 +83,9 @@ import type {
 import {
   BUILTIN_PRIORITY_POLICY_KEY,
   BUILTIN_PRIORITY_POLICY_VERSION,
+  type CurrentRiskCalculationRead,
+  type LockedPriorityCalculationContext,
+  type LockedPriorityCalculationDecision,
   type PersistedRiskCalculationReason,
   type PriorityPolicyLookup,
   type RiskCalculationPersistencePort,
@@ -166,15 +169,7 @@ function roleGrantsPolicyManage(role: MembershipRole): boolean {
 
 export type CalculateFindingRiskDependencies<TValidatedDefinition, TParsedFacts> = {
   readonly engine: PriorityEnginePort<TValidatedDefinition, TParsedFacts>;
-  readonly persistence: Pick<
-    RiskCalculationPersistencePort,
-    | 'loadPriorityCalculationFactGraph'
-    | 'findPublishedBuiltinPriorityPolicy'
-    | 'findSelectedOrganizationPriorityOverride'
-    | 'findCurrentRiskCalculation'
-    | 'persistRiskCalculation'
-  >;
-  readonly kevMembership: QueryActiveKevMembershipUseCase;
+  readonly persistence: Pick<RiskCalculationPersistencePort, 'executeLockedPriorityCalculation'>;
   readonly builtinDefinition: unknown;
   readonly createCorrelationId?: () => string;
 };
@@ -398,38 +393,71 @@ async function executeCalculation<TValidatedDefinition, TParsedFacts>(
   if (!authorized.ok) {
     return { kind: authorized.kind };
   }
-  const loaded = await loadSnapshot(dependencies, authorized);
+  if (typeof dependencies.persistence.executeLockedPriorityCalculation !== 'function') {
+    return { kind: 'internal_failure' };
+  }
+  const outcome = await dependencies.persistence.executeLockedPriorityCalculation(
+    {
+      organizationId: authorized.actor.organizationId,
+      actorUserId: authorized.actor.userId,
+      membershipId: authorized.actor.membershipId,
+      findingId: authorized.findingId,
+    },
+    (context) => decideLockedCalculation(dependencies, createCorrelationId, authorized, context),
+  );
+  switch (outcome.kind) {
+    case 'stop':
+      return outcome.result;
+    case 'write':
+      return mapPersistedCalculation(outcome.result);
+    case 'unavailable':
+      return { kind: 'unavailable' };
+    default:
+      return assertNever(outcome);
+  }
+}
+
+async function decideLockedCalculation<TValidatedDefinition, TParsedFacts>(
+  dependencies: CalculateFindingRiskDependencies<TValidatedDefinition, TParsedFacts>,
+  createCorrelationId: () => string,
+  authorized: AuthorizedFinding,
+  context: LockedPriorityCalculationContext,
+): Promise<LockedPriorityCalculationDecision<CalculateFindingRiskResult>> {
+  const loaded = readLockedSnapshot(authorized, context);
   if (!loaded.ok) {
-    return loaded.failure;
+    return { kind: 'stop', result: loaded.failure };
   }
   const canonicalCves = selectFindingRiskCanonicalCves(loaded.snapshot);
   if (!canonicalCves.ok) {
-    return { kind: 'canonical_cve_rejected', code: canonicalCves.error.code };
+    return {
+      kind: 'stop',
+      result: { kind: 'canonical_cve_rejected', code: canonicalCves.error.code },
+    };
   }
-  const memberships = await readMemberships(dependencies.kevMembership, canonicalCves.value);
+  const memberships = await readMemberships(context.queryActiveKevMembership, canonicalCves.value);
   if (!memberships.ok) {
-    return { kind: 'kev_membership_error', error: memberships.error };
+    return { kind: 'stop', result: { kind: 'kev_membership_error', error: memberships.error } };
   }
   const kevFact = mapActiveKevToListedFact(canonicalCves.value.length, memberships.value);
   if (!kevFact.ok) {
-    return { kind: 'kev_mapping_rejected', code: kevFact.error.code };
+    return { kind: 'stop', result: { kind: 'kev_mapping_rejected', code: kevFact.error.code } };
   }
   const kevSource = kevCatalogSource(kevFact.value, memberships.value);
   if (!kevSource.ok) {
-    return { kind: 'kev_source_rejected', code: kevSource.error.code };
+    return { kind: 'stop', result: { kind: 'kev_source_rejected', code: kevSource.error.code } };
   }
-  const selected = await selectPolicy(dependencies, authorized.actor.organizationId);
+  const selected = selectPolicy(dependencies, context.builtin, context.override);
   if (!selected.ok) {
-    return selected.failure;
+    return { kind: 'stop', result: selected.failure };
   }
   const facts = assemblePriorityFacts(loaded.snapshot, kevFact.value, loaded.asOf);
   if (!facts.ok) {
-    return { kind: 'facts_rejected', code: facts.error.code };
+    return { kind: 'stop', result: { kind: 'facts_rejected', code: facts.error.code } };
   }
   const sources = assembleRiskCalculationFactorSources(loaded.snapshot, kevSource.value);
   const parsed = dependencies.engine.parseFactInput(facts.value);
   if (!parsed.ok) {
-    return { kind: 'fact_input_rejected' };
+    return { kind: 'stop', result: { kind: 'fact_input_rejected' } };
   }
   const fingerprint = fingerprintCalculation(
     dependencies.engine,
@@ -437,42 +465,42 @@ async function executeCalculation<TValidatedDefinition, TParsedFacts>(
     parsed.value,
   );
   if (!fingerprint.ok) {
-    return fingerprint.failure;
+    return { kind: 'stop', result: fingerprint.failure };
   }
-  const reason = await resolveReason(
-    dependencies,
-    authorized,
-    fingerprint.policyDefinitionSha256,
-    facts.value,
-  );
+  const reason = resolveReason(context.current, fingerprint.policyDefinitionSha256, facts.value);
   if (!reason.ok) {
-    return reason.failure;
+    return { kind: 'stop', result: reason.failure };
   }
   const evaluation = dependencies.engine.evaluatePriority(selected.policy.definition, parsed.value);
   if (!evaluation.ok || !evaluationAccepted(evaluation.value)) {
-    return { kind: 'engine_rejected' };
+    return { kind: 'stop', result: { kind: 'engine_rejected' } };
   }
   const correlationId = readCorrelationId(createCorrelationId);
   if (correlationId === null) {
-    return { kind: 'internal_failure' };
+    return { kind: 'stop', result: { kind: 'internal_failure' } };
   }
-  if (typeof dependencies.persistence.persistRiskCalculation !== 'function') {
-    return { kind: 'internal_failure' };
-  }
-  const persisted = await dependencies.persistence.persistRiskCalculation({
-    organizationId: authorized.actor.organizationId,
-    actorUserId: authorized.actor.userId,
-    membershipId: authorized.actor.membershipId,
-    findingId: authorized.findingId,
-    riskPolicyId: selected.policy.riskPolicyId,
-    policyDefinitionSha256: fingerprint.policyDefinitionSha256,
-    inputFingerprint: fingerprint.inputFingerprint,
-    calculationReason: reason.reason,
-    factors: factorsDocument(evaluation.value, sources),
-    result: resultDocument(evaluation.value),
-    correlationId,
-    calculatedAt: loaded.asOf,
-  });
+  return {
+    kind: 'persist',
+    command: {
+      organizationId: authorized.actor.organizationId,
+      actorUserId: authorized.actor.userId,
+      membershipId: authorized.actor.membershipId,
+      findingId: authorized.findingId,
+      riskPolicyId: selected.policy.riskPolicyId,
+      policyDefinitionSha256: fingerprint.policyDefinitionSha256,
+      inputFingerprint: fingerprint.inputFingerprint,
+      calculationReason: reason.reason,
+      factors: factorsDocument(evaluation.value, sources),
+      result: resultDocument(evaluation.value),
+      correlationId,
+      calculatedAt: loaded.asOf,
+    },
+  };
+}
+
+function mapPersistedCalculation(
+  persisted: Awaited<ReturnType<RiskCalculationPersistencePort['persistRiskCalculation']>>,
+): CalculateFindingRiskResult {
   switch (persisted.kind) {
     case 'persisted':
       return { kind: 'calculated', calculation: persisted.calculation };
@@ -538,21 +566,13 @@ function readEnvelope(input: unknown): CommandRead {
   };
 }
 
-async function loadSnapshot<TValidatedDefinition, TParsedFacts>(
-  dependencies: CalculateFindingRiskDependencies<TValidatedDefinition, TParsedFacts>,
+function readLockedSnapshot(
   authorized: AuthorizedFinding,
-): Promise<
+  context: LockedPriorityCalculationContext,
+):
   | { readonly ok: true; readonly asOf: Date; readonly snapshot: FindingRiskSourceSnapshot }
-  | { readonly ok: false; readonly failure: CalculateFindingRiskResult }
-> {
-  if (typeof dependencies.persistence.loadPriorityCalculationFactGraph !== 'function') {
-    return { ok: false, failure: { kind: 'internal_failure' } };
-  }
-  const graph = await dependencies.persistence.loadPriorityCalculationFactGraph({
-    organizationId: authorized.actor.organizationId,
-    findingId: authorized.findingId,
-  });
-  switch (graph.kind) {
+  | { readonly ok: false; readonly failure: CalculateFindingRiskResult } {
+  switch (context.graph.kind) {
     case 'not_found':
       return { ok: false, failure: { kind: 'not_found' } };
     case 'unavailable':
@@ -560,33 +580,36 @@ async function loadSnapshot<TValidatedDefinition, TParsedFacts>(
     case 'found':
       break;
     default:
-      return assertNever(graph);
+      return assertNever(context.graph);
+  }
+  if (context.asOf === null) {
+    return { ok: false, failure: { kind: 'unavailable' } };
   }
   if (
-    graph.snapshot.finding.id !== authorized.findingId ||
-    graph.snapshot.finding.organizationId !== authorized.actor.organizationId
+    context.graph.snapshot.finding.id !== authorized.findingId ||
+    context.graph.snapshot.finding.organizationId !== authorized.actor.organizationId
   ) {
     return { ok: false, failure: { kind: 'not_found' } };
   }
-  const eligibility = assessFindingRiskEligibility(graph.snapshot);
+  const eligibility = assessFindingRiskEligibility(context.graph.snapshot);
   if (eligibility.outcome === 'ineligible') {
     return { ok: false, failure: { kind: 'ineligible', reason: eligibility.reason } };
   }
-  return { ok: true, asOf: graph.asOf, snapshot: graph.snapshot };
+  return { ok: true, asOf: context.asOf, snapshot: context.graph.snapshot };
 }
 
 async function readMemberships(
-  kevMembership: QueryActiveKevMembershipUseCase,
+  queryActiveKevMembership: LockedPriorityCalculationContext['queryActiveKevMembership'],
   canonicalCves: readonly string[],
 ): Promise<Result<readonly ActiveKevMembership[], FindingRiskKevMembershipError>> {
-  if (typeof kevMembership.queryActiveKevMembership !== 'function') {
+  if (typeof queryActiveKevMembership !== 'function') {
     return err(findingRiskKevMembershipError('source_missing'));
   }
   const memberships: ActiveKevMembership[] = [];
   for (const cve of canonicalCves) {
     let result: Result<ActiveKevMembership>;
     try {
-      result = await kevMembership.queryActiveKevMembership({ cve });
+      result = await queryActiveKevMembership({ cve });
     } catch {
       return err(findingRiskKevMembershipError('source_missing'));
     }
@@ -720,26 +743,17 @@ function unknownFreshness(
   }
 }
 
-async function selectPolicy<TValidatedDefinition, TParsedFacts>(
+function selectPolicy<TValidatedDefinition, TParsedFacts>(
   dependencies: CalculateFindingRiskDependencies<TValidatedDefinition, TParsedFacts>,
-  organizationId: string,
-): Promise<
+  builtin: PriorityPolicyLookup,
+  override: PriorityPolicyLookup,
+):
   | { readonly ok: true; readonly policy: SelectedPolicy<TValidatedDefinition> }
-  | { readonly ok: false; readonly failure: CalculateFindingRiskResult }
-> {
-  if (
-    typeof dependencies.persistence.findPublishedBuiltinPriorityPolicy !== 'function' ||
-    typeof dependencies.persistence.findSelectedOrganizationPriorityOverride !== 'function'
-  ) {
-    return { ok: false, failure: { kind: 'internal_failure' } };
-  }
-  const builtin = await dependencies.persistence.findPublishedBuiltinPriorityPolicy();
+  | { readonly ok: false; readonly failure: CalculateFindingRiskResult } {
   const validatedBuiltin = validateBuiltinPolicy(dependencies, builtin);
   if (!validatedBuiltin.ok) {
     return validatedBuiltin;
   }
-  const override =
-    await dependencies.persistence.findSelectedOrganizationPriorityOverride(organizationId);
   if (override.kind === 'unavailable') {
     return { ok: false, failure: { kind: 'override_rejected', reason: 'unreadable' } };
   }
@@ -863,22 +877,13 @@ function sha256Hex(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
-async function resolveReason<TValidatedDefinition, TParsedFacts>(
-  dependencies: CalculateFindingRiskDependencies<TValidatedDefinition, TParsedFacts>,
-  authorized: AuthorizedFinding,
+function resolveReason(
+  current: CurrentRiskCalculationRead,
   policyDefinitionSha256: string,
   facts: PriorityFactInput,
-): Promise<
+):
   | { readonly ok: true; readonly reason: PersistedRiskCalculationReason }
-  | { readonly ok: false; readonly failure: CalculateFindingRiskResult }
-> {
-  if (typeof dependencies.persistence.findCurrentRiskCalculation !== 'function') {
-    return { ok: false, failure: { kind: 'internal_failure' } };
-  }
-  const current = await dependencies.persistence.findCurrentRiskCalculation({
-    organizationId: authorized.actor.organizationId,
-    findingId: authorized.findingId,
-  });
+  | { readonly ok: false; readonly failure: CalculateFindingRiskResult } {
   switch (current.kind) {
     case 'unavailable':
       return { ok: false, failure: { kind: 'unavailable' } };

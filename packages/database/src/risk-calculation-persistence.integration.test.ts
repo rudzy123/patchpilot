@@ -1031,12 +1031,14 @@ beforeAll(async () => {
   await deployMigrations(database.databaseUrl);
   prisma = new PrismaClient({ datasources: { db: { url: database.databaseUrl } } });
   await seedDevelopmentData({ env: createFoundationTestEnv(), client: prisma });
-  const persistence = createRiskCalculationApplicationPersistence(prisma);
-  const kevMembership = createQueryActiveKevMembershipUseCase({
-    membership: createActiveKevMembershipPersistence(prisma),
-    kevEnabled: true,
-    staleThresholdSeconds: 259_200,
-    now: () => new Date(),
+  const persistence = createRiskCalculationApplicationPersistence(prisma, {
+    bindKevMembership: (client, asOf) =>
+      createQueryActiveKevMembershipUseCase({
+        membership: createActiveKevMembershipPersistence(client),
+        kevEnabled: true,
+        staleThresholdSeconds: 259_200,
+        now: () => asOf,
+      }),
   });
   const engine = {
     parseFactInput,
@@ -1049,7 +1051,6 @@ beforeAll(async () => {
     calculate: createCalculateFindingRiskUseCase({
       engine,
       persistence,
-      kevMembership,
       builtinDefinition: BUILTIN_PRIORITY_POLICY_DEFINITION,
     }),
     read: createReadCurrentFindingRiskUseCase({ persistence }),
@@ -1614,10 +1615,6 @@ describe('risk calculation persistence', () => {
   });
 
   it('rejects update and delete and leaves no partial audit on fingerprint conflict', async () => {
-    // persist() has no post-insert hook, so this file cannot force a throw
-    // after the calculation insert. The organization-finding lock makes the
-    // concurrent path a serialized replay. A same fingerprint with a different
-    // result returns immutable_conflict and adds no calculation or audit.
     const prepared = await prepareFinding('append-only');
     const calculated = await services.calculate.execute(envelope(prepared));
     expect(calculated.kind).toBe('calculated');
@@ -1661,6 +1658,31 @@ describe('risk calculation persistence', () => {
     expect(await calculationCount(prepared.organizationId, prepared.findingId)).toBe(calculations);
     expect(await auditCount(prepared.organizationId, 'priority.calculated')).toBe(audits);
     expect(await rowSnapshot(calculated.calculation.id)).toEqual(before);
+  });
+
+  it('rolls back the calculation when the priority audit insert fails', async () => {
+    const prepared = await prepareFinding('audit-rollback');
+    const calculations = await calculationCount(prepared.organizationId, prepared.findingId);
+    const audits = await auditCount(prepared.organizationId, 'priority.calculated');
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "audit_event"
+      ADD CONSTRAINT "priority_calculated_audit_rollback"
+      CHECK ("action" <> 'priority.calculated') NOT VALID
+    `);
+    try {
+      const result = await services.calculate.execute(envelope(prepared));
+      expect(result.kind === 'unavailable' || result.kind === 'internal_failure').toBe(true);
+      expect(await calculationCount(prepared.organizationId, prepared.findingId)).toBe(
+        calculations,
+      );
+      expect(await auditCount(prepared.organizationId, 'priority.calculated')).toBe(audits);
+      await expectFindingUntouched(prepared.organizationId, prepared.findingId);
+    } finally {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "audit_event"
+        DROP CONSTRAINT IF EXISTS "priority_calculated_audit_rollback"
+      `);
+    }
   });
 
   it('appends a second calculation when a new KEV generation corrects membership', async () => {

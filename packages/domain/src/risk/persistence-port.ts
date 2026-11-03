@@ -9,6 +9,8 @@ import type {
   RiskCalculationResultV1Json,
 } from '../json-documents.js';
 import type { RiskCalculationReason } from '../lifecycle.js';
+import type { Result } from '../result.js';
+import type { ActiveKevMembership } from '../vulnerability/kev-membership.js';
 import type { FindingRiskSourceSnapshot } from './fact-assembly.js';
 import { PRIORITY_CALCULATION_ENGINE_VERSION } from './catalog.js';
 
@@ -120,9 +122,42 @@ export type PublishOrganizationPriorityOverridePersistenceResult =
   | { readonly kind: 'rejected' }
   | { readonly kind: 'unavailable' };
 
+export type LockedPriorityCalculationScope = RiskCalculationScope & {
+  readonly actorUserId: string;
+  readonly membershipId: string;
+};
+
 /**
- * Methods the calculation use cases call. The insert transaction reloads
- * membership. Fact-graph loading is a separate read and returns `asOf`.
+ * Rows loaded after the Finding lock, before the engine runs.
+ * `asOf` is null when the fact graph was not found. When the graph is found,
+ * `asOf` is the database timestamp used both for finding age and `calculatedAt`.
+ * `queryActiveKevMembership` reads KEV through the same database transaction.
+ */
+export type LockedPriorityCalculationContext = {
+  readonly asOf: Date | null;
+  readonly graph: RiskCalculationFactGraphRead;
+  readonly builtin: PriorityPolicyLookup;
+  readonly override: PriorityPolicyLookup;
+  readonly current: CurrentRiskCalculationRead;
+  readonly queryActiveKevMembership: (input: unknown) => Promise<Result<ActiveKevMembership>>;
+};
+
+export type LockedPriorityCalculationDecision<TStop> =
+  | { readonly kind: 'persist'; readonly command: PersistFindingRiskCalculationCommand }
+  | { readonly kind: 'stop'; readonly result: TStop };
+
+export type LockedPriorityCalculationOutcome<TStop> =
+  | { readonly kind: 'write'; readonly result: PersistFindingRiskCalculationResult }
+  | { readonly kind: 'stop'; readonly result: TStop }
+  | { readonly kind: 'unavailable' };
+
+/**
+ * Methods the calculation use cases call.
+ * `executeLockedPriorityCalculation` is the one calculation transaction:
+ * lock, load, invoke `work` (eligibility, KEV, policy, engine, fingerprint),
+ * then insert and audit. The other read methods stay available for the
+ * current-calculation query and for direct inserts of an already evaluated
+ * document.
  */
 export type RiskCalculationPersistencePort = {
   readonly loadPriorityCalculationFactGraph: (
@@ -138,6 +173,12 @@ export type RiskCalculationPersistencePort = {
   readonly persistRiskCalculation: (
     input: PersistFindingRiskCalculationCommand,
   ) => Promise<PersistFindingRiskCalculationResult>;
+  readonly executeLockedPriorityCalculation: <TStop>(
+    scope: LockedPriorityCalculationScope,
+    work: (
+      context: LockedPriorityCalculationContext,
+    ) => Promise<LockedPriorityCalculationDecision<TStop>>,
+  ) => Promise<LockedPriorityCalculationOutcome<TStop>>;
   readonly publishOrganizationPriorityOverride: (
     input: PublishOrganizationPriorityOverrideCommand,
   ) => Promise<PublishOrganizationPriorityOverridePersistenceResult>;

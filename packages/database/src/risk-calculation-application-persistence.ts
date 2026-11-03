@@ -1,13 +1,15 @@
 /**
  * Thin adapter from the domain risk-calculation port to the existing
- * PostgreSQL functions. The fact-graph snapshot is passed through. This
- * module does not assemble facts, hash a policy, or import the policy engine.
- * The database barrel does not construct it.
+ * PostgreSQL functions. Calculation runs inside one transaction: the adapter
+ * loads rows under the Finding lock and invokes the domain callback there.
+ * This module does not assemble facts, hash a policy, or import the policy
+ * engine. The database barrel does not construct it.
  */
 
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import type {
   CurrentRiskCalculationRead,
+  LockedPriorityCalculationContext,
   PersistFindingRiskCalculationResult,
   PriorityPolicyLookup,
   PublishOrganizationPriorityOverridePersistenceResult,
@@ -18,7 +20,10 @@ import type {
 } from '@patchpilot/domain';
 import { assertNever } from '@patchpilot/domain';
 
-import { createRiskCalculationPersistence } from './risk-calculation-persistence.js';
+import {
+  createRiskCalculationPersistence,
+  runLockedPriorityCalculation,
+} from './risk-calculation-persistence.js';
 import type {
   CurrentRiskCalculationResult,
   PersistRiskCalculationResult,
@@ -29,8 +34,18 @@ import type {
   StoredPriorityPolicy,
 } from './risk-calculation-persistence.js';
 
+export type RiskCalculationApplicationPersistenceOptions = {
+  readonly bindKevMembership: (
+    client: Prisma.TransactionClient,
+    asOf: Date,
+  ) => {
+    readonly queryActiveKevMembership: LockedPriorityCalculationContext['queryActiveKevMembership'];
+  };
+};
+
 export function createRiskCalculationApplicationPersistence(
   client: PrismaClient,
+  options: RiskCalculationApplicationPersistenceOptions,
 ): RiskCalculationPersistencePort {
   const persistence = createRiskCalculationPersistence(client);
   return {
@@ -48,6 +63,34 @@ export function createRiskCalculationApplicationPersistence(
     },
     async persistRiskCalculation(input) {
       return mapPersist(await persistence.persist(input));
+    },
+    async executeLockedPriorityCalculation(scope, work) {
+      const outcome = await runLockedPriorityCalculation(
+        client,
+        scope,
+        options.bindKevMembership,
+        async (raw) => {
+          const decision = await work({
+            asOf: raw.asOf,
+            graph: mapFactGraph(raw.graph),
+            builtin: mapPolicy(raw.builtin),
+            override: mapPolicy(raw.override),
+            current: mapCurrent(raw.current),
+            queryActiveKevMembership: (input) => raw.queryActiveKevMembership(input),
+          });
+          if (decision.kind === 'stop') {
+            return { kind: 'stop', result: decision.result };
+          }
+          return { kind: 'persist', command: decision.command };
+        },
+      );
+      if (outcome.kind === 'stop') {
+        return { kind: 'stop', result: outcome.result };
+      }
+      if (outcome.kind === 'write') {
+        return { kind: 'write', result: mapPersist(outcome.result) };
+      }
+      return { kind: 'unavailable' };
     },
     async publishOrganizationPriorityOverride(input) {
       return mapPublish(await persistence.publishOrganizationPriorityOverride(input));

@@ -2,16 +2,19 @@
  * Uncomposed PostgreSQL adapter for one RiskCalculation and for organization
  * priority-policy versions.
  *
- * The caller evaluates priority before calling this module. This module does
- * not assemble fact tokens, does not hash a policy or a fingerprint, and does
- * not import `@patchpilot/policy-engine`. It does not update the Finding,
- * Product Match Evidence, observations, or KEV rows.
+ * `runLockedPriorityCalculation` is the calculation transaction. It takes the
+ * organization-scoped lock, selects the Finding FOR UPDATE, loads persisted
+ * rows, and invokes the caller before insert. The caller assembles facts,
+ * reads KEV through the injected query, selects the policy, and calls the
+ * engine. This module then inserts the RiskCalculation and the
+ * `priority.calculated` audit in that same transaction. `calculatedAt` is the
+ * fact-graph `CURRENT_TIMESTAMP`. The transaction does no network or object
+ * storage, does not import `@patchpilot/policy-engine`, and does not update
+ * the Finding, Product Match Evidence, observations, or KEV rows.
  *
- * `calculatedAt`, when the caller supplies it, is stored as `calculated_at`.
- * That value must be the same database timestamp used to compute finding age,
- * so the stored instant matches the age fact. When `calculatedAt` is omitted,
- * the insert transaction reads `CURRENT_TIMESTAMP` once and stores that value.
- * The transaction does not call `Date.now()` after that read.
+ * `persistRiskCalculation` remains a direct insert for an already evaluated
+ * document. It opens its own transaction. When `calculatedAt` is omitted,
+ * that transaction reads `CURRENT_TIMESTAMP` once.
  *
  * Nothing in `apps/` or the database barrel constructs this adapter.
  */
@@ -464,6 +467,154 @@ export async function persistRiskCalculation(
   }
 }
 
+type PrioritySqlClient = PrismaClient | Prisma.TransactionClient;
+
+type LockedPriorityCalculationScopeInput = {
+  readonly organizationId: string;
+  readonly actorUserId: string;
+  readonly membershipId: string;
+  readonly findingId: string;
+};
+
+export type LockedPriorityCalculationWorkContext<
+  TQuery extends (input: unknown) => Promise<unknown>,
+> = {
+  readonly asOf: Date | null;
+  readonly graph: PriorityCalculationFactGraphResult;
+  readonly builtin: PriorityPolicyReadResult;
+  readonly override: PriorityPolicyReadResult;
+  readonly current: CurrentRiskCalculationResult;
+  readonly queryActiveKevMembership: TQuery;
+};
+
+type LockedPriorityCalculationWorkDecision<TStop> =
+  | { readonly kind: 'persist'; readonly command: PersistRiskCalculationInput }
+  | { readonly kind: 'stop'; readonly result: TStop };
+
+type LockedTransactionResult<TStop> =
+  | { readonly kind: 'write'; readonly result: PersistRiskCalculationResult }
+  | { readonly kind: 'stop'; readonly result: TStop }
+  | { readonly kind: 'internal_failure' };
+
+export type RunLockedPriorityCalculationResult<TStop> =
+  | LockedTransactionResult<TStop>
+  | { readonly kind: 'database_unavailable' }
+  | { readonly kind: 'transaction_aborted' };
+
+/**
+ * One calculation transaction: organization lock, Finding `FOR UPDATE`,
+ * persisted reads, caller work, then calculation insert and audit.
+ * `bindKevMembership` must query through the transaction client it receives.
+ * A thrown audit or constraint error rolls the calculation insert back with
+ * the audit. `calculatedAt` is the fact-graph database timestamp.
+ */
+export async function runLockedPriorityCalculation<
+  TStop,
+  TQuery extends (input: unknown) => Promise<unknown>,
+>(
+  client: PrismaClient,
+  scope: LockedPriorityCalculationScopeInput,
+  bindKevMembership: (
+    client: Prisma.TransactionClient,
+    asOf: Date,
+  ) => { readonly queryActiveKevMembership: TQuery },
+  work: (
+    context: LockedPriorityCalculationWorkContext<TQuery>,
+  ) => Promise<LockedPriorityCalculationWorkDecision<TStop>>,
+): Promise<RunLockedPriorityCalculationResult<TStop>> {
+  const organizationId = normalizeUuid(scope.organizationId);
+  const actorUserId = normalizeUuid(scope.actorUserId);
+  const membershipId = normalizeUuid(scope.membershipId);
+  const findingId = normalizeUuid(scope.findingId);
+  if (
+    organizationId === null ||
+    actorUserId === null ||
+    membershipId === null ||
+    findingId === null
+  ) {
+    return { kind: 'write', result: { kind: 'rejected', reason: 'malformed_id' } };
+  }
+  let replayCommand: NormalizedPersist | null = null;
+  try {
+    return await client.$transaction(
+      async (tx): Promise<LockedTransactionResult<TStop>> => {
+        await lockTransactionScope(tx, `${organizationId}:${findingId}`);
+        const actor = await loadActor(tx, organizationId, membershipId);
+        if (actor === null || actor !== actorUserId) {
+          return { kind: 'write', result: { kind: 'authority_rejected' } };
+        }
+        await loadFindingForUpdate(tx, organizationId, findingId);
+        const graph = await loadFactGraph(tx, organizationId, findingId);
+        const graphAsOf = graph.kind === 'found' ? graph.graph.asOf : null;
+        const builtin = await queryPublishedBuiltinPriorityPolicy(tx);
+        const override = await querySelectedOrganizationPriorityOverride(tx, organizationId);
+        const current = await queryCurrentRiskCalculation(tx, organizationId, findingId);
+        const kevClock = graphAsOf ?? (await readDatabaseNow(tx));
+        const kev = bindKevMembership(tx, kevClock);
+        if (typeof kev.queryActiveKevMembership !== 'function') {
+          return { kind: 'internal_failure' };
+        }
+        const queryActiveKevMembership: TQuery = kev.queryActiveKevMembership;
+        const decision = await work({
+          asOf: graphAsOf,
+          graph,
+          builtin,
+          override,
+          current,
+          queryActiveKevMembership,
+        });
+        if (decision.kind === 'stop') {
+          return { kind: 'stop', result: decision.result };
+        }
+        if (graphAsOf === null) {
+          return { kind: 'internal_failure' };
+        }
+        const normalized = normalizePersistInput(decision.command);
+        if (normalized.kind === 'rejected') {
+          return { kind: 'write', result: normalized };
+        }
+        if (
+          normalized.command.organizationId !== organizationId ||
+          normalized.command.actorUserId !== actorUserId ||
+          normalized.command.membershipId !== membershipId ||
+          normalized.command.findingId !== findingId
+        ) {
+          return { kind: 'write', result: { kind: 'authority_rejected' } };
+        }
+        if (
+          normalized.command.calculatedAt === null ||
+          normalized.command.calculatedAt.getTime() !== graphAsOf.getTime()
+        ) {
+          return {
+            kind: 'write',
+            result: { kind: 'rejected', reason: 'malformed_timestamp' },
+          };
+        }
+        const command = { ...normalized.command, calculatedAt: graphAsOf };
+        replayCommand = command;
+        return {
+          kind: 'write',
+          result: await persistInTransaction(tx, command),
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
+  } catch (error) {
+    const aborted = abortedResult(error);
+    if (aborted !== null) {
+      return aborted;
+    }
+    if (isUniqueViolation(error) && replayCommand !== null) {
+      return { kind: 'write', result: await reloadReplay(client, replayCommand) };
+    }
+    const failure = classifyDatabaseFailure(error);
+    if (failure !== null) {
+      return { kind: failure };
+    }
+    throw error;
+  }
+}
+
 /**
  * Inserts a new published organization policy version. It does not update a
  * published row and does not validate weights. The next version is
@@ -503,27 +654,7 @@ export async function findPublishedBuiltinPriorityPolicy(
   client: PrismaClient,
 ): Promise<PriorityPolicyReadResult> {
   try {
-    const rows = await client.$queryRaw<PolicyRow[]>`
-      SELECT
-        "id"::text AS "id",
-        "organization_id"::text AS "organization_id",
-        "scope"::text AS "scope",
-        "policy_key",
-        "name",
-        "version"::int AS "version",
-        "status"::text AS "status",
-        "policy_schema_version"::int AS "policy_schema_version",
-        "definition",
-        "published_at",
-        "created_by_membership_id"::text AS "created_by_membership_id"
-      FROM "risk_policy"
-      WHERE "organization_id" IS NULL
-        AND "scope" = 'builtin'::"risk_policy_scope"
-        AND "policy_key" = ${BUILTIN_PRIORITY_POLICY_KEY}
-        AND "version" = ${BUILTIN_PRIORITY_POLICY_VERSION}::int
-      LIMIT 1
-    `;
-    return classifyPolicyRead(rows, 'builtin');
+    return await queryPublishedBuiltinPriorityPolicy(client);
   } catch (error) {
     return mapReadFailure(error);
   }
@@ -544,28 +675,7 @@ export async function findSelectedOrganizationPriorityOverride(
     return { kind: 'rejected', reason: 'malformed_id' };
   }
   try {
-    const rows = await client.$queryRaw<PolicyRow[]>`
-      SELECT
-        "id"::text AS "id",
-        "organization_id"::text AS "organization_id",
-        "scope"::text AS "scope",
-        "policy_key",
-        "name",
-        "version"::int AS "version",
-        "status"::text AS "status",
-        "policy_schema_version"::int AS "policy_schema_version",
-        "definition",
-        "published_at",
-        "created_by_membership_id"::text AS "created_by_membership_id"
-      FROM "risk_policy"
-      WHERE "organization_id" = ${organization}::uuid
-        AND "scope" = 'organization'::"risk_policy_scope"
-        AND "policy_key" = ${BUILTIN_PRIORITY_POLICY_KEY}
-        AND "status" = 'published'::"risk_policy_status"
-      ORDER BY "version" DESC
-      LIMIT 1
-    `;
-    return classifyPolicyRead(rows, 'organization');
+    return await querySelectedOrganizationPriorityOverride(client, organization);
   } catch (error) {
     return mapReadFailure(error);
   }
@@ -585,42 +695,7 @@ export async function findCurrentRiskCalculation(
     return { kind: 'rejected', reason: 'malformed_id' };
   }
   try {
-    const rows = await client.$queryRaw<CalculationRow[]>`
-      SELECT
-        "id"::text AS "id",
-        "organization_id"::text AS "organization_id",
-        "finding_id"::text AS "finding_id",
-        "risk_policy_id"::text AS "risk_policy_id",
-        "policy_version"::int AS "policy_version",
-        btrim("policy_definition_sha256") AS "policy_definition_sha256",
-        "calculated_at",
-        "factors",
-        "result",
-        "calculation_engine_version",
-        "calculation_reason"::text AS "calculation_reason",
-        btrim("input_fingerprint") AS "input_fingerprint"
-      FROM "risk_calculation"
-      WHERE "organization_id" = ${organizationId}::uuid
-        AND "finding_id" = ${findingId}::uuid
-      ORDER BY "calculated_at" DESC, "id" DESC
-      LIMIT 1
-    `;
-    const row = rows[0];
-    if (row === undefined) {
-      return { kind: 'not_found' };
-    }
-    if (rows.length !== 1) {
-      return { kind: 'internal_failure' };
-    }
-    const calculation = mapCalculationRow(row);
-    if (
-      calculation === null ||
-      calculation.organizationId !== organizationId ||
-      calculation.findingId !== findingId
-    ) {
-      return { kind: 'malformed' };
-    }
-    return { kind: 'found', calculation };
+    return await queryCurrentRiskCalculation(client, organizationId, findingId);
   } catch (error) {
     return mapReadFailure(error);
   }
@@ -2411,6 +2486,103 @@ function distinctIds(ids: readonly string[]): string[] {
     }
   }
   return result;
+}
+
+async function queryPublishedBuiltinPriorityPolicy(
+  client: PrioritySqlClient,
+): Promise<PriorityPolicyReadResult> {
+  const rows = await client.$queryRaw<PolicyRow[]>`
+    SELECT
+      "id"::text AS "id",
+      "organization_id"::text AS "organization_id",
+      "scope"::text AS "scope",
+      "policy_key",
+      "name",
+      "version"::int AS "version",
+      "status"::text AS "status",
+      "policy_schema_version"::int AS "policy_schema_version",
+      "definition",
+      "published_at",
+      "created_by_membership_id"::text AS "created_by_membership_id"
+    FROM "risk_policy"
+    WHERE "organization_id" IS NULL
+      AND "scope" = 'builtin'::"risk_policy_scope"
+      AND "policy_key" = ${BUILTIN_PRIORITY_POLICY_KEY}
+      AND "version" = ${BUILTIN_PRIORITY_POLICY_VERSION}::int
+    LIMIT 1
+  `;
+  return classifyPolicyRead(rows, 'builtin');
+}
+
+async function querySelectedOrganizationPriorityOverride(
+  client: PrioritySqlClient,
+  organizationId: string,
+): Promise<PriorityPolicyReadResult> {
+  const rows = await client.$queryRaw<PolicyRow[]>`
+    SELECT
+      "id"::text AS "id",
+      "organization_id"::text AS "organization_id",
+      "scope"::text AS "scope",
+      "policy_key",
+      "name",
+      "version"::int AS "version",
+      "status"::text AS "status",
+      "policy_schema_version"::int AS "policy_schema_version",
+      "definition",
+      "published_at",
+      "created_by_membership_id"::text AS "created_by_membership_id"
+    FROM "risk_policy"
+    WHERE "organization_id" = ${organizationId}::uuid
+      AND "scope" = 'organization'::"risk_policy_scope"
+      AND "policy_key" = ${BUILTIN_PRIORITY_POLICY_KEY}
+      AND "status" = 'published'::"risk_policy_status"
+    ORDER BY "version" DESC
+    LIMIT 1
+  `;
+  return classifyPolicyRead(rows, 'organization');
+}
+
+async function queryCurrentRiskCalculation(
+  client: PrioritySqlClient,
+  organizationId: string,
+  findingId: string,
+): Promise<CurrentRiskCalculationResult> {
+  const rows = await client.$queryRaw<CalculationRow[]>`
+    SELECT
+      "id"::text AS "id",
+      "organization_id"::text AS "organization_id",
+      "finding_id"::text AS "finding_id",
+      "risk_policy_id"::text AS "risk_policy_id",
+      "policy_version"::int AS "policy_version",
+      btrim("policy_definition_sha256") AS "policy_definition_sha256",
+      "calculated_at",
+      "factors",
+      "result",
+      "calculation_engine_version",
+      "calculation_reason"::text AS "calculation_reason",
+      btrim("input_fingerprint") AS "input_fingerprint"
+    FROM "risk_calculation"
+    WHERE "organization_id" = ${organizationId}::uuid
+      AND "finding_id" = ${findingId}::uuid
+    ORDER BY "calculated_at" DESC, "id" DESC
+    LIMIT 1
+  `;
+  const row = rows[0];
+  if (row === undefined) {
+    return { kind: 'not_found' };
+  }
+  if (rows.length !== 1) {
+    return { kind: 'internal_failure' };
+  }
+  const calculation = mapCalculationRow(row);
+  if (
+    calculation === null ||
+    calculation.organizationId !== organizationId ||
+    calculation.findingId !== findingId
+  ) {
+    return { kind: 'malformed' };
+  }
+  return { kind: 'found', calculation };
 }
 
 async function lockTransactionScope(tx: Prisma.TransactionClient, lockKey: string): Promise<void> {
