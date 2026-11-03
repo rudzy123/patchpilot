@@ -28,6 +28,7 @@
     "@patchpilot/integrations": "workspace:*",
     "@patchpilot/logger": "workspace:*",
     "@patchpilot/observability": "workspace:*",
+    "@patchpilot/vulnerability-intelligence": "workspace:*",
     "fastify": "5.12.5",
     "ioredis": "^5.8.2"
   },

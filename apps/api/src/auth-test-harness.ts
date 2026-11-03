@@ -55,6 +55,10 @@ import {
   denyFindingDiscoveryRuntime,
   type FindingDiscoveryRuntime,
 } from './finding-discovery-runtime.js';
+import {
+  denyProductMatchEvaluationRuntime,
+  type ProductMatchEvaluationRuntime,
+} from './product-match-evaluation-runtime.js';
 import { createIntelligenceRuntime, type IntelligenceRuntime } from './intelligence-runtime.js';
 import type { SbomRuntime } from './sbom-runtime.js';
 
@@ -103,6 +107,8 @@ export async function buildTestApi(options?: {
   latestObservationPeerKey?: (request: FastifyRequest) => string;
   discovery?: FindingDiscoveryRuntime;
   discoveryOrganizationLimiter?: FindingOrganizationRateLimiter;
+  productMatchEvaluation?: ProductMatchEvaluationRuntime;
+  productMatchEvaluationOrganizationLimiter?: FindingOrganizationRateLimiter;
 }) {
   const harness = options?.harness ?? createAuthTestHarness(options);
   const app = await buildApi({
@@ -132,6 +138,15 @@ export async function buildTestApi(options?: {
     ...(options?.discoveryOrganizationLimiter === undefined
       ? {}
       : { discoveryOrganizationLimiter: options.discoveryOrganizationLimiter }),
+    ...(options?.productMatchEvaluation === undefined
+      ? { productMatchEvaluation: denyProductMatchEvaluationRuntime() }
+      : { productMatchEvaluation: options.productMatchEvaluation }),
+    ...(options?.productMatchEvaluationOrganizationLimiter === undefined
+      ? {}
+      : {
+          productMatchEvaluationOrganizationLimiter:
+            options.productMatchEvaluationOrganizationLimiter,
+        }),
     ...(options?.now === undefined ? {} : { now: options.now }),
     ...(options?.generateId === undefined ? {} : { generateId: options.generateId }),
   });

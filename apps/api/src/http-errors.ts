@@ -55,6 +55,15 @@ export const FINDING_OPERATOR_UNAVAILABLE: AppError = Object.freeze({
   message: 'Finding operator is temporarily unavailable.',
 });
 
+/**
+ * Fail-closed response when Product Match Evidence evaluation cannot decide.
+ * Timeouts, database outages, and a limiter fault share this message.
+ */
+export const PRODUCT_MATCH_EVALUATION_UNAVAILABLE: AppError = Object.freeze({
+  code: 'internal',
+  message: 'Product Match Evidence evaluation is temporarily unavailable.',
+});
+
 /** Confidential 503 for advisory storage, malformed rows, and internal failure. */
 export const ADVISORY_MUTATION_UNAVAILABLE: AppError = Object.freeze({
   code: 'internal',
@@ -122,7 +131,8 @@ export function httpStatusForError(error: AppError): number {
       return error.message === LOGIN_UNAVAILABLE.message ||
         error.message === INTELLIGENCE_STATUS_UNAVAILABLE.message ||
         error.message === FINDING_OPERATOR_UNAVAILABLE.message ||
-        error.message === ADVISORY_MUTATION_UNAVAILABLE.message
+        error.message === ADVISORY_MUTATION_UNAVAILABLE.message ||
+        error.message === PRODUCT_MATCH_EVALUATION_UNAVAILABLE.message
         ? 503
         : 500;
   }

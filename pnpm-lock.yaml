@@ -86,6 +86,9 @@ importers:
       '@patchpilot/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@patchpilot/vulnerability-intelligence':
+        specifier: workspace:*
+        version: link:../../packages/vulnerability-intelligence
       fastify:
         specifier: 5.12.5
         version: 5.12.5

@@ -33,6 +33,11 @@ import {
   denyMaintainerReviewedAdvisoryRuntime,
   type MaintainerReviewedAdvisoryRuntime,
 } from './maintainer-reviewed-advisory-runtime.js';
+import { registerProductMatchEvaluationRoutes } from './product-match-evaluation-routes.js';
+import {
+  denyProductMatchEvaluationRuntime,
+  type ProductMatchEvaluationRuntime,
+} from './product-match-evaluation-runtime.js';
 import { registerSbomRoutes } from './sbom-routes.js';
 import type { SbomRuntime } from './sbom-runtime.js';
 import { readSingleHeader } from './headers.js';
@@ -57,6 +62,8 @@ export type ApiDependencies = {
   latestObservationPeerKey?: (request: FastifyRequest) => string;
   discovery?: FindingDiscoveryRuntime;
   discoveryOrganizationLimiter?: FindingOrganizationRateLimiter;
+  productMatchEvaluation?: ProductMatchEvaluationRuntime;
+  productMatchEvaluationOrganizationLimiter?: FindingOrganizationRateLimiter;
   now?: () => string;
   generateId?: () => string;
 };
@@ -267,6 +274,20 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     ...(dependencies.discoveryOrganizationLimiter === undefined
       ? {}
       : { discoveryOrganizationLimiter: dependencies.discoveryOrganizationLimiter }),
+  });
+
+  await registerProductMatchEvaluationRoutes(app, {
+    config: dependencies.config,
+    logger: dependencies.logger,
+    auth: dependencies.auth,
+    productMatchEvaluation:
+      dependencies.productMatchEvaluation ?? denyProductMatchEvaluationRuntime(),
+    ...(dependencies.productMatchEvaluationOrganizationLimiter === undefined
+      ? {}
+      : {
+          productMatchEvaluationOrganizationLimiter:
+            dependencies.productMatchEvaluationOrganizationLimiter,
+        }),
   });
 
   app.addHook('onSend', async (request, _reply, payload) => {
