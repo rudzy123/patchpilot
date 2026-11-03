@@ -433,10 +433,11 @@ async function reloadActor(
     WHERE "id" = ${command.organizationId}::uuid
   `;
   const organization = organizations[0];
-  if (organizations.length !== 1 || organization === undefined) {
-    return { ok: false, result: failure('malformed_persisted_state') };
-  }
-  if (organization.status !== 'active') {
+  if (
+    organizations.length !== 1 ||
+    organization === undefined ||
+    organization.status !== 'active'
+  ) {
     return { ok: false, result: failure('authority_rejected') };
   }
   const memberships = await tx.$queryRaw<
