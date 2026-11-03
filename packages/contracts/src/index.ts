@@ -143,6 +143,13 @@ export {
   type ControlledFindingInspectionResponse,
   type ControlledFindingLatestObservationResponse,
 } from './findings.js';
+export {
+  DELIBERATE_PRODUCT_MATCH_EVALUATION_RESPONSE_SCHEMA_VERSION,
+  deliberateProductMatchEvaluationRequestSchema,
+  deliberateProductMatchEvaluationResponseSchema,
+  type DeliberateProductMatchEvaluationRequest,
+  type DeliberateProductMatchEvaluationResponse,
+} from './product-match-evaluation.js';
 
 export const healthServiceSchema = z.enum(['api', 'web', 'worker']);
 

@@ -6,6 +6,8 @@ import {
   FINDING_DISCOVER_CONTROLLED_PERMISSION,
   FINDING_INSPECT_PERMISSION,
   ok,
+  PRODUCT_MATCH_EVALUATE_CONTROLLED_PERMISSION,
+  productMatchEvaluationPermissionsForRole,
   type MembershipRole,
   type Result,
 } from '@patchpilot/domain';
@@ -29,6 +31,7 @@ export const PERMISSIONS = {
   findingCreateControlled: FINDING_CREATE_CONTROLLED_PERMISSION,
   findingDiscoverControlled: FINDING_DISCOVER_CONTROLLED_PERMISSION,
   findingInspect: FINDING_INSPECT_PERMISSION,
+  productMatchEvaluateControlled: PRODUCT_MATCH_EVALUATE_CONTROLLED_PERMISSION,
   remediationManage: 'remediation:manage',
   riskAcceptanceRequest: 'risk_acceptance:request',
   riskAcceptanceApprove: 'risk_acceptance:approve',
@@ -58,6 +61,7 @@ export const permissionCatalog: readonly Permission[] = Object.freeze([
   PERMISSIONS.findingCreateControlled,
   PERMISSIONS.findingDiscoverControlled,
   PERMISSIONS.findingInspect,
+  PERMISSIONS.productMatchEvaluateControlled,
   PERMISSIONS.remediationManage,
   PERMISSIONS.riskAcceptanceRequest,
   PERMISSIONS.riskAcceptanceApprove,
@@ -81,6 +85,7 @@ const VIEWER_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.intelligenceRead,
   ...controlledFindingOperatorPermissionsForRole('viewer'),
   ...controlledFindingDiscoveryPermissionsForRole('viewer'),
+  ...productMatchEvaluationPermissionsForRole('viewer'),
 ];
 
 const MEMBER_PERMISSIONS: readonly Permission[] = [
@@ -90,12 +95,14 @@ const MEMBER_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.remediationManage,
   ...operatorGrantsBeyond('member', VIEWER_PERMISSIONS),
   ...discoveryGrantsBeyond('member', VIEWER_PERMISSIONS),
+  ...productMatchGrantsBeyond('member', VIEWER_PERMISSIONS),
 ];
 
 const ADMIN_PERMISSIONS: readonly Permission[] = [
   ...MEMBER_PERMISSIONS,
   ...operatorGrantsBeyond('admin', MEMBER_PERMISSIONS),
   ...discoveryGrantsBeyond('admin', MEMBER_PERMISSIONS),
+  ...productMatchGrantsBeyond('admin', MEMBER_PERMISSIONS),
   PERMISSIONS.membershipManage,
   PERMISSIONS.teamManage,
   PERMISSIONS.assetManage,
@@ -109,6 +116,7 @@ const OWNER_PERMISSIONS: readonly Permission[] = [
   ...ADMIN_PERMISSIONS,
   ...operatorGrantsBeyond('owner', ADMIN_PERMISSIONS),
   ...discoveryGrantsBeyond('owner', ADMIN_PERMISSIONS),
+  ...productMatchGrantsBeyond('owner', ADMIN_PERMISSIONS),
   PERMISSIONS.organizationManage,
   PERMISSIONS.riskAcceptanceApprove,
 ];
@@ -118,6 +126,15 @@ function discoveryGrantsBeyond(
   already: readonly Permission[],
 ): readonly Permission[] {
   return controlledFindingDiscoveryPermissionsForRole(role).filter(
+    (permission) => !already.includes(permission),
+  );
+}
+
+function productMatchGrantsBeyond(
+  role: MembershipRole,
+  already: readonly Permission[],
+): readonly Permission[] {
+  return productMatchEvaluationPermissionsForRole(role).filter(
     (permission) => !already.includes(permission),
   );
 }

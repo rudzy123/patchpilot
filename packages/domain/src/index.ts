@@ -1182,6 +1182,13 @@ export {
 } from './findings/controlled-discovery/permissions.js';
 
 export {
+  PRODUCT_MATCH_EVALUATE_CONTROLLED_PERMISSION,
+  productMatchEvaluationPermissionsForRole,
+  roleGrantsProductMatchEvaluation,
+  type ProductMatchEvaluationPermission,
+} from './product-match/permissions.js';
+
+export {
   FINDING_DISCOVERY_AFFECTED_VERSION_DISPLAY_LIMIT,
   FINDING_DISCOVERY_CLASSIFICATIONS,
   FINDING_DISCOVERY_EXPLANATION_CODES,

@@ -31,6 +31,7 @@ import { createAssetRuntime } from './asset-runtime.js';
 import { composeControlledFindingOperatorRuntime } from './finding-runtime.js';
 import { composeMaintainerReviewedAdvisoryRuntime } from './maintainer-reviewed-advisory-runtime.js';
 import { composeControlledFindingDiscoveryRuntime } from './finding-discovery-runtime.js';
+import { composeProductMatchEvaluationRuntime } from './product-match-evaluation-runtime.js';
 import { createIntelligenceRuntime } from './intelligence-runtime.js';
 import { createRedisLoginRateLimiter } from './redis-login-rate-limiter.js';
 import { createSbomRuntime } from './sbom-runtime.js';
@@ -144,6 +145,7 @@ async function main(): Promise<void> {
     findings: composeControlledFindingOperatorRuntime(prisma),
     advisories: composeMaintainerReviewedAdvisoryRuntime(prisma),
     discovery: composeControlledFindingDiscoveryRuntime(prisma),
+    productMatchEvaluation: composeProductMatchEvaluationRuntime(prisma),
   });
 
   let shuttingDown = false;
