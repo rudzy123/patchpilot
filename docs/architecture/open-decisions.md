@@ -63,7 +63,7 @@ OD-14 (CycloneDX versions beyond 1.6) is unchanged: allowlist 1.4, 1.5, and 1.6.
 | --- | --- | --- |
 | Provider-status authorization | Authenticated `intelligence:read` over instance-owned global status; active Organization is access context, not data scope | [ADR 0022](../adr/0022-intelligence-provider-status-authorization.md) |
 
-OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cross-organization operator bypass, manual sync, retry, detailed SyncRun APIs, or a dashboard. [ADR 0043](../adr/0043-instance-advisory-authority-grants.md) narrows only maintainer-reviewed advisory submission and approval. It does not close OD-10.
+OD-10 (instance-operator identity) **remains open**. Batch 9B does not add a cross-organization operator bypass, manual sync, retry, detailed SyncRun APIs, or a dashboard. [ADR 0043](../adr/0043-instance-advisory-authority-grants.md) narrows only maintainer-reviewed advisory submission and approval. It does not close OD-10. Proposed [ADR 0046](../adr/0046-offline-npm-osv-import.md) adds one host-executed offline npm GHSA import and does not close OD-10.
 
 ## Closed in Session 10 Batch 1B (ADR 0023)
 

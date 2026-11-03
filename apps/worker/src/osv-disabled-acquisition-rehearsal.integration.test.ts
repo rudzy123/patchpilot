@@ -281,14 +281,14 @@ describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
       select: { id: true, parsedRevisionId: true, snapshotId: true },
     });
     await prisma.osvParserAttempt.updateMany({
-      where: { id: { in: attempts.map((row) => row.id) } },
+      where: { id: { in: attempts.map((row: { id: string }) => row.id) } },
       data: { parsedRevisionId: null },
     });
     await prisma.osvParsedAdvisoryRevision.deleteMany({
       where: { snapshot: { contentSha256: run.bodySha } },
     });
     await prisma.osvParserAttempt.deleteMany({
-      where: { id: { in: attempts.map((row) => row.id) } },
+      where: { id: { in: attempts.map((row: { id: string }) => row.id) } },
     });
     const snapshots = await prisma.osvProviderBodySnapshot.findMany({
       where: { contentSha256: run.bodySha },
@@ -297,7 +297,7 @@ describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
     await prisma.osvProviderBodySnapshot.deleteMany({
       where: { contentSha256: run.bodySha },
     });
-    const attachmentIds = snapshots.map((row) => row.attachmentId);
+    const attachmentIds = snapshots.map((row: { attachmentId: string }) => row.attachmentId);
     const bodyAttachments = await prisma.osvObjectAttachment.findMany({
       where: {
         OR: [
@@ -310,7 +310,7 @@ describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
       await deleteObject(row.objectKey);
     }
     await prisma.osvObjectAttachment.deleteMany({
-      where: { id: { in: bodyAttachments.map((row) => row.id) } },
+      where: { id: { in: bodyAttachments.map((row: { id: string }) => row.id) } },
     });
     await prisma.osvProviderGeneration.deleteMany({
       where: { providerObjectKeyDigest: digest },
@@ -320,10 +320,10 @@ describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
       select: { id: true },
     });
     await prisma.osvInventoryObjectObservation.deleteMany({
-      where: { inventoryRunId: { in: inventoryRuns.map((row) => row.id) } },
+      where: { inventoryRunId: { in: inventoryRuns.map((row: { id: string }) => row.id) } },
     });
     await prisma.osvInventoryPrefixPass.deleteMany({
-      where: { inventoryRunId: { in: inventoryRuns.map((row) => row.id) } },
+      where: { inventoryRunId: { in: inventoryRuns.map((row: { id: string }) => row.id) } },
     });
     await prisma.osvInventoryRun.deleteMany({
       where: { catalogGenerationId: run.catalogGenerationId },
@@ -363,7 +363,7 @@ describe('Session 11 Batch 6C disabled OSV acquisition rehearsal', () => {
       await deleteObject(row.objectKey);
     }
     await prisma.osvObjectAttachment.deleteMany({
-      where: { id: { in: parsedAttachments.map((row) => row.id) } },
+      where: { id: { in: parsedAttachments.map((row: { id: string }) => row.id) } },
     });
     await deleteObject(`intelligence/osv/parsed_advisory/sha256/${PARSED_DOCUMENT_SHA256}`);
   }

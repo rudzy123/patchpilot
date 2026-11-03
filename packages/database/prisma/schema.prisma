@@ -3630,6 +3630,8 @@ model AdvisoryRevision {
   approval                       MaintainerReviewedAdvisoryApproval?
   reviewerCapabilityIssuances    ReviewerCapabilityIssuance[]
   rangeEvents                    AdvisoryRevisionRangeEvent[]
+  sourceProvenance               AdvisoryRevisionSourceProvenance?
+  explicitVersions               AdvisoryRevisionExplicitVersion[]
   productMatchEvaluationEvidence ProductMatchEvaluationEvidence[]
 
   @@index([advisoryFamilyId], map: "advisory_revision_family_idx")
@@ -3794,6 +3796,66 @@ model AdvisoryRevisionRangeEvent {
   @@unique([advisoryRevisionId, rangeOrdinal, eventOrdinal], map: "advisory_revision_range_event_ordinal_uidx")
   @@index([advisoryRevisionId], map: "advisory_revision_range_event_revision_idx")
   @@map("advisory_revision_range_event")
+}
+
+/// Instance-owned offline advisory import batch.
+/// One manifest hash is one import attempt. No organization and no counters.
+model OfflineAdvisoryImportBatch {
+  id                           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  manifestSha256               String   @unique(map: "offline_advisory_import_batch_manifest_uidx") @map("manifest_sha256") @db.Text
+  sourceLicenseRegistryVersion String   @map("source_license_registry_version") @db.VarChar(80)
+  retrievedAt                  DateTime @map("retrieved_at") @db.Timestamptz(6)
+
+  provenance AdvisoryRevisionSourceProvenance[]
+
+  @@map("offline_advisory_import_batch")
+}
+
+/// Append-only source provenance for one advisory revision.
+/// An offline import row is not product-evaluation evidence.
+model AdvisoryRevisionSourceProvenance {
+  id                           String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  advisoryRevisionId           String                     @unique(map: "advisory_revision_source_provenance_revision_uidx") @map("advisory_revision_id") @db.Uuid
+  source                       AdvisoryEvidenceSource
+  sourceLicenseRegistryVersion String                     @map("source_license_registry_version") @db.VarChar(80)
+  advisoryId                   String                     @map("advisory_id") @db.VarChar(512)
+  packageIdentityKey           String                     @map("package_identity_key") @db.VarChar(1024)
+  rawContentSha256             String                     @map("raw_content_sha256") @db.Text
+  parserId                     String                     @map("parser_id") @db.VarChar(80)
+  parserResourcePolicy         String                     @map("parser_resource_policy") @db.VarChar(80)
+  advisorySchemaVersion        String                     @map("advisory_schema_version") @db.VarChar(80)
+  advisorySchemaCommit         String                     @map("advisory_schema_commit") @db.VarChar(40)
+  normalizationIdentity        String                     @map("normalization_identity") @db.VarChar(80)
+  retrievedAt                  DateTime                   @map("retrieved_at") @db.Timestamptz(6)
+  modifiedAt                   DateTime                   @map("modified_at") @db.Timestamptz(6)
+  publishedAt                  DateTime?                  @map("published_at") @db.Timestamptz(6)
+  withdrawnAt                  DateTime?                  @map("withdrawn_at") @db.Timestamptz(6)
+  purl                         String?                    @db.Text
+  licenseAdmissionReason       String                     @map("license_admission_reason") @db.VarChar(80)
+  offlineAdvisoryImportBatchId String                     @map("offline_advisory_import_batch_id") @db.Uuid
+
+  revision AdvisoryRevision           @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_revision_source_provenance_revision_fkey")
+  batch    OfflineAdvisoryImportBatch @relation(fields: [offlineAdvisoryImportBatchId], references: [id], onDelete: Restrict, map: "advisory_revision_source_provenance_batch_fkey")
+
+  @@index([offlineAdvisoryImportBatchId], map: "advisory_revision_source_provenance_batch_idx")
+  @@map("advisory_revision_source_provenance")
+}
+
+/// Append-only explicit affected versions for one advisory revision.
+/// Ordinals are contiguous from 0. The text is not a version range.
+model AdvisoryRevisionExplicitVersion {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  advisoryRevisionId String   @map("advisory_revision_id") @db.Uuid
+  ordinal            Int
+  versionText        String   @map("version_text") @db.VarChar(256)
+  createdAt          DateTime @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  revision AdvisoryRevision @relation(fields: [advisoryRevisionId], references: [id], onDelete: Restrict, map: "advisory_revision_explicit_version_revision_fkey")
+
+  @@unique([advisoryRevisionId, ordinal], map: "advisory_revision_explicit_version_ordinal_uidx")
+  @@unique([advisoryRevisionId, versionText], map: "advisory_revision_explicit_version_text_uidx")
+  @@index([advisoryRevisionId], map: "advisory_revision_explicit_version_revision_idx")
+  @@map("advisory_revision_explicit_version")
 }
 
 /// Tenant-owned immutable product match evidence.

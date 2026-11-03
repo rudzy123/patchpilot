@@ -1204,4 +1204,44 @@ describe('advisory revision PostgreSQL persistence', () => {
       expect(JSON.stringify(inspected)).not.toContain('advisory_revision');
     }
   });
+
+  it('rejects supersession onto a different package and stores no range rows', async () => {
+    const first = await port.persistImmutableAdvisoryRevision(
+      providerCommand({
+        advisoryId: 'GHSA-SYNTH-0001-2R90',
+        aliases: [],
+        trustClassification: 'unreviewed',
+        providerGeneration: '90',
+        name: 'left-pad',
+      }),
+    );
+    expect(first.kind).toBe('recorded');
+    if (first.kind !== 'recorded') {
+      return;
+    }
+    expect(
+      await prisma.advisoryRevisionRangeEvent.count({
+        where: { advisoryRevisionId: first.projection.revisionId },
+      }),
+    ).toBe(0);
+    expect(await prisma.advisoryRevisionExplicitVersion.count()).toBe(0);
+    expect(await prisma.advisoryRevisionSourceProvenance.count()).toBe(0);
+    const crossPackage = await port.persistImmutableAdvisoryRevision(
+      providerCommand({
+        advisoryId: 'GHSA-SYNTH-0001-2R90',
+        aliases: [],
+        trustClassification: 'unreviewed',
+        providerGeneration: '91',
+        name: 'right-pad',
+        supersedesRevisionDigest: first.projection.revisionDigest,
+      }),
+    );
+    expect(crossPackage.kind).toBe('rejected');
+    if (crossPackage.kind === 'rejected') {
+      expect(crossPackage.code).toBe('supersession_rejected');
+    }
+    expect(
+      await prisma.advisoryRevision.count({ where: { advisoryId: 'GHSA-SYNTH-0001-2R90' } }),
+    ).toBe(1);
+  });
 });

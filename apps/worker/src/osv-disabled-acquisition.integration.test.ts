@@ -125,14 +125,14 @@ describe('disabled OSV acquisition MinIO and PostgreSQL composition', () => {
         select: { id: true },
       });
       await prisma.osvParserAttempt.updateMany({
-        where: { id: { in: attempts.map((row) => row.id) } },
+        where: { id: { in: attempts.map((row: { id: string }) => row.id) } },
         data: { parsedRevisionId: null },
       });
       await prisma.osvParsedAdvisoryRevision.deleteMany({
         where: { snapshot: { contentSha256: syntheticSha } },
       });
       await prisma.osvParserAttempt.deleteMany({
-        where: { id: { in: attempts.map((row) => row.id) } },
+        where: { id: { in: attempts.map((row: { id: string }) => row.id) } },
       });
       const parsedAttachments = await prisma.osvObjectAttachment.findMany({
         where: {
@@ -148,7 +148,7 @@ describe('disabled OSV acquisition MinIO and PostgreSQL composition', () => {
         expect(deleted.ok).toBe(true);
       }
       await prisma.osvObjectAttachment.deleteMany({
-        where: { id: { in: parsedAttachments.map((row) => row.id) } },
+        where: { id: { in: parsedAttachments.map((row: { id: string }) => row.id) } },
       });
       const snapshots = await prisma.osvProviderBodySnapshot.findMany({
         where: { contentSha256: syntheticSha },
@@ -160,7 +160,7 @@ describe('disabled OSV acquisition MinIO and PostgreSQL composition', () => {
       const attachments = await prisma.osvObjectAttachment.findMany({
         where: {
           OR: [
-            { id: { in: snapshots.map((row) => row.attachmentId) } },
+            { id: { in: snapshots.map((row: { attachmentId: string }) => row.attachmentId) } },
             { objectKey: { startsWith: 'intelligence/osv/' }, contentSha256: syntheticSha },
           ],
         },
@@ -173,7 +173,7 @@ describe('disabled OSV acquisition MinIO and PostgreSQL composition', () => {
         expect(deleted.ok).toBe(true);
       }
       await prisma.osvObjectAttachment.deleteMany({
-        where: { id: { in: attachments.map((row) => row.id) } },
+        where: { id: { in: attachments.map((row: { id: string }) => row.id) } },
       });
       await prisma.osvProviderGeneration.deleteMany({
         where: { providerObjectKeyDigest: digest },
@@ -183,10 +183,10 @@ describe('disabled OSV acquisition MinIO and PostgreSQL composition', () => {
         select: { id: true },
       });
       await prisma.osvInventoryObjectObservation.deleteMany({
-        where: { inventoryRunId: { in: inventoryRuns.map((row) => row.id) } },
+        where: { inventoryRunId: { in: inventoryRuns.map((row: { id: string }) => row.id) } },
       });
       await prisma.osvInventoryPrefixPass.deleteMany({
-        where: { inventoryRunId: { in: inventoryRuns.map((row) => row.id) } },
+        where: { inventoryRunId: { in: inventoryRuns.map((row: { id: string }) => row.id) } },
       });
       await prisma.osvInventoryRun.deleteMany({
         where: { catalogGenerationId: generationId },

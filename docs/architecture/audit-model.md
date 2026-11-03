@@ -162,6 +162,10 @@ Payloads must not contain provider prose, package inventories, affected-version 
 
 [ADR 0043](../adr/0043-instance-advisory-authority-grants.md) governs grant-command audit. Those events are implemented and are written only by the deployment-local command. `actorType` is `system`, with null user, organization, and membership. The API submission route writes `intelligence.maintainer_reviewed_advisory_submitted` inside the submission transaction. The API approval route writes `intelligence.maintainer_reviewed_advisory_approved` inside the approval transaction. Exact replay writes neither event again. Human submission and approval events in [ADR 0042](../adr/0042-maintainer-reviewed-advisory-production-composition.md) use instance-level `user` with `actorUserId` set and null organization and membership. Payloads omit passwords, session tokens, CSRF tokens, capability seals, raw advisory bodies, and raw fingerprints. The payload object includes `schemaVersion` 1. Exact replay writes no second event, including when a later correlation id differs. Grant events and the contracted submission event use a null organization, so `correlationId` is required.
 
+### Offline npm OSV import events
+
+[ADR 0046](../adr/0046-offline-npm-osv-import.md) (Proposed) names three `system` actions with null user, organization, and membership: `intelligence.offline_npm_osv_import_started`, `intelligence.offline_npm_osv_file_imported`, and `intelligence.offline_npm_osv_import_completed`. Payloads carry counts, reason codes, grammar-valid advisory ids, SHA-256, registry id, and byte length. They omit document text, paths, filenames, stacks, and secrets. The deployment-local import command is the only writer. A later file in the same correlation that inserts another revision for the same family commits that revision and does not write a second file audit, because the system audit replay index is one row per action, subject, and correlation. Migration 27 is implemented and seeds no audit rows. The frozen migration count is 27.
+
 ## What audit is not
 
 - Not a compliance certificate.

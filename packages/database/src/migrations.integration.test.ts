@@ -31,6 +31,7 @@ import {
   CONTROLLED_FINDING_CREATION,
   CONTROLLED_FINDING_REPEATED_OBSERVATION,
   INSTANCE_ADVISORY_AUTHORITY_GRANT,
+  OFFLINE_NPM_OSV_IMPORT,
   REVIEWER_CAPABILITY_ISSUANCE,
   applyMigrationSqlAndResolve,
   applyThroughSession14,
@@ -38,6 +39,7 @@ import {
   applyThroughReviewerCapability,
   applyThroughProductMatchCardinality,
   applyThroughControlledFindingCreation,
+  applyThroughInstanceAdvisoryAuthorityGrant,
   applySession3Schema,
   applyThroughAuditActorAnonymous,
   applyThroughPolicyCreatorMembership,
@@ -142,7 +144,10 @@ const PRISMA_TABLES = [
   'advisory_family',
   'advisory_revision',
   'advisory_revision_alias',
+  'advisory_revision_explicit_version',
+  'advisory_revision_source_provenance',
   'advisory_vulnerability_binding',
+  'offline_advisory_import_batch',
   'maintainer_reviewed_advisory_approval',
   'reviewer_capability_issuance',
   'reviewer_capability_lifecycle_observation',
@@ -223,6 +228,9 @@ const PRISMA_FOREIGN_KEYS = [
   'advisory_revision_family_fkey',
   'advisory_revision_supersedes_fkey',
   'advisory_revision_alias_revision_fkey',
+  'advisory_revision_explicit_version_revision_fkey',
+  'advisory_revision_source_provenance_revision_fkey',
+  'advisory_revision_source_provenance_batch_fkey',
   'advisory_vulnerability_binding_revision_fkey',
   'advisory_vulnerability_binding_vulnerability_fkey',
   'maintainer_reviewed_advisory_approval_revision_fkey',
@@ -411,6 +419,10 @@ const SQL_ONLY_CHECKS = [
   'advisory_revision_alias_shape_chk',
   'advisory_vulnerability_binding_shape_chk',
   'advisory_revision_author_chk',
+  'advisory_revision_offline_import_shape_chk',
+  'offline_advisory_import_batch_shape_chk',
+  'advisory_revision_source_provenance_shape_chk',
+  'advisory_revision_explicit_version_shape_chk',
   'maintainer_reviewed_advisory_approval_closed_chk',
   'maintainer_reviewed_advisory_approval_fingerprint_chk',
   'maintainer_reviewed_advisory_approval_identity_chk',
@@ -486,6 +498,12 @@ const SQL_ONLY_INDEXES = [
   'advisory_revision_alias_replay_uidx',
   'advisory_revision_alias_ordinal_uidx',
   'advisory_revision_alias_value_uidx',
+  'advisory_revision_explicit_version_ordinal_uidx',
+  'advisory_revision_explicit_version_text_uidx',
+  'advisory_revision_explicit_version_revision_idx',
+  'advisory_revision_source_provenance_revision_uidx',
+  'advisory_revision_source_provenance_batch_idx',
+  'offline_advisory_import_batch_manifest_uidx',
   'advisory_vulnerability_binding_revision_uidx',
   'advisory_vulnerability_binding_replay_uidx',
   'advisory_vulnerability_binding_vulnerability_idx',
@@ -574,6 +592,14 @@ const SQL_ONLY_TRIGGERS = [
   'advisory_family_append_only',
   'advisory_revision_append_only',
   'advisory_revision_alias_append_only',
+  'advisory_revision_explicit_version_append_only',
+  'advisory_revision_explicit_version_guard',
+  'advisory_revision_source_provenance_append_only',
+  'advisory_revision_source_provenance_guard',
+  'advisory_revision_range_event_offline_closed',
+  'offline_advisory_import_batch_append_only',
+  'offline_npm_advisory_revision_complete',
+  'patchpilot_advisory_revision_supersession_package',
   'advisory_vulnerability_binding_append_only',
   'advisory_revision_bind_family',
   'advisory_revision_supersession',
@@ -646,6 +672,11 @@ const SQL_ONLY_FUNCTIONS = [
   'patchpilot_match_evaluation_explanation_same_transaction',
   'patchpilot_advisory_revision_bind_family',
   'patchpilot_advisory_revision_supersession',
+  'patchpilot_advisory_revision_supersession_package',
+  'patchpilot_advisory_revision_source_provenance_guard',
+  'patchpilot_advisory_revision_explicit_version_guard',
+  'patchpilot_advisory_revision_range_event_offline_closed',
+  'patchpilot_offline_npm_advisory_revision_complete',
   'patchpilot_advisory_revision_aliases_complete',
   'patchpilot_advisory_revision_alias_same_transaction',
   'patchpilot_advisory_vulnerability_binding_guard',
@@ -890,6 +921,33 @@ async function assertFinalMigratedSchema(client: PrismaClient): Promise<void> {
     SELECT COUNT(*)::bigint AS count FROM "instance_advisory_authority_grant"
   `;
   expect(Number(grantRows[0]?.count)).toBe(0);
+  const offlineImportRows = await client.$queryRaw<
+    Array<{
+      batches: bigint | number | string;
+      provenance: bigint | number | string;
+      versions: bigint | number | string;
+    }>
+  >`
+    SELECT
+      (SELECT COUNT(*) FROM "offline_advisory_import_batch")::bigint AS batches,
+      (SELECT COUNT(*) FROM "advisory_revision_source_provenance")::bigint AS provenance,
+      (SELECT COUNT(*) FROM "advisory_revision_explicit_version")::bigint AS versions
+  `;
+  expect(Number(offlineImportRows[0]?.batches)).toBe(0);
+  expect(Number(offlineImportRows[0]?.provenance)).toBe(0);
+  expect(Number(offlineImportRows[0]?.versions)).toBe(0);
+  const offlineOrganizationColumns = await names(
+    client,
+    `SELECT column_name AS name FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name IN (
+         'offline_advisory_import_batch',
+         'advisory_revision_source_provenance',
+         'advisory_revision_explicit_version'
+       )
+       AND column_name = 'organization_id'`,
+  );
+  expect(offlineOrganizationColumns).toEqual([]);
 
   const triggers = await names(
     client,
@@ -1403,8 +1461,8 @@ async function assertOsvAcquisitionCatalog(client: PrismaClient): Promise<void> 
 
 describe('frozen migrations', () => {
   it('keeps Session 3 through Session 13 Batch 3D-S SQL byte-stable', async () => {
-    expect(FROZEN_MIGRATIONS).toHaveLength(26);
-    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(26);
+    expect(FROZEN_MIGRATIONS).toHaveLength(27);
+    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(27);
     expect(FROZEN_MIGRATIONS.map((item) => item.directory)).toEqual([
       ...EXPECTED_APPLIED_MIGRATIONS,
     ]);
@@ -1451,35 +1509,36 @@ describe('frozen migrations', () => {
         (name) => name === SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
       ),
     ).toEqual([SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE]);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-1)).toBe(INSTANCE_ADVISORY_AUTHORITY_GRANT);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-2)).toBe(CONTROLLED_FINDING_REPEATED_OBSERVATION);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-3)).toBe(CONTROLLED_FINDING_CREATION);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-4)).toBe(PRODUCT_MATCH_EVIDENCE_CARDINALITY);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-5)).toBe(REVIEWER_CAPABILITY_ISSUANCE);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-6)).toBe(PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-7)).toBe(PRODUCT_MATCH_EVIDENCE_BATCH_2_APPROVAL);
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-8)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-1)).toBe(OFFLINE_NPM_OSV_IMPORT);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-2)).toBe(INSTANCE_ADVISORY_AUTHORITY_GRANT);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-3)).toBe(CONTROLLED_FINDING_REPEATED_OBSERVATION);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-4)).toBe(CONTROLLED_FINDING_CREATION);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-5)).toBe(PRODUCT_MATCH_EVIDENCE_CARDINALITY);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-6)).toBe(REVIEWER_CAPABILITY_ISSUANCE);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-7)).toBe(PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-8)).toBe(PRODUCT_MATCH_EVIDENCE_BATCH_2_APPROVAL);
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-9)).toBe(
       SESSION_15_ADVISORY_REVISION_VULNERABILITY_BINDING,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-9)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-10)).toBe(
       SESSION_14_MATCH_EVALUATION_EVIDENCE_PERSISTENCE,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-10)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-11)).toBe(
       SESSION_13_OSV_LISTING_OBSERVATION_EVIDENCE_PERSISTENCE,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-11)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-12)).toBe(
       SESSION_13_OSV_LISTING_PROVIDER_CONTACT_AUTHORIZATION_PERSISTENCE,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-12)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-13)).toBe(
       SESSION_13_OSV_CANARY_AUTHORIZATION_PERSISTENCE,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-13)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-14)).toBe(
       SESSION_12_OSV_RUNTIME_COORDINATION_PERSISTENCE,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-14)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-15)).toBe(
       SESSION_11_OSV_PARSED_REVISION_ID_CHECK_CORRECTION,
     );
-    expect(EXPECTED_APPLIED_MIGRATIONS.at(-15)).toBe(
+    expect(EXPECTED_APPLIED_MIGRATIONS.at(-16)).toBe(
       SESSION_11_OSV_ACQUISITION_PERSISTENCE_FOUNDATION,
     );
     expect(
@@ -1952,6 +2011,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
 
@@ -2041,6 +2101,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2187,6 +2248,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -2256,6 +2318,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2314,6 +2377,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2370,6 +2434,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2428,6 +2493,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2485,6 +2551,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2533,6 +2600,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       const afterDef = await names(
         client,
@@ -2582,6 +2650,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2630,6 +2699,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2679,6 +2749,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2729,6 +2800,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
       const evidenceCounts = await client.$queryRaw<
@@ -2792,6 +2864,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2835,6 +2908,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -2889,6 +2963,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await deployMigrations(ephemeral.databaseUrl);
       const appliedTwice = await names(
@@ -2940,6 +3015,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       const evidence = await client.$queryRaw<Array<{ count: bigint }>>`
         SELECT COUNT(*)::bigint AS count FROM "product_match_evaluation_evidence"
@@ -2988,6 +3064,7 @@ describe('migrations', { timeout: 90_000 }, () => {
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       const counts = await client.$queryRaw<
         Array<{
@@ -3055,6 +3132,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       const counts = await client.$queryRaw<
         Array<{
@@ -3166,6 +3244,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
       );
       await applyMigrationSqlAndResolve(ephemeral.databaseUrl, INSTANCE_ADVISORY_AUTHORITY_GRANT);
+      await applyMigrationSqlAndResolve(ephemeral.databaseUrl, OFFLINE_NPM_OSV_IMPORT);
       await assertFinalMigratedSchema(client);
 
       const checkDef = await names(
@@ -3268,6 +3347,7 @@ describe('migrations', { timeout: 90_000 }, () => {
         CONTROLLED_FINDING_CREATION,
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
+        OFFLINE_NPM_OSV_IMPORT,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -3284,6 +3364,70 @@ describe('migrations', { timeout: 90_000 }, () => {
         }),
       ).rejects.toThrow();
       await expect(client.auditEvent.delete({ where: { id: auditId } })).rejects.toThrow();
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades the instance-advisory grant head by applying only offline npm import', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+
+    try {
+      await applyThroughInstanceAdvisoryAuthorityGrant(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore.at(-1)).toBe(INSTANCE_ADVISORY_AUTHORITY_GRANT);
+      expect(appliedBefore).not.toContain(OFFLINE_NPM_OSV_IMPORT);
+      expect(appliedBefore).toHaveLength(26);
+      const tablesBefore = await names(
+        client,
+        `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'`,
+      );
+      expect(tablesBefore).not.toContain('offline_advisory_import_batch');
+      expect(tablesBefore).not.toContain('advisory_revision_source_provenance');
+      expect(tablesBefore).not.toContain('advisory_revision_explicit_version');
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        OFFLINE_NPM_OSV_IMPORT,
+      ]);
+      const counts = await client.$queryRaw<
+        Array<{
+          batches: bigint;
+          provenance: bigint;
+          versions: bigint;
+          findings: bigint;
+        }>
+      >`
+        SELECT
+          (SELECT COUNT(*) FROM "offline_advisory_import_batch")::bigint AS batches,
+          (SELECT COUNT(*) FROM "advisory_revision_source_provenance")::bigint AS provenance,
+          (SELECT COUNT(*) FROM "advisory_revision_explicit_version")::bigint AS versions,
+          (SELECT COUNT(*) FROM "finding")::bigint AS findings
+      `;
+      expect(Number(counts[0]?.batches)).toBe(0);
+      expect(Number(counts[0]?.provenance)).toBe(0);
+      expect(Number(counts[0]?.versions)).toBe(0);
+      expect(Number(counts[0]?.findings)).toBe(0);
+
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedTwice = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedTwice).toEqual(appliedAfter);
+      expect(appliedTwice).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
+      await assertFinalMigratedSchema(client);
     } finally {
       await client.$disconnect();
       await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
