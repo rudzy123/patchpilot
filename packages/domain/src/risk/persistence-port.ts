@@ -1,0 +1,144 @@
+/**
+ * Persistence port for uncomposed priority calculation.
+ * The database adapter wraps the existing risk-calculation functions.
+ * This module does not import that adapter.
+ */
+
+import type {
+  RiskCalculationFactorsV2Json,
+  RiskCalculationResultV1Json,
+} from '../json-documents.js';
+import type { RiskCalculationReason } from '../lifecycle.js';
+import type { FindingRiskSourceSnapshot } from './fact-assembly.js';
+import { PRIORITY_CALCULATION_ENGINE_VERSION } from './catalog.js';
+
+export const BUILTIN_PRIORITY_POLICY_KEY = 'patchpilot.builtin.v0' as const;
+
+export const BUILTIN_PRIORITY_POLICY_VERSION = 2 as const;
+
+export const PERSISTED_RISK_CALCULATION_REASONS = [
+  'initial',
+  'rescan',
+  'intel_refresh',
+  'policy_change',
+  'asset_change',
+] as const satisfies readonly RiskCalculationReason[];
+
+export type PersistedRiskCalculationReason = (typeof PERSISTED_RISK_CALCULATION_REASONS)[number];
+
+export type StoredRiskCalculation = {
+  readonly id: string;
+  readonly organizationId: string;
+  readonly findingId: string;
+  readonly riskPolicyId: string;
+  readonly policyVersion: number;
+  readonly policyDefinitionSha256: string;
+  readonly calculatedAt: Date;
+  readonly factors: RiskCalculationFactorsV2Json;
+  readonly result: RiskCalculationResultV1Json;
+  readonly calculationEngineVersion: typeof PRIORITY_CALCULATION_ENGINE_VERSION;
+  readonly calculationReason: PersistedRiskCalculationReason;
+  readonly inputFingerprint: string;
+};
+
+export type RiskCalculationScope = {
+  readonly organizationId: string;
+  readonly findingId: string;
+};
+
+/**
+ * `asOf` is the loader timestamp. Callers pass that same value as
+ * `calculatedAt` so finding age and the stored instant match.
+ * `snapshot` is the loader's `FindingRiskSourceSnapshot`.
+ */
+export type RiskCalculationFactGraphRead =
+  | {
+      readonly kind: 'found';
+      readonly asOf: Date;
+      readonly snapshot: FindingRiskSourceSnapshot;
+    }
+  | { readonly kind: 'not_found' }
+  | { readonly kind: 'unavailable' };
+
+export type StoredPriorityPolicyView = {
+  readonly id: string;
+  readonly policyKey: typeof BUILTIN_PRIORITY_POLICY_KEY;
+  readonly version: number;
+  readonly definition: Readonly<Record<string, unknown>>;
+};
+
+export type PriorityPolicyLookup =
+  | { readonly kind: 'found'; readonly policy: StoredPriorityPolicyView }
+  | { readonly kind: 'not_found' }
+  | { readonly kind: 'unavailable' };
+
+export type CurrentRiskCalculationRead =
+  | { readonly kind: 'found'; readonly calculation: StoredRiskCalculation }
+  | { readonly kind: 'not_found' }
+  | { readonly kind: 'unavailable' };
+
+export type PersistFindingRiskCalculationCommand = {
+  readonly organizationId: string;
+  readonly actorUserId: string;
+  readonly membershipId: string;
+  readonly findingId: string;
+  readonly riskPolicyId: string;
+  readonly policyDefinitionSha256: string;
+  readonly inputFingerprint: string;
+  readonly calculationReason: PersistedRiskCalculationReason;
+  readonly factors: RiskCalculationFactorsV2Json;
+  readonly result: RiskCalculationResultV1Json;
+  readonly correlationId: string;
+  readonly calculatedAt: Date;
+};
+
+export type PersistFindingRiskCalculationResult =
+  | { readonly kind: 'persisted'; readonly calculation: StoredRiskCalculation }
+  | { readonly kind: 'replay'; readonly calculation: StoredRiskCalculation }
+  | { readonly kind: 'immutable_conflict' }
+  | { readonly kind: 'not_found' }
+  | { readonly kind: 'ineligible' }
+  | { readonly kind: 'policy_unavailable' }
+  | { readonly kind: 'unauthorized' }
+  | { readonly kind: 'unavailable' };
+
+export type PublishOrganizationPriorityOverrideCommand = {
+  readonly organizationId: string;
+  readonly membershipId: string;
+  readonly definition: unknown;
+  readonly policySchemaVersion: number;
+  readonly policyKey: string;
+};
+
+export type PublishOrganizationPriorityOverridePersistenceResult =
+  | {
+      readonly kind: 'published';
+      readonly policy: { readonly id: string; readonly version: number };
+    }
+  | { readonly kind: 'membership_not_found' }
+  | { readonly kind: 'version_conflict' }
+  | { readonly kind: 'rejected' }
+  | { readonly kind: 'unavailable' };
+
+/**
+ * Methods the calculation use cases call. The insert transaction reloads
+ * membership. Fact-graph loading is a separate read and returns `asOf`.
+ */
+export type RiskCalculationPersistencePort = {
+  readonly loadPriorityCalculationFactGraph: (
+    input: RiskCalculationScope,
+  ) => Promise<RiskCalculationFactGraphRead>;
+  readonly findPublishedBuiltinPriorityPolicy: () => Promise<PriorityPolicyLookup>;
+  readonly findSelectedOrganizationPriorityOverride: (
+    organizationId: string,
+  ) => Promise<PriorityPolicyLookup>;
+  readonly findCurrentRiskCalculation: (
+    input: RiskCalculationScope,
+  ) => Promise<CurrentRiskCalculationRead>;
+  readonly persistRiskCalculation: (
+    input: PersistFindingRiskCalculationCommand,
+  ) => Promise<PersistFindingRiskCalculationResult>;
+  readonly publishOrganizationPriorityOverride: (
+    input: PublishOrganizationPriorityOverrideCommand,
+  ) => Promise<PublishOrganizationPriorityOverridePersistenceResult>;
+};

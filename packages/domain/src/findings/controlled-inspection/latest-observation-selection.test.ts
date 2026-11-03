@@ -933,6 +933,72 @@ describe('malformed persisted state', () => {
     versioned['finding'] = { ...findingRecord(CREATED), version: 2 };
     expect(select(versioned).status).toBe('malformed_persisted_state');
   });
+
+  it('accepts a positive risk calculation count while the current pointer and due date stay null', () => {
+    const input = selection([]);
+    input['finding'] = { ...findingRecord(CREATED), riskCalculationCount: 1 };
+    const projection = found(input);
+    expect(Object.keys(projection).sort()).toEqual(
+      [...FINDING_LATEST_OBSERVATION_PROJECTION_FIELDS].sort(),
+    );
+    expect(projection).not.toHaveProperty('priority');
+    expect(projection).not.toHaveProperty('priorityBand');
+    expect(projection).not.toHaveProperty('riskCalculationCount');
+    expect(projection).not.toHaveProperty('currentRiskCalculationId');
+    expect(projection).not.toHaveProperty('dueAt');
+    expect(projection.observationSource).toBe('creation');
+    expect(JSON.stringify(projection)).not.toContain('priority');
+  });
+
+  it.each([
+    ['current pointer', { currentRiskCalculationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+    [
+      'current pointer alongside calculations',
+      {
+        riskCalculationCount: 3,
+        currentRiskCalculationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      },
+    ],
+    ['due date', { dueAt: '2026-10-07T00:00:00.000000Z' }],
+    [
+      'due date alongside calculations',
+      { riskCalculationCount: 3, dueAt: '2026-10-07T00:00:00.000000Z' },
+    ],
+    ['non-open state', { riskCalculationCount: 3, state: 'resolved' }],
+    ['version other than 1', { riskCalculationCount: 3, version: 2 }],
+    ['remediation task', { riskCalculationCount: 3, remediationTaskCount: 1 }],
+    ['risk acceptance', { riskCalculationCount: 3, riskAcceptanceCount: 1 }],
+    ['generic evidence', { riskCalculationCount: 3, genericEvidenceCount: 1 }],
+    [
+      'assigned membership',
+      {
+        riskCalculationCount: 3,
+        assignedMembershipId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      },
+    ],
+    [
+      'assigned team',
+      { riskCalculationCount: 3, assignedTeamId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    ],
+    ['resolved timestamp', { riskCalculationCount: 3, resolvedAt: '2026-10-07T00:00:00.000000Z' }],
+    ['reopened timestamp', { riskCalculationCount: 3, reopenedAt: '2026-10-07T00:00:00.000000Z' }],
+    [
+      'component occurrence',
+      {
+        riskCalculationCount: 3,
+        componentOccurrenceId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      },
+    ],
+    ['negative calculation count', { riskCalculationCount: -1 }],
+    ['fractional calculation count', { riskCalculationCount: 1.5 }],
+    ['non-numeric calculation count', { riskCalculationCount: '1' }],
+  ] as const)('fails closed on a %s', (label, patch) => {
+    const input = selection([]);
+    input['finding'] = { ...findingRecord(CREATED), ...patch };
+    const result = select(input);
+    expect(result.status, label).toBe('malformed_persisted_state');
+    expect(result).not.toHaveProperty('projection');
+  });
 });
 
 describe('bounded projection', () => {

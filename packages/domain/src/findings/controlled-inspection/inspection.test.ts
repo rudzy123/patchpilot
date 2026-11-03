@@ -380,6 +380,76 @@ describe('controlled finding inspection projection', () => {
     expect(statuses).toEqual(Array.from({ length: 9 }, () => 'malformed_persisted_state'));
   });
 
+  it('accepts a positive risk calculation count while the current pointer and due date stay null', async () => {
+    const loaded = port(async () => ({
+      status: 'ready',
+      bundle: { ...bundle(['1.2.0']), riskCalculationCount: 1 },
+    }));
+    const result = await openFindingInspection(loaded.port).inspect(command());
+    expect(result.status).toBe('found');
+    if (result.status !== 'found') {
+      return;
+    }
+    expect(result.projection.state).toBe('open');
+    expect(result.projection).not.toHaveProperty('priority');
+    expect(result.projection).not.toHaveProperty('priorityBand');
+    expect(result.projection).not.toHaveProperty('riskCalculationCount');
+    expect(result.projection).not.toHaveProperty('currentRiskCalculationId');
+    expect(result.projection).not.toHaveProperty('dueAt');
+    expect(JSON.stringify(result.projection)).not.toContain('priority');
+  });
+
+  it.each([
+    ['current pointer', { currentRiskCalculationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+    [
+      'current pointer alongside calculations',
+      {
+        riskCalculationCount: 3,
+        currentRiskCalculationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      },
+    ],
+    ['due date', { dueAt: '2026-10-07T00:00:00.000Z' }],
+    [
+      'due date alongside calculations',
+      { riskCalculationCount: 3, dueAt: '2026-10-07T00:00:00.000Z' },
+    ],
+    ['non-open state', { riskCalculationCount: 3, state: 'resolved' }],
+    ['version other than 1', { riskCalculationCount: 3, version: 2 }],
+    ['remediation task', { riskCalculationCount: 3, remediationTaskCount: 1 }],
+    ['risk acceptance', { riskCalculationCount: 3, riskAcceptanceCount: 1 }],
+    ['generic evidence', { riskCalculationCount: 3, genericEvidenceCount: 1 }],
+    [
+      'assigned membership',
+      {
+        riskCalculationCount: 3,
+        assignedMembershipId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      },
+    ],
+    [
+      'assigned team',
+      { riskCalculationCount: 3, assignedTeamId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    ],
+    ['resolved timestamp', { riskCalculationCount: 3, resolvedAt: '2026-10-07T00:00:00.000Z' }],
+    ['reopened timestamp', { riskCalculationCount: 3, reopenedAt: '2026-10-07T00:00:00.000Z' }],
+    [
+      'component occurrence',
+      {
+        riskCalculationCount: 3,
+        componentOccurrenceId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      },
+    ],
+    ['negative calculation count', { riskCalculationCount: -1 }],
+    ['fractional calculation count', { riskCalculationCount: 1.5 }],
+  ] as const)('fails closed on a %s', async (_label, patch) => {
+    const loaded = port(async () => ({
+      status: 'ready',
+      bundle: { ...bundle(['1.2.0']), ...patch },
+    }));
+    const result = await openFindingInspection(loaded.port).inspect(command());
+    expect(result.status).toBe('malformed_persisted_state');
+    expect(result).not.toHaveProperty('projection');
+  });
+
   it('reports missing evidence parents as evidence unavailable', async () => {
     const value = bundle(['1.1.0']);
     const current = value.links[0];

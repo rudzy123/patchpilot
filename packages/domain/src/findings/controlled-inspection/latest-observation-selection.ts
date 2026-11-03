@@ -647,7 +647,7 @@ function parseFinding(
     values.get('currentRiskCalculationId') !== null ||
     !isZeroCount(values.get('remediationTaskCount')) ||
     !isZeroCount(values.get('riskAcceptanceCount')) ||
-    !isZeroCount(values.get('riskCalculationCount')) ||
+    !isLegalRiskCalculationCount(values.get('riskCalculationCount')) ||
     !isZeroCount(values.get('genericEvidenceCount'))
   ) {
     return fail('malformed_persisted_state');
@@ -2034,6 +2034,12 @@ function readGraph(value: unknown): (typeof GRAPH_VALUES)[number] | null | undef
 
 function isZeroCount(value: unknown): boolean {
   return Object.is(value, 0);
+}
+
+function isLegalRiskCalculationCount(value: unknown): boolean {
+  return (
+    typeof value === 'number' && Number.isSafeInteger(value) && (value > 0 || Object.is(value, 0))
+  );
 }
 
 function compareUuid(left: string, right: string): number {

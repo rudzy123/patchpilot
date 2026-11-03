@@ -51,6 +51,13 @@ const matrix: Record<Permission, Record<MembershipRole, boolean>> = {
     admin: false,
     owner: true,
   },
+  [PERMISSIONS.priorityCalculateControlled]: {
+    viewer: false,
+    member: false,
+    admin: false,
+    owner: true,
+  },
+  [PERMISSIONS.priorityInspect]: { viewer: false, member: false, admin: true, owner: true },
   [PERMISSIONS.remediationManage]: { viewer: false, member: true, admin: true, owner: true },
   [PERMISSIONS.riskAcceptanceRequest]: { viewer: false, member: false, admin: true, owner: true },
   [PERMISSIONS.riskAcceptanceApprove]: { viewer: false, member: false, admin: false, owner: true },
@@ -111,6 +118,23 @@ describe('permission catalog', () => {
     expect(hasPermission('admin', PERMISSIONS.productMatchEvaluateControlled)).toBe(false);
     expect(hasPermission('member', PERMISSIONS.productMatchEvaluateControlled)).toBe(false);
     expect(hasPermission('viewer', PERMISSIONS.productMatchEvaluateControlled)).toBe(false);
+    expect(PERMISSIONS.priorityCalculateControlled).toBe('priority:calculate_controlled');
+    expect(PERMISSIONS.priorityInspect).toBe('priority:inspect');
+    expect(PERMISSIONS.priorityCalculateControlled).not.toBe(PERMISSIONS.priorityInspect);
+    expect(PERMISSIONS.priorityCalculateControlled).not.toBe(PERMISSIONS.findingCreateControlled);
+    expect(PERMISSIONS.priorityCalculateControlled).not.toBe(PERMISSIONS.findingInspect);
+    expect(PERMISSIONS.priorityCalculateControlled).not.toBe(PERMISSIONS.policyManage);
+    expect(PERMISSIONS.priorityInspect).not.toBe(PERMISSIONS.findingInspect);
+    expect(PERMISSIONS.priorityInspect).not.toBe(PERMISSIONS.policyRead);
+    expect(PERMISSIONS.priorityInspect).not.toBe(PERMISSIONS.policyManage);
+    expect(hasPermission('owner', PERMISSIONS.priorityCalculateControlled)).toBe(true);
+    expect(hasPermission('owner', PERMISSIONS.priorityInspect)).toBe(true);
+    expect(hasPermission('admin', PERMISSIONS.priorityCalculateControlled)).toBe(false);
+    expect(hasPermission('admin', PERMISSIONS.priorityInspect)).toBe(true);
+    expect(hasPermission('member', PERMISSIONS.priorityCalculateControlled)).toBe(false);
+    expect(hasPermission('member', PERMISSIONS.priorityInspect)).toBe(false);
+    expect(hasPermission('viewer', PERMISSIONS.priorityCalculateControlled)).toBe(false);
+    expect(hasPermission('viewer', PERMISSIONS.priorityInspect)).toBe(false);
     expect(hasPermission('member', PERMISSIONS.findingTriage)).toBe(true);
     expect(hasPermission('viewer', PERMISSIONS.findingRead)).toBe(true);
   });
@@ -129,12 +153,16 @@ describe('permission catalog', () => {
         PERMISSIONS.findingTriage,
         PERMISSIONS.findingRead,
         PERMISSIONS.productMatchEvaluateControlled,
+        PERMISSIONS.priorityCalculateControlled,
+        PERMISSIONS.priorityInspect,
       ],
     };
     expect(actorHasPermission(actor, PERMISSIONS.findingCreateControlled)).toBe(false);
     expect(actorHasPermission(actor, PERMISSIONS.findingInspect)).toBe(false);
     expect(actorHasPermission(actor, PERMISSIONS.findingDiscoverControlled)).toBe(false);
     expect(actorHasPermission(actor, PERMISSIONS.productMatchEvaluateControlled)).toBe(false);
+    expect(actorHasPermission(actor, PERMISSIONS.priorityCalculateControlled)).toBe(false);
+    expect(actorHasPermission(actor, PERMISSIONS.priorityInspect)).toBe(false);
     expect(requirePermission(actor, PERMISSIONS.findingCreateControlled)).toEqual({
       ok: false,
       error: PERMISSION_DENIED,

@@ -199,7 +199,7 @@ function structuralFailure(
     bundle.version !== 1 ||
     bundle.remediationTaskCount !== 0 ||
     bundle.riskAcceptanceCount !== 0 ||
-    bundle.riskCalculationCount !== 0 ||
+    !isLegalRiskCalculationCount(bundle.riskCalculationCount) ||
     bundle.genericEvidenceCount !== 0
   ) {
     return 'malformed_persisted_state';
@@ -431,4 +431,8 @@ function isOptionalDisplay(value: string | null, maxLength: number): boolean {
 
 function isCount(value: number): boolean {
   return Number.isSafeInteger(value) && value >= 0 && value <= 100_000;
+}
+
+function isLegalRiskCalculationCount(value: number): boolean {
+  return Number.isSafeInteger(value) && (value > 0 || Object.is(value, 0));
 }

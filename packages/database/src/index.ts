@@ -50,7 +50,15 @@ export {
   type OsvCanaryPreflightReadinessAdapters,
 } from './osv-canary-preflight-readiness.js';
 export { createOsvAcquisitionResumeInspection } from './osv-acquisition-inspection.js';
-export { developmentSeedIds, seedDevelopmentData } from './seed/development.js';
+export {
+  BuiltinPriorityPolicyImmutableConflictError,
+  developmentSeedIds,
+  ensurePublishedBuiltinPriorityPolicy,
+  seedDevelopmentData,
+  type BuiltinPriorityPolicySeedRow,
+  type DevelopmentSeedOptions,
+  type EnsurePublishedBuiltinPriorityPolicyResult,
+} from './seed/development.js';
 export { boundPageSize } from './paging.js';
 export {
   normalizeEmail,
