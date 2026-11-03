@@ -18,6 +18,10 @@
       "types": "./dist/controlled-finding-discovery-persistence.d.ts",
       "import": "./dist/controlled-finding-discovery-persistence.js"
     },
+    "./deliberate-product-match-evaluation-persistence": {
+      "types": "./dist/deliberate-product-match-evaluation-persistence.d.ts",
+      "import": "./dist/deliberate-product-match-evaluation-persistence.js"
+    },
     "./controlled-finding-latest-observation-persistence": {
       "types": "./dist/controlled-finding-latest-observation-persistence.d.ts",
       "import": "./dist/controlled-finding-latest-observation-persistence.js"

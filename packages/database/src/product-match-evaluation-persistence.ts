@@ -450,48 +450,12 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
         evaluatorCalls = 1;
         const body = replayBody(input.command, component.snapshot, decision);
         pendingBody = body;
-        const created = await tx.productMatchEvaluationEvidence.create({
-          data: {
-            organizationId: component.snapshot.organizationId,
-            componentOccurrenceId: component.snapshot.componentOccurrenceId,
-            assetId: component.snapshot.assetId,
-            sbomId: component.snapshot.sbomId,
-            sbomIngestionId: component.snapshot.sbomIngestionId,
-            componentId: component.snapshot.componentId,
-            sbomSha256: component.snapshot.sbomSha256,
-            componentIdentityKey: component.snapshot.componentIdentityKey,
-            componentEvidenceFingerprint: body.componentEvidenceFingerprint,
-            evidenceSchemaVersion: PRODUCT_MATCH_EVALUATION_SCHEMA_VERSION,
-            packageIdentityKey: body.packageIdentityKey,
-            rawObservedVersion: body.rawObservedVersion,
-            rawObservedVersionSha256: sha256(body.rawObservedVersion),
-            advisoryFamilyId: advisory.bundle.revision.familyId,
-            advisoryRevisionId: body.advisoryRevisionId,
-            approvalId: body.approvalEvidenceId,
-            contentFingerprint: body.contentFingerprint,
-            rangeFingerprint: body.rangeFingerprint,
-            vulnerabilityId: body.vulnerabilityId,
-            evaluatorId: body.evaluatorId,
-            evaluatorVersion: body.evaluatorVersion,
-            matchingPolicyId: body.matchingPolicyId,
-            matchingPolicyVersion: body.matchingPolicyVersion,
-            productEvidencePolicyId: PRODUCT_MATCH_EVALUATION_POLICY_ID,
-            productEvidencePolicyVersion: PRODUCT_MATCH_EVALUATION_POLICY_VERSION,
-            outcome: body.outcome,
-            productOrigin: PRODUCT_MATCH_EVALUATION_ORIGIN,
-            replayFingerprint: productMatchReplayFingerprint(body),
-            findingCreation: PRODUCT_MATCH_FINDING_CREATION,
-            suppressionAuthority: PRODUCT_MATCH_SUPPRESSION_AUTHORITY,
-            explanations: {
-              create: body.explanationCodes.map((code, index) => ({
-                ordinal: index + 1,
-                explanationCode: code,
-              })),
-            },
-          },
-          select: EVIDENCE_SELECT,
+        const created = await writeProductMatchEvaluationEvidence(tx, {
+          snapshot: component.snapshot,
+          familyId: advisory.bundle.revision.familyId,
+          body,
         });
-        return applied(projectFrom(storedFrom(created)), 1, 1);
+        return applied(projectFrom(created), 1, 1);
       });
     } catch (error) {
       if (error instanceof ProductMatchRowError) {
@@ -704,6 +668,90 @@ class PrismaProductMatchEvaluationPersistence implements ProductMatchEvaluationP
       }
       return { kind: 'rejected' as const, code: 'database_unavailable' as const };
     }
+  }
+}
+
+/**
+ * Inserts one immutable evidence row inside the caller's transaction.
+ * The single-occurrence commit and the deliberate evaluation adapter share it.
+ * created_at stays database time. This function does not open a transaction.
+ */
+export async function writeProductMatchEvaluationEvidence(
+  tx: PrismaClientLike,
+  input: {
+    readonly snapshot: ProductMatchComponentSnapshot;
+    readonly familyId: string;
+    readonly body: ProductMatchReplayBody;
+  },
+): Promise<StoredProductMatchRecord> {
+  const body = input.body;
+  const created = await tx.productMatchEvaluationEvidence.create({
+    data: {
+      organizationId: input.snapshot.organizationId,
+      componentOccurrenceId: input.snapshot.componentOccurrenceId,
+      assetId: input.snapshot.assetId,
+      sbomId: input.snapshot.sbomId,
+      sbomIngestionId: input.snapshot.sbomIngestionId,
+      componentId: input.snapshot.componentId,
+      sbomSha256: input.snapshot.sbomSha256,
+      componentIdentityKey: input.snapshot.componentIdentityKey,
+      componentEvidenceFingerprint: body.componentEvidenceFingerprint,
+      evidenceSchemaVersion: PRODUCT_MATCH_EVALUATION_SCHEMA_VERSION,
+      packageIdentityKey: body.packageIdentityKey,
+      rawObservedVersion: body.rawObservedVersion,
+      rawObservedVersionSha256: sha256(body.rawObservedVersion),
+      advisoryFamilyId: input.familyId,
+      advisoryRevisionId: body.advisoryRevisionId,
+      approvalId: body.approvalEvidenceId,
+      contentFingerprint: body.contentFingerprint,
+      rangeFingerprint: body.rangeFingerprint,
+      vulnerabilityId: body.vulnerabilityId,
+      evaluatorId: body.evaluatorId,
+      evaluatorVersion: body.evaluatorVersion,
+      matchingPolicyId: body.matchingPolicyId,
+      matchingPolicyVersion: body.matchingPolicyVersion,
+      productEvidencePolicyId: PRODUCT_MATCH_EVALUATION_POLICY_ID,
+      productEvidencePolicyVersion: PRODUCT_MATCH_EVALUATION_POLICY_VERSION,
+      outcome: body.outcome,
+      productOrigin: PRODUCT_MATCH_EVALUATION_ORIGIN,
+      replayFingerprint: productMatchReplayFingerprint(body),
+      findingCreation: PRODUCT_MATCH_FINDING_CREATION,
+      suppressionAuthority: PRODUCT_MATCH_SUPPRESSION_AUTHORITY,
+      explanations: {
+        create: body.explanationCodes.map((code, index) => ({
+          ordinal: index + 1,
+          explanationCode: code,
+        })),
+      },
+    },
+    select: EVIDENCE_SELECT,
+  });
+  return storedFrom(created);
+}
+
+/** Reads one natural-identity row. A self-inconsistent row is malformed. */
+export async function readProductMatchEvidenceForIdentity(
+  tx: PrismaClientLike,
+  query: ProductMatchEvaluationLookup,
+): Promise<
+  | { readonly kind: 'none' }
+  | { readonly kind: 'row'; readonly row: StoredProductMatchRecord }
+  | { readonly kind: 'malformed' }
+> {
+  const row = await tx.productMatchEvaluationEvidence.findFirst({
+    where: evaluationIdentityWhere(query),
+    select: EVIDENCE_SELECT,
+  });
+  if (row === null) {
+    return { kind: 'none' };
+  }
+  try {
+    return { kind: 'row', row: storedFrom(row) };
+  } catch (error) {
+    if (error instanceof ProductMatchRowError) {
+      return { kind: 'malformed' };
+    }
+    throw error;
   }
 }
 
