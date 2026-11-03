@@ -45,6 +45,12 @@ const matrix: Record<Permission, Record<MembershipRole, boolean>> = {
     owner: true,
   },
   [PERMISSIONS.findingInspect]: { viewer: false, member: false, admin: true, owner: true },
+  [PERMISSIONS.productMatchEvaluateControlled]: {
+    viewer: false,
+    member: false,
+    admin: false,
+    owner: true,
+  },
   [PERMISSIONS.remediationManage]: { viewer: false, member: true, admin: true, owner: true },
   [PERMISSIONS.riskAcceptanceRequest]: { viewer: false, member: false, admin: true, owner: true },
   [PERMISSIONS.riskAcceptanceApprove]: { viewer: false, member: false, admin: false, owner: true },
@@ -89,6 +95,22 @@ describe('permission catalog', () => {
     expect(hasPermission('member', PERMISSIONS.findingInspect)).toBe(false);
     expect(hasPermission('viewer', PERMISSIONS.findingCreateControlled)).toBe(false);
     expect(hasPermission('viewer', PERMISSIONS.findingInspect)).toBe(false);
+    expect(PERMISSIONS.productMatchEvaluateControlled).toBe('product_match:evaluate_controlled');
+    expect(PERMISSIONS.productMatchEvaluateControlled).not.toBe(
+      PERMISSIONS.findingCreateControlled,
+    );
+    expect(PERMISSIONS.productMatchEvaluateControlled).not.toBe(
+      PERMISSIONS.findingDiscoverControlled,
+    );
+    expect(PERMISSIONS.productMatchEvaluateControlled).not.toBe(PERMISSIONS.findingInspect);
+    expect(PERMISSIONS.productMatchEvaluateControlled).not.toBe(PERMISSIONS.findingTriage);
+    expect(PERMISSIONS.productMatchEvaluateControlled).not.toBe(PERMISSIONS.findingRead);
+    expect(PERMISSIONS.productMatchEvaluateControlled).not.toBe(PERMISSIONS.assetManage);
+    expect(PERMISSIONS.productMatchEvaluateControlled).not.toBe(PERMISSIONS.intelligenceRead);
+    expect(hasPermission('owner', PERMISSIONS.productMatchEvaluateControlled)).toBe(true);
+    expect(hasPermission('admin', PERMISSIONS.productMatchEvaluateControlled)).toBe(false);
+    expect(hasPermission('member', PERMISSIONS.productMatchEvaluateControlled)).toBe(false);
+    expect(hasPermission('viewer', PERMISSIONS.productMatchEvaluateControlled)).toBe(false);
     expect(hasPermission('member', PERMISSIONS.findingTriage)).toBe(true);
     expect(hasPermission('viewer', PERMISSIONS.findingRead)).toBe(true);
   });
@@ -106,11 +128,13 @@ describe('permission catalog', () => {
         PERMISSIONS.findingDiscoverControlled,
         PERMISSIONS.findingTriage,
         PERMISSIONS.findingRead,
+        PERMISSIONS.productMatchEvaluateControlled,
       ],
     };
     expect(actorHasPermission(actor, PERMISSIONS.findingCreateControlled)).toBe(false);
     expect(actorHasPermission(actor, PERMISSIONS.findingInspect)).toBe(false);
     expect(actorHasPermission(actor, PERMISSIONS.findingDiscoverControlled)).toBe(false);
+    expect(actorHasPermission(actor, PERMISSIONS.productMatchEvaluateControlled)).toBe(false);
     expect(requirePermission(actor, PERMISSIONS.findingCreateControlled)).toEqual({
       ok: false,
       error: PERMISSION_DENIED,
