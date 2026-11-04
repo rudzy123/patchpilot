@@ -4,7 +4,7 @@ This is the append-only record that discharges [risk register](risk-register.md)
 
 ## Current status
 
-One entry exists, V-0001, prepared on 2026-11-04. No validator has signed it, and the principal architect has not countersigned it. No outcome is recorded. No (engine version, definition hash) pair is validated. R13 stays open, and production composition of priority calculation stays blocked.
+One entry exists, V-0001, prepared on 2026-11-04. No validator has signed it, and the principal architect has not countersigned it. No outcome is recorded. No (engine version, definition hash) pair is validated. R13 stays open. ADR 0047 is Accepted and composed. The production allowlist is empty, so publication and calculation fail closed.
 
 ## What validation means
 
@@ -12,7 +12,7 @@ Validators judge whether the built-in policy's outputs on the synthetic corpus b
 
 - Validation does not make priority security truth. It does not establish exploitability, affectedness, compliance, or remediation. Product copy may describe a validated policy only as a "validated operator policy proposal" with its validation date.
 - Validation never changes a weight, normalization table, band, or rule. A desired change needs a new policy version and a new entry.
-- Validation alone authorizes no composition. Production composition also needs [ADR 0047](../adr/0047-controlled-priority-activation.md), which is Proposed and is not accepted. That ADR, not this record, chooses the composition root and the built-in publication path.
+- Validation alone does not admit a pair. [ADR 0047](../adr/0047-controlled-priority-activation.md) is Accepted and chooses the composition root and the built-in publication command. The code allowlist stays empty until a signed `validated` or `validated_with_residuals` entry is mirrored.
 
 ## Record rules
 
@@ -25,7 +25,7 @@ Validators judge whether the built-in policy's outputs on the synthetic corpus b
    - `rejected_new_version_required`. The policy is not used. A new policy version and a new entry follow. The rejected definition is never edited.
 5. **Signers.** At least one named operator reviewer who did not author ADR 0045 and who declares that in the entry. The principal architect countersigns. The validator and the countersigner are different people. Record names only, never email addresses, credentials, or contact details.
 6. **Synthetic evidence only.** The corpus uses closed fact tokens and integers. It contains no real SBOM, customer data, tenant identifier, component name, vulnerability identifier, or credential. Validators must not substitute real tenant data.
-7. **Code mirror.** A later implementation may mirror this record as a constant allowlist of validated pairs. Only entries with outcome `validated` or `validated_with_residuals` may appear on it. Every allowlist change cites its entry ID. Composition must fail closed for any pair not on it. No allowlist exists yet.
+7. **Code mirror.** `ADMITTED_PRIORITY_POLICY_PAIRS` in `packages/domain/src/risk/admitted-priority-policy.ts` mirrors this record. Only entries with outcome `validated` or `validated_with_residuals` may appear on it. Every allowlist change cites its entry ID. The list is empty while V-0001 is unsigned. Composition fails closed for any pair not on it.
 
 ## Subject of V-0001
 
@@ -45,7 +45,7 @@ Validators judge whether the built-in policy's outputs on the synthetic corpus b
 
 The definition hash is the lowercase hex SHA-256 of the UTF-8 bytes of `canonicalJson(BUILTIN_PRIORITY_POLICY_DEFINITION)`. This is the same derivation `fingerprintCalculation` uses in `packages/domain/src/risk/calculation.ts`. The policy version number is not part of the hash (ADR 0045 approval item 19). Re-validating a structured clone of the definition, as the writer does with a definition loaded from storage, gives the same hash.
 
-The development seed row ID is listed only to identify the row. Builtin version 2 exists only in the development seed. Production has no built-in publication path.
+The development seed row ID is listed only to identify the row. The same id is used by the deployment-local publication command. That command writes nothing while this pair is unsigned. The development seed is not the production writer.
 
 The built-in numbers under validation, as fixed by ADR 0045:
 

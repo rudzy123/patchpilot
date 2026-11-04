@@ -19,6 +19,8 @@ import {
   type ControlledFindingDiscoveryResponse,
   type ControlledFindingInspectionResponse,
   type ControlledFindingLatestObservationResponse,
+  type FindingPriorityResponse,
+  type FindingRiskCalculationResponse,
   type EnvironmentOption,
   type MembershipOption,
   type OrganizationsResponse,
@@ -27,6 +29,7 @@ import {
 } from '@patchpilot/contracts';
 
 import { readLatestObservation } from './finding-latest-observation';
+import { readFindingPriority, readFindingRiskCalculation } from './finding-priority';
 import { isCanonicalUuid } from './resource-id';
 
 /** Synchronizer token header. Must match `AUTH_CSRF_HEADER_NAME` / ADR 0019. */
@@ -281,6 +284,59 @@ export function createAuthApi(apiBaseUrl: string) {
             );
           }
           return observation;
+        },
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+        unavailableMessage: FINDING_SERVICE_UNAVAILABLE,
+      });
+    },
+
+    readFindingPriority(findingId: string): Promise<FindingPriorityResponse> {
+      if (!isCanonicalUuid(findingId)) {
+        return Promise.reject(createAuthRequestError(404, 'not_found', 'Not found.'));
+      }
+      return sendJson({
+        baseUrl,
+        path: `/findings/${findingId}/priority`,
+        method: 'GET',
+        parse: (value) => {
+          const priority = readFindingPriority(value, findingId);
+          if (priority === null) {
+            throw createAuthRequestError(
+              503,
+              'internal',
+              'Priority inspection is temporarily unavailable.',
+            );
+          }
+          return priority;
+        },
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+        unavailableMessage: FINDING_SERVICE_UNAVAILABLE,
+      });
+    },
+
+    calculateFindingPriority(
+      findingId: string,
+      csrfToken: string,
+    ): Promise<FindingRiskCalculationResponse> {
+      if (!isCanonicalUuid(findingId)) {
+        return Promise.reject(createAuthRequestError(404, 'not_found', 'Not found.'));
+      }
+      return sendJson({
+        baseUrl,
+        path: `/findings/${findingId}/risk-calculations`,
+        method: 'POST',
+        body: {},
+        csrfToken,
+        parse: (value) => {
+          const calculation = readFindingRiskCalculation(value, findingId);
+          if (calculation === null) {
+            throw createAuthRequestError(
+              503,
+              'internal',
+              'Priority calculation is temporarily unavailable.',
+            );
+          }
+          return calculation;
         },
         unauthorizedMessage: GENERIC_SESSION_EXPIRED,
         unavailableMessage: FINDING_SERVICE_UNAVAILABLE,

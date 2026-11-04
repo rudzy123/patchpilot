@@ -1,19 +1,21 @@
 # ADR 0047: Controlled priority activation
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-04
 - Deciders: PatchPilot maintainers. Acceptance confirms the publication choice in section 4.
 - Supersedes: none
 - Superseded by: none
 
-Proposed. Acceptance is a maintainer decision. This ADR chooses the composition
-root for deliberate priority calculation and the current-priority read. It also
-chooses how builtin `patchpilot.builtin.v0` version 2 is published in production.
-It amends [ADR 0012](0012-explainable-policy-engine.md): the deliberate
-calculation is composed in the API process, and worker injection is reserved for
-a future automatic-recalculation ADR. It does not implement routes, compose
-production, add a migration, or authorize a calculation while it remains
-Proposed.
+Accepted on 2026-11-04. Acceptance confirms the deployment-local publication
+command in section 4. This ADR chooses the composition root for deliberate
+priority calculation and the current-priority read, and how builtin
+`patchpilot.builtin.v0` version 2 is published in production. It amends
+[ADR 0012](0012-explainable-policy-engine.md): the deliberate calculation is
+composed in the API process, and worker injection is reserved for a future
+automatic-recalculation ADR. The routes and the publication command are
+implemented. The production allowlist stays empty while V-0001 is unsigned, so
+publication exits 2 and the routes return 503 until a signed pair is mirrored
+and an operator runs the command. This ADR adds no migration.
 
 [ADR 0045](0045-deterministic-p1-p4-priority-policy.md) is Accepted and does not
 authorize composition. Operator weight validation
@@ -48,7 +50,7 @@ Repository truth at this decision:
   locks the Finding `FOR UPDATE`, and admits only a Finding that is `open`,
   version 1, with null `current_risk_calculation_id` and null `due_at`.
 - `priority:calculate_controlled` is owner only. `priority:inspect` is owner and
-  admin. `PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION` is `absent`.
+  admin. `PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION` is `api_process`.
 - The calculation reason is classified by the use case as `initial`, `rescan`,
   `intel_refresh`, `policy_change`, or `asset_change`. The writer rejects
   `manual_override` and `manual_recalc`.
@@ -103,9 +105,7 @@ Domain still does not import `@patchpilot/policy-engine`.
 `apps/api` gains a workspace dependency on `@patchpilot/policy-engine`. That
 package is internal. It is not a third-party dependency.
 
-The implementation pull request sets
-`PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION` to `api_process`. Until that pull
-request, the constant stays `absent`.
+`PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION` is `api_process`.
 
 The worker, the web process, migration startup, the development seed, and API
 startup do not construct the use case. Startup does not publish a policy.

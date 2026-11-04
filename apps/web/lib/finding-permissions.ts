@@ -21,3 +21,13 @@ export function canPresentControlledFindingCreation(role: PresentationRole): boo
 export function canPresentControlledFindingInspection(role: PresentationRole): boolean {
   return role === 'owner' || role === 'admin';
 }
+
+/** Owner and admin may see the priority section. The API remains authoritative. */
+export function canPresentFindingPriority(role: PresentationRole): boolean {
+  return role === 'owner' || role === 'admin';
+}
+
+/** Only an owner sees the calculate control. The API remains authoritative. */
+export function canPresentFindingPriorityCalculation(role: PresentationRole): boolean {
+  return role === 'owner';
+}

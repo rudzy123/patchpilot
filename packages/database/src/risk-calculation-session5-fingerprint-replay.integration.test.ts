@@ -5,7 +5,7 @@
  * The calculation entry point is the uncomposed use case. This file adds no route.
  */
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { Prisma, PrismaClient } from '@prisma/client';
 import {
@@ -14,6 +14,7 @@ import {
 } from '@patchpilot/domain';
 import {
   BUILTIN_PRIORITY_POLICY_DEFINITION,
+  POLICY_ENGINE_VERSION,
   canonicalJson,
   evaluatePriority,
   parseFactInput,
@@ -33,6 +34,20 @@ import {
 import { createRiskCalculationApplicationPersistence } from './risk-calculation-application-persistence.js';
 import { ensurePublishedBuiltinPriorityPolicy, seedDevelopmentData } from './seed/development.js';
 import { createAsset, createOrg } from './sbom-test-fixture.js';
+
+function admittedBuiltinPairs() {
+  const encoded = canonicalJson(BUILTIN_PRIORITY_POLICY_DEFINITION);
+  if (!encoded.ok) {
+    throw new Error('builtin canonical json failed');
+  }
+  return [
+    {
+      engineVersion: POLICY_ENGINE_VERSION,
+      policyDefinitionSha256: createHash('sha256').update(encoded.value, 'utf8').digest('hex'),
+      validationEntryId: 'fixture',
+    },
+  ];
+}
 
 const SESSION_ID = 'risk-calculation-session';
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/;
@@ -219,6 +234,7 @@ beforeAll(async () => {
     },
     persistence,
     builtinDefinition: BUILTIN_PRIORITY_POLICY_DEFINITION,
+    admittedPairs: admittedBuiltinPairs(),
   });
 });
 

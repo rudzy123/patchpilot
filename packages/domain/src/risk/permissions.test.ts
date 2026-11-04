@@ -1,5 +1,5 @@
 /**
- * Uncomposed priority permissions.
+ * Priority permissions. Production registration is the API process.
  * Finding, policy, and product-match grants are not these grants.
  */
 
@@ -29,7 +29,7 @@ const OTHER_PERMISSIONS = [
   'intelligence:read',
 ] as const;
 
-describe('uncomposed priority permissions', () => {
+describe('priority permissions', () => {
   it('grants priority:calculate_controlled to the owner only', () => {
     expect(PRIORITY_CALCULATE_CONTROLLED_PERMISSION).toBe('priority:calculate_controlled');
     expect(priorityPermissionsForRole('owner')).toEqual([
@@ -61,8 +61,8 @@ describe('uncomposed priority permissions', () => {
     expect(OTHER_PERMISSIONS).not.toContain(PRIORITY_INSPECT_PERMISSION);
   });
 
-  it('stays uncomposed', () => {
-    expect(PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION).toBe('absent');
+  it('registers production composition in the API process', () => {
+    expect(PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION).toBe('api_process');
   });
 
   it('rejects an unexpected membership role', () => {

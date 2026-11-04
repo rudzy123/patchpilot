@@ -11,6 +11,7 @@ const SOURCE_FILES = [
   'lib/finding-permissions.ts',
   'lib/finding-workflow.ts',
   'lib/finding-latest-observation.ts',
+  'lib/finding-priority.ts',
   'lib/resource-id.ts',
   'components/controlled-finding-confirmation-dialog.tsx',
   'components/affected-version-summary.tsx',
@@ -21,6 +22,7 @@ const SOURCE_FILES = [
   'app/findings/[findingId]/page.tsx',
   'app/findings/[findingId]/finding-inspection-page-client.tsx',
   'app/findings/[findingId]/finding-latest-observation-section.tsx',
+  'app/findings/[findingId]/finding-priority-section.tsx',
   'next.config.ts',
 ];
 

@@ -110,6 +110,20 @@ const EMPTY_BUILTIN_V1 = {
   weights: {},
 };
 const TIE_ID = 'ffffffff-ffff-8fff-bfff-ffffffffffff';
+function admittedBuiltinPairs() {
+  const encoded = canonicalJson(BUILTIN_PRIORITY_POLICY_DEFINITION);
+  if (!encoded.ok) {
+    throw new Error('builtin canonical json failed');
+  }
+  return [
+    {
+      engineVersion: POLICY_ENGINE_VERSION,
+      policyDefinitionSha256: createHash('sha256').update(encoded.value, 'utf8').digest('hex'),
+      validationEntryId: 'fixture',
+    },
+  ];
+}
+
 const SESSION_ID = 'risk-calculation-session';
 
 type VersionRequest = {
@@ -1052,6 +1066,7 @@ beforeAll(async () => {
       engine,
       persistence,
       builtinDefinition: BUILTIN_PRIORITY_POLICY_DEFINITION,
+      admittedPairs: admittedBuiltinPairs(),
     }),
     read: createReadCurrentFindingRiskUseCase({ persistence }),
     publish: createPublishOrganizationPriorityOverrideUseCase({

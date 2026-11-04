@@ -183,6 +183,14 @@ export function createFakeAuthApi(overrides: Partial<FakeAuthApi> = {}): FakeAut
     inspectControlledFindingLatestObservation: vi.fn(async () => {
       throw new Error('inspectControlledFindingLatestObservation was not stubbed');
     }),
+    readFindingPriority: vi.fn(async (findingId: string) => ({
+      schemaVersion: 'finding_priority_v1' as const,
+      status: 'not_calculated' as const,
+      findingId,
+    })),
+    calculateFindingPriority: vi.fn(async () => {
+      throw new Error('calculateFindingPriority was not stubbed');
+    }),
     ...overrides,
   };
 }

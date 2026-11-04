@@ -21,6 +21,11 @@ import type { AssetRuntime } from './asset-runtime.js';
 import { registerAuthRoutes } from './auth-routes.js';
 import type { AuthRuntime } from './auth-runtime.js';
 import { registerFindingRoutes } from './finding-routes.js';
+import { registerFindingPriorityRoutes } from './finding-priority-routes.js';
+import {
+  denyControlledPriorityRuntime,
+  type ControlledPriorityRuntime,
+} from './priority-runtime.js';
 import type { FindingOperatorRuntime } from './finding-runtime.js';
 import { registerFindingDiscoveryRoutes } from './finding-discovery-routes.js';
 import { denyFindingDiscoveryRuntime } from './finding-discovery-runtime.js';
@@ -55,6 +60,7 @@ export type ApiDependencies = {
   sboms: SbomRuntime;
   intelligence: IntelligenceRuntime;
   findings: FindingOperatorRuntime;
+  priority?: ControlledPriorityRuntime;
   advisories?: MaintainerReviewedAdvisoryRuntime;
   submissionPeerKey?: (request: FastifyRequest) => string;
   approvalPeerKey?: (request: FastifyRequest) => string;
@@ -251,6 +257,13 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     ...(dependencies.approvalPeerKey === undefined
       ? {}
       : { approvalPeerKey: dependencies.approvalPeerKey }),
+  });
+
+  await registerFindingPriorityRoutes(app, {
+    config: dependencies.config,
+    logger: dependencies.logger,
+    auth: dependencies.auth,
+    priority: dependencies.priority ?? denyControlledPriorityRuntime(),
   });
 
   await registerFindingRoutes(app, {

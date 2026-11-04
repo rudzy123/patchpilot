@@ -2,7 +2,7 @@
 
 Use this to build and run the application profile. It is the operator path for `web`, `api`, and `worker` containers. It is not the local development procedure. Development still uses [local setup](../development/local-setup.md) and [local infrastructure failure](local-infrastructure-failure.md).
 
-A healthy stack is not production-ready, certified, or a browser login. The profile does not create a first user. The priority engine stays uncomposed. CISA KEV synchronization and OSV acquisition stay off unless an operator changes the existing flags. `INTELLIGENCE_OSV_ENABLED=true` stays rejected. Login still needs operator HTTPS. This profile does not add a TLS proxy, and `trustProxy` stays false. Health checks do not prove a browser session.
+A healthy stack is not production-ready, certified, or a browser login. The profile does not create a first user. The priority routes are composed with an empty allowlist and return 503 until a signed pair is published. CISA KEV synchronization and OSV acquisition stay off unless an operator changes the existing flags. `INTELLIGENCE_OSV_ENABLED=true` stays rejected. Login still needs operator HTTPS. This profile does not add a TLS proxy, and `trustProxy` stays false. Health checks do not prove a browser session.
 
 Architecture: [deployment model](../architecture/deployment-model.md), [container architecture](../architecture/container-architecture.md). Current capability: [current state](../project/current-state.md).
 
@@ -189,7 +189,7 @@ This stops project `patchpilot-eval` and keeps named volumes. The script prints 
 ## What stays unavailable
 
 - No first user, no registration, and no production seed.
-- No priority rows. [ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md) stays uncomposed. No route, worker job, or Outbox event calculates priority.
+- No priority rows until an operator runs the built-in publication command. That command exits 2 while V-0001 is unsigned. [ADR 0047](../adr/0047-controlled-priority-activation.md) composes the priority routes with an empty allowlist, so they return 503. No worker job or Outbox event calculates priority.
 - No TLS proxy. `trustProxy` stays false. Loopback HTTP health is not a browser session.
 - No public bucket.
 - No grant command and no offline npm import in this profile. Those remain separate explicit commands.

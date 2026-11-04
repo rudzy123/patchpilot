@@ -28,6 +28,7 @@ import { isCanonicalUuid } from '../../../lib/resource-id';
 import { isAuthRequestError } from '../../../lib/auth-api';
 
 import { FindingLatestObservationSection } from './finding-latest-observation-section';
+import { FindingPrioritySection } from './finding-priority-section';
 
 type InspectionView =
   | { status: 'loading' }
@@ -173,6 +174,7 @@ function FindingInspectionPageBody({ findingId }: { findingId: string }): ReactE
       {canInspect && findingIdValid ? (
         <FindingLatestObservationSection findingId={findingId} />
       ) : null}
+      {canInspect && findingIdValid ? <FindingPrioritySection findingId={findingId} /> : null}
     </main>
   );
 }

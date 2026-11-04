@@ -106,9 +106,14 @@ function repoSources(directory: string): string[] {
 }
 
 describe('policy engine source boundary', () => {
-  it('rejects policy-engine imports from domain, apps, and the database barrel', () => {
+  it('rejects policy-engine imports outside the API composition and the publication command', () => {
     const repoRoot = join(packageRoot, '..', '..');
-    const allowed = join(repoRoot, 'packages/database/src/seed/run.ts');
+    const allowed = new Set([
+      join(repoRoot, 'packages/database/src/seed/run.ts'),
+      join(repoRoot, 'apps/api/src/priority-engine.ts'),
+      join(repoRoot, 'apps/api/src/priority-policy-hash.ts'),
+      join(repoRoot, 'packages/database/src/builtin-priority-policy-publication-command-main.ts'),
+    ]);
     const roots = [
       join(repoRoot, 'apps/api'),
       join(repoRoot, 'apps/web'),
@@ -121,7 +126,7 @@ describe('policy engine source boundary', () => {
       const files = repoSources(root);
       expect(files.length, root).toBeGreaterThan(0);
       for (const file of files) {
-        if (file === allowed) {
+        if (allowed.has(file)) {
           continue;
         }
         const specifiers = importSpecifiers(readFileSync(file, 'utf8'));

@@ -1295,6 +1295,12 @@ export {
 } from './risk/index.js';
 
 export {
+  ADMITTED_PRIORITY_POLICY_PAIRS,
+  isAdmittedPriorityPolicyPair,
+  type AdmittedPriorityPolicyPair,
+} from './risk/index.js';
+
+export {
   PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
   PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION,
   PRIORITY_INSPECT_PERMISSION,
@@ -1305,6 +1311,7 @@ export {
 
 export {
   ORGANIZATION_PRIORITY_OVERRIDE_PERMISSION,
+  authorizePriorityFindingCommand,
   createCalculateFindingRiskUseCase,
   createPublishOrganizationPriorityOverrideUseCase,
   createReadCurrentFindingRiskUseCase,
@@ -1317,10 +1324,27 @@ export {
 } from './risk/index.js';
 
 export {
+  FINDING_PRIORITY_REVIEW_NONE,
+  PRIORITY_INPUT_CHANGE_SIGNALS,
+  classifyPriorityInputChanges,
+  createReadControlledFindingPriorityUseCase,
+  type FindingPriorityCalculatedView,
+  type FindingPriorityReviewNone,
+  type PriorityInputChangeComparison,
+  type PriorityInputChangeReport,
+  type PriorityInputChangeSignal,
+  type ReadControlledFindingPriorityDependencies,
+  type ReadControlledFindingPriorityResult,
+} from './risk/index.js';
+
+export {
   BUILTIN_PRIORITY_POLICY_KEY,
   BUILTIN_PRIORITY_POLICY_VERSION,
   PERSISTED_RISK_CALCULATION_REASONS,
   type CurrentRiskCalculationRead,
+  type FindingPriorityCalculationRecord,
+  type FindingPriorityPublishedBuiltin,
+  type FindingPriorityRead,
   type LockedPriorityCalculationContext,
   type LockedPriorityCalculationDecision,
   type LockedPriorityCalculationOutcome,

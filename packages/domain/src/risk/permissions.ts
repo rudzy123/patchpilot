@@ -1,7 +1,8 @@
 /**
- * Closed role mapping for uncomposed priority calculation and inspection.
+ * Closed role mapping for priority calculation and inspection.
  * Caller-supplied permission strings are not an input.
- * These grants do not publish a policy, create a Finding, or register a route.
+ * These grants do not publish a policy or create a Finding.
+ * Production registration is the API process.
  */
 
 import type { MembershipRole } from '../lifecycle.js';
@@ -10,7 +11,7 @@ export const PRIORITY_CALCULATE_CONTROLLED_PERMISSION = 'priority:calculate_cont
 
 export const PRIORITY_INSPECT_PERMISSION = 'priority:inspect' as const;
 
-export const PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION = 'absent' as const;
+export const PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION = 'api_process' as const;
 
 export type PriorityPermission =
   typeof PRIORITY_CALCULATE_CONTROLLED_PERMISSION | typeof PRIORITY_INSPECT_PERMISSION;

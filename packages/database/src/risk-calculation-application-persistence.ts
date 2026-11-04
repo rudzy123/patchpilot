@@ -9,6 +9,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type {
   CurrentRiskCalculationRead,
+  FindingPriorityRead,
   LockedPriorityCalculationContext,
   PersistFindingRiskCalculationResult,
   PriorityPolicyLookup,
@@ -26,6 +27,7 @@ import {
 } from './risk-calculation-persistence.js';
 import type {
   CurrentRiskCalculationResult,
+  FindingPriorityStateResult,
   PersistRiskCalculationResult,
   PersistedRiskCalculation,
   PriorityCalculationFactGraphResult,
@@ -60,6 +62,9 @@ export function createRiskCalculationApplicationPersistence(
     },
     async findCurrentRiskCalculation(input) {
       return mapCurrent(await persistence.findCurrentRiskCalculation(input));
+    },
+    async readFindingPriority(input) {
+      return mapFindingPriority(await persistence.readFindingPriority(input));
     },
     async persistRiskCalculation(input) {
       return mapPersist(await persistence.persist(input));
@@ -141,6 +146,33 @@ function policyView(policy: StoredPriorityPolicy): StoredPriorityPolicyView {
     version: policy.version,
     definition: policy.definition,
   };
+}
+
+function mapFindingPriority(result: FindingPriorityStateResult): FindingPriorityRead {
+  switch (result.kind) {
+    case 'finding_absent':
+      return { kind: 'finding_absent' };
+    case 'not_calculated':
+      return {
+        kind: 'not_calculated',
+        findingId: result.findingId,
+        publishedBuiltin: result.publishedBuiltin,
+      };
+    case 'calculated':
+      return {
+        kind: 'calculated',
+        findingId: result.findingId,
+        publishedBuiltin: result.publishedBuiltin,
+        calculation: result.calculation,
+      };
+    case 'malformed':
+    case 'rejected':
+    case 'database_unavailable':
+    case 'internal_failure':
+      return { kind: 'unavailable' };
+    default:
+      return assertNever(result);
+  }
 }
 
 function mapCurrent(result: CurrentRiskCalculationResult): CurrentRiskCalculationRead {

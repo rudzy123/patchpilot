@@ -6,7 +6,7 @@
 - Supersedes: none
 - Superseded by: none
 
-Further amended on 2026-11-04 by [ADR 0047](0047-controlled-priority-activation.md): the deliberate calculation is composed in the API process, and worker injection is reserved for a future automatic-recalculation ADR; this amendment authorizes no route while that ADR remains Proposed.
+Further amended on 2026-11-04 by [ADR 0047](0047-controlled-priority-activation.md): the deliberate calculation is composed in the API process, and worker injection is reserved for a future automatic-recalculation ADR. ADR 0047 is Accepted. The production allowlist is empty while V-0001 is unsigned.
 
 ## Context
 

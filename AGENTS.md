@@ -49,7 +49,7 @@ Modular monolith. Separately deployable `web`, `api`, and `worker` apps share pa
 | `packages/integrations` | Storage and provider adapters. |
 | `packages/sbom` | CycloneDX parse. |
 | `packages/auth` | Passwords, sessions, permissions. |
-| `packages/policy-engine` | Pure, dependency-free P1 to P4 priority engine ([ADR 0045](docs/adr/0045-deterministic-p1-p4-priority-policy.md), Accepted). Production uncomposed. Must not import `@patchpilot/domain`, `@patchpilot/config`, or `node:*`. |
+| `packages/policy-engine` | Pure, dependency-free P1 to P4 priority engine ([ADR 0045](docs/adr/0045-deterministic-p1-p4-priority-policy.md), Accepted). Composed only by the API priority runtime and the builtin publication command ([ADR 0047](docs/adr/0047-controlled-priority-activation.md)). Must not import `@patchpilot/domain`, `@patchpilot/config`, or `node:*`. |
 | `docs/adr` | Decision records. |
 | `docs/architecture` | Subsystem design. |
 | `docs/runbooks` | Operator procedures. |

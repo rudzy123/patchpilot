@@ -144,6 +144,14 @@ export {
   type ControlledFindingLatestObservationResponse,
 } from './findings.js';
 export {
+  findingPriorityResponseSchema,
+  findingRiskCalculationRequestSchema,
+  findingRiskCalculationResponseSchema,
+  type FindingPriorityResponse,
+  type FindingRiskCalculationRequest,
+  type FindingRiskCalculationResponse,
+} from './finding-priority.js';
+export {
   DELIBERATE_PRODUCT_MATCH_EVALUATION_RESPONSE_SCHEMA_VERSION,
   deliberateProductMatchEvaluationRequestSchema,
   deliberateProductMatchEvaluationResponseSchema,

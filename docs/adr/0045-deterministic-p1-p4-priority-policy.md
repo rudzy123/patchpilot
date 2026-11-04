@@ -42,13 +42,16 @@ Current checkpoint: [current-state.md](../project/current-state.md).
   PostgreSQL adapter in `packages/database/src/risk-calculation-persistence.ts`, the
   permissions `priority:calculate_controlled` (owner only) and `priority:inspect`
   (owner and admin), and one `priority.calculated` audit row per new calculation.
-  `PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION` is `absent`. API, web, worker, and
-  migration startup do not construct the use case. The uncomposed writer can append
-  **RiskCalculation** rows in tests and development. Production writes none.
+  `PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION` is `api_process`. API startup
+  constructs the use case. The web, worker, and migration startup do not. The
+  production allowlist is empty, so a production calculation writes nothing until
+  a signed pair is mirrored.
 - **Built-in version (checklist item 19).** The persistence session chose version 2.
   Builtin `patchpilot.builtin.v0` version 2 has the fixed id
   `55555555-5555-4555-8555-555555555502` and stores
-  `BUILTIN_PRIORITY_POLICY_DEFINITION`. Only the development seed publishes it.
+  `BUILTIN_PRIORITY_POLICY_DEFINITION`. The development seed can publish it. The
+  deployment-local publication command is the production writer and writes nothing
+  while the pair is unsigned.
   Production seeding is refused, and the production bootstrap writes nothing. No
   production publication path exists.
 - **Input fingerprint.** The implementation matches section 9:
@@ -67,10 +70,12 @@ Current checkpoint: [current-state.md](../project/current-state.md).
 - **Composition root.** The last sentence of section 9 and the original follow-up
   repeat ADR 0012's earlier statement that the worker injects the engine. Acceptance
   of this ADR does not choose a composition root.
-  [ADR 0047](0047-controlled-priority-activation.md) (Proposed) is that choice:
+  [ADR 0047](0047-controlled-priority-activation.md) is that choice:
   deliberate calculation in the API process, and a deployment-local builtin
-  publication command. It is not accepted and it authorizes no route. See the
-  follow-up section.
+  publication command. On 2026-11-04 ADR 0047 was accepted and composed. The
+  production allowlist stays empty while V-0001 is unsigned, so the routes
+  return 503 until a signed pair is mirrored. The checklist items above are
+  unchanged. See the follow-up section.
 
 ## Context
 
