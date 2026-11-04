@@ -44,7 +44,7 @@ These are the **intended** required GitHub Actions check names once branch prote
 - `CodeQL / Analyze`
 - `Dependency review / Dependency review`
 
-Do not require Scorecard, SBOM, Release dry run, E2E, or Container build. GitHub-hosted E2E and container validation are deferred; see [ci.md](ci.md).
+Do not require Scorecard, SBOM, Release dry run, E2E, or Container build. GitHub-hosted E2E is deferred. Container build exists and does not push images; do not require it until the hosted check name is confirmed. See [ci.md](ci.md).
 
 Authors should still run the equivalent local commands and report actual results when GitHub-hosted jobs have not finished. Do not claim checks passed if they were not run.
 

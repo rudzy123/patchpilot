@@ -1,6 +1,25 @@
-# Local Docker Compose for PostgreSQL, Redis, and MinIO.
-# Development-only placeholder credentials. Unfit for production.
-# Applications (web, api, worker) are started with `pnpm dev`, not this file.
+# Local data plane, plus an application profile for web, api, and worker.
+# `pnpm infrastructure:up` starts only the services without a profile and does
+# not pass the application env file. Credential defaults below match the
+# development data plane when the corresponding variable is unset.
+#
+# Start the application profile with scripts/run-application-deployment.mjs.
+# That wrapper uses Compose project patchpilot-eval so its volumes stay off
+# the development project. Application containers read application.env.example
+# and, when present, deploy/compose/application.env. Pass that same file to
+# Compose with --env-file so infrastructure interpolation matches.
+
+x-minio-image: &minio-image bitnamilegacy/minio:2025.7.23-debian-12-r3@sha256:953d489a81cc4de7975f90e07202189c4325da39b0b92470b6a13c7ea99e36cd
+
+x-application-build: &application-build
+  context: ../..
+  dockerfile: deploy/docker/Dockerfile
+
+x-application-env-file: &application-env-file
+  env_file:
+    - application.env.example
+    - path: application.env
+      required: false
 
 name: patchpilot
 
@@ -11,9 +30,9 @@ services:
     ports:
       - '127.0.0.1:${PATCHPILOT_POSTGRES_PORT:-55432}:5432'
     environment:
-      POSTGRES_USER: patchpilot
-      POSTGRES_PASSWORD: patchpilot-dev-not-for-production
-      POSTGRES_DB: patchpilot
+      POSTGRES_USER: ${POSTGRES_USER:-patchpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-patchpilot-dev-not-for-production}
+      POSTGRES_DB: ${POSTGRES_DB:-patchpilot}
     volumes:
       - patchpilot_postgres:/var/lib/postgresql/data
     healthcheck:
@@ -28,25 +47,43 @@ services:
     restart: unless-stopped
     ports:
       - '127.0.0.1:${PATCHPILOT_REDIS_PORT:-16379}:6379'
-    command: ['redis-server', '--appendonly', 'yes']
+    environment:
+      PATCHPILOT_REDIS_PASSWORD: ${PATCHPILOT_REDIS_PASSWORD:-}
+    # Empty password keeps the historical unauthenticated server. A set
+    # password is passed to --requirepass. The entrypoint still drops to the
+    # image's redis user. REDISCLI_AUTH keeps the secret off the redis-cli argv.
+    entrypoint: ['sh', '-c']
+    command:
+      - |
+        if [ -n "$$PATCHPILOT_REDIS_PASSWORD" ]; then
+          exec /usr/local/bin/docker-entrypoint.sh redis-server --appendonly yes --requirepass "$$PATCHPILOT_REDIS_PASSWORD"
+        fi
+        exec /usr/local/bin/docker-entrypoint.sh redis-server --appendonly yes
     volumes:
       - patchpilot_redis:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test:
+        - CMD-SHELL
+        - |
+          if [ -n "$$PATCHPILOT_REDIS_PASSWORD" ]; then
+            REDISCLI_AUTH="$$PATCHPILOT_REDIS_PASSWORD" redis-cli ping
+          else
+            redis-cli ping
+          fi
       interval: 5s
       timeout: 3s
       retries: 12
       start_period: 5s
 
   minio:
-    image: bitnamilegacy/minio:2025.7.23-debian-12-r3@sha256:953d489a81cc4de7975f90e07202189c4325da39b0b92470b6a13c7ea99e36cd
+    image: *minio-image
     restart: unless-stopped
     ports:
       - '127.0.0.1:${PATCHPILOT_MINIO_API_PORT:-19000}:9000'
       - '127.0.0.1:${PATCHPILOT_MINIO_CONSOLE_PORT:-19001}:9001'
     environment:
-      MINIO_ROOT_USER: patchpilot-dev-access
-      MINIO_ROOT_PASSWORD: patchpilot-dev-secret-not-for-production
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-patchpilot-dev-access}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-patchpilot-dev-secret-not-for-production}
     volumes:
       - patchpilot_minio:/bitnami/minio/data
     healthcheck:
@@ -56,6 +93,210 @@ services:
       timeout: 5s
       retries: 12
       start_period: 10s
+
+  object-storage-init:
+    image: *minio-image
+    profiles: [application]
+    restart: 'no'
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-}
+      MINIO_DEFAULT_BUCKETS: ${PATCHPILOT_MINIO_DEFAULT_BUCKETS:-}
+    # MINIO_DEFAULT_BUCKETS is this image's bucket-initialization contract.
+    # It stays off the shared minio service so infrastructure:up does not
+    # create a bucket from the developer OBJECT_STORAGE_BUCKET. The client
+    # below creates one private bucket and exits. It never sets a public
+    # policy and does not call initializeDevelopmentBucket.
+    entrypoint: ['bash', '-c']
+    command:
+      - |
+        set -e
+        bucket="$$OBJECT_STORAGE_BUCKET"
+        defaults="$$MINIO_DEFAULT_BUCKETS"
+        if [ -z "$$bucket" ] || [ "$$bucket" != "$$defaults" ]; then
+          echo "MINIO_DEFAULT_BUCKETS must equal OBJECT_STORAGE_BUCKET" >&2
+          exit 1
+        fi
+        case "$$bucket" in
+          *[:/]*|*..*|*patchpilot-dev*|*not-for-production*|*minioadmin*|*changeme*|*password*)
+            echo "Refusing object-storage bucket" >&2
+            exit 1
+            ;;
+        esac
+        case "$$bucket" in
+          [a-z0-9]*) ;;
+          *)
+            echo "Refusing object-storage bucket" >&2
+            exit 1
+            ;;
+        esac
+        if [ -z "$$MINIO_ROOT_USER" ] || [ -z "$$MINIO_ROOT_PASSWORD" ]; then
+          echo "Object-storage root credentials are required" >&2
+          exit 1
+        fi
+        mc=""
+        for candidate in /opt/bitnami/minio-client/bin/mc /opt/bitnami/minio/bin/mc /usr/bin/mc /usr/local/bin/mc; do
+          if [ -x "$$candidate" ]; then
+            mc="$$candidate"
+            break
+          fi
+        done
+        if [ -z "$$mc" ]; then
+          echo "Pinned MinIO image does not include the MinIO client" >&2
+          exit 1
+        fi
+        HOME=/tmp
+        config_dir=/tmp/patchpilot-mc
+        mkdir -p "$$config_dir"
+        ready=0
+        for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+          if "$$mc" --config-dir "$$config_dir" alias set local "http://minio:9000" "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1; then
+            ready=1
+            break
+          fi
+          sleep 1
+        done
+        if [ "$$ready" -ne 1 ]; then
+          echo "Object storage did not accept the root credentials" >&2
+          exit 1
+        fi
+        for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+          if "$$mc" --config-dir "$$config_dir" stat "local/$$bucket" >/dev/null 2>&1; then
+            exit 0
+          fi
+          if "$$mc" --config-dir "$$config_dir" mb "local/$$bucket" >/dev/null 2>&1; then
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "Private object-storage bucket was not created" >&2
+        exit 1
+
+  migrate:
+    <<: *application-env-file
+    profiles: [application]
+    build:
+      <<: *application-build
+      target: migrate
+    image: patchpilot-migrate:local
+    restart: 'no'
+    working_dir: /src
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ['pnpm', 'db:migrate:deploy']
+
+  bootstrap:
+    profiles: [application]
+    build:
+      <<: *application-build
+      target: migrate
+    image: patchpilot-migrate:local
+    restart: 'no'
+    working_dir: /src
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      PATCHPILOT_DEPLOYMENT_ENVIRONMENT: ${PATCHPILOT_DEPLOYMENT_ENVIRONMENT:-}
+    volumes:
+      - type: bind
+        source: ../../scripts/production-bootstrap.mjs
+        target: /src/scripts/production-bootstrap.mjs
+        read_only: true
+    command: ['node', 'scripts/production-bootstrap.mjs']
+
+  api:
+    <<: *application-env-file
+    profiles: [application]
+    build:
+      <<: *application-build
+      target: api
+    image: patchpilot-api:local
+    restart: unless-stopped
+    stop_grace_period: 15s
+    ports:
+      - '127.0.0.1:3001:3001'
+    environment:
+      API_HOST: 0.0.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/health/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  worker:
+    <<: *application-env-file
+    profiles: [application]
+    build:
+      <<: *application-build
+      target: worker
+    image: patchpilot-worker:local
+    restart: unless-stopped
+    stop_grace_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+      object-storage-init:
+        condition: service_completed_successfully
+    # No published port and no healthcheck. Startup already requires Postgres,
+    # the private bucket, the migrated cisa_kev row, and Redis. Process exit
+    # is the failure signal. A probe that always passes would hide that.
+
+  web:
+    profiles: [application]
+    build:
+      <<: *application-build
+      target: web
+      args:
+        NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: ${NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT:-production}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://api.patchpilot.example}
+    image: patchpilot-web:local
+    restart: unless-stopped
+    stop_grace_period: 15s
+    ports:
+      - '127.0.0.1:3000:3000'
+    environment:
+      NODE_ENV: production
+      WEB_PORT: ${WEB_PORT:-3000}
+      NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT: ${NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT:-production}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://api.patchpilot.example}
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
 
 volumes:
   patchpilot_postgres:

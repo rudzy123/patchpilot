@@ -1,6 +1,6 @@
 # Continuous integration
 
-This document describes the seven GitHub Actions workflows added in Session 4. It is process documentation, not a claim that PatchPilot is production-ready, certified, or comprehensively assured.
+This document describes the GitHub Actions workflows. Session 4 added seven of them. Container build is the later [CI-DEFER-2](#ci-defer-2--container-build-workflow) follow-through. It is process documentation, not a claim that PatchPilot is production-ready, certified, or comprehensively assured.
 
 Local commands remain authoritative when GitHub-hosted checks have not run yet. After a pull request is opened, confirm the check names GitHub actually emits before applying branch protection.
 
@@ -15,8 +15,9 @@ Local commands remain authoritative when GitHub-hosted checks have not run yet. 
 | `.github/workflows/scorecard.yml` | Scorecard | OpenSSF Scorecard on `main` and a weekly schedule |
 | `.github/workflows/sbom.yml` | SBOM | Supply-chain CycloneDX SBOM for this repository |
 | `.github/workflows/release-dry-run.yml` | Release dry run | Manual quality verification without publishing |
+| `.github/workflows/container-build.yml` | Container build | BuildKit build of the reviewed `api`, `worker`, `web`, and `migrate` targets. Does not push images |
 
-There is no GitHub-hosted E2E workflow and no container-build workflow in this session. Those checks are deferred (see [Deferred CI work](#deferred-ci-work)).
+There is no GitHub-hosted E2E workflow. Container build is a real non-pushing image build. E2E remains deferred (see [Deferred CI work](#deferred-ci-work)).
 
 Workflows are split so permissions, failure diagnosis, and required checks stay narrow. Shared Node.js/pnpm setup lives in [`.github/actions/setup-node-pnpm`](../../.github/actions/setup-node-pnpm/action.yml).
 
@@ -31,8 +32,9 @@ Workflows are split so permissions, failure diagnosis, and required checks stay 
 | Scorecard | no | yes | weekly Monday | no |
 | SBOM | no | yes | weekly Monday | yes |
 | Release dry run | no | no | no | yes |
+| Container build | yes | yes | no | no |
 
-Pull-request workflows use `pull_request`, not `pull_request_target`. They do not receive repository secrets. There are no path filters on pull-request jobs, so documentation-only pull requests still run CI, Integration, CodeQL, and Dependency review.
+Pull-request workflows use `pull_request`, not `pull_request_target`. They do not receive repository secrets. There are no path filters on pull-request jobs, so documentation-only pull requests still run CI, Integration, CodeQL, Dependency review, and Container build.
 
 ## Permissions
 
@@ -40,11 +42,11 @@ Every workflow sets `permissions.contents: read` at the workflow level. Addition
 
 | Workflow | Extra job permissions |
 | --- | --- |
-| CI, Integration, SBOM, Release dry run, Dependency review | none |
+| CI, Integration, SBOM, Release dry run, Dependency review, Container build | none |
 | CodeQL | `security-events: write`, `actions: read` |
 | Scorecard | `security-events: write`, `actions: read` |
 
-No workflow uses `id-token: write`. Scorecard sets `publish_results: false`, so OpenSSF OIDC publication is disabled and no OIDC permission is required. There is no `contents: write`, `packages: write`, `packages: read`, `deployments: write`, or `pull-requests: write`.
+No workflow uses `id-token: write`. Scorecard sets `publish_results: false`, so OpenSSF OIDC publication is disabled and no OIDC permission is required. There is no `contents: write`, `packages: write`, `packages: read`, `deployments: write`, or `pull-requests: write`. Container build does not log in to a registry.
 
 `packages: read` is omitted from CodeQL because this repository uses `build-mode: none` and the default queries bundled with `github/codeql-action`. GitHub's starter workflow grants `packages: read` only to fetch internal or private CodeQL packs, which this configuration does not use.
 
@@ -64,7 +66,7 @@ Do **not** require on pull requests:
 - SBOM (runs on `main`, schedule, and `workflow_dispatch` only)
 - Release dry run (manual `workflow_dispatch` only)
 - E2E (no workflow in this session)
-- Container build (no workflow in this session)
+- Container build. The workflow exists. The intended check name is `Container build / Build`. Do not require it until that name has been confirmed on a hosted run. A built image is not a product-readiness gate.
 
 ## CI / Workflows
 
@@ -73,7 +75,7 @@ The `Workflows` job does not install application dependencies. It runs `node scr
 - Confirms required GitHub governance files exist (`CODEOWNERS`, Dependabot, PR and issue templates, the local setup action, CodeQL config)
 - Rejects a public vulnerability issue template
 - Rejects Dependabot auto-merge configuration
-- Rejects placeholder `.github/workflows/e2e.yml` and `.github/workflows/container-build.yml`
+- Rejects placeholder `.github/workflows/e2e.yml`. `.github/workflows/container-build.yml` is the non-pushing build in [Container validation](#container-validation) and is not on the forbidden list
 - Downloads pinned `actionlint` 1.7.12, verifies the archive SHA-256 and the extracted binary SHA-256, and lints workflow YAML. A cached binary is hashed before it is executed; a mismatch is not executed. Tracked files under `.cache/actionlint` fail the job.
 
 ## CI / Quality
@@ -130,7 +132,15 @@ A Scorecard score is **not** certification or comprehensive security assurance.
 
 ## Container validation
 
-There are no production runtime Dockerfiles. There is no container-build workflow and no fake container-build job in CI. Do not add placeholder Dockerfiles only to satisfy a status check. Real container validation is deferred to the production containerization milestone ([CI-DEFER-2](#deferred-ci-work)).
+`.github/workflows/container-build.yml` is the [CI-DEFER-2](#ci-defer-2--container-build-workflow) follow-through. It is not a placeholder and it is not folded into the CI workflow.
+
+The job checks out the repository and refuses any tracked Dockerfile other than `deploy/docker/Dockerfile`. That file must declare stages `api`, `worker`, `web`, and `migrate`, must contain `USER node`, and must pin `node:24-bookworm-slim` by digest. The job then builds those four targets with Docker Buildx (`docker buildx build --load`). It does not pass `--push`, does not log in to a registry, does not read `deploy/compose/application.env`, and does not upload image tarballs or provenance. `BUILDX_NO_DEFAULT_ATTESTATIONS=1` is set, and each build passes `--provenance=false` and `--sbom=false`. After the build, the job inspects each local image and fails unless `Config.User` is `node`.
+
+The `api`, `worker`, and `web` builds pass public build args `NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT=production` and `NEXT_PUBLIC_API_BASE_URL=https://api.patchpilot.example`. Those values are not secrets. They match the web package build defaults. Next.js inlines them, and they may appear in the build log. The migrate target does not receive them.
+
+The job runs on `pull_request` and on `push` to `main`, with no path filter. Permissions are `contents: read` only. The timeout is 60 minutes. It does not start Compose, migrate a database, or run the application.
+
+Local operators build the same Dockerfile through [self-hosted deployment](../runbooks/self-hosted-deployment.md).
 
 ## Supply-chain SBOM
 
@@ -200,13 +210,14 @@ When that workflow is added it must:
 
 ### CI-DEFER-2 — Container-build workflow
 
-Introduce a real container-build workflow only when reviewed runtime Dockerfiles exist for web, API, and worker. Until then, do not create `.github/workflows/container-build.yml`, do not fold a fake container-build job into CI, and do not add placeholder Dockerfiles.
+Closed. Reviewed runtime targets `api`, `worker`, `web`, and `migrate` live in `deploy/docker/Dockerfile`. `.github/workflows/container-build.yml` builds them with BuildKit, does not push images, does not log registry credentials, fails when a tracked Dockerfile is not that reviewed file, and is no longer on the forbidden list in `scripts/lint-workflows.mjs`.
 
-When that workflow is added it must build with BuildKit (or the repository-approved equivalent), must not push images, must not log registry credentials, must fail on Dockerfiles that are not the reviewed production files, and must remove `.github/workflows/container-build.yml` from the forbidden list in `scripts/lint-workflows.mjs`.
+Do not add a second container-build workflow. Do not fold a registry push or a fake always-green job into CI. E2E remains [CI-DEFER-1](#ci-defer-1--github-hosted-playwright-e2e).
 
 ## Related documents
 
 - [CI security](../security/ci-security.md)
+- [Self-hosted deployment](../runbooks/self-hosted-deployment.md)
 - [Artifact retention](artifact-retention.md)
 - [Branch protection](branch-protection.md)
 - [Repository settings](repository-settings.md)

@@ -5,6 +5,9 @@
   "description": "Background worker. Relays transactional outbox events to BullMQ, processes CycloneDX SBOM ingestion, and runs CISA KEV synchronization.",
   "license": "Apache-2.0",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.build.json",

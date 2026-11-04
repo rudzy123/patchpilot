@@ -29,7 +29,7 @@ Production runtime libraries (Next.js, Fastify, Prisma, Pino, and similar) are *
 
 Reviewers must run normal CI. See [dependency-security.md](../security/dependency-security.md) and [dependency-alert.md](../runbooks/dependency-alert.md).
 
-Docker image updates for Compose are reviewed manually until runtime Dockerfiles exist. Dependabot's docker ecosystem is not enabled against `deploy/compose/compose.yaml` in this session.
+Runtime images live in `deploy/docker/Dockerfile`. Dependabot's docker ecosystem is not enabled against that file or `deploy/compose/compose.yaml`. Review image digest updates manually.
 
 ## License review
 

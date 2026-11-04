@@ -5,6 +5,9 @@
   "description": "Fastify HTTP API. Health, Session 6 authentication, Session 7 asset inventory, and Session 8 SBOM upload routes.",
   "license": "Apache-2.0",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.build.json",

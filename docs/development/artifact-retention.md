@@ -12,7 +12,7 @@ GitHub Actions artifacts are visible to users who can read Actions logs for the 
 | CodeQL SARIF | Code scanning | Query results | Internal source paths | GitHub code-scanning retention | Always on CodeQL runs | No secrets in source |
 | Scorecard SARIF | Supply-chain posture | Check results; no secrets or SBOM bodies | Internal | 5 days (Actions artifact); also code scanning | `main`, schedule, `branch_protection_rule` | Not certification. External OpenSSF publication is disabled |
 | Repository SBOM | PatchPilot's own dependency inventory | CycloneDX JSON | Internal package names and versions | 7 days | `main`, schedule, manual | Inspect for tokens; never include `.env` or customer SBOMs |
-| Container metadata | Deferred until runtime Dockerfiles exist ([CI-DEFER-2](ci.md#deferred-ci-work)) | n/a | n/a | n/a | Not until a real container-build workflow exists | Do not log registry credentials |
+| Container images | Built by [Container build](ci.md#container-validation) to validate `deploy/docker/Dockerfile` | Local runner images for targets `api`, `worker`, `web`, and `migrate`. No registry push | Build logs can include the public `NEXT_PUBLIC_` values. They must not include registry credentials or `.env` files | n/a | Not uploaded | Do not log registry credentials. Do not upload image tarballs or provenance |
 
 Artifact names include `github.run_id` and `github.run_attempt` so reruns do not collide.
 

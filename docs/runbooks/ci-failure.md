@@ -19,6 +19,7 @@ Use this when a GitHub Actions workflow or a local quality gate fails. Do not pa
 | Integration | Service unhealthy or URL/port mismatch | Confirm health; keep ports `55432` / `16379` / `19000` |
 | Prisma | Schema invalid or migrate deploy failed | `pnpm db:validate`; inspect migration SQL without logging `DATABASE_URL` |
 | Workflows | actionlint error | Fix YAML; do not pin `main` action refs |
+| Container build | `deploy/docker/Dockerfile` changed, an extra Dockerfile was added, or the image build failed | [Container validation](../development/ci.md#container-validation). The workflow does not push images. Do not add a registry login to make it pass |
 | Required check missing | Workflow YAML is invalid or the workflow file was removed, so the check never queued | GitHub blocks merge while the required check is absent. Follow [branch-protection.md](../development/branch-protection.md#required-workflow-never-reports): temporarily relax that required check or use admin bypass, merge the workflow fix, restore the rule. Do not force-push `main` |
 | CodeQL SARIF rejected | "CodeQL analyses from advanced configurations cannot be processed when the default setup is enabled" | Disable **CodeQL default setup** in **Settings → Code security → Code scanning**. Keep `.github/workflows/codeql.yml`. Re-run the failed `CodeQL / Analyze` job. Do not mask the upload with `continue-on-error` |
 | CodeQL / dependency review / Scorecard | New finding or advisory | Follow the security runbooks |

@@ -32,7 +32,7 @@ nvm use        # or install Node 24 another way
    pnpm install
    ```
 
-3. Start PostgreSQL, Redis, and MinIO. Applications are **not** started by Compose.
+3. Start PostgreSQL, Redis, and MinIO. Applications are **not** started by this command. `pnpm infrastructure:up` does not pass `--profile application`. The application profile is a separate Compose project, documented in [self-hosted deployment](../runbooks/self-hosted-deployment.md). Keep using this page for local development.
 
    ```bash
    pnpm infrastructure:up
@@ -94,7 +94,7 @@ pnpm workflows:lint
 | `pnpm test:integration` | Compose-backed PostgreSQL, Redis, and MinIO checks. Integration suites create disposable databases. |
 | `pnpm build` | Production build of packages and apps |
 | `pnpm workflows:lint` | Checksum-pinned actionlint on `.github/workflows` |
-| `pnpm infrastructure:up` | Start local PostgreSQL, Redis, MinIO and wait until healthchecks pass |
+| `pnpm infrastructure:up` | Start local PostgreSQL, Redis, and MinIO and wait until healthchecks pass. Does not start the application profile |
 | `pnpm infrastructure:status` | Show Compose container status and health. After `infrastructure:down`, this prints an empty table and exits 0; that means no PatchPilot containers are running, not a healthcheck failure |
 | `pnpm infrastructure:down` | Stop Compose services. Named volumes persist; this is not a data reset |
 | `pnpm infrastructure:logs` | Follow Compose logs until interrupted |
@@ -138,5 +138,7 @@ If the state does not advance, the worker is the thing to check first: the relay
 Do not put real customer SBOMs in this bucket. Local MinIO has placeholder credentials, no TLS, and no backup.
 
 ## What this foundation does not include
+
+This page is the development procedure. It is not [self-hosted deployment](../runbooks/self-hosted-deployment.md). That profile also does not add registration or a first user.
 
 See [database.md](database.md) and [migrations.md](migrations.md). Do not expect registration, password reset, an SBOM web UI, retry or quarantine-release APIs, orphan-object cleanup, risk scoring, advisory matching, Findings from intelligence, a vulnerability dashboard, or GitHub integration in this milestone. KEV runtime synchronization exists when `INTELLIGENCE_KEV_ENABLED=true`; OSV runtime remains disabled (`INTELLIGENCE_OSV_ENABLED=true` is rejected). Local tests use synthetic provider data; ordinary CI and test suites do not call live CISA. Do not download the production KEV catalog by hand. Operators may inspect sanitized state with the authenticated provider-status GET routes (`intelligence:read` and an active Organization). Session 6 login uses `/login` against the API origin in `NEXT_PUBLIC_API_BASE_URL`.

@@ -1,0 +1,11 @@
+# Build context for deploy/docker/Dockerfile is the repository root.
+.env
+.env.*
+node_modules
+dist
+.next
+.turbo
+.git
+
+# Filled operator env. The committed example is application.env.example.
+deploy/compose/application.env

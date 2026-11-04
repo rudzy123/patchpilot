@@ -21,6 +21,8 @@ coverage/
 .env.*
 !.env.example
 !.env.*.example
+# Filled self-hosted application env. The example file stays committed.
+deploy/compose/application.env
 *.pem
 *.key
 *.p12

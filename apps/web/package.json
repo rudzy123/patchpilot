@@ -5,6 +5,11 @@
   "description": "Next.js App Router presentation. Landing, Session 6 authentication, and Session 7 asset inventory UI.",
   "license": "Apache-2.0",
   "type": "module",
+  "files": [
+    ".next",
+    "!.next/cache",
+    "next.config.ts"
+  ],
   "scripts": {
     "dev": "NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT=\"${NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT:-development}\" NEXT_PUBLIC_API_BASE_URL=\"${NEXT_PUBLIC_API_BASE_URL:-http://127.0.0.1:3001}\" next dev --port 3000 --hostname 127.0.0.1",
     "build": "NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT=\"${NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT:-production}\" NEXT_PUBLIC_API_BASE_URL=\"${NEXT_PUBLIC_API_BASE_URL:-https://api.patchpilot.example}\" next build",

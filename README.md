@@ -31,6 +31,8 @@ pnpm dev
 
 In another terminal, the quality gates are `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:integration`, `pnpm build`, and `pnpm workflows:lint`.
 
+Local development and the self-hosted application profile are different Compose projects. `pnpm infrastructure:up` starts PostgreSQL, Redis, and MinIO only. Application containers, migrate, and the no-write bootstrap are in [self-hosted deployment](docs/runbooks/self-hosted-deployment.md). A healthy container stack still has no first user, leaves the priority engine uncomposed, and needs operator HTTPS before a browser can log in.
+
 `.env.example` values are development placeholders and are unfit for production.
 
 PatchPilot does not confer regulatory compliance or certification by itself. See [non-goals](docs/product/non-goals.md).
