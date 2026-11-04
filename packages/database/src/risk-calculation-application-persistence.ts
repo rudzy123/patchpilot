@@ -25,6 +25,8 @@ import {
   createRiskCalculationPersistence,
   runLockedPriorityCalculation,
 } from './risk-calculation-persistence.js';
+
+export { readRemediationQueuePage } from './remediation-queue-persistence.js';
 import type {
   CurrentRiskCalculationResult,
   FindingPriorityStateResult,

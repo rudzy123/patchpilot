@@ -79,6 +79,11 @@ export const PRIORITY_INSPECTION_UNAVAILABLE: AppError = Object.freeze({
   message: 'Priority inspection is temporarily unavailable.',
 });
 
+export const REMEDIATION_QUEUE_UNAVAILABLE: AppError = Object.freeze({
+  code: 'internal',
+  message: 'Remediation queue is temporarily unavailable.',
+});
+
 /** Confidential 503 for advisory storage, malformed rows, and internal failure. */
 export const ADVISORY_MUTATION_UNAVAILABLE: AppError = Object.freeze({
   code: 'internal',
@@ -150,7 +155,8 @@ export function httpStatusForError(error: AppError): number {
         error.message === PRODUCT_MATCH_EVALUATION_UNAVAILABLE.message ||
         error.message === PRIORITY_POLICY_UNAVAILABLE.message ||
         error.message === PRIORITY_CALCULATION_UNAVAILABLE.message ||
-        error.message === PRIORITY_INSPECTION_UNAVAILABLE.message
+        error.message === PRIORITY_INSPECTION_UNAVAILABLE.message ||
+        error.message === REMEDIATION_QUEUE_UNAVAILABLE.message
         ? 503
         : 500;
   }

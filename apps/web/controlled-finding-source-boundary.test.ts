@@ -23,6 +23,9 @@ const SOURCE_FILES = [
   'app/findings/[findingId]/finding-inspection-page-client.tsx',
   'app/findings/[findingId]/finding-latest-observation-section.tsx',
   'app/findings/[findingId]/finding-priority-section.tsx',
+  'lib/remediation-queue.ts',
+  'app/remediation-queue/page.tsx',
+  'app/remediation-queue/remediation-queue-page-client.tsx',
   'next.config.ts',
 ];
 

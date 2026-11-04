@@ -7,16 +7,22 @@
 import { randomUUID } from 'node:crypto';
 
 import { createActiveKevMembershipPersistence } from '@patchpilot/database';
-import { createRiskCalculationApplicationPersistence } from '@patchpilot/database/risk-calculation-application-persistence';
+import {
+  createRiskCalculationApplicationPersistence,
+  readRemediationQueuePage,
+} from '@patchpilot/database/risk-calculation-application-persistence';
 import type { ControlledFindingOperatorActor } from '@patchpilot/domain/controlled-finding-operator';
 import {
   PRIORITY_CALCULATION_ENGINE_VERSION,
   createCalculateFindingRiskUseCase,
   createQueryActiveKevMembershipUseCase,
   createReadControlledFindingPriorityUseCase,
+  createReadRemediationQueueUseCase,
   type AdmittedPriorityPolicyPair,
   type CalculateFindingRiskResult,
   type ReadControlledFindingPriorityResult,
+  type ReadRemediationQueueResult,
+  type RemediationQueueSection,
 } from '@patchpilot/domain';
 
 import { BUILTIN_PRIORITY_POLICY_DEFINITION, createPriorityEnginePort } from './priority-engine.js';
@@ -35,9 +41,17 @@ export type ControlledPriorityReadInput = {
   readonly findingId: string;
 };
 
+export type ControlledRemediationQueueInput = {
+  readonly actor: ControlledFindingOperatorActor;
+  readonly section: RemediationQueueSection;
+  readonly limit: number;
+  readonly cursor: string | null;
+};
+
 export type ControlledPriorityRuntime = {
   calculate(input: ControlledPriorityCalculationInput): Promise<CalculateFindingRiskResult>;
   read(input: ControlledPriorityReadInput): Promise<ReadControlledFindingPriorityResult>;
+  readQueue(input: ControlledRemediationQueueInput): Promise<ReadRemediationQueueResult>;
 };
 
 export type ControlledPriorityRuntimeOptions = {
@@ -67,6 +81,15 @@ export function composeControlledPriorityRuntime(
     referenceEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
     hashPolicyDefinition: hashPriorityPolicyDefinition,
   });
+  const queue = createReadRemediationQueueUseCase({
+    persistence: {
+      findPublishedBuiltinPriorityPolicy: () => persistence.findPublishedBuiltinPriorityPolicy(),
+      readRemediationQueue: (query) => readRemediationQueuePage(client, query),
+    },
+    admittedPairs: options.admittedPairs,
+    referenceEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+    hashPolicyDefinition: hashPriorityPolicyDefinition,
+  });
   return {
     async calculate(input) {
       const correlationId = LOWERCASE_UUID.test(input.correlationId)
@@ -90,6 +113,16 @@ export function composeControlledPriorityRuntime(
         command: { findingId: input.findingId },
       });
     },
+    readQueue(input) {
+      return queue.execute({
+        actor: input.actor,
+        command: {
+          section: input.section,
+          limit: input.limit,
+          cursor: input.cursor,
+        },
+      });
+    },
   };
 }
 
@@ -99,6 +132,9 @@ export function denyControlledPriorityRuntime(): ControlledPriorityRuntime {
       return { kind: 'internal_failure' };
     },
     async read() {
+      return { kind: 'unavailable' };
+    },
+    async readQueue() {
       return { kind: 'unavailable' };
     },
   };

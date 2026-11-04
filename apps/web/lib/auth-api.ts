@@ -21,6 +21,7 @@ import {
   type ControlledFindingLatestObservationResponse,
   type FindingPriorityResponse,
   type FindingRiskCalculationResponse,
+  type RemediationQueueResponse,
   type EnvironmentOption,
   type MembershipOption,
   type OrganizationsResponse,
@@ -30,6 +31,7 @@ import {
 
 import { readLatestObservation } from './finding-latest-observation';
 import { readFindingPriority, readFindingRiskCalculation } from './finding-priority';
+import { QUEUE_UNAVAILABLE, readRemediationQueue } from './remediation-queue';
 import { isCanonicalUuid } from './resource-id';
 
 /** Synchronizer token header. Must match `AUTH_CSRF_HEADER_NAME` / ADR 0019. */
@@ -308,6 +310,35 @@ export function createAuthApi(apiBaseUrl: string) {
             );
           }
           return priority;
+        },
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+        unavailableMessage: FINDING_SERVICE_UNAVAILABLE,
+      });
+    },
+
+    readRemediationQueue(query: {
+      section: 'ranked' | 'incomparable' | 'not_calculated';
+      limit?: number;
+      cursor?: string;
+    }): Promise<RemediationQueueResponse> {
+      const params: Record<string, string> = { section: query.section };
+      if (query.limit !== undefined) {
+        params['limit'] = String(query.limit);
+      }
+      if (query.cursor !== undefined && query.cursor.length > 0) {
+        params['cursor'] = query.cursor;
+      }
+      return sendJson({
+        baseUrl,
+        path: '/remediation-queue',
+        method: 'GET',
+        query: params,
+        parse: (value) => {
+          const page = readRemediationQueue(value, query.section);
+          if (page === null) {
+            throw createAuthRequestError(503, 'internal', QUEUE_UNAVAILABLE);
+          }
+          return page;
         },
         unauthorizedMessage: GENERIC_SESSION_EXPIRED,
         unavailableMessage: FINDING_SERVICE_UNAVAILABLE,

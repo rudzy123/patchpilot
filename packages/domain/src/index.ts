@@ -1338,6 +1338,36 @@ export {
 } from './risk/index.js';
 
 export {
+  REMEDIATION_QUEUE_COMPARISON_MESSAGE,
+  REMEDIATION_QUEUE_DEFAULT_LIMIT,
+  REMEDIATION_QUEUE_MAX_CURSOR_LENGTH,
+  REMEDIATION_QUEUE_MAX_LIMIT,
+  REMEDIATION_QUEUE_READ_PERMISSION,
+  REMEDIATION_QUEUE_SECTIONS,
+  compareStoredRemediationRank,
+  createReadRemediationQueueUseCase,
+  remediationQueuePermissionsForRole,
+  roleGrantsRemediationQueueRead,
+  storedKevListed,
+  type ReadRemediationQueueDependencies,
+  type ReadRemediationQueueResult,
+  type RemediationQueueCalculationFields,
+  type RemediationQueueCounts,
+  type RemediationQueueIncomparableRow,
+  type RemediationQueueNotCalculatedRow,
+  type RemediationQueuePage,
+  type RemediationQueuePermission,
+  type RemediationQueuePersistencePort,
+  type RemediationQueueRankedRow,
+  type RemediationQueueRawRow,
+  type RemediationQueueReadQuery,
+  type RemediationQueueReadResult,
+  type RemediationQueueReference,
+  type RemediationQueueSection,
+  type StoredRemediationRankKey,
+} from './risk/index.js';
+
+export {
   BUILTIN_PRIORITY_POLICY_KEY,
   BUILTIN_PRIORITY_POLICY_VERSION,
   PERSISTED_RISK_CALCULATION_REASONS,

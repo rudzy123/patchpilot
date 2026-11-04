@@ -1,22 +1,25 @@
 # ADR 0048: Controlled remediation queue
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-04
 - Deciders: PatchPilot maintainers. Acceptance confirms that a review never changes queue order.
 - Supersedes: none
 - Superseded by: none
 
-Proposed. Acceptance is a maintainer decision. This ADR admits one read-only
-Finding list, `GET /remediation-queue`, and the page `/remediation-queue`. It is
-the architecture review [ADR 0038](0038-controlled-finding-web-workflow.md)
-section 24 requires before any Finding list. The list is not a RemediationTask
-list. Acceptance lifts ADR 0038's no-list limit only for this route and this
-page. Target discovery still returns no Finding id.
+Accepted on 2026-11-04. Acceptance confirms that a review never changes queue
+order. This ADR admits one read-only Finding list, `GET /remediation-queue`,
+and the page `/remediation-queue`. It is the architecture review
+[ADR 0038](0038-controlled-finding-web-workflow.md) section 24 requires before
+any Finding list. The list is not a RemediationTask list. Acceptance lifts ADR
+0038's no-list limit only for this route and this page. Target discovery still
+returns no Finding id.
 
-This ADR does not implement the route, add a migration, or authorize the page
-while it remains Proposed. It depends on the reference policy from
-[ADR 0047](0047-controlled-priority-activation.md). It adds no migration. The
-frozen migration count stays 27.
+The route and the page are implemented. The production allowlist is empty
+while V-0001 is unsigned, so the route returns 503 until a signed pair is
+mirrored and an operator publishes the builtin. Every row's review marker
+stays `none` and does not change order. It depends on the reference policy
+from [ADR 0047](0047-controlled-priority-activation.md). It adds no migration.
+The frozen migration count stays 27.
 
 ## Context
 
@@ -234,15 +237,10 @@ canonical redaction list.
 
 ## Follow-up
 
-- Implement the permission and role tests, the domain query, the PostgreSQL
-  read, contracts, the route, and the page.
-- Tests: two organizations' Findings never mix; a missing calculation never
-  appears in `ranked`; section counts add up to the Finding count; SQL order
-  equals the engine comparator on shared fixtures; the same state returns the
-  same pages; a stale cursor returns 409; members and viewers are denied.
-- On acceptance, amend ADR 0038 so its no-list sentences describe the decision
-  before this route, and record that the lift is only `GET /remediation-queue`
-  and `/remediation-queue`.
-- The implementation pull request updates
-  [current state](../project/current-state.md). No migration, so the frozen
-  count stays 27.
+- The permission, domain read, PostgreSQL read, contracts, route, and page are
+  implemented. Tests cover tenant isolation, the section partition, comparator
+  equivalence, stable pages, a stale cursor, and member and viewer denial.
+- ADR 0038 records that the no-list lift is only `GET /remediation-queue` and
+  `/remediation-queue`.
+- [current state](../project/current-state.md) records the composed route. No
+  migration, so the frozen count stays 27.

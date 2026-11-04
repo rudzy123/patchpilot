@@ -22,6 +22,7 @@ import { registerAuthRoutes } from './auth-routes.js';
 import type { AuthRuntime } from './auth-runtime.js';
 import { registerFindingRoutes } from './finding-routes.js';
 import { registerFindingPriorityRoutes } from './finding-priority-routes.js';
+import { registerRemediationQueueRoutes } from './remediation-queue-routes.js';
 import {
   denyControlledPriorityRuntime,
   type ControlledPriorityRuntime,
@@ -259,11 +260,18 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       : { approvalPeerKey: dependencies.approvalPeerKey }),
   });
 
+  const priority = dependencies.priority ?? denyControlledPriorityRuntime();
   await registerFindingPriorityRoutes(app, {
     config: dependencies.config,
     logger: dependencies.logger,
     auth: dependencies.auth,
-    priority: dependencies.priority ?? denyControlledPriorityRuntime(),
+    priority,
+  });
+  await registerRemediationQueueRoutes(app, {
+    config: dependencies.config,
+    logger: dependencies.logger,
+    auth: dependencies.auth,
+    priority,
   });
 
   await registerFindingRoutes(app, {

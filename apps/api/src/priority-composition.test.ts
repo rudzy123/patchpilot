@@ -8,8 +8,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 
 describe('controlled priority composition', () => {
-  it('constructs the calculation use case only in the API priority runtime', () => {
-    const needle = 'createCalculateFindingRiskUseCase';
+  it('constructs the calculation and queue use cases only in the API priority runtime', () => {
+    const needles = ['createCalculateFindingRiskUseCase', 'createReadRemediationQueueUseCase'];
     const allowed = new Set([path.join(here, 'priority-runtime.ts')]);
     const roots = [
       path.join(repoRoot, 'apps/api/src'),
@@ -26,7 +26,8 @@ describe('controlled priority composition', () => {
         if (allowed.has(filePath)) {
           continue;
         }
-        if (readFileSync(filePath, 'utf8').includes(needle)) {
+        const source = readFileSync(filePath, 'utf8');
+        if (needles.some((needle) => source.includes(needle))) {
           offenders.push(path.relative(repoRoot, filePath));
         }
       }
@@ -35,8 +36,10 @@ describe('controlled priority composition', () => {
     const runtime = readFileSync(path.join(here, 'priority-runtime.ts'), 'utf8');
     const server = readFileSync(path.join(here, 'server.ts'), 'utf8');
     expect(runtime).toContain('createReadControlledFindingPriorityUseCase');
+    expect(runtime).toContain('createReadRemediationQueueUseCase');
     expect(server).toContain('composeControlledPriorityRuntime');
     expect(server).not.toContain('createCalculateFindingRiskUseCase');
+    expect(server).not.toContain('createReadRemediationQueueUseCase');
     expect(server).not.toContain('@patchpilot/policy-engine');
   });
 });

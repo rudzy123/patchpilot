@@ -31,3 +31,8 @@ export function canPresentFindingPriority(role: PresentationRole): boolean {
 export function canPresentFindingPriorityCalculation(role: PresentationRole): boolean {
   return role === 'owner';
 }
+
+/** Owner and admin may see the remediation queue. The API remains authoritative. */
+export function canPresentRemediationQueue(role: PresentationRole): boolean {
+  return role === 'owner' || role === 'admin';
+}

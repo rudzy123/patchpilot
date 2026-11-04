@@ -152,6 +152,10 @@ export {
   type FindingRiskCalculationResponse,
 } from './finding-priority.js';
 export {
+  remediationQueueResponseSchema,
+  type RemediationQueueResponse,
+} from './remediation-queue.js';
+export {
   DELIBERATE_PRODUCT_MATCH_EVALUATION_RESPONSE_SCHEMA_VERSION,
   deliberateProductMatchEvaluationRequestSchema,
   deliberateProductMatchEvaluationResponseSchema,

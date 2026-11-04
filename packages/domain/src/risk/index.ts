@@ -151,6 +151,46 @@ export {
 } from './priority-read.js';
 
 export {
+  REMEDIATION_QUEUE_READ_PERMISSION,
+  remediationQueuePermissionsForRole,
+  roleGrantsRemediationQueueRead,
+  type RemediationQueuePermission,
+} from './remediation-queue-permissions.js';
+
+export { REMEDIATION_QUEUE_MAX_CURSOR_LENGTH } from './remediation-queue-cursor.js';
+
+export {
+  compareStoredRemediationRank,
+  storedKevListed,
+  type StoredRemediationRankKey,
+} from './remediation-queue-order.js';
+
+export {
+  REMEDIATION_QUEUE_DEFAULT_LIMIT,
+  REMEDIATION_QUEUE_MAX_LIMIT,
+  REMEDIATION_QUEUE_SECTIONS,
+  type RemediationQueueCalculationFields,
+  type RemediationQueueCounts,
+  type RemediationQueuePersistencePort,
+  type RemediationQueueRawRow,
+  type RemediationQueueReadQuery,
+  type RemediationQueueReadResult,
+  type RemediationQueueSection,
+} from './remediation-queue-port.js';
+
+export {
+  REMEDIATION_QUEUE_COMPARISON_MESSAGE,
+  createReadRemediationQueueUseCase,
+  type ReadRemediationQueueDependencies,
+  type ReadRemediationQueueResult,
+  type RemediationQueueIncomparableRow,
+  type RemediationQueueNotCalculatedRow,
+  type RemediationQueuePage,
+  type RemediationQueueRankedRow,
+  type RemediationQueueReference,
+} from './remediation-queue.js';
+
+export {
   BUILTIN_PRIORITY_POLICY_KEY,
   BUILTIN_PRIORITY_POLICY_VERSION,
   PERSISTED_RISK_CALCULATION_REASONS,

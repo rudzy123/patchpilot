@@ -73,6 +73,9 @@ function runtime(result?: Partial<ControlledPriorityRuntime>): {
         }
         return { kind: 'not_calculated', findingId: input.findingId };
       },
+      async readQueue() {
+        return { kind: 'unavailable' };
+      },
       ...result,
     },
   };
