@@ -1,0 +1,48 @@
+/**
+ * Closed role mapping for uncomposed priority calculation and inspection.
+ * Caller-supplied permission strings are not an input.
+ * These grants do not publish a policy, create a Finding, or register a route.
+ */
+
+import type { MembershipRole } from '../lifecycle.js';
+
+export const PRIORITY_CALCULATE_CONTROLLED_PERMISSION = 'priority:calculate_controlled' as const;
+
+export const PRIORITY_INSPECT_PERMISSION = 'priority:inspect' as const;
+
+export const PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION = 'absent' as const;
+
+export type PriorityPermission =
+  typeof PRIORITY_CALCULATE_CONTROLLED_PERMISSION | typeof PRIORITY_INSPECT_PERMISSION;
+
+const NO_GRANTS: readonly PriorityPermission[] = Object.freeze([]);
+
+const ADMIN_GRANTS: readonly PriorityPermission[] = Object.freeze([PRIORITY_INSPECT_PERMISSION]);
+
+const OWNER_GRANTS: readonly PriorityPermission[] = Object.freeze([
+  PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
+  PRIORITY_INSPECT_PERMISSION,
+]);
+
+export function priorityPermissionsForRole(role: MembershipRole): readonly PriorityPermission[] {
+  switch (role) {
+    case 'owner':
+      return OWNER_GRANTS;
+    case 'admin':
+      return ADMIN_GRANTS;
+    case 'member':
+    case 'viewer':
+      return NO_GRANTS;
+    default: {
+      const exhaustive: never = role;
+      throw new Error(`Unexpected membership role: ${String(exhaustive)}`);
+    }
+  }
+}
+
+export function roleGrantsPriorityPermission(
+  role: MembershipRole,
+  permission: PriorityPermission,
+): boolean {
+  return priorityPermissionsForRole(role).some((granted) => granted === permission);
+}

@@ -74,3 +74,68 @@ describe('policy-engine package boundary', () => {
     }
   });
 });
+
+const SKIPPED_DIRECTORIES = new Set(['node_modules', 'dist', '.next', 'coverage', 'generated']);
+
+function repoSources(directory: string): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (SKIPPED_DIRECTORIES.has(entry.name)) {
+      continue;
+    }
+    const fullPath = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...repoSources(fullPath));
+      continue;
+    }
+    if (!entry.isFile()) {
+      continue;
+    }
+    if (
+      entry.name.endsWith('.d.ts') ||
+      entry.name.includes('.test.') ||
+      entry.name.includes('.spec.')
+    ) {
+      continue;
+    }
+    if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
+describe('policy engine source boundary', () => {
+  it('rejects policy-engine imports from domain, apps, and the database barrel', () => {
+    const repoRoot = join(packageRoot, '..', '..');
+    const allowed = join(repoRoot, 'packages/database/src/seed/run.ts');
+    const roots = [
+      join(repoRoot, 'apps/api'),
+      join(repoRoot, 'apps/web'),
+      join(repoRoot, 'apps/worker'),
+      join(repoRoot, 'packages/domain/src'),
+      join(repoRoot, 'packages/database/src'),
+    ];
+    const offenders: string[] = [];
+    for (const root of roots) {
+      const files = repoSources(root);
+      expect(files.length, root).toBeGreaterThan(0);
+      for (const file of files) {
+        if (file === allowed) {
+          continue;
+        }
+        const specifiers = importSpecifiers(readFileSync(file, 'utf8'));
+        if (
+          specifiers.some(
+            (specifier) =>
+              specifier === '@patchpilot/policy-engine' ||
+              specifier.startsWith('@patchpilot/policy-engine/'),
+          )
+        ) {
+          offenders.push(file);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
