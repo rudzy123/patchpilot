@@ -182,7 +182,7 @@ This table is a snapshot of the 2026-10-06 commands after the review resolutions
 ## Review process for dependency pull requests
 
 1. Confirm the update is from Dependabot or a known maintainer, not an unexpected lockfile rewrite.
-2. Require the normal CI, Integration, CodeQL, and Dependency review checks. Do not auto-merge. Do not wait on an E2E or container-build check; those workflows are deferred.
+2. Require the normal CI, Integration, CodeQL, and Dependency review checks. Do not auto-merge. Do not wait on E2E; that workflow is deferred. Container build is a non-pushing image build and is not a required check until branch protection says so.
 3. For high/critical advisories, prefer upgrading or replacing the package over ignoring.
 4. Do not add `continue-on-error` to hide a review failure.
 5. Licensing questions that are not obvious from SPDX identifiers need qualified review.

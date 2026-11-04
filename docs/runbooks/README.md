@@ -12,6 +12,7 @@ They do not include exploit payloads. They do not claim compliance.
 
 | Runbook | When to use |
 | --- | --- |
+| [Self-hosted deployment](self-hosted-deployment.md) | Build and run the application profile on project `patchpilot-eval`. Not local `pnpm dev`. No first user. Priority stays uncomposed. Login still needs operator HTTPS |
 | [SBOM ingestion failure](sbom-ingestion-failure.md) | Upload, parse, quarantine, or orphan-object problems |
 | [Vulnerability sync failure](vulnerability-sync-failure.md) | OSV or CISA KEV refresh stale, rate-limited, or inconsistent |
 | [OSV first-provider canary procedures](osv-canary.md) | Session 13 Batch 3C executed one listing-only real-provider canary; Session 13 Batch 3D executed one separately authorized one-page protected-evidence listing (`protected_evidence_listing_canary_one_page_persisted`; 1000 encrypted observations; halt restored; lease released; commands remain production-unregistered; do not retry; do not request a second page; Session 13 Batch 3D-R independently reviewed; selection unauthorized; Batch 4-P blocked) |

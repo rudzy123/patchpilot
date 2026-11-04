@@ -2,7 +2,7 @@
 
 Use this when PostgreSQL, Redis, or MinIO on the developer workstation will not start, stay healthy, or accept connections. This is a **local Compose** failure plan. It is not a production incident process.
 
-Compose file: `deploy/compose/compose.yaml`. Apps are not in Compose; start them with `pnpm dev`.
+Compose file: `deploy/compose/compose.yaml`. `pnpm infrastructure:up` starts PostgreSQL, Redis, and MinIO only. It does not select the application profile. Start apps for development with `pnpm dev`. The application profile is [self-hosted deployment](self-hosted-deployment.md) on project `patchpilot-eval`.
 
 ## Symptoms
 
@@ -55,11 +55,12 @@ Storage symptoms map to failure categories the adapter reports:
 
 ## Data loss warning
 
-Named volumes persist across `compose down`. `compose down -v` deletes them. That is acceptable for local placeholder data only.
+Named volumes persist across `compose down`. `compose down -v` deletes them. That is acceptable for local placeholder data only. `pnpm infrastructure:down` and the application profile `down` command do not pass `-v`.
 
 ## Related
 
 - [Local setup](../development/local-setup.md)
+- [Self-hosted deployment](self-hosted-deployment.md)
 - [Environment variables](../development/environment-variables.md)
 - [Background job failure](background-job-failure.md)
 - [SBOM ingestion failure](sbom-ingestion-failure.md)

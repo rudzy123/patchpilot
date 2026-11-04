@@ -1,0 +1,96 @@
+name: Container build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: container-build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash --noprofile --norc -eo pipefail {0}
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      BUILDX_NO_DEFAULT_ATTESTATIONS: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Require the reviewed Dockerfile
+        run: |
+          list="$(mktemp)"
+          git ls-files -z >"$list"
+          unexpected=0
+          found_reviewed=0
+          while IFS= read -r -d '' path; do
+            base="${path##*/}"
+            case "$base" in
+              Dockerfile | Dockerfile.* | *.Dockerfile)
+                if [ "$path" = 'deploy/docker/Dockerfile' ]; then
+                  found_reviewed=1
+                else
+                  printf 'Unexpected Dockerfile: %s\n' "$path" >&2
+                  unexpected=1
+                fi
+                ;;
+            esac
+          done <"$list"
+          rm -f "$list"
+          if [ "$unexpected" -ne 0 ] || [ "$found_reviewed" -ne 1 ]; then
+            printf 'The only reviewed production Dockerfile is deploy/docker/Dockerfile.\n' >&2
+            exit 1
+          fi
+          dockerfile='deploy/docker/Dockerfile'
+          grep -q 'node:24-bookworm-slim@sha256:' "$dockerfile"
+          grep -qx 'USER node' "$dockerfile"
+          for target in api worker web migrate; do
+            grep -qx "FROM base AS ${target}" "$dockerfile"
+          done
+
+      - name: Build reviewed targets with BuildKit
+        run: |
+          docker buildx version
+          public_args=(
+            --build-arg NEXT_PUBLIC_PATCHPILOT_ENVIRONMENT=production
+            --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.patchpilot.example
+          )
+          for target in api worker web; do
+            docker buildx build \
+              --file deploy/docker/Dockerfile \
+              --target "$target" \
+              --tag "patchpilot-${target}:ci" \
+              --load \
+              --provenance=false \
+              --sbom=false \
+              "${public_args[@]}" \
+              .
+          done
+          docker buildx build \
+            --file deploy/docker/Dockerfile \
+            --target migrate \
+            --tag patchpilot-migrate:ci \
+            --load \
+            --provenance=false \
+            --sbom=false \
+            .
+          for target in api worker web migrate; do
+            user="$(docker image inspect --format '{{.Config.User}}' "patchpilot-${target}:ci")"
+            if [ "$user" != 'node' ]; then
+              printf 'Image patchpilot-%s:ci runs as %s.\n' "$target" "$user" >&2
+              exit 1
+            fi
+          done

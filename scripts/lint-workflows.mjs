@@ -39,10 +39,7 @@ const REQUIRED_GOVERNANCE_FILES = Object.freeze([
   '.github/codeql/codeql-config.yml',
 ]);
 
-const FORBIDDEN_WORKFLOW_FILES = Object.freeze([
-  '.github/workflows/e2e.yml',
-  '.github/workflows/container-build.yml',
-]);
+const FORBIDDEN_WORKFLOW_FILES = Object.freeze(['.github/workflows/e2e.yml']);
 
 /**
  * @param {string} message
@@ -66,7 +63,7 @@ function checkGitHubGovernance() {
   for (const relativePath of FORBIDDEN_WORKFLOW_FILES) {
     if (existsSync(path.join(rootDirectory, relativePath))) {
       fail(
-        `Unexpected workflow ${relativePath}. GitHub-hosted E2E and container-build checks are deferred; do not add placeholder workflows.`,
+        `Unexpected workflow ${relativePath}. GitHub-hosted E2E is deferred; do not add a placeholder workflow.`,
       );
     }
   }
