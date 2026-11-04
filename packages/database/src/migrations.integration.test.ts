@@ -3285,6 +3285,7 @@ describe('migrations', { timeout: 180_000 }, () => {
       );
       await applyMigrationSqlAndResolve(ephemeral.databaseUrl, INSTANCE_ADVISORY_AUTHORITY_GRANT);
       await applyMigrationSqlAndResolve(ephemeral.databaseUrl, OFFLINE_NPM_OSV_IMPORT);
+      await applyMigrationSqlAndResolve(ephemeral.databaseUrl, RISK_CALCULATION_REVIEW);
       await assertFinalMigratedSchema(client);
 
       const checkDef = await names(

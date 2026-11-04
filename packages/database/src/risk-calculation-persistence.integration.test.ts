@@ -1513,7 +1513,7 @@ describe('risk calculation persistence', () => {
     await expectFindingUntouched(prepared.organizationId, prepared.findingId);
   });
 
-  it('appends a policy_change row for a valid override and rejects an out-of-bounds override', async () => {
+  it('rejects an out-of-bounds override and refuses calculation while a valid override is present', async () => {
     const prepared = await prepareFinding('policy');
     const first = await services.calculate.execute(envelope(prepared));
     expect(first.kind).toBe('calculated');
@@ -1549,23 +1549,10 @@ describe('risk calculation persistence', () => {
     expect(published.policy.version).toBe(1);
     expect(await auditCount(prepared.organizationId, 'risk_policy.published')).toBe(1);
     const second = await services.calculate.execute(envelope(prepared));
-    expect(second.kind).toBe('calculated');
-    if (second.kind !== 'calculated') {
-      return;
-    }
-    expect(second.calculation.calculationReason).toBe('policy_change');
-    expect(second.calculation.riskPolicyId).toBe(published.policy.id);
-    expect(second.calculation.policyVersion).toBe(1);
+    expect(second).toEqual({ kind: 'priority_policy_unavailable', reason: 'override_present' });
+    expect(await calculationCount(prepared.organizationId, prepared.findingId)).toBe(1);
+    expect(await auditCount(prepared.organizationId, 'priority.calculated')).toBe(1);
     expect(await rowSnapshot(first.calculation.id)).toEqual(before);
-    assertMatchesEngine(
-      second.calculation,
-      checked.value,
-      await factsFor(
-        second.calculation,
-        { state: 'unavailable', reason: 'no_canonical_cve' },
-        'unknown',
-      ),
-    );
     expect(seedCanonical(BUILTIN_PRIORITY_POLICY_DEFINITION)).toBe(
       seedCanonical(validatedBuiltin()),
     );

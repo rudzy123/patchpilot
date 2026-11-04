@@ -45,6 +45,7 @@ import {
   CONTROLLED_FINDING_REPEATED_OBSERVATION,
   INSTANCE_ADVISORY_AUTHORITY_GRANT,
   OFFLINE_NPM_OSV_IMPORT,
+  RISK_CALCULATION_REVIEW,
   PRODUCT_MATCH_EVIDENCE_BATCH_3_EVALUATION,
   PRODUCT_MATCH_EVIDENCE_CARDINALITY,
   REVIEWER_CAPABILITY_ISSUANCE,
@@ -744,6 +745,7 @@ describe('durable reviewer capability PostgreSQL persistence', () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await deployMigrations(ephemeral.databaseUrl);
       const appliedAfter = await client.$queryRaw<Array<{ name: string }>>`

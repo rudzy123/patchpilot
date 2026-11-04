@@ -503,72 +503,83 @@ async function insertRevision(
     },
     select: { id: true },
   });
-  const revision = await client.advisoryRevision.create({
-    data: {
-      revisionSchemaVersion: MAINTAINER_REVIEWED_REVISION_SCHEMA_VERSION,
-      advisoryFamilyId: family.id,
-      source: 'maintainer_reviewed_advisory',
-      advisoryId,
-      familyDigest,
-      revisionDigest,
-      providerGeneration: MAINTAINER_REVIEWED_APPROVAL_PINS.providerGeneration,
-      contentFingerprint,
-      session14RangeFingerprint: rangeFingerprint,
-      productRangeFingerprint: rangeFingerprint,
-      parserId: MAINTAINER_REVIEWED_APPROVAL_PINS.documentSchema,
-      parserResourcePolicy: MAINTAINER_REVIEWED_APPROVAL_PINS.canonicalization,
-      advisorySchemaVersion: MAINTAINER_REVIEWED_APPROVAL_PINS.documentSchema,
-      advisorySchemaCommit: MAINTAINER_REVIEWED_APPROVAL_PINS.schemaCommit,
-      sourceLicenseRegistryVersion: MAINTAINER_REVIEWED_APPROVAL_PINS.licensePolicyId,
-      sourceLicensePolicyVersion: '1',
-      spdxLicenseId: 'CC-BY-4.0',
-      origin: 'maintainer_reviewed_advisory',
-      trustClassification: 'unreviewed',
-      revisionDisposition: 'recorded',
-      withdrawalClassification: 'not_withdrawn',
-      quarantineClassification: 'not_quarantined',
-      supersedesRevisionDigest: 'none',
-      retrievalClassification: MAINTAINER_REVIEWED_APPROVAL_PINS.retrieval,
-      retrievalEvidenceId: MAINTAINER_REVIEWED_APPROVAL_PINS.retrievalEvidence,
-      retrievalPolicyId: MAINTAINER_REVIEWED_APPROVAL_PINS.retrievalPolicy,
-      ecosystem: 'npm',
-      packageName,
-      packageIdentityKey: packageIdentity(packageName),
-      evaluatorVersion: PRODUCT_MATCH_EVALUATOR_VERSION,
-      matchingPolicyId: PRODUCT_MATCH_MATCHING_POLICY_ID,
-      aliasCount: options.canonicalCve === undefined ? 0 : 1,
-      cveAliasCount: options.canonicalCve === undefined ? 0 : 1,
-      aliasSetDigest: digest(`aliases:${revisionDigest}`),
-      replayFingerprint: digest(`replay:${revisionDigest}`),
-      authorIdentity,
-    },
-    select: { id: true },
-  });
-  if (options.canonicalCve !== undefined) {
-    await client.advisoryRevisionAlias.create({
-      data: {
-        advisoryRevisionId: revision.id,
-        ordinal: 1,
-        aliasType: 'canonical_cve',
-        aliasValue: options.canonicalCve,
-        aliasPolicyVersion: 'osv_advisory_alias_policy_v1',
-        sourceClassification: 'maintainer_reviewed_advisory',
-        reviewClassification: 'unreviewed',
-        replayFingerprint: digest(`alias:${advisoryId}:${options.canonicalCve}`),
-      },
-    });
-  }
+  const revisionData = {
+    revisionSchemaVersion: MAINTAINER_REVIEWED_REVISION_SCHEMA_VERSION,
+    advisoryFamilyId: family.id,
+    source: 'maintainer_reviewed_advisory' as const,
+    advisoryId,
+    familyDigest,
+    revisionDigest,
+    providerGeneration: MAINTAINER_REVIEWED_APPROVAL_PINS.providerGeneration,
+    contentFingerprint,
+    session14RangeFingerprint: rangeFingerprint,
+    productRangeFingerprint: rangeFingerprint,
+    parserId: MAINTAINER_REVIEWED_APPROVAL_PINS.documentSchema,
+    parserResourcePolicy: MAINTAINER_REVIEWED_APPROVAL_PINS.canonicalization,
+    advisorySchemaVersion: MAINTAINER_REVIEWED_APPROVAL_PINS.documentSchema,
+    advisorySchemaCommit: MAINTAINER_REVIEWED_APPROVAL_PINS.schemaCommit,
+    sourceLicenseRegistryVersion: MAINTAINER_REVIEWED_APPROVAL_PINS.licensePolicyId,
+    sourceLicensePolicyVersion: '1',
+    spdxLicenseId: 'CC-BY-4.0',
+    origin: 'maintainer_reviewed_advisory' as const,
+    trustClassification: 'unreviewed' as const,
+    revisionDisposition: 'recorded' as const,
+    withdrawalClassification: 'not_withdrawn' as const,
+    quarantineClassification: 'not_quarantined' as const,
+    supersedesRevisionDigest: 'none',
+    retrievalClassification: MAINTAINER_REVIEWED_APPROVAL_PINS.retrieval,
+    retrievalEvidenceId: MAINTAINER_REVIEWED_APPROVAL_PINS.retrievalEvidence,
+    retrievalPolicyId: MAINTAINER_REVIEWED_APPROVAL_PINS.retrievalPolicy,
+    ecosystem: 'npm' as const,
+    packageName,
+    packageIdentityKey: packageIdentity(packageName),
+    evaluatorVersion: PRODUCT_MATCH_EVALUATOR_VERSION,
+    matchingPolicyId: PRODUCT_MATCH_MATCHING_POLICY_ID,
+    aliasCount: options.canonicalCve === undefined ? 0 : 1,
+    cveAliasCount: options.canonicalCve === undefined ? 0 : 1,
+    aliasSetDigest: digest(`aliases:${revisionDigest}`),
+    replayFingerprint: digest(`replay:${revisionDigest}`),
+    authorIdentity,
+  };
+  const canonicalCve = options.canonicalCve;
+  const revisionId =
+    canonicalCve === undefined
+      ? (
+          await client.advisoryRevision.create({
+            data: revisionData,
+            select: { id: true },
+          })
+        ).id
+      : await client.$transaction(async (tx) => {
+          const created = await tx.advisoryRevision.create({
+            data: revisionData,
+            select: { id: true },
+          });
+          await tx.advisoryRevisionAlias.create({
+            data: {
+              advisoryRevisionId: created.id,
+              ordinal: 1,
+              aliasType: 'canonical_cve',
+              aliasValue: canonicalCve,
+              aliasPolicyVersion: 'osv_advisory_alias_policy_v1',
+              sourceClassification: 'maintainer_reviewed_advisory',
+              reviewClassification: 'unreviewed',
+              replayFingerprint: digest(`alias:${advisoryId}:${canonicalCve}`),
+            },
+          });
+          return created.id;
+        });
   await client.advisoryRevisionRangeEvent.createMany({
     data: [
       {
-        advisoryRevisionId: revision.id,
+        advisoryRevisionId: revisionId,
         rangeOrdinal: 0,
         eventOrdinal: 0,
         eventName: 'introduced',
         eventValue: '1.0.0',
       },
       {
-        advisoryRevisionId: revision.id,
+        advisoryRevisionId: revisionId,
         rangeOrdinal: 0,
         eventOrdinal: 1,
         eventName: 'fixed',
@@ -579,7 +590,7 @@ async function insertRevision(
   await client.advisoryVulnerabilityBinding.create({
     data: {
       bindingSchemaVersion: MAINTAINER_REVIEWED_BINDING_SCHEMA_VERSION,
-      advisoryRevisionId: revision.id,
+      advisoryRevisionId: revisionId,
       vulnerabilityId: vulnerability.id,
       mappingPolicyId: VULNERABILITY_MAPPING_POLICY_ID,
       mappingMethod: EXACT_MAPPING_METHOD,
@@ -587,14 +598,17 @@ async function insertRevision(
       mappingReviewState: 'reviewed',
       mappingSourceClassification: 'explicit_reviewed_binding',
       conflictClassification: 'none',
-      bindingClassification: 'provider_native_without_cve',
+      bindingClassification:
+        options.canonicalCve === undefined
+          ? 'provider_native_without_cve'
+          : 'one_cve_alias_evidence',
       replayFingerprint: digest(`binding:${revisionDigest}`),
     },
   });
   if (options.approve) {
     const approval = await createApprovalCapabilityHarness(client).approve(
       approvalCommand({
-        revisionId: revision.id,
+        revisionId,
         familyDigest,
         contentFingerprint,
         rangeFingerprint,
@@ -608,7 +622,7 @@ async function insertRevision(
     }
   }
   return {
-    revisionId: revision.id,
+    revisionId,
     contentFingerprint,
     vulnerabilityId: vulnerability.id,
   };
