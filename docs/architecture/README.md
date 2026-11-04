@@ -44,8 +44,8 @@ When two documents describe the same rule, treat this table as the source of tru
 | Controlled Finding creation and inspection | [ADR 0035](../adr/0035-controlled-finding-creation.md), [ADR 0036](../adr/0036-controlled-finding-operator-api.md), and [finding-lifecycle.md](finding-lifecycle.md) |
 | Controlled Finding target discovery | [ADR 0037](../adr/0037-controlled-finding-target-discovery.md). Implemented, read-only, owner and admin only |
 | Controlled Finding web workflow | [ADR 0038](../adr/0038-controlled-finding-web-workflow.md). Accepted nested asset workflow. Implemented as a web API client. Session 1-R is next |
-| Scoring, factors, policy versions | [risk-policy.md](risk-policy.md) |
-| Remediation tasks and risk acceptance | [remediation-lifecycle.md](remediation-lifecycle.md) |
+| Scoring, factors, policy versions | [risk-policy.md](risk-policy.md). Proposed activation, queue comparability, and priority review: [ADR 0047](../adr/0047-controlled-priority-activation.md), [ADR 0048](../adr/0048-controlled-remediation-queue.md), and [ADR 0049](../adr/0049-append-only-priority-review.md). None is composed |
+| Remediation tasks and risk acceptance | [remediation-lifecycle.md](remediation-lifecycle.md). The proposed Finding queue is [ADR 0048](../adr/0048-controlled-remediation-queue.md). A priority review is [ADR 0049](../adr/0049-append-only-priority-review.md) and is not RiskAcceptance |
 | Audit event types and immutability | [audit-model.md](audit-model.md) |
 | Organization context and repository scoping | [tenant-isolation.md](tenant-isolation.md) |
 | Authentication, sessions, CSRF, interim permissions | [ADR 0019](../adr/0019-local-password-sessions.md) |

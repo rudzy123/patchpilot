@@ -1,5 +1,7 @@
 # Remediation lifecycle
 
+**Status.** **RemediationTask** and **RiskAcceptance** remain unrouted. [ADR 0048](../adr/0048-controlled-remediation-queue.md) (Proposed) is a read-only Finding queue, not a **RemediationTask** list. [ADR 0049](../adr/0049-append-only-priority-review.md) (Proposed) is an append-only review of one immutable **RiskCalculation**. A review is not **RiskAcceptance**. A `manual_override` calculation and the override-expiry job below are not authorized. `risk_acceptance:*` stays unrouted. The member-request sentence in the risk-acceptance section conflicts with [ADR 0019](../adr/0019-local-password-sessions.md). The stricter ADR 0019 mapping applies: `risk_acceptance:request` is admin and owner only.
+
 This document defines **RemediationTask** and **RiskAcceptance** states. Completing work records **remediation activity**. It does not prove the vulnerable component is gone. **Resolved (on rescan)** lives on the [finding](finding-lifecycle.md).
 
 ## RemediationTask
@@ -72,7 +74,7 @@ There is **no** permanent acceptance in v0.1.
 | `active` | `revoked` | `admin` or `owner` |
 | `active` | `superseded` | New acceptance created for the same finding |
 
-A `member` may **request** (requester). Only `admin` or `owner` may **approve** (approver must be a different user when more than one eligible actor exists; solo-owner orgs may approve their own request — record that fact). Amendments do not edit reason in place. A new row is inserted; the previous becomes `superseded`.
+A `member` may **request** (requester). Only `admin` or `owner` may **approve** (approver must be a different user when more than one eligible actor exists; solo-owner orgs may approve their own request — record that fact). That member-request sentence conflicts with [ADR 0019](../adr/0019-local-password-sessions.md). The stricter ADR 0019 mapping applies: `risk_acceptance:request` is admin and owner only, and the permission stays unrouted. Amendments do not edit reason in place. A new row is inserted; the previous becomes `superseded`.
 
 ### Required fields
 
@@ -93,7 +95,7 @@ Maximum duration is a **configurable initial recommendation**: 365 days. Operato
 ### Review and expiry jobs
 
 - **Review job:** `reviewAt <= now` and `state = active` → emit audit `risk_acceptance.review_due` and surface the finding in a review queue. It does **not** auto-`resolved` or extend `expiresAt`.
-- **Expiry job:** `expiresAt <= now` and `state = active` → `expired`, audit, finding state per [finding lifecycle](finding-lifecycle.md). Reopen to `open` only if the finding is still `risk_accepted` and the current observation is `present`. Do **not** reopen `resolved`. Idempotent on acceptance id. A scheduled **override-expiry** job (separate) inserts a non-override **RiskCalculation** when `manual_override` expires; it does not delete history.
+- **Expiry job:** `expiresAt <= now` and `state = active` → `expired`, audit, finding state per [finding lifecycle](finding-lifecycle.md). Reopen to `open` only if the finding is still `risk_accepted` and the current observation is `present`. Do **not** reopen `resolved`. Idempotent on acceptance id. A scheduled **override-expiry** job (separate) was sketched to insert a non-override **RiskCalculation** when `manual_override` expires. That job is not authorized. [ADR 0049](../adr/0049-append-only-priority-review.md) does not insert a **RiskCalculation** when a review expires, and it does not delete history.
 
 ## Compensating controls
 

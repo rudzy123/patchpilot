@@ -65,16 +65,20 @@ Current checkpoint: [current-state.md](../project/current-state.md).
 - **Sequencing (checklist item 20).** Moot. The [ADR 0044](0044-deliberate-product-match-evidence-evaluation.md)
   implementation the item names merged before acceptance.
 - **Composition root.** The last sentence of section 9 and the original follow-up
-  repeat ADR 0012's statement that the worker injects the engine. Acceptance of this
-  ADR does not choose a composition root. That choice, production publication of the
-  built-in policy, and any recalculation trigger belong to a separate controlled
-  priority activation ADR. See the follow-up section.
+  repeat ADR 0012's earlier statement that the worker injects the engine. Acceptance
+  of this ADR does not choose a composition root.
+  [ADR 0047](0047-controlled-priority-activation.md) (Proposed) is that choice:
+  deliberate calculation in the API process, and a deployment-local builtin
+  publication command. It is not accepted and it authorizes no route. See the
+  follow-up section.
 
 ## Context
 
 [ADR 0012](0012-explainable-policy-engine.md) accepts a deterministic engine in
 `packages/policy-engine` with no I/O and no import of `packages/domain`. Domain
-defines a port and the worker injects the engine. Each **RiskCalculation** stores
+defines a port. [ADR 0047](0047-controlled-priority-activation.md) (Proposed) places
+deliberate calculation in the API process and reserves worker injection for a
+future automatic-recalculation ADR. That ADR is not composed. Each **RiskCalculation** stores
 the policy version, `policyDefinitionSha256`, `inputFingerprint`, contributing
 factors, intel source record ids, **priority**, **priorityBand**, due-date
 recommendation, and escalation recommendation. ADR 0012 does not decide numbers.
@@ -537,8 +541,10 @@ No schema or migration change. The existing JSONB CHECKs accept these documents.
   persistence session must either derive "current" at read time as the latest
   calculation by `calculatedAt` then `id`, or propose a forward-only migration.
 
-The engine defines its own types. A later domain port is structurally compatible and
-the worker injects the engine, as ADR 0012 requires.
+The engine defines its own types. A later domain port is structurally compatible.
+[ADR 0047](0047-controlled-priority-activation.md) (Proposed) places deliberate
+calculation in the API process and amends
+[ADR 0012](0012-explainable-policy-engine.md). This ADR does not compose it.
 
 ### 10. Required tests for the engine implementation
 
@@ -674,10 +680,10 @@ Amended on 2026-11-04. Completed items are kept for the record.
   derivation), and calculation audit. Production stays uncomposed.
 - Replaced. The original persistence item also named "worker composition through the
   transactional Outbox". That item is withdrawn. Production composition, the
-  composition root, and production publication of the built-in policy are deferred to
-  a separate controlled priority activation ADR, which does not exist yet. Until it
-  is accepted, no composition root is chosen. `finding.recalculate`, worker scoring,
-  and automatic recalculation stay unauthorized.
+  composition root, and production publication of the built-in policy are proposed by
+  [ADR 0047](0047-controlled-priority-activation.md). Until that ADR is accepted, no
+  composition root is in force. `finding.recalculate`, worker scoring, and automatic
+  recalculation stay unauthorized.
 - Done. Replace the illustrative sketch in [risk policy](../architecture/risk-policy.md)
   with a reference to this ADR, update the R13 residual in the
   [risk register](../security/risk-register.md), and update

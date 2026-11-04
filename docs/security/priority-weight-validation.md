@@ -12,7 +12,7 @@ Validators judge whether the built-in policy's outputs on the synthetic corpus b
 
 - Validation does not make priority security truth. It does not establish exploitability, affectedness, compliance, or remediation. Product copy may describe a validated policy only as a "validated operator policy proposal" with its validation date.
 - Validation never changes a weight, normalization table, band, or rule. A desired change needs a new policy version and a new entry.
-- Validation alone authorizes no composition. Production composition also needs a separate controlled priority activation ADR, which does not exist yet. That ADR, not this record, chooses the composition root and the built-in publication path.
+- Validation alone authorizes no composition. Production composition also needs [ADR 0047](../adr/0047-controlled-priority-activation.md), which is Proposed and is not accepted. That ADR, not this record, chooses the composition root and the built-in publication path.
 
 ## Record rules
 
