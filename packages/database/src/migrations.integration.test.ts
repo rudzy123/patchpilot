@@ -1670,10 +1670,11 @@ describe('frozen migrations', () => {
   });
 });
 
-// GitHub Actions applies these upgrade paths in ~16–28s each after Session 9
-// (local ~4–13s). The default 30s package timeout failed PR Integration on
-// the Session 6 180000 CHECK path, which also applies Sessions 7–9 SQL.
-describe('migrations', { timeout: 90_000 }, () => {
+// GitHub Actions applies the later full-chain upgrades in ~80–90s after the
+// frozen head reached 27 migrations (local ~4–13s). A 30s package timeout
+// failed the Session 6 180000 CHECK path. The later 90s suite timeout failed
+// that same path and the offline npm import upgrade on PR Integration.
+describe('migrations', { timeout: 180_000 }, () => {
   it('applies every migration to a clean isolated database', async () => {
     const ephemeral = await createEphemeralDatabase('migrate');
     const client = new PrismaClient({
