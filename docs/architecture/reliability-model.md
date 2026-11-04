@@ -107,7 +107,7 @@ Tenant uniqueness always includes `organizationId`.
 | SBOM document | org + asset + sha256 |
 | Outbox | org + `dedupeKey` |
 | Finding create | org + asset + versionless `componentId` + `vulnerabilityId` ([ADR 0026](../adr/0026-authoritative-match-evidence-and-finding-lifecycle.md)); not occurrence, ingestion, CVE, or OSV id string |
-| RiskCalculation | org + finding + `inputFingerprint` (canonical hash of reason, `policyDefinitionSha256`, sorted intel source record ids, `sbomIngestionId` or null, asset context version or null, override id or null). Intel refresh and ingest docs must use this same key — not a shorter `(finding, sourceRecordId, policyVersion)` tuple. |
+| RiskCalculation | org + finding + `inputFingerprint`, unique as `risk_calculation_replay_key` `(organization_id, finding_id, input_fingerprint)`. `inputFingerprint` is the SHA-256 of `canonicalJson` of `{ engineVersion, policyDefinitionSha256, facts }`, where `facts` is the parsed engine fact input ([ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md) section 9). The calculation reason, provenance sources, and ingestion ids are not part of it. An earlier formula over reason, intel source record ids, `sbomIngestionId`, asset context version, and override id is retired ([risk register](../security/risk-register.md) R37). Intel refresh and ingest docs must use this same key — not a shorter `(finding, sourceRecordId, policyVersion)` tuple. |
 | RiskAcceptance create | `Idempotency-Key` + org; at most one `active` acceptance per finding |
 | Export create | `Idempotency-Key` + org |
 | System intel refresh outbox | `eventType` + non-null `dedupeKey` (content SHA-256 of the source unit); unique on `(eventType, dedupeKey)` because `organizationId` is null. Do not treat unverified HTTP validators as the idempotency key. |
@@ -122,7 +122,7 @@ Replay of the same job twice produces one tenant-visible effect (required test).
 - Two uploads of different hashes for one asset: both proceed; rescan compare and `lastSuccessfulSbomIngestionId` use the `completed` ingestion whose SBOM `receivedAt` is greatest, **not** the last worker to finish.
 - Two workers correlating the same SBOM: unique constraints prevent duplicate findings; second worker updates observations idempotently.
 - Risk acceptance vs rescan: last completed transaction wins; both leave audit rows.
-- Intel refresh vs ingest: Session 9 import must not write Findings or `finding.recalculate`. When a later correlation session exists, calculations are append-only; last `currentRiskCalculationId` update is a compare-and-set on finding row version if needed.
+- Intel refresh vs ingest: Session 9 import must not write Findings or `finding.recalculate`. When a later correlation session exists, calculations are append-only. `currentRiskCalculationId` stays null; the current calculation is derived at read time as the latest row by `calculatedAt` descending, then `id` descending ([ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md) checklist item 21).
 
 ## Poison and DLQ
 

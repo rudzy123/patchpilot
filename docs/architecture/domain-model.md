@@ -459,7 +459,7 @@ Natural key: `organizationId` + `assetId` + `componentId` + `vulnerabilityId`. A
 
 Lifecycle: [finding-lifecycle.md](finding-lifecycle.md).
 
-Does not store a mutable "score" in place. Current priority comes from the latest **RiskCalculation** referenced by `currentRiskCalculationId`. Each calculation must store `policyVersion`, `policyDefinitionSha256`, `inputFingerprint`, full **contributingFactors**, intel source record ids used, **priorityBand**, due-date recommendation, and escalation recommendation. Match evaluation does not create a RiskCalculation. `currentRiskCalculationId` may remain null. Provider catalog dates must not populate `Finding.dueAt`.
+Does not store a mutable "score" in place. Current priority is derived at read time as the latest **RiskCalculation** by `calculatedAt` descending, then `id` descending. `currentRiskCalculationId` stays null ([ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md) checklist item 21). Each calculation must store `policyVersion`, `policyDefinitionSha256`, `inputFingerprint`, full **contributingFactors**, intel source record ids used, **priorityBand**, due-date recommendation, and escalation recommendation. Match evaluation does not create a RiskCalculation. Provider catalog dates must not populate `Finding.dueAt`.
 
 ## FindingObservation
 
@@ -523,7 +523,7 @@ Append-only calculated conclusion for a finding under one policy version.
 | `escalationRecommendation` | Calculated boolean/label; MVP does not auto-notify |
 | `severitySnapshot` | Copied observed source severity, not the priority |
 | `contributingFactors` | Full factor set used |
-| `inputFingerprint` | SHA-256 of the canonical input object (sorted intel source record ids, `sbomIngestionId` or null, asset context version or null, override id or null, `calculationReason`, `policyDefinitionSha256`) |
+| `inputFingerprint` | SHA-256 of `canonicalJson` of `{ engineVersion, policyDefinitionSha256, facts }`, where `facts` is the parsed engine fact input ([ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md) section 9). `calculationReason`, provenance sources, and `sbomIngestionId` are not part of it ([risk register](../security/risk-register.md) R37) |
 | `sbomIngestionId` | Set for `initial` / `rescan`; null for intel/policy/asset/manual reasons that are not ingest-driven |
 | `calculatedAt` | UTC |
 | `calculationReason` | `initial`, `rescan`, `intel_refresh`, `policy_change`, `asset_change`, `manual_recalc`, `manual_override` |

@@ -1,19 +1,74 @@
 # ADR 0045: Deterministic P1-P4 priority policy and pure policy engine
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-02
-- Deciders: PatchPilot maintainers (principal architect approval required)
+- Accepted on: 2026-11-04
+- Deciders: PatchPilot maintainers (principal architect approval of all 21 checklist
+  items recorded on 2026-11-04)
 - Supersedes: none
 - Superseded by: none
 
-Proposed. Acceptance is a maintainer decision and requires approval of every item
-in the approval checklist below. This ADR decides the numerical priority policy and
-the contract of the pure engine in `packages/policy-engine`. It does not compose
-the engine. It adds no permission, domain port, PostgreSQL adapter, seed, route, web
-UI, worker, queue, scheduler, Outbox row, migration, or dependency. It writes no
-**RiskCalculation**, sets no `Finding.currentRiskCalculationId`, and never sets
-`Finding.dueAt`. Prioritization stays unavailable. The frozen migration count stays
-26.
+Accepted. The principal architect approved every item in the approval checklist
+below on 2026-11-04. This ADR decides the numerical priority policy and the contract
+of the pure engine in `packages/policy-engine`. It does not compose the engine, and
+acceptance does not authorize production composition. Composition stays blocked by
+operator weight validation ([risk register](../security/risk-register.md) R13) and
+needs a separate ADR. The decision itself adds no permission, domain port,
+PostgreSQL adapter, seed, route, web UI, worker, queue, scheduler, Outbox row,
+migration, or dependency. It writes no **RiskCalculation**, sets no
+`Finding.currentRiskCalculationId`, and never sets `Finding.dueAt`. Prioritization
+stays unavailable. The frozen migration count was 26 when this ADR was proposed. That
+count is historical; see the implementation status below.
+
+## Implementation status
+
+Status note dated 2026-11-04. Status is **Accepted** on 2026-11-04. The proposal
+date remains 2026-11-02. This note records repository truth at acceptance. It
+changes no numerical value, no section 1 to 10 contract, and no checklist item.
+Current checkpoint: [current-state.md](../project/current-state.md).
+
+- **Migration count.** The context section and the paragraph above cite 26. That is
+  the historical count at proposal. The current frozen migration count is 27.
+  Migration 27 belongs to [ADR 0046](0046-offline-npm-osv-import.md). Neither this
+  ADR nor its implementation adds a migration.
+- **Engine.** Implemented in `packages/policy-engine` with the section 10 golden,
+  property, determinism, and package-boundary tests. `POLICY_ENGINE_VERSION` is
+  `@patchpilot/policy-engine@1`. The package has zero runtime dependencies.
+- **Persistence slice.** Implemented and production uncomposed. The context section's
+  statements that no domain port, adapter, or seed exists are historical. The slice
+  contains the v2 document types (`RiskPolicyDefinitionV2Json`,
+  `RiskCalculationFactorsV2Json`), `PriorityEnginePort`,
+  `createCalculateFindingRiskUseCase`, `createReadCurrentFindingRiskUseCase`, the
+  PostgreSQL adapter in `packages/database/src/risk-calculation-persistence.ts`, the
+  permissions `priority:calculate_controlled` (owner only) and `priority:inspect`
+  (owner and admin), and one `priority.calculated` audit row per new calculation.
+  `PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION` is `absent`. API, web, worker, and
+  migration startup do not construct the use case. The uncomposed writer can append
+  **RiskCalculation** rows in tests and development. Production writes none.
+- **Built-in version (checklist item 19).** The persistence session chose version 2.
+  Builtin `patchpilot.builtin.v0` version 2 has the fixed id
+  `55555555-5555-4555-8555-555555555502` and stores
+  `BUILTIN_PRIORITY_POLICY_DEFINITION`. Only the development seed publishes it.
+  Production seeding is refused, and the production bootstrap writes nothing. No
+  production publication path exists.
+- **Input fingerprint.** The implementation matches section 9:
+  `inputFingerprint` is the SHA-256 of `canonicalJson` of
+  `{ engineVersion, policyDefinitionSha256, facts }`, where `facts` is the parsed
+  engine fact input. The calculation reason, `sources`, and ingestion ids are not part
+  of it. Replay uniqueness is `risk_calculation_replay_key`
+  `(organization_id, finding_id, input_fingerprint)`. This is the only RiskCalculation
+  idempotency key (risk register R37).
+- **Current calculation (checklist item 21).** Resolved by read-time derivation. The
+  current calculation is the latest row by `calculated_at DESC, id DESC`.
+  `current_risk_calculation_id` and `due_at` stay null. No forward-only migration was
+  needed.
+- **Sequencing (checklist item 20).** Moot. The [ADR 0044](0044-deliberate-product-match-evidence-evaluation.md)
+  implementation the item names merged before acceptance.
+- **Composition root.** The last sentence of section 9 and the original follow-up
+  repeat ADR 0012's statement that the worker injects the engine. Acceptance of this
+  ADR does not choose a composition root. That choice, production publication of the
+  built-in policy, and any recalculation trigger belong to a separate controlled
+  priority activation ADR. See the follow-up section.
 
 ## Context
 
@@ -608,18 +663,29 @@ Negative:
 
 ## Follow-up
 
-- Implement the engine in `packages/policy-engine` (catalog, definition and override
-  validation, fact parsing, evaluation, ordering, canonical JSON, deep freeze, and the
-  built-in definition) with the tests in section 10. Production stays uncomposed.
-- Persistence session: v2 TypeScript document types, the domain port, the built-in
-  seed version, the `current_risk_calculation_id` decision, calculation audit, and
-  worker composition through the transactional Outbox. Each needs its own review.
-- Replace the illustrative sketch in [risk policy](../architecture/risk-policy.md)
+Amended on 2026-11-04. Completed items are kept for the record.
+
+- Done. Implement the engine in `packages/policy-engine` (catalog, definition and
+  override validation, fact parsing, evaluation, ordering, canonical JSON, deep
+  freeze, and the built-in definition) with the tests in section 10. Production stays
+  uncomposed.
+- Done. Persistence session: v2 TypeScript document types, the domain port, the
+  built-in seed version (2), the `current_risk_calculation_id` decision (read-time
+  derivation), and calculation audit. Production stays uncomposed.
+- Replaced. The original persistence item also named "worker composition through the
+  transactional Outbox". That item is withdrawn. Production composition, the
+  composition root, and production publication of the built-in policy are deferred to
+  a separate controlled priority activation ADR, which does not exist yet. Until it
+  is accepted, no composition root is chosen. `finding.recalculate`, worker scoring,
+  and automatic recalculation stay unauthorized.
+- Done. Replace the illustrative sketch in [risk policy](../architecture/risk-policy.md)
   with a reference to this ADR, update the R13 residual in the
   [risk register](../security/risk-register.md), and update
-  [current state](../project/current-state.md) to "policy engine implemented,
-  production uncomposed; prioritization still unavailable" when the engine merges.
-- Operator validation of weights (R13) before any production composition.
+  [current state](../project/current-state.md).
+- Open. Operator validation of weights (R13) before any production composition.
+  Validation binds to `POLICY_ENGINE_VERSION` and the exact `policyDefinitionSha256`
+  of the built-in definition. A change to either needs a new validation. Acceptance of
+  this ADR is not that validation.
 
 ## Approval checklist
 
@@ -652,3 +718,20 @@ Acceptance requires principal architect approval of each item:
     implementation).
 21. The persistence-session obligation to resolve the `current_risk_calculation_id`
     constraint, by read-time derivation or a forward-only migration.
+
+### Approval record
+
+On 2026-11-04 the principal architect approved all 21 items above. The items are
+recorded unchanged.
+
+- Items 1 to 18 are approved as written.
+- Item 19 is approved as written. The persistence session chose version 2, and the
+  definition hash does not depend on the version number.
+- Item 20 is approved and recorded as moot. The ADR 0044 implementation it names had
+  already merged.
+- Item 21 is approved and recorded as resolved by read-time derivation: latest by
+  `calculated_at DESC, id DESC`, with no migration.
+
+Approval accepts the policy decision only. It is not operator weight validation (R13),
+and it authorizes no production composition, route, worker job, Outbox event, policy
+publication, or migration.
