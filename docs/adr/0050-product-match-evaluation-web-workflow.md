@@ -1,16 +1,16 @@
 # ADR 0050: Product Match Evidence evaluation web workflow
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-04
 - Deciders: PatchPilot maintainers. Acceptance confirms owner-only discovery and a withheld CVE identifier.
 - Supersedes: none
 - Superseded by: none
 
-Proposed. Acceptance is a maintainer decision. This ADR admits one asset-scoped
-read of evaluation candidates and one owner web page that posts the existing
-evaluation command. It does not change that command. It does not implement the
-route or the page while it remains Proposed. It adds no migration. The frozen
-migration count stays 27.
+Accepted on 2026-11-04. This ADR admits one asset-scoped read of evaluation
+candidates and one owner web page that posts the existing evaluation command.
+It does not change that command. `GET /assets/:assetId/product-match-candidates`
+and `/assets/:assetId/product-match-evaluations` are implemented. It adds no
+migration. The frozen migration count stays 28.
 
 On acceptance, [ADR 0044](0044-deliberate-product-match-evidence-evaluation.md)
 residual R-3 narrows: revision identifiers for this workflow come from the
@@ -209,7 +209,7 @@ evaluate-all, no Finding creation, and no change to offline-import eligibility.
   stay on the POST.
 - The empty state will be the common state while the product-eligible count is
   0.
-- No migration. The frozen count stays 27.
+- No migration. The frozen count stays 28.
 - ADR 0044 R-3 narrows only when this ADR is accepted. This proposal does not
   edit ADR 0044.
 
@@ -238,14 +238,12 @@ package is affected. Evaluation evidence remains what ADR 0044 stores.
 
 ## Follow-up
 
-- Implement the read port and adapter, contracts, the route, the permission and
-  role tests, and the page.
-- Tests: tenant isolation; one exclusion test per ineligible class; a response
-  field allowlist snapshot, including the absence of the CVE identifier; stale
-  cursor 409; member, viewer, and admin denial; the POST body still has only
-  `advisoryRevisionId`; the page's client does not call `POST /findings`.
-- On acceptance, amend ADR 0044 so the no-web-UI sentences and residual R-3
-  describe the decision before this route, and record the narrowed residual:
-  discovery is asset-scoped, and this page is the only web listing.
-- The implementation pull request updates
-  [current state](../project/current-state.md). No migration.
+Implemented on 2026-11-04. The read port, adapter, contracts, route, permission,
+and owner page are in the tree. Tests cover tenant isolation, one exclusion per
+ineligible class, the response field allowlist including the absence of the CVE
+identifier, stale cursor 409, member, viewer, and admin denial, a POST body of
+only `advisoryRevisionId`, and a page client that does not call `POST /findings`.
+ADR 0044 records the earlier no-web-UI decision and the narrowed residual: discovery
+is asset-scoped, and this page is the only web listing. A global catalog remains
+withheld. [Current state](../project/current-state.md) records the composed route.
+No migration.

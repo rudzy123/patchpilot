@@ -8,10 +8,13 @@ import {
   ok,
   PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
   PRIORITY_INSPECT_PERMISSION,
+  PRIORITY_REVIEW_CONTROLLED_PERMISSION,
   priorityPermissionsForRole,
   REMEDIATION_QUEUE_READ_PERMISSION,
   remediationQueuePermissionsForRole,
+  PRODUCT_MATCH_DISCOVER_CONTROLLED_PERMISSION,
   PRODUCT_MATCH_EVALUATE_CONTROLLED_PERMISSION,
+  productMatchDiscoveryPermissionsForRole,
   productMatchEvaluationPermissionsForRole,
   type MembershipRole,
   type Result,
@@ -37,8 +40,10 @@ export const PERMISSIONS = {
   findingDiscoverControlled: FINDING_DISCOVER_CONTROLLED_PERMISSION,
   findingInspect: FINDING_INSPECT_PERMISSION,
   productMatchEvaluateControlled: PRODUCT_MATCH_EVALUATE_CONTROLLED_PERMISSION,
+  productMatchDiscoverControlled: PRODUCT_MATCH_DISCOVER_CONTROLLED_PERMISSION,
   priorityCalculateControlled: PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
   priorityInspect: PRIORITY_INSPECT_PERMISSION,
+  priorityReviewControlled: PRIORITY_REVIEW_CONTROLLED_PERMISSION,
   remediationQueueRead: REMEDIATION_QUEUE_READ_PERMISSION,
   remediationManage: 'remediation:manage',
   riskAcceptanceRequest: 'risk_acceptance:request',
@@ -70,8 +75,10 @@ export const permissionCatalog: readonly Permission[] = Object.freeze([
   PERMISSIONS.findingDiscoverControlled,
   PERMISSIONS.findingInspect,
   PERMISSIONS.productMatchEvaluateControlled,
+  PERMISSIONS.productMatchDiscoverControlled,
   PERMISSIONS.priorityCalculateControlled,
   PERMISSIONS.priorityInspect,
+  PERMISSIONS.priorityReviewControlled,
   PERMISSIONS.remediationQueueRead,
   PERMISSIONS.remediationManage,
   PERMISSIONS.riskAcceptanceRequest,
@@ -97,6 +104,7 @@ const VIEWER_PERMISSIONS: readonly Permission[] = [
   ...controlledFindingOperatorPermissionsForRole('viewer'),
   ...controlledFindingDiscoveryPermissionsForRole('viewer'),
   ...productMatchEvaluationPermissionsForRole('viewer'),
+  ...productMatchDiscoveryPermissionsForRole('viewer'),
   ...priorityPermissionsForRole('viewer'),
   ...remediationQueuePermissionsForRole('viewer'),
 ];
@@ -109,6 +117,7 @@ const MEMBER_PERMISSIONS: readonly Permission[] = [
   ...operatorGrantsBeyond('member', VIEWER_PERMISSIONS),
   ...discoveryGrantsBeyond('member', VIEWER_PERMISSIONS),
   ...productMatchGrantsBeyond('member', VIEWER_PERMISSIONS),
+  ...productMatchDiscoveryGrantsBeyond('member', VIEWER_PERMISSIONS),
   ...priorityGrantsBeyond('member', VIEWER_PERMISSIONS),
   ...remediationQueueGrantsBeyond('member', VIEWER_PERMISSIONS),
 ];
@@ -118,6 +127,7 @@ const ADMIN_PERMISSIONS: readonly Permission[] = [
   ...operatorGrantsBeyond('admin', MEMBER_PERMISSIONS),
   ...discoveryGrantsBeyond('admin', MEMBER_PERMISSIONS),
   ...productMatchGrantsBeyond('admin', MEMBER_PERMISSIONS),
+  ...productMatchDiscoveryGrantsBeyond('admin', MEMBER_PERMISSIONS),
   ...priorityGrantsBeyond('admin', MEMBER_PERMISSIONS),
   ...remediationQueueGrantsBeyond('admin', MEMBER_PERMISSIONS),
   PERMISSIONS.membershipManage,
@@ -134,6 +144,7 @@ const OWNER_PERMISSIONS: readonly Permission[] = [
   ...operatorGrantsBeyond('owner', ADMIN_PERMISSIONS),
   ...discoveryGrantsBeyond('owner', ADMIN_PERMISSIONS),
   ...productMatchGrantsBeyond('owner', ADMIN_PERMISSIONS),
+  ...productMatchDiscoveryGrantsBeyond('owner', ADMIN_PERMISSIONS),
   ...priorityGrantsBeyond('owner', ADMIN_PERMISSIONS),
   ...remediationQueueGrantsBeyond('owner', ADMIN_PERMISSIONS),
   PERMISSIONS.organizationManage,
@@ -154,6 +165,15 @@ function productMatchGrantsBeyond(
   already: readonly Permission[],
 ): readonly Permission[] {
   return productMatchEvaluationPermissionsForRole(role).filter(
+    (permission) => !already.includes(permission),
+  );
+}
+
+function productMatchDiscoveryGrantsBeyond(
+  role: MembershipRole,
+  already: readonly Permission[],
+): readonly Permission[] {
+  return productMatchDiscoveryPermissionsForRole(role).filter(
     (permission) => !already.includes(permission),
   );
 }

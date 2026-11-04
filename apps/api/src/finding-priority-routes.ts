@@ -1,7 +1,8 @@
 /**
  * POST /findings/:findingId/risk-calculations
  * GET /findings/:findingId/priority
- * Organization comes from the trusted actor. The body cannot name a reason.
+ * POST /findings/:findingId/priority-reviews
+ * Organization comes from the trusted actor. A review reason is not logged.
  */
 
 import rateLimit from '@fastify/rate-limit';
@@ -10,6 +11,7 @@ import type { ServerConfig } from '@patchpilot/config';
 import {
   controlledFindingIdParamSchema,
   findingRiskCalculationRequestSchema,
+  priorityReviewRequestSchema,
 } from '@patchpilot/contracts';
 import { ORGANIZATION_CONTEXT_REQUIRED, type AppError } from '@patchpilot/domain';
 import type { Logger } from '@patchpilot/logger';
@@ -37,9 +39,12 @@ import {
   PRIORITY_CALCULATION_UNAVAILABLE,
   PRIORITY_INSPECTION_UNAVAILABLE,
   PRIORITY_READ_ROUTE,
+  PRIORITY_REVIEW_ROUTE,
+  PRIORITY_REVIEW_UNAVAILABLE,
   priorityOutcomeForError,
   translatePriorityCalculation,
   translatePriorityRead,
+  translatePriorityReview,
   type PriorityPublicOutcome,
 } from './finding-priority-http.js';
 import {
@@ -58,6 +63,8 @@ import {
 
 export const PRIORITY_REQUEST_BODY_LIMIT_BYTES = 1024;
 
+export const PRIORITY_REVIEW_BODY_LIMIT_BYTES = 4096;
+
 export const PRIORITY_CALCULATION_PEER_LIMIT = Object.freeze({
   max: 5,
   windowMs: 60_000,
@@ -70,6 +77,16 @@ export const PRIORITY_CALCULATION_ORGANIZATION_LIMIT = Object.freeze({
 
 export const PRIORITY_READ_PEER_LIMIT = Object.freeze({
   max: 30,
+  windowMs: 60_000,
+});
+
+export const PRIORITY_REVIEW_PEER_LIMIT = Object.freeze({
+  max: 5,
+  windowMs: 60_000,
+});
+
+export const PRIORITY_REVIEW_ORGANIZATION_LIMIT = Object.freeze({
+  max: 5,
   windowMs: 60_000,
 });
 
@@ -91,14 +108,20 @@ export async function registerFindingPriorityRoutes(
     calculationOrganizationLimiter?: FindingOrganizationRateLimiter;
     calculationPeerKey?: (request: FastifyRequest) => string;
     readPeerKey?: (request: FastifyRequest) => string;
+    reviewOrganizationLimiter?: FindingOrganizationRateLimiter;
+    reviewPeerKey?: (request: FastifyRequest) => string;
   },
 ): Promise<void> {
   const { config, logger, auth, priority } = dependencies;
   const organizationLimiter =
     dependencies.calculationOrganizationLimiter ??
     createFindingOrganizationRateLimiter(PRIORITY_CALCULATION_ORGANIZATION_LIMIT);
+  const reviewOrganizationLimiter =
+    dependencies.reviewOrganizationLimiter ??
+    createFindingOrganizationRateLimiter(PRIORITY_REVIEW_ORGANIZATION_LIMIT);
   const calculationPeer = dependencies.calculationPeerKey ?? findingDirectPeerRateLimitKey;
   const readPeer = dependencies.readPeerKey ?? findingDirectPeerRateLimitKey;
+  const reviewPeer = dependencies.reviewPeerKey ?? findingDirectPeerRateLimitKey;
 
   await app.register(async (scoped) => {
     scoped.addHook('onRequest', async (request, reply) => {
@@ -268,6 +291,140 @@ export async function registerFindingPriorityRoutes(
               PRIORITY_CALCULATION_UNAVAILABLE,
               actor,
               PRIORITY_CALCULATION_ROUTE,
+            );
+          }
+        },
+      );
+    });
+
+    await scoped.register(async (reviews) => {
+      await reviews.register(rateLimit, {
+        global: true,
+        hook: 'onRequest',
+        skipOnError: false,
+        max: PRIORITY_REVIEW_PEER_LIMIT.max,
+        timeWindow: PRIORITY_REVIEW_PEER_LIMIT.windowMs,
+        keyGenerator: (request) => guardPeerKey(request, reviewPeer),
+        errorResponseBuilder: createFindingPeerRateLimitError,
+      });
+      reviews.addHook('onRequest', async (request, reply) => {
+        if (!parseFindingJsonContentType(request.headers['content-type']).ok) {
+          return reject(logger, request, reply, INVALID_REQUEST, null, PRIORITY_REVIEW_ROUTE);
+        }
+        const length = declaredContentLength(request.headers['content-length']);
+        if (
+          length === 'invalid' ||
+          (typeof length === 'number' && length > PRIORITY_REVIEW_BODY_LIMIT_BYTES)
+        ) {
+          return reject(logger, request, reply, INVALID_REQUEST, null, PRIORITY_REVIEW_ROUTE);
+        }
+        return undefined;
+      });
+      reviews.post(
+        PRIORITY_REVIEW_ROUTE,
+        { bodyLimit: PRIORITY_REVIEW_BODY_LIMIT_BYTES },
+        async (request, reply) => {
+          if (Array.isArray(request.headers.origin)) {
+            return reject(logger, request, reply, ORIGIN_NOT_ALLOWED, null, PRIORITY_REVIEW_ROUTE);
+          }
+          if (requireAllowedOrigin(request, reply, config.corsAllowedOrigins) !== undefined) {
+            logPriority(logger, request, 'forbidden', undefined, PRIORITY_REVIEW_ROUTE);
+            return reply;
+          }
+          const authRequest = request as ResolvedAuthRequest;
+          bindSessionCookie(authRequest, config.auth.cookieName);
+          await resolveBoundSession(authRequest, (sessionToken) =>
+            auth.resolveSession.execute({ sessionToken }),
+          );
+          if (requireAuthenticatedSession(authRequest, reply) !== undefined) {
+            logPriority(logger, request, 'unauthorized', undefined, PRIORITY_REVIEW_ROUTE);
+            return reply;
+          }
+          if (Array.isArray(request.headers[config.auth.csrfHeaderName.toLowerCase()])) {
+            return reject(
+              logger,
+              request,
+              reply,
+              INVALID_REQUEST,
+              authRequest.actor,
+              PRIORITY_REVIEW_ROUTE,
+            );
+          }
+          if (requireSynchronizerCsrf(authRequest, reply, config) !== undefined) {
+            logPriority(logger, request, 'unauthorized', authRequest.actor, PRIORITY_REVIEW_ROUTE);
+            return reply;
+          }
+          const actor = requireActor(authRequest, reply, logger, request, PRIORITY_REVIEW_ROUTE);
+          if (actor === undefined) {
+            return reply;
+          }
+          const permitted = requirePermission(actor, PERMISSIONS.priorityReviewControlled);
+          if (!permitted.ok) {
+            return reject(logger, request, reply, permitted.error, actor, PRIORITY_REVIEW_ROUTE);
+          }
+          if (carriesAuthorityHeader(request) || requestHasQuery(request)) {
+            return reject(logger, request, reply, INVALID_REQUEST, actor, PRIORITY_REVIEW_ROUTE);
+          }
+          const params = controlledFindingIdParamSchema.safeParse(request.params);
+          const body = priorityReviewRequestSchema.safeParse(request.body);
+          if (!params.success || !body.success) {
+            return reject(logger, request, reply, INVALID_REQUEST, actor, PRIORITY_REVIEW_ROUTE);
+          }
+          const budget = reviewOrganizationLimiter.consume(actor.organizationId);
+          if (budget !== 'allowed') {
+            return reject(
+              logger,
+              request,
+              reply,
+              budget === 'limited' ? findingRateLimitedError() : PRIORITY_REVIEW_UNAVAILABLE,
+              actor,
+              PRIORITY_REVIEW_ROUTE,
+            );
+          }
+          try {
+            const result = await priority.recordReview({
+              actor: {
+                userId: actor.userId,
+                sessionId: actor.sessionId,
+                organizationId: actor.organizationId,
+                membershipId: actor.membershipId,
+                role: actor.role,
+              },
+              findingId: params.data.findingId,
+              correlationId: request.correlationId,
+              command: {
+                riskCalculationId: body.data.riskCalculationId,
+                supersedesReviewId: body.data.supersedesReviewId,
+                decision: body.data.decision,
+                correctedBand: body.data.correctedBand ?? null,
+                expiresAt: body.data.expiresAt ?? null,
+                reason: body.data.reason ?? null,
+              },
+            });
+            const translated = translatePriorityReview(
+              result,
+              params.data.findingId,
+              body.data.riskCalculationId,
+            );
+            if (!translated.ok) {
+              return reject(logger, request, reply, translated.error, actor, PRIORITY_REVIEW_ROUTE);
+            }
+            logPriority(
+              logger,
+              request,
+              translated.body.status === 'recorded' ? 'recorded' : 'already_applied',
+              actor,
+              PRIORITY_REVIEW_ROUTE,
+            );
+            return reply.status(translated.statusCode).send(translated.body);
+          } catch {
+            return reject(
+              logger,
+              request,
+              reply,
+              PRIORITY_REVIEW_UNAVAILABLE,
+              actor,
+              PRIORITY_REVIEW_ROUTE,
             );
           }
         },

@@ -10,6 +10,7 @@ import {
   PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
   PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION,
   PRIORITY_INSPECT_PERMISSION,
+  PRIORITY_REVIEW_CONTROLLED_PERMISSION,
   priorityPermissionsForRole,
   roleGrantsPriorityPermission,
 } from './permissions.js';
@@ -35,6 +36,7 @@ describe('priority permissions', () => {
     expect(priorityPermissionsForRole('owner')).toEqual([
       PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
       PRIORITY_INSPECT_PERMISSION,
+      PRIORITY_REVIEW_CONTROLLED_PERMISSION,
     ]);
     expect(priorityPermissionsForRole('admin')).toEqual([PRIORITY_INSPECT_PERMISSION]);
     expect(priorityPermissionsForRole('member')).toEqual([]);
@@ -51,6 +53,15 @@ describe('priority permissions', () => {
     for (const role of ROLES) {
       expect(roleGrantsPriorityPermission(role, PRIORITY_INSPECT_PERMISSION)).toBe(
         role === 'owner' || role === 'admin',
+      );
+    }
+  });
+
+  it('grants priority:review_controlled to the owner only', () => {
+    expect(PRIORITY_REVIEW_CONTROLLED_PERMISSION).toBe('priority:review_controlled');
+    for (const role of ROLES) {
+      expect(roleGrantsPriorityPermission(role, PRIORITY_REVIEW_CONTROLLED_PERMISSION)).toBe(
+        role === 'owner',
       );
     }
   });

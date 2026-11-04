@@ -44,6 +44,11 @@ import {
   denyProductMatchEvaluationRuntime,
   type ProductMatchEvaluationRuntime,
 } from './product-match-evaluation-runtime.js';
+import { registerProductMatchCandidateRoutes } from './product-match-candidate-routes.js';
+import {
+  denyProductMatchCandidateRuntime,
+  type ProductMatchCandidateRuntime,
+} from './product-match-candidate-runtime.js';
 import { registerSbomRoutes } from './sbom-routes.js';
 import type { SbomRuntime } from './sbom-runtime.js';
 import { readSingleHeader } from './headers.js';
@@ -71,6 +76,8 @@ export type ApiDependencies = {
   discoveryOrganizationLimiter?: FindingOrganizationRateLimiter;
   productMatchEvaluation?: ProductMatchEvaluationRuntime;
   productMatchEvaluationOrganizationLimiter?: FindingOrganizationRateLimiter;
+  productMatchCandidates?: ProductMatchCandidateRuntime;
+  productMatchCandidateOrganizationLimiter?: FindingOrganizationRateLimiter;
   now?: () => string;
   generateId?: () => string;
 };
@@ -308,6 +315,20 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       : {
           productMatchEvaluationOrganizationLimiter:
             dependencies.productMatchEvaluationOrganizationLimiter,
+        }),
+  });
+
+  await registerProductMatchCandidateRoutes(app, {
+    config: dependencies.config,
+    logger: dependencies.logger,
+    auth: dependencies.auth,
+    productMatchCandidates:
+      dependencies.productMatchCandidates ?? denyProductMatchCandidateRuntime(),
+    ...(dependencies.productMatchCandidateOrganizationLimiter === undefined
+      ? {}
+      : {
+          productMatchCandidateOrganizationLimiter:
+            dependencies.productMatchCandidateOrganizationLimiter,
         }),
   });
 

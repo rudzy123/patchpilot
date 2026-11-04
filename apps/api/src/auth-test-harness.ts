@@ -60,6 +60,10 @@ import {
   denyProductMatchEvaluationRuntime,
   type ProductMatchEvaluationRuntime,
 } from './product-match-evaluation-runtime.js';
+import {
+  denyProductMatchCandidateRuntime,
+  type ProductMatchCandidateRuntime,
+} from './product-match-candidate-runtime.js';
 import { createIntelligenceRuntime, type IntelligenceRuntime } from './intelligence-runtime.js';
 import type { SbomRuntime } from './sbom-runtime.js';
 
@@ -111,6 +115,8 @@ export async function buildTestApi(options?: {
   discoveryOrganizationLimiter?: FindingOrganizationRateLimiter;
   productMatchEvaluation?: ProductMatchEvaluationRuntime;
   productMatchEvaluationOrganizationLimiter?: FindingOrganizationRateLimiter;
+  productMatchCandidates?: ProductMatchCandidateRuntime;
+  productMatchCandidateOrganizationLimiter?: FindingOrganizationRateLimiter;
 }) {
   const harness = options?.harness ?? createAuthTestHarness(options);
   const app = await buildApi({
@@ -149,6 +155,15 @@ export async function buildTestApi(options?: {
       : {
           productMatchEvaluationOrganizationLimiter:
             options.productMatchEvaluationOrganizationLimiter,
+        }),
+    ...(options?.productMatchCandidates === undefined
+      ? { productMatchCandidates: denyProductMatchCandidateRuntime() }
+      : { productMatchCandidates: options.productMatchCandidates }),
+    ...(options?.productMatchCandidateOrganizationLimiter === undefined
+      ? {}
+      : {
+          productMatchCandidateOrganizationLimiter:
+            options.productMatchCandidateOrganizationLimiter,
         }),
     ...(options?.now === undefined ? {} : { now: options.now }),
     ...(options?.generateId === undefined ? {} : { generateId: options.generateId }),

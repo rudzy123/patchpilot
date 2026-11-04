@@ -51,6 +51,12 @@ const matrix: Record<Permission, Record<MembershipRole, boolean>> = {
     admin: false,
     owner: true,
   },
+  [PERMISSIONS.productMatchDiscoverControlled]: {
+    viewer: false,
+    member: false,
+    admin: false,
+    owner: true,
+  },
   [PERMISSIONS.priorityCalculateControlled]: {
     viewer: false,
     member: false,
@@ -58,6 +64,12 @@ const matrix: Record<Permission, Record<MembershipRole, boolean>> = {
     owner: true,
   },
   [PERMISSIONS.priorityInspect]: { viewer: false, member: false, admin: true, owner: true },
+  [PERMISSIONS.priorityReviewControlled]: {
+    viewer: false,
+    member: false,
+    admin: false,
+    owner: true,
+  },
   [PERMISSIONS.remediationQueueRead]: { viewer: false, member: false, admin: true, owner: true },
   [PERMISSIONS.remediationManage]: { viewer: false, member: true, admin: true, owner: true },
   [PERMISSIONS.riskAcceptanceRequest]: { viewer: false, member: false, admin: true, owner: true },
@@ -119,8 +131,31 @@ describe('permission catalog', () => {
     expect(hasPermission('admin', PERMISSIONS.productMatchEvaluateControlled)).toBe(false);
     expect(hasPermission('member', PERMISSIONS.productMatchEvaluateControlled)).toBe(false);
     expect(hasPermission('viewer', PERMISSIONS.productMatchEvaluateControlled)).toBe(false);
+    expect(PERMISSIONS.productMatchDiscoverControlled).toBe('product_match:discover_controlled');
+    expect(PERMISSIONS.productMatchDiscoverControlled).not.toBe(
+      PERMISSIONS.productMatchEvaluateControlled,
+    );
+    expect(PERMISSIONS.productMatchDiscoverControlled).not.toBe(
+      PERMISSIONS.findingDiscoverControlled,
+    );
+    expect(PERMISSIONS.productMatchDiscoverControlled).not.toBe(PERMISSIONS.findingRead);
+    expect(PERMISSIONS.productMatchDiscoverControlled).not.toBe(PERMISSIONS.assetManage);
+    expect(PERMISSIONS.productMatchDiscoverControlled).not.toBe(PERMISSIONS.intelligenceRead);
+    expect(hasPermission('owner', PERMISSIONS.productMatchDiscoverControlled)).toBe(true);
+    expect(hasPermission('admin', PERMISSIONS.productMatchDiscoverControlled)).toBe(false);
+    expect(hasPermission('member', PERMISSIONS.productMatchDiscoverControlled)).toBe(false);
+    expect(hasPermission('viewer', PERMISSIONS.productMatchDiscoverControlled)).toBe(false);
     expect(PERMISSIONS.priorityCalculateControlled).toBe('priority:calculate_controlled');
     expect(PERMISSIONS.priorityInspect).toBe('priority:inspect');
+    expect(PERMISSIONS.priorityReviewControlled).toBe('priority:review_controlled');
+    expect(PERMISSIONS.priorityReviewControlled).not.toBe(PERMISSIONS.priorityInspect);
+    expect(PERMISSIONS.priorityReviewControlled).not.toBe(PERMISSIONS.priorityCalculateControlled);
+    expect(PERMISSIONS.priorityReviewControlled).not.toBe(PERMISSIONS.findingInspect);
+    expect(PERMISSIONS.priorityReviewControlled).not.toBe(PERMISSIONS.remediationQueueRead);
+    expect(hasPermission('owner', PERMISSIONS.priorityReviewControlled)).toBe(true);
+    expect(hasPermission('admin', PERMISSIONS.priorityReviewControlled)).toBe(false);
+    expect(hasPermission('member', PERMISSIONS.priorityReviewControlled)).toBe(false);
+    expect(hasPermission('viewer', PERMISSIONS.priorityReviewControlled)).toBe(false);
     expect(PERMISSIONS.priorityCalculateControlled).not.toBe(PERMISSIONS.priorityInspect);
     expect(PERMISSIONS.priorityCalculateControlled).not.toBe(PERMISSIONS.findingCreateControlled);
     expect(PERMISSIONS.priorityCalculateControlled).not.toBe(PERMISSIONS.findingInspect);

@@ -25,9 +25,10 @@ They do not include exploit payloads. They do not claim compliance.
 | [Authentication failure](authentication-failure.md) | Login, session, CSRF, cookie, or login-limiter problems |
 | [Instance advisory authority command](instance-advisory-authority-command.md) | Explicit deployment-local grant, revoke, disable, and enable operations |
 | [Built-in priority policy publication](builtin-priority-policy-publication.md) | Explicit deployment-local publication of builtin `patchpilot.builtin.v0` version 2. The unsigned V-0001 pair exits 2 and writes nothing |
+| [Priority review](priority-review.md) | Owner append-only review of one RiskCalculation. A review does not change the calculated priority or the queue order |
 | [Offline npm OSV import](offline-npm-osv-import.md) | Explicit deployment-local npm GHSA directory import. Production uncomposed. Migration 27 is implemented and seeds no rows. Production OSV acquisition stays disabled |
 | [Maintainer-reviewed advisory API](maintainer-reviewed-advisory-api.md) | Authenticated local advisory submission and independent approval through the API |
-| [Deliberate Product Match Evidence evaluation](deliberate-product-match-evidence-evaluation.md) | Owner evaluation of one approved npm revision against one asset. API only. This slice adds no migration. The frozen migration count is 27 |
+| [Deliberate Product Match Evidence evaluation](deliberate-product-match-evidence-evaluation.md) | Owner evaluation of one approved npm revision against one asset, and the owner candidate page. This slice adds no migration. The frozen migration count is 28 |
 | [Controlled Finding operator](controlled-finding-operator.md) | Owner creation, owner or admin inspection, and owner or admin target discovery through the API |
 | [Controlled Finding web workflow](controlled-finding-web-workflow.md) | Nested target review and direct Finding inspection in the web application |
 | [CI failure](ci-failure.md) | GitHub Actions or local quality gates fail |

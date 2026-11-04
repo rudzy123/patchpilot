@@ -13,6 +13,7 @@ import type { Result } from '../result.js';
 import type { ActiveKevMembership } from '../vulnerability/kev-membership.js';
 import type { FindingRiskSourceSnapshot } from './fact-assembly.js';
 import { PRIORITY_CALCULATION_ENGINE_VERSION } from './catalog.js';
+import type { FindingPriorityReview } from './priority-review.js';
 
 export const BUILTIN_PRIORITY_POLICY_KEY = 'patchpilot.builtin.v0' as const;
 
@@ -124,6 +125,7 @@ export type FindingPriorityRead =
       readonly findingId: string;
       readonly publishedBuiltin: FindingPriorityPublishedBuiltin | null;
       readonly calculation: FindingPriorityCalculationRecord;
+      readonly review: FindingPriorityReview;
     }
   | { readonly kind: 'unavailable' };
 

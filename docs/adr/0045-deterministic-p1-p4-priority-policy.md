@@ -28,7 +28,7 @@ changes no numerical value, no section 1 to 10 contract, and no checklist item.
 Current checkpoint: [current-state.md](../project/current-state.md).
 
 - **Migration count.** The context section and the paragraph above cite 26. That is
-  the historical count at proposal. The current frozen migration count is 27.
+  the historical count at proposal. The current frozen migration count is 28.
   Migration 27 belongs to [ADR 0046](0046-offline-npm-osv-import.md). Neither this
   ADR nor its implementation adds a migration.
 - **Engine.** Implemented in `packages/policy-engine` with the section 10 golden,

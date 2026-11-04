@@ -6,6 +6,7 @@ import {
   canPresentControlledFindingTargets,
   canPresentFindingPriority,
   canPresentFindingPriorityCalculation,
+  canPresentFindingPriorityReview,
 } from './finding-permissions';
 
 describe('controlled Finding presentation permissions', () => {
@@ -20,6 +21,8 @@ describe('controlled Finding presentation permissions', () => {
     expect(canPresentFindingPriority('admin')).toBe(true);
     expect(canPresentFindingPriorityCalculation('owner')).toBe(true);
     expect(canPresentFindingPriorityCalculation('admin')).toBe(false);
+    expect(canPresentFindingPriorityReview('owner')).toBe(true);
+    expect(canPresentFindingPriorityReview('admin')).toBe(false);
   });
 
   it('withholds the workflow from member, viewer, and a missing role', () => {
@@ -29,6 +32,7 @@ describe('controlled Finding presentation permissions', () => {
       expect(canPresentControlledFindingInspection(role)).toBe(false);
       expect(canPresentFindingPriority(role)).toBe(false);
       expect(canPresentFindingPriorityCalculation(role)).toBe(false);
+      expect(canPresentFindingPriorityReview(role)).toBe(false);
     }
   });
 });

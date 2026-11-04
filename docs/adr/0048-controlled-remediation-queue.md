@@ -16,10 +16,10 @@ returns no Finding id.
 
 The route and the page are implemented. The production allowlist is empty
 while V-0001 is unsigned, so the route returns 503 until a signed pair is
-mirrored and an operator publishes the builtin. Every row's review marker
-stays `none` and does not change order. It depends on the reference policy
+mirrored and an operator publishes the builtin. The review marker comes from
+[ADR 0049](0049-append-only-priority-review.md) and does not change order. It depends on the reference policy
 from [ADR 0047](0047-controlled-priority-activation.md). It adds no migration.
-The frozen migration count stays 27.
+The frozen migration count stays 28.
 
 ## Context
 
@@ -158,8 +158,9 @@ the ADR 0047 `inputsChanged` signals, and `humanReview`.
 
 `not_calculated` rows omit band, priority, policy, and due fields.
 
-`humanReview` is the marker defined by ADR 0049. Until that ADR is composed,
-every row has `humanReview` status `none`. The marker never reorders the row.
+`humanReview` is the marker defined by ADR 0049. A calculated row reports the
+current review head. A row with no calculation reports `none`. The marker
+never reorders the row.
 
 No assignment, due date, Finding state, or RemediationTask field appears.
 
@@ -243,4 +244,4 @@ canonical redaction list.
 - ADR 0038 records that the no-list lift is only `GET /remediation-queue` and
   `/remediation-queue`.
 - [current state](../project/current-state.md) records the composed route. No
-  migration, so the frozen count stays 27.
+  migration, so the frozen count stays 28.

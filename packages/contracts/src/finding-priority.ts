@@ -12,6 +12,8 @@ import {
 } from '@patchpilot/domain';
 import { z } from 'zod';
 
+import { findingPriorityReviewSchema } from './priority-review.js';
+
 const LOWERCASE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA256_HEX = /^[a-f0-9]{64}$/;
 const CALCULATED_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -95,13 +97,6 @@ const inputsChangedSchema = z
     }
   });
 
-const reviewSchema = z
-  .object({
-    status: z.literal('none'),
-    priorReviewExists: z.literal(false),
-  })
-  .strict();
-
 const notCalculatedSchema = z
   .object({
     schemaVersion: z.literal('finding_priority_v1'),
@@ -118,7 +113,7 @@ const calculatedSchema = z
     calculation: calculationSchema,
     comparability: z.enum(['reference', 'incomparable']),
     inputsChanged: inputsChangedSchema,
-    review: reviewSchema,
+    review: findingPriorityReviewSchema,
   })
   .strict();
 

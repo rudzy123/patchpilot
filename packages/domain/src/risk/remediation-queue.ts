@@ -3,7 +3,7 @@
  * The organization comes from the trusted actor. This module does not call
  * the priority engine, assemble facts, or write an audit row.
  * Section order is the adapter's stored-field order.
- * Until priority review is composed, every row's humanReview status is none.
+ * humanReview is a marker. It does not change section order or stored priority.
  */
 
 import {
@@ -22,7 +22,8 @@ import {
   BUILTIN_PRIORITY_POLICY_VERSION,
 } from './persistence-port.js';
 import { PRIORITY_INSPECT_PERMISSION, roleGrantsPriorityPermission } from './permissions.js';
-import { FINDING_PRIORITY_REVIEW_NONE, classifyPriorityInputChanges } from './priority-read.js';
+import { classifyPriorityInputChanges } from './priority-read.js';
+import type { FindingPriorityReviewMarker } from './priority-review.js';
 import { roleGrantsRemediationQueueRead } from './remediation-queue-permissions.js';
 import {
   decodeRemediationQueueCursor,
@@ -101,7 +102,7 @@ export type RemediationQueueRankedRow = {
   };
   readonly calculatedAt: string;
   readonly inputsChanged: NonNullable<ReturnType<typeof classifyPriorityInputChanges>>;
-  readonly humanReview: typeof FINDING_PRIORITY_REVIEW_NONE;
+  readonly humanReview: FindingPriorityReviewMarker;
 };
 
 export type RemediationQueueIncomparableRow = RemediationQueueRankedRow & {
@@ -115,7 +116,7 @@ export type RemediationQueueNotCalculatedRow = {
   readonly componentName: string;
   readonly componentVersion: string;
   readonly vulnerabilityPublicId: string;
-  readonly humanReview: typeof FINDING_PRIORITY_REVIEW_NONE;
+  readonly humanReview: FindingPriorityReviewMarker;
 };
 
 export type RemediationQueuePage = {
@@ -386,7 +387,11 @@ function mapRows(
       return null;
     }
     if (section === 'not_calculated') {
-      if (row.calculation !== null) {
+      if (
+        row.calculation !== null ||
+        row.humanReview.status !== 'none' ||
+        row.humanReview.priorReviewExists
+      ) {
         return null;
       }
       mapped.push({
@@ -396,7 +401,7 @@ function mapRows(
         componentName: row.componentName,
         componentVersion: row.componentVersion,
         vulnerabilityPublicId: row.vulnerabilityPublicId,
-        humanReview: FINDING_PRIORITY_REVIEW_NONE,
+        humanReview: row.humanReview,
       });
       last = row;
       continue;
@@ -438,7 +443,7 @@ function mapRows(
       },
       calculatedAt: row.calculation.calculatedAt,
       inputsChanged,
-      humanReview: FINDING_PRIORITY_REVIEW_NONE,
+      humanReview: row.humanReview,
     };
     if (section === 'incomparable') {
       mapped.push({

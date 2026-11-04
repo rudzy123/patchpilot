@@ -32,6 +32,11 @@ export function canPresentFindingPriorityCalculation(role: PresentationRole): bo
   return role === 'owner';
 }
 
+/** Only an owner sees the review form. The API remains authoritative. */
+export function canPresentFindingPriorityReview(role: PresentationRole): boolean {
+  return role === 'owner';
+}
+
 /** Owner and admin may see the remediation queue. The API remains authoritative. */
 export function canPresentRemediationQueue(role: PresentationRole): boolean {
   return role === 'owner' || role === 'admin';

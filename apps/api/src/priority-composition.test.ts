@@ -9,7 +9,11 @@ const repoRoot = path.resolve(here, '../../..');
 
 describe('controlled priority composition', () => {
   it('constructs the calculation and queue use cases only in the API priority runtime', () => {
-    const needles = ['createCalculateFindingRiskUseCase', 'createReadRemediationQueueUseCase'];
+    const needles = [
+      'createCalculateFindingRiskUseCase',
+      'createReadRemediationQueueUseCase',
+      'createRecordPriorityReviewUseCase',
+    ];
     const allowed = new Set([path.join(here, 'priority-runtime.ts')]);
     const roots = [
       path.join(repoRoot, 'apps/api/src'),
@@ -40,6 +44,8 @@ describe('controlled priority composition', () => {
     expect(server).toContain('composeControlledPriorityRuntime');
     expect(server).not.toContain('createCalculateFindingRiskUseCase');
     expect(server).not.toContain('createReadRemediationQueueUseCase');
+    expect(server).not.toContain('createRecordPriorityReviewUseCase');
+    expect(runtime).toContain('createRecordPriorityReviewUseCase');
     expect(server).not.toContain('@patchpilot/policy-engine');
   });
 });

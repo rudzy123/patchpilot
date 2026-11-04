@@ -1,27 +1,32 @@
 /**
- * The only production constructor for controlled priority calculation and
- * the current-priority read. Worker, web, seed, and startup do not construct
- * these use cases. Startup does not publish a policy.
+ * The only production constructor for controlled priority calculation,
+ * the current-priority read, and an append-only priority review.
+ * Worker, web, seed, and startup do not construct these use cases.
+ * Startup does not publish a policy.
  */
 
 import { randomUUID } from 'node:crypto';
 
 import { createActiveKevMembershipPersistence } from '@patchpilot/database';
 import {
+  createPriorityReviewPersistence,
   createRiskCalculationApplicationPersistence,
   readRemediationQueuePage,
 } from '@patchpilot/database/risk-calculation-application-persistence';
-import type { ControlledFindingOperatorActor } from '@patchpilot/domain/controlled-finding-operator';
 import {
   PRIORITY_CALCULATION_ENGINE_VERSION,
+  type ControlledFindingOperatorActor,
   createCalculateFindingRiskUseCase,
   createQueryActiveKevMembershipUseCase,
   createReadControlledFindingPriorityUseCase,
   createReadRemediationQueueUseCase,
+  createRecordPriorityReviewUseCase,
   type AdmittedPriorityPolicyPair,
   type CalculateFindingRiskResult,
+  type PriorityReviewDecision,
   type ReadControlledFindingPriorityResult,
   type ReadRemediationQueueResult,
+  type RecordPriorityReviewResult,
   type RemediationQueueSection,
 } from '@patchpilot/domain';
 
@@ -48,10 +53,25 @@ export type ControlledRemediationQueueInput = {
   readonly cursor: string | null;
 };
 
+export type ControlledPriorityReviewInput = {
+  readonly actor: ControlledFindingOperatorActor;
+  readonly findingId: string;
+  readonly correlationId: string;
+  readonly command: {
+    readonly riskCalculationId: string;
+    readonly supersedesReviewId: string | null;
+    readonly decision: PriorityReviewDecision;
+    readonly correctedBand: 'P1' | 'P2' | 'P3' | 'P4' | null;
+    readonly expiresAt: string | null;
+    readonly reason: string | null;
+  };
+};
+
 export type ControlledPriorityRuntime = {
   calculate(input: ControlledPriorityCalculationInput): Promise<CalculateFindingRiskResult>;
   read(input: ControlledPriorityReadInput): Promise<ReadControlledFindingPriorityResult>;
   readQueue(input: ControlledRemediationQueueInput): Promise<ReadRemediationQueueResult>;
+  recordReview(input: ControlledPriorityReviewInput): Promise<RecordPriorityReviewResult>;
 };
 
 export type ControlledPriorityRuntimeOptions = {
@@ -123,6 +143,27 @@ export function composeControlledPriorityRuntime(
         },
       });
     },
+    async recordReview(input) {
+      const correlationId = LOWERCASE_UUID.test(input.correlationId)
+        ? input.correlationId
+        : randomUUID();
+      const review = createRecordPriorityReviewUseCase({
+        persistence: createPriorityReviewPersistence(client),
+      });
+      return review.execute({
+        actor: input.actor,
+        command: {
+          findingId: input.findingId,
+          riskCalculationId: input.command.riskCalculationId,
+          supersedesReviewId: input.command.supersedesReviewId,
+          decision: input.command.decision,
+          correctedBand: input.command.correctedBand,
+          expiresAt: input.command.expiresAt,
+          reason: input.command.reason,
+          correlationId,
+        },
+      });
+    },
   };
 }
 
@@ -135,6 +176,9 @@ export function denyControlledPriorityRuntime(): ControlledPriorityRuntime {
       return { kind: 'unavailable' };
     },
     async readQueue() {
+      return { kind: 'unavailable' };
+    },
+    async recordReview() {
       return { kind: 'unavailable' };
     },
   };

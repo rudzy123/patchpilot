@@ -9,6 +9,7 @@ const webRoot = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_FILES = [
   'lib/auth-api.ts',
   'lib/finding-permissions.ts',
+  'lib/product-match-permissions.ts',
   'lib/finding-workflow.ts',
   'lib/finding-latest-observation.ts',
   'lib/finding-priority.ts',
@@ -17,6 +18,8 @@ const SOURCE_FILES = [
   'components/affected-version-summary.tsx',
   'components/safe-request-identifiers.tsx',
   'app/assets/[assetId]/asset-detail-page-client.tsx',
+  'app/assets/[assetId]/product-match-evaluations/page.tsx',
+  'app/assets/[assetId]/product-match-evaluations/product-match-evaluations-page-client.tsx',
   'app/assets/[assetId]/findings/targets/page.tsx',
   'app/assets/[assetId]/findings/targets/controlled-finding-targets-page-client.tsx',
   'app/findings/[findingId]/page.tsx',

@@ -108,7 +108,7 @@ Order in the Compose file:
 5. `api` and `worker` start after bootstrap. The worker also waits for the bucket init.
 6. `web` starts after the API healthcheck passes.
 
-Migrate does not retry, seed, reset, or resolve migrations. It does not edit the frozen chain. The frozen migration count is 27. A second migrate against the same database is a no-op. A non-zero migrate exit does not start `api`, `worker`, or `web`, because those services wait on bootstrap, and bootstrap waits on migrate.
+Migrate does not retry, seed, reset, or resolve migrations. It does not edit the frozen chain. The frozen migration count is 28. A second migrate against the same database is a no-op. A non-zero migrate exit does not start `api`, `worker`, or `web`, because those services wait on bootstrap, and bootstrap waits on migrate.
 
 Bootstrap exits 0 only when `PATCHPILOT_DEPLOYMENT_ENVIRONMENT=production`. It accepts no arguments. It creates no files, opens no database connection, and writes nothing. It does not call `seedDevelopmentData`, `ensurePublishedBuiltinPriorityPolicy`, `pnpm instance-advisory-authority`, or `pnpm offline-npm-osv-import`. Any other deployment value exits 1. Success prints `Production bootstrap completed without writing data.`
 
@@ -193,7 +193,7 @@ This stops project `patchpilot-eval` and keeps named volumes. The script prints 
 - No TLS proxy. `trustProxy` stays false. Loopback HTTP health is not a browser session.
 - No public bucket.
 - No grant command and no offline npm import in this profile. Those remain separate explicit commands.
-- No new migration. The frozen count remains 27.
+- No new migration. The frozen count remains 28.
 
 ## Related
 

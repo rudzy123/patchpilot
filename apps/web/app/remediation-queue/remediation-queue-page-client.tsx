@@ -10,6 +10,7 @@ import { RequireAuth } from '../../components/require-auth';
 import { SignedInShell } from '../../components/signed-in-shell';
 import { isAuthRequestError } from '../../lib/auth-api';
 import { canPresentRemediationQueue } from '../../lib/finding-permissions';
+import { priorityReviewMarkerLabel } from '../../lib/finding-priority';
 import {
   QUEUE_COMPARISON_MESSAGE,
   QUEUE_FORBIDDEN,
@@ -233,7 +234,7 @@ function QueuePanel({
                 {section === 'incomparable' ? <p>{QUEUE_COMPARISON_MESSAGE}</p> : null}
               </>
             ) : null}
-            <p>No priority review is recorded.</p>
+            <p>{priorityReviewMarkerLabel(row.humanReview)}</p>
           </li>
         ))}
       </ul>

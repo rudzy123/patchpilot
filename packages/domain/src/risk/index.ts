@@ -117,6 +117,7 @@ export {
   PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
   PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION,
   PRIORITY_INSPECT_PERMISSION,
+  PRIORITY_REVIEW_CONTROLLED_PERMISSION,
   priorityPermissionsForRole,
   roleGrantsPriorityPermission,
   type PriorityPermission,
@@ -149,6 +150,26 @@ export {
   type ReadControlledFindingPriorityDependencies,
   type ReadControlledFindingPriorityResult,
 } from './priority-read.js';
+
+export {
+  PRIORITY_REVIEW_AUDIT_ACTIONS,
+  PRIORITY_REVIEW_DECISIONS,
+  PRIORITY_REVIEW_SUBJECT_TYPE,
+  createRecordPriorityReviewUseCase,
+  normalizePriorityReviewReason,
+  priorityReviewAuditAction,
+  priorityReviewAuditPayload,
+  projectFindingPriorityReview,
+  projectPriorityReviewMarker,
+  type FindingPriorityReview,
+  type FindingPriorityReviewMarker,
+  type PriorityReviewAuditPayload,
+  type PriorityReviewDecision,
+  type PriorityReviewPersistencePort,
+  type RecordPriorityReviewCommand,
+  type RecordPriorityReviewPersistenceResult,
+  type RecordPriorityReviewResult,
+} from './priority-review.js';
 
 export {
   REMEDIATION_QUEUE_READ_PERMISSION,

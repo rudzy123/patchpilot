@@ -1174,7 +1174,7 @@ describe('compatibility and non-composition', () => {
     const migrations = readdirSync(
       path.join(repoRoot, 'packages/database/prisma/migrations'),
     ).filter((name) => name !== 'migration_lock.toml');
-    expect(migrations).toHaveLength(27);
+    expect(migrations).toHaveLength(28);
     const offenders: string[] = [];
     for (const root of ['apps/api/src', 'apps/web', 'apps/worker/src', 'packages/database/src']) {
       for (const filePath of walk(path.join(repoRoot, root))) {

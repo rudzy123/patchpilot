@@ -32,6 +32,7 @@ import {
   CONTROLLED_FINDING_REPEATED_OBSERVATION,
   INSTANCE_ADVISORY_AUTHORITY_GRANT,
   OFFLINE_NPM_OSV_IMPORT,
+  RISK_CALCULATION_REVIEW,
   REVIEWER_CAPABILITY_ISSUANCE,
   applyMigrationSqlAndResolve,
   applyThroughSession14,
@@ -40,6 +41,7 @@ import {
   applyThroughProductMatchCardinality,
   applyThroughControlledFindingCreation,
   applyThroughInstanceAdvisoryAuthorityGrant,
+  applyThroughOfflineNpmOsvImport,
   applySession3Schema,
   applyThroughAuditActorAnonymous,
   applyThroughPolicyCreatorMembership,
@@ -91,6 +93,7 @@ const PRISMA_TABLES = [
   'finding_repeated_observation_evidence_link',
   'risk_policy',
   'risk_calculation',
+  'risk_calculation_review',
   'remediation_task',
   'risk_acceptance',
   'evidence',
@@ -242,6 +245,12 @@ const PRISMA_FOREIGN_KEYS = [
   'reviewer_capability_lifecycle_observation_capability_fkey',
   'reviewer_capability_lifecycle_observation_approval_fkey',
   'instance_advisory_authority_grant_user_id_fkey',
+  'risk_calculation_review_organization_fkey',
+  'risk_calculation_review_finding_fkey',
+  'risk_calculation_review_calculation_fkey',
+  'risk_calculation_review_supersedes_fkey',
+  'risk_calculation_review_actor_membership_fkey',
+  'risk_calculation_review_actor_user_fkey',
 ] as const;
 
 const SQL_ONLY_CHECKS = [
@@ -439,6 +448,11 @@ const SQL_ONLY_CHECKS = [
   'finding_repeated_observation_evidence_link_shape_chk',
   'finding_creation_evidence_link_outcome_chk',
   'instance_advisory_authority_grant_revoked_at_order_chk',
+  'risk_calculation_review_decision_chk',
+  'risk_calculation_review_band_chk',
+  'risk_calculation_review_correlation_chk',
+  'risk_calculation_review_reason_hash_chk',
+  'risk_calculation_review_shape_chk',
 ] as const;
 
 const SQL_ONLY_INDEXES = [
@@ -531,6 +545,8 @@ const SQL_ONLY_INDEXES = [
   'instance_advisory_authority_grant_user_alignment_key',
   'instance_advisory_authority_grant_user_idx',
   'instance_advisory_authority_grant_one_active_user_idx',
+  'risk_calculation_review_root_uidx',
+  'risk_calculation_review_successor_uidx',
 ] as const;
 
 const SQL_ONLY_TRIGGERS = [
@@ -634,6 +650,8 @@ const SQL_ONLY_TRIGGERS = [
   'user_instance_advisory_status_complete',
   'instance_advisory_audit_insert_guard',
   'instance_advisory_audit_complete',
+  'risk_calculation_review_chain',
+  'risk_calculation_review_append_only',
 ] as const;
 
 const SQL_ONLY_FUNCTIONS = [
@@ -703,6 +721,7 @@ const SQL_ONLY_FUNCTIONS = [
   'patchpilot_user_instance_advisory_status_complete',
   'patchpilot_instance_advisory_audit_insert_guard',
   'patchpilot_instance_advisory_audit_complete',
+  'patchpilot_risk_calculation_review_chain',
 ] as const;
 
 async function names(client: PrismaClient, sql: string): Promise<string[]> {
@@ -1461,8 +1480,8 @@ async function assertOsvAcquisitionCatalog(client: PrismaClient): Promise<void> 
 
 describe('frozen migrations', () => {
   it('keeps Session 3 through Session 13 Batch 3D-S SQL byte-stable', async () => {
-    expect(FROZEN_MIGRATIONS).toHaveLength(27);
-    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(27);
+    expect(FROZEN_MIGRATIONS).toHaveLength(28);
+    expect(EXPECTED_APPLIED_MIGRATIONS).toHaveLength(28);
     expect(FROZEN_MIGRATIONS.map((item) => item.directory)).toEqual([
       ...EXPECTED_APPLIED_MIGRATIONS,
     ]);
@@ -2013,6 +2032,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
 
@@ -2103,6 +2123,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2250,6 +2271,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -2320,6 +2342,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2379,6 +2402,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2436,6 +2460,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2495,6 +2520,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2553,6 +2579,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2602,6 +2629,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       const afterDef = await names(
         client,
@@ -2652,6 +2680,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2701,6 +2730,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2751,6 +2781,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2802,6 +2833,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
       const evidenceCounts = await client.$queryRaw<
@@ -2866,6 +2898,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
     } finally {
@@ -2910,6 +2943,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -2965,6 +2999,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await deployMigrations(ephemeral.databaseUrl);
       const appliedTwice = await names(
@@ -3017,6 +3052,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       const evidence = await client.$queryRaw<Array<{ count: bigint }>>`
         SELECT COUNT(*)::bigint AS count FROM "product_match_evaluation_evidence"
@@ -3066,6 +3102,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       const counts = await client.$queryRaw<
         Array<{
@@ -3134,6 +3171,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       const counts = await client.$queryRaw<
         Array<{
@@ -3349,6 +3387,7 @@ describe('migrations', { timeout: 180_000 }, () => {
         CONTROLLED_FINDING_REPEATED_OBSERVATION,
         INSTANCE_ADVISORY_AUTHORITY_GRANT,
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       await assertFinalMigratedSchema(client);
 
@@ -3371,7 +3410,7 @@ describe('migrations', { timeout: 180_000 }, () => {
     }
   });
 
-  it('upgrades the instance-advisory grant head by applying only offline npm import', async () => {
+  it('upgrades the instance-advisory grant head by applying offline import and priority review', async () => {
     const ephemeral = await createEphemeralDatabase('migrate');
     const client = new PrismaClient({
       datasources: { db: { url: ephemeral.databaseUrl } },
@@ -3393,6 +3432,7 @@ describe('migrations', { timeout: 180_000 }, () => {
       expect(tablesBefore).not.toContain('offline_advisory_import_batch');
       expect(tablesBefore).not.toContain('advisory_revision_source_provenance');
       expect(tablesBefore).not.toContain('advisory_revision_explicit_version');
+      expect(tablesBefore).not.toContain('risk_calculation_review');
 
       await deployMigrations(ephemeral.databaseUrl);
       const appliedAfter = await names(
@@ -3401,6 +3441,7 @@ describe('migrations', { timeout: 180_000 }, () => {
       );
       expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
         OFFLINE_NPM_OSV_IMPORT,
+        RISK_CALCULATION_REVIEW,
       ]);
       const counts = await client.$queryRaw<
         Array<{
@@ -3429,6 +3470,43 @@ describe('migrations', { timeout: 180_000 }, () => {
       expect(appliedTwice).toEqual(appliedAfter);
       expect(appliedTwice).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
       await assertFinalMigratedSchema(client);
+    } finally {
+      await client.$disconnect();
+      await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);
+    }
+  });
+
+  it('upgrades the offline npm import head by applying only the priority review', async () => {
+    const ephemeral = await createEphemeralDatabase('migrate');
+    const client = new PrismaClient({
+      datasources: { db: { url: ephemeral.databaseUrl } },
+    });
+    try {
+      await applyThroughOfflineNpmOsvImport(ephemeral.databaseUrl);
+      const appliedBefore = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedBefore.at(-1)).toBe(OFFLINE_NPM_OSV_IMPORT);
+      expect(appliedBefore).not.toContain(RISK_CALCULATION_REVIEW);
+      const tablesBefore = await names(
+        client,
+        `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'`,
+      );
+      expect(tablesBefore).not.toContain('risk_calculation_review');
+      await deployMigrations(ephemeral.databaseUrl);
+      const appliedAfter = await names(
+        client,
+        `SELECT migration_name AS name FROM _prisma_migrations ORDER BY finished_at`,
+      );
+      expect(appliedAfter.filter((name) => !appliedBefore.includes(name))).toEqual([
+        RISK_CALCULATION_REVIEW,
+      ]);
+      const counts = await client.$queryRaw<Array<{ reviews: bigint }>>`
+        SELECT COUNT(*)::bigint AS reviews FROM "risk_calculation_review"
+      `;
+      expect(Number(counts[0]?.reviews)).toBe(0);
+      expect(appliedAfter).toEqual([...EXPECTED_APPLIED_MIGRATIONS]);
     } finally {
       await client.$disconnect();
       await dropEphemeralDatabase(ephemeral.admin, ephemeral.databaseName);

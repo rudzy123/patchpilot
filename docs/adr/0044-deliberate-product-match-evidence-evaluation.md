@@ -729,7 +729,10 @@ per organization per minute (5 requests times 16 occurrences).
 
 The first implementation is a synchronous protected API command only. No web UI. No
 worker. No queue, scheduler, Outbox row, or BullMQ job. No automatic ingestion
-trigger. No deployment-local command. No CLI.
+trigger. No deployment-local command. No CLI. On 2026-11-04,
+[ADR 0050](0050-product-match-evaluation-web-workflow.md) later admits one nested
+owner page at `/assets/:assetId/product-match-evaluations` and the read
+`GET /assets/:assetId/product-match-candidates`. The POST contract is unchanged.
 
 Synchronous evaluation is bounded because it involves one advisory package, one asset,
 one latest ingestion, a fixed cap of 16 occurrences, a pure in-memory evaluator, no
@@ -787,7 +790,10 @@ lifecycle; automatic Finding creation; risk and priority; assignment and due dat
 suppression and accepted risk; false-positive decisions; remediation and
 verification; notifications, exports, ticketing, and AI authority; and evidence
 backfill. Evaluation for an archived asset is not specially treated, consistent with
-discovery and creation; asset lifecycle is a separate decision.
+discovery and creation; asset lifecycle is a separate decision. On 2026-11-04,
+[ADR 0050](0050-product-match-evaluation-web-workflow.md) later admits one nested
+owner page and one asset-scoped candidate read. The rest of this list stays
+unavailable. A global advisory catalog remains withheld.
 
 ### 19. Implementation sequence and exit criteria
 
@@ -946,6 +952,8 @@ Negative:
 - Open governance questions, none of which this slice needs: advisory listing for
   owners, a withdrawal and quarantine writer, superseding revisions, automatic and
   worker evaluation, `component_absent`, and a possible evidence-to-audit constraint.
+  On 2026-11-04, [ADR 0050](0050-product-match-evaluation-web-workflow.md) closes the
+  asset-scoped listing. A global catalog remains open.
 
 ## Accepted residual risks
 
@@ -956,7 +964,7 @@ Negative:
   workflow.
 - **R-2.** No database constraint links evidence inserts to the audit row. The adapter
   must remain the only production evidence writer.
-- **R-3.** No advisory listing. Revision identifiers travel out of band.
+- **R-3.** At acceptance, no advisory listing existed and revision identifiers traveled out of band. On 2026-11-04, [ADR 0050](0050-product-match-evaluation-web-workflow.md) narrowed this residual: discovery is asset-scoped, and `/assets/:assetId/product-match-evaluations` is the only web listing. A global catalog remains withheld.
 - **R-4.** Process-local rate limits multiply across API processes.
 - **R-5.** Approved advisory range membership is inferable by any tenant owner holding
   the revision identifier and a suitable SBOM.

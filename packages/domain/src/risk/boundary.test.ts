@@ -81,6 +81,7 @@ describe('priority contract boundary', () => {
       'priority:calculate_controlled',
     );
     expect(domainPublic.PRIORITY_INSPECT_PERMISSION).toBe('priority:inspect');
+    expect(domainPublic.PRIORITY_REVIEW_CONTROLLED_PERMISSION).toBe('priority:review_controlled');
     expect(domainPublic.PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION).toBe('api_process');
   });
 

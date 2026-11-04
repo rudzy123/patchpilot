@@ -76,6 +76,10 @@ function runtime(result?: Partial<ControlledPriorityRuntime>): {
       async readQueue() {
         return { kind: 'unavailable' };
       },
+      async recordReview(input) {
+        calls.push(`review:${input.actor.role}:${input.findingId}`);
+        return { kind: 'not_found' };
+      },
       ...result,
     },
   };
@@ -192,6 +196,122 @@ describe('controlled finding priority routes', () => {
     expect(again.json()).toMatchObject({ status: 'already_applied' });
     await second.app.close();
   });
+
+  it('lets an owner record a review and keeps the reason out of the log', async () => {
+    const reason = 'priority-review-reason-token';
+    const script = runtime({
+      async recordReview(input) {
+        return {
+          kind: 'recorded',
+          reviewId: '88888888-8888-4888-8888-888888888888',
+          findingId: input.findingId,
+          riskCalculationId: input.command.riskCalculationId,
+        };
+      },
+    });
+    const harness = createAuthTestHarness({ membershipCount: 1, primaryRole: 'owner' });
+    const built = await buildTestApi({ harness, priority: script.runtime });
+    const loggedIn = await built.app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      remoteAddress: LOGIN_IP,
+      headers: { origin: TEST_ORIGIN, 'content-type': 'application/json' },
+      payload: { email: harness.user.email, password: VALID_PASSWORD },
+    });
+    const session = sessionFrom(loggedIn, harness.config.auth.cookieName);
+    const response = await review(built.app, session, {
+      schemaVersion: 'priority_review_v1',
+      riskCalculationId: CALCULATION,
+      supersedesReviewId: null,
+      decision: 'accepted',
+      reason,
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({
+      schemaVersion: 'priority_review_v1',
+      status: 'recorded',
+      reviewId: '88888888-8888-4888-8888-888888888888',
+      findingId: FINDING,
+      riskCalculationId: CALCULATION,
+    });
+    expect(JSON.stringify(response.json())).not.toContain(reason);
+    expect(harness.logs()).not.toContain(reason);
+    await built.app.close();
+  });
+
+  it('denies an admin review and rejects a missing token or foreign origin', async () => {
+    const admin = runtime();
+    const owner = runtime();
+    const adminBoot = await boot('admin', admin.runtime);
+    const ownerBoot = await boot('owner', owner.runtime);
+    const body = {
+      schemaVersion: 'priority_review_v1',
+      riskCalculationId: CALCULATION,
+      supersedesReviewId: null,
+      decision: 'accepted',
+    };
+    expect((await review(adminBoot.app, adminBoot.session, body)).statusCode).toBe(403);
+    const missing = await review(ownerBoot.app, ownerBoot.session, body, { csrf: false });
+    const origin = await ownerBoot.app.inject({
+      method: 'POST',
+      url: `/findings/${FINDING}/priority-reviews`,
+      remoteAddress: '198.51.100.31',
+      headers: {
+        origin: 'https://evil.example',
+        'content-type': 'application/json',
+        cookie: ownerBoot.session.cookie,
+        'x-csrf-token': ownerBoot.session.csrf,
+      },
+      payload: body,
+    });
+    expect(missing.statusCode).toBe(401);
+    expect(origin.statusCode).toBe(403);
+    expect(admin.calls).toEqual([]);
+    expect(owner.calls).toEqual([]);
+    await closeAll(adminBoot, ownerBoot);
+  });
+
+  it('returns the review conflict tokens and exact replay', async () => {
+    const stale = runtime({
+      async recordReview() {
+        return { kind: 'review_not_current' };
+      },
+    });
+    const oldCalculation = runtime({
+      async recordReview() {
+        return { kind: 'calculation_not_current' };
+      },
+    });
+    const replay = runtime({
+      async recordReview(input) {
+        return {
+          kind: 'already_applied',
+          reviewId: '88888888-8888-4888-8888-888888888888',
+          findingId: input.findingId,
+          riskCalculationId: input.command.riskCalculationId,
+        };
+      },
+    });
+    const body = {
+      schemaVersion: 'priority_review_v1',
+      riskCalculationId: CALCULATION,
+      supersedesReviewId: null,
+      decision: 'accepted',
+    };
+    const first = await boot('owner', stale.runtime);
+    const second = await boot('owner', oldCalculation.runtime);
+    const third = await boot('owner', replay.runtime);
+    expect((await review(first.app, first.session, body)).json()).toMatchObject({
+      error: { code: 'conflict', message: 'review_not_current' },
+    });
+    expect((await review(second.app, second.session, body)).json()).toMatchObject({
+      error: { code: 'conflict', message: 'calculation_not_current' },
+    });
+    const again = await review(third.app, third.session, body);
+    expect(again.statusCode).toBe(200);
+    expect(again.json()).toMatchObject({ status: 'already_applied' });
+    await closeAll(first, second, third);
+  });
 });
 
 async function boot(role: RoleName, priority: ControlledPriorityRuntime) {
@@ -228,6 +348,26 @@ async function post(
       ...(options?.csrf === false ? {} : { 'x-csrf-token': session.csrf }),
     },
     payload: {},
+  });
+}
+
+async function review(
+  app: FastifyInstance,
+  session: { cookie: string; csrf: string },
+  payload: Record<string, string | null>,
+  options?: { csrf?: boolean },
+) {
+  return app.inject({
+    method: 'POST',
+    url: `/findings/${FINDING}/priority-reviews`,
+    remoteAddress: '198.51.100.30',
+    headers: {
+      origin: TEST_ORIGIN,
+      'content-type': 'application/json',
+      cookie: session.cookie,
+      ...(options?.csrf === false ? {} : { 'x-csrf-token': session.csrf }),
+    },
+    payload,
   });
 }
 

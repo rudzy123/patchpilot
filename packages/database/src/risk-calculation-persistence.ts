@@ -77,6 +77,8 @@ import {
   type RiskCalculationKevSourceV2,
   type RiskCalculationReason,
   type RiskCalculationResultV1Json,
+  projectFindingPriorityReview,
+  type FindingPriorityReview,
 } from '@patchpilot/domain';
 
 import { SHA256_HEX, UUID_PATTERN } from './guards.js';
@@ -2633,6 +2635,7 @@ export type FindingPriorityStateResult =
       readonly findingId: string;
       readonly publishedBuiltin: FindingPriorityBuiltinRow | null;
       readonly calculation: FindingPriorityCalculationRow;
+      readonly review: FindingPriorityReview;
     }
   | { readonly kind: 'malformed' }
   | { readonly kind: 'rejected'; readonly reason: 'malformed_id' }
@@ -2704,6 +2707,14 @@ type FindingPriorityStateRow = {
   readonly published_version: number | null;
   readonly published_definition: Prisma.JsonValue | null;
   readonly kev_generation_id: string | null;
+  readonly review_as_of: Date | string | null;
+  readonly prior_review_exists: boolean | null;
+  readonly review_id: string | null;
+  readonly review_decision: string | null;
+  readonly review_corrected_band: string | null;
+  readonly review_expires_at: Date | string | null;
+  readonly review_reason: string | null;
+  readonly review_head_count: number | bigint | null;
 };
 
 async function queryFindingPriorityState(
@@ -2736,7 +2747,22 @@ async function queryFindingPriorityState(
         SELECT s."active_generation_id"::text
         FROM "intelligence_source" s
         WHERE s."provider_key" = 'cisa_kev'::"integration_provider_key"
-      ) AS "kev_generation_id"
+      ) AS "kev_generation_id",
+      CURRENT_TIMESTAMP AS "review_as_of",
+      EXISTS (
+        SELECT 1
+        FROM "risk_calculation_review" older
+        WHERE older."organization_id" = f."organization_id"
+          AND older."finding_id" = f."id"
+          AND c."id" IS NOT NULL
+          AND older."risk_calculation_id" <> c."id"::uuid
+      ) AS "prior_review_exists",
+      review."id" AS "review_id",
+      review."decision" AS "review_decision",
+      review."corrected_band" AS "review_corrected_band",
+      review."expires_at" AS "review_expires_at",
+      review."reason" AS "review_reason",
+      review."head_count" AS "review_head_count"
     FROM "finding" f
     INNER JOIN "asset" a
       ON a."organization_id" = f."organization_id"
@@ -2775,6 +2801,39 @@ async function queryFindingPriorityState(
         AND p."status" = 'published'::"risk_policy_status"
       LIMIT 1
     ) bp ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        head."id"::text AS "id",
+        head."decision" AS "decision",
+        head."corrected_band" AS "corrected_band",
+        head."expires_at" AS "expires_at",
+        head."reason" AS "reason",
+        (
+          SELECT COUNT(*)::int
+          FROM "risk_calculation_review" candidate
+          WHERE candidate."organization_id" = f."organization_id"
+            AND c."id" IS NOT NULL
+            AND candidate."risk_calculation_id" = c."id"::uuid
+            AND NOT EXISTS (
+              SELECT 1
+              FROM "risk_calculation_review" successor
+              WHERE successor."organization_id" = candidate."organization_id"
+                AND successor."supersedes_review_id" = candidate."id"
+            )
+        ) AS "head_count"
+      FROM "risk_calculation_review" head
+      WHERE c."id" IS NOT NULL
+        AND head."organization_id" = f."organization_id"
+        AND head."risk_calculation_id" = c."id"::uuid
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "risk_calculation_review" successor
+          WHERE successor."organization_id" = head."organization_id"
+            AND successor."supersedes_review_id" = head."id"
+        )
+      ORDER BY head."id" DESC
+      LIMIT 1
+    ) review ON TRUE
     WHERE f."organization_id" = ${organizationId}::uuid
       AND f."id" = ${findingId}::uuid
   `;
@@ -2803,7 +2862,11 @@ async function queryFindingPriorityState(
   if (calculation === null) {
     return { kind: 'malformed' };
   }
-  return { kind: 'calculated', findingId, publishedBuiltin, calculation };
+  const review = readStoredPriorityReview(row);
+  if (review === null) {
+    return { kind: 'malformed' };
+  }
+  return { kind: 'calculated', findingId, publishedBuiltin, calculation, review };
 }
 
 function readPublishedBuiltin(
@@ -2895,6 +2958,69 @@ function readPriorityCalculation(
     assetUpdatedAt,
     activeKevGenerationId,
   };
+}
+
+function readStoredPriorityReview(row: FindingPriorityStateRow): FindingPriorityReview | null {
+  const asOf = readTimestamp(row.review_as_of);
+  if (asOf === null || typeof row.prior_review_exists !== 'boolean') {
+    return null;
+  }
+  const headCount = readHeadCount(row.review_head_count);
+  if (row.review_id === null) {
+    if (headCount !== 0 || row.review_reason !== null) {
+      return null;
+    }
+    return projectFindingPriorityReview({
+      asOf,
+      priorReviewExists: row.prior_review_exists,
+      head: null,
+    });
+  }
+  if (headCount !== 1) {
+    return null;
+  }
+  const reviewId = normalizeUuid(row.review_id);
+  const decision = row.review_decision;
+  if (
+    reviewId === null ||
+    (decision !== 'accepted' && decision !== 'corrected' && decision !== 'withdrawn')
+  ) {
+    return null;
+  }
+  const correctedBand = readReviewBand(row.review_corrected_band);
+  const expiresAt = row.review_expires_at === null ? null : readTimestamp(row.review_expires_at);
+  if (correctedBand === 'invalid' || (expiresAt === null && row.review_expires_at !== null)) {
+    return null;
+  }
+  return projectFindingPriorityReview({
+    asOf,
+    priorReviewExists: row.prior_review_exists,
+    head: {
+      reviewId,
+      decision,
+      correctedBand,
+      expiresAt,
+    },
+    reason: row.review_reason,
+  });
+}
+
+function readHeadCount(value: number | bigint | null): number | null {
+  if (value === null) {
+    return 0;
+  }
+  const count = typeof value === 'bigint' ? Number(value) : value;
+  return Number.isInteger(count) && count >= 0 ? count : null;
+}
+
+function readReviewBand(value: string | null): PriorityBand | null | 'invalid' {
+  if (value === null) {
+    return null;
+  }
+  if (!PRIORITY_BANDS.includes(value as PriorityBand)) {
+    return 'invalid';
+  }
+  return value as PriorityBand;
 }
 
 function readStoredEngineVersion(value: string | null): string | null {

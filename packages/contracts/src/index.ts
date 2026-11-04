@@ -156,12 +156,27 @@ export {
   type RemediationQueueResponse,
 } from './remediation-queue.js';
 export {
+  findingPriorityReviewSchema,
+  priorityReviewMarkerSchema,
+  priorityReviewRequestSchema,
+  priorityReviewResponseSchema,
+  type PriorityReviewRequest,
+  type PriorityReviewResponse,
+} from './priority-review.js';
+export {
   DELIBERATE_PRODUCT_MATCH_EVALUATION_RESPONSE_SCHEMA_VERSION,
   deliberateProductMatchEvaluationRequestSchema,
   deliberateProductMatchEvaluationResponseSchema,
   type DeliberateProductMatchEvaluationRequest,
   type DeliberateProductMatchEvaluationResponse,
 } from './product-match-evaluation.js';
+export {
+  PRODUCT_MATCH_CANDIDATES_SCHEMA_VERSION,
+  productMatchCandidateSchema,
+  productMatchCandidatesResponseSchema,
+  type ProductMatchCandidate,
+  type ProductMatchCandidatesResponse,
+} from './product-match-candidates.js';
 
 export const healthServiceSchema = z.enum(['api', 'web', 'worker']);
 

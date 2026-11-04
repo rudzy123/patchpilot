@@ -27,7 +27,9 @@ import {
 import {
   canPresentFindingPriority,
   canPresentFindingPriorityCalculation,
+  canPresentFindingPriorityReview,
 } from '../../../lib/finding-permissions';
+import { FindingPriorityReviewPanel } from './finding-priority-review-panel';
 import { isCanonicalUuid } from '../../../lib/resource-id';
 
 type PriorityView =
@@ -50,6 +52,7 @@ export function FindingPrioritySection({ findingId }: { findingId: string }): Re
   const role = organization?.role;
   const canRead = organization !== null && canPresentFindingPriority(role);
   const canCalculate = canPresentFindingPriorityCalculation(role);
+  const canReview = canPresentFindingPriorityReview(role);
   const findingIdValid = isCanonicalUuid(findingId);
   const organizationIdRef = useRef(organizationId);
   const findingIdRef = useRef(findingId);
@@ -113,6 +116,29 @@ export function FindingPrioritySection({ findingId }: { findingId: string }): Re
     <section className="finding-priority" aria-labelledby="finding-priority-heading">
       <h2 id="finding-priority-heading">{PRIORITY_HEADING}</h2>
       <PriorityBody view={view} />
+      {view.status === 'ready' && view.priority.status === 'calculated' ? (
+        <FindingPriorityReviewPanel
+          key={`${findingId}:${reviewPanelKey(view.priority.review)}`}
+          findingId={findingId}
+          priority={view.priority}
+          canSubmit={canReview}
+          getCsrfToken={getCsrfToken}
+          record={(id, csrfToken, body) => api.recordFindingPriorityReview(id, csrfToken, body)}
+          onRecorded={async () => {
+            const generation = generationRef.current + 1;
+            generationRef.current = generation;
+            const priority = await api.readFindingPriority(findingId);
+            if (
+              generation !== generationRef.current ||
+              organizationIdRef.current !== organizationId ||
+              findingIdRef.current !== findingId
+            ) {
+              return;
+            }
+            setView({ status: 'ready', priority });
+          }}
+        />
+      ) : null}
       {canCalculate ? (
         <button
           type="button"
@@ -164,6 +190,12 @@ export function FindingPrioritySection({ findingId }: { findingId: string }): Re
       ) : null}
     </section>
   );
+}
+
+function reviewPanelKey(
+  review: Extract<FindingPriorityResponse, { status: 'calculated' }>['review'],
+): string {
+  return 'reviewId' in review ? `${review.status}:${review.reviewId}` : review.status;
 }
 
 function PriorityBody({ view }: { view: PriorityView }): ReactElement {

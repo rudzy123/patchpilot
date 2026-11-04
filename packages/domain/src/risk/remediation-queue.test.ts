@@ -61,6 +61,7 @@ function rankedRow(overrides: Partial<RemediationQueueRawRow> = {}): Remediation
     vulnerabilityPublicId: 'OSV-1',
     firstObservedAt: AT,
     section: 'ranked',
+    humanReview: { status: 'none', priorReviewExists: false },
     calculation: {
       riskPolicyId: POLICY,
       policyKey: BUILTIN_PRIORITY_POLICY_KEY,

@@ -8,25 +8,32 @@ import { PERMISSION_DENIED } from '@patchpilot/auth';
 import {
   findingPriorityResponseSchema,
   findingRiskCalculationResponseSchema,
+  priorityReviewResponseSchema,
   type FindingPriorityResponse,
   type FindingRiskCalculationResponse,
+  type PriorityReviewResponse,
 } from '@patchpilot/contracts';
 import type {
   AppError,
   CalculateFindingRiskResult,
   ReadControlledFindingPriorityResult,
+  RecordPriorityReviewResult,
 } from '@patchpilot/domain';
 
 import { FINDING_INTERNAL, FINDING_NOT_FOUND } from './finding-http.js';
 import {
   INVALID_REQUEST,
+  PRIORITY_CALCULATION_NOT_CURRENT,
   PRIORITY_CALCULATION_UNAVAILABLE,
   PRIORITY_INSPECTION_UNAVAILABLE,
   PRIORITY_POLICY_UNAVAILABLE,
+  PRIORITY_REVIEW_NOT_CURRENT,
+  PRIORITY_REVIEW_UNAVAILABLE,
 } from './http-errors.js';
 
 export const PRIORITY_CALCULATION_ROUTE = '/findings/:findingId/risk-calculations';
 export const PRIORITY_READ_ROUTE = '/findings/:findingId/priority';
+export const PRIORITY_REVIEW_ROUTE = '/findings/:findingId/priority-reviews';
 
 export const FINDING_NOT_ELIGIBLE: AppError = Object.freeze({
   code: 'conflict',
@@ -34,13 +41,17 @@ export const FINDING_NOT_ELIGIBLE: AppError = Object.freeze({
 });
 
 export {
+  PRIORITY_CALCULATION_NOT_CURRENT,
   PRIORITY_CALCULATION_UNAVAILABLE,
   PRIORITY_INSPECTION_UNAVAILABLE,
   PRIORITY_POLICY_UNAVAILABLE,
+  PRIORITY_REVIEW_NOT_CURRENT,
+  PRIORITY_REVIEW_UNAVAILABLE,
 };
 
 export type PriorityPublicOutcome =
   | 'calculated'
+  | 'recorded'
   | 'already_applied'
   | 'not_calculated'
   | 'found'
@@ -49,6 +60,8 @@ export type PriorityPublicOutcome =
   | 'forbidden'
   | 'not_found'
   | 'finding_not_eligible'
+  | 'calculation_not_current'
+  | 'review_not_current'
   | 'priority_policy_unavailable'
   | 'rate_limited'
   | 'unavailable'
@@ -149,16 +162,49 @@ export function translatePriorityRead(
   return { ok: false, ...readFailure(result.kind) };
 }
 
+export function translatePriorityReview(
+  result: RecordPriorityReviewResult,
+  findingId: string,
+  riskCalculationId: string,
+):
+  | { readonly ok: true; readonly statusCode: 200 | 201; readonly body: PriorityReviewResponse }
+  | { readonly ok: false; readonly error: AppError; readonly outcome: PriorityPublicOutcome } {
+  if (result.kind === 'recorded' || result.kind === 'already_applied') {
+    if (result.findingId !== findingId || result.riskCalculationId !== riskCalculationId) {
+      return { ok: false, error: FINDING_NOT_FOUND, outcome: 'not_found' };
+    }
+    const body = priorityReviewResponseSchema.safeParse({
+      schemaVersion: 'priority_review_v1',
+      status: result.kind,
+      reviewId: result.reviewId,
+      findingId: result.findingId,
+      riskCalculationId: result.riskCalculationId,
+    });
+    if (!body.success) {
+      return { ok: false, error: PRIORITY_REVIEW_UNAVAILABLE, outcome: 'unavailable' };
+    }
+    return { ok: true, statusCode: result.kind === 'recorded' ? 201 : 200, body: body.data };
+  }
+  return { ok: false, ...reviewFailure(result.kind) };
+}
+
 export function priorityOutcomeForError(error: AppError): PriorityPublicOutcome {
   if (error.message === FINDING_NOT_ELIGIBLE.message) {
     return 'finding_not_eligible';
+  }
+  if (error.message === PRIORITY_CALCULATION_NOT_CURRENT.message) {
+    return 'calculation_not_current';
+  }
+  if (error.message === PRIORITY_REVIEW_NOT_CURRENT.message) {
+    return 'review_not_current';
   }
   if (error.message === PRIORITY_POLICY_UNAVAILABLE.message) {
     return 'priority_policy_unavailable';
   }
   if (
     error.message === PRIORITY_CALCULATION_UNAVAILABLE.message ||
-    error.message === PRIORITY_INSPECTION_UNAVAILABLE.message
+    error.message === PRIORITY_INSPECTION_UNAVAILABLE.message ||
+    error.message === PRIORITY_REVIEW_UNAVAILABLE.message
   ) {
     return 'unavailable';
   }
@@ -213,6 +259,30 @@ function calculationFailure(
     case 'unavailable':
     case 'internal_failure':
       return { error: PRIORITY_CALCULATION_UNAVAILABLE, outcome: 'unavailable' };
+    default:
+      return { error: FINDING_INTERNAL, outcome: 'internal' };
+  }
+}
+
+function reviewFailure(
+  kind: Exclude<RecordPriorityReviewResult['kind'], 'recorded' | 'already_applied'>,
+): {
+  readonly error: AppError;
+  readonly outcome: PriorityPublicOutcome;
+} {
+  switch (kind) {
+    case 'not_found':
+      return { error: FINDING_NOT_FOUND, outcome: 'not_found' };
+    case 'calculation_not_current':
+      return { error: PRIORITY_CALCULATION_NOT_CURRENT, outcome: 'calculation_not_current' };
+    case 'review_not_current':
+      return { error: PRIORITY_REVIEW_NOT_CURRENT, outcome: 'review_not_current' };
+    case 'unauthorized':
+      return { error: PERMISSION_DENIED, outcome: 'forbidden' };
+    case 'invalid_command':
+      return { error: INVALID_REQUEST, outcome: 'validation' };
+    case 'unavailable':
+      return { error: PRIORITY_REVIEW_UNAVAILABLE, outcome: 'unavailable' };
     default:
       return { error: FINDING_INTERNAL, outcome: 'internal' };
   }

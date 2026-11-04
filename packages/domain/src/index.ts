@@ -1193,15 +1193,21 @@ export {
   type ControlledFindingOperatorPermission,
 } from './findings/controlled-operator/permissions.js';
 
+export type { ControlledFindingOperatorActor } from './findings/controlled-operator/actor.js';
+
 export {
   FINDING_DISCOVER_CONTROLLED_PERMISSION,
   controlledFindingDiscoveryPermissionsForRole,
 } from './findings/controlled-discovery/permissions.js';
 
 export {
+  PRODUCT_MATCH_DISCOVER_CONTROLLED_PERMISSION,
   PRODUCT_MATCH_EVALUATE_CONTROLLED_PERMISSION,
+  productMatchDiscoveryPermissionsForRole,
   productMatchEvaluationPermissionsForRole,
+  roleGrantsProductMatchDiscovery,
   roleGrantsProductMatchEvaluation,
+  type ProductMatchDiscoveryPermission,
   type ProductMatchEvaluationPermission,
 } from './product-match/permissions.js';
 
@@ -1304,6 +1310,7 @@ export {
   PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
   PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION,
   PRIORITY_INSPECT_PERMISSION,
+  PRIORITY_REVIEW_CONTROLLED_PERMISSION,
   priorityPermissionsForRole,
   roleGrantsPriorityPermission,
   type PriorityPermission,
@@ -1335,6 +1342,26 @@ export {
   type PriorityInputChangeSignal,
   type ReadControlledFindingPriorityDependencies,
   type ReadControlledFindingPriorityResult,
+} from './risk/index.js';
+
+export {
+  PRIORITY_REVIEW_AUDIT_ACTIONS,
+  PRIORITY_REVIEW_DECISIONS,
+  PRIORITY_REVIEW_SUBJECT_TYPE,
+  createRecordPriorityReviewUseCase,
+  normalizePriorityReviewReason,
+  priorityReviewAuditAction,
+  priorityReviewAuditPayload,
+  projectFindingPriorityReview,
+  projectPriorityReviewMarker,
+  type FindingPriorityReview,
+  type FindingPriorityReviewMarker,
+  type PriorityReviewAuditPayload,
+  type PriorityReviewDecision,
+  type PriorityReviewPersistencePort,
+  type RecordPriorityReviewCommand,
+  type RecordPriorityReviewPersistenceResult,
+  type RecordPriorityReviewResult,
 } from './risk/index.js';
 
 export {

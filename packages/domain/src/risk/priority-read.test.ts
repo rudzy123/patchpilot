@@ -272,6 +272,7 @@ describe('createReadControlledFindingPriorityUseCase', () => {
               definition: { schemaVersion: 2 },
             },
             calculation: calculation(),
+            review: FINDING_PRIORITY_REVIEW_NONE,
           };
         },
       },
@@ -333,6 +334,7 @@ describe('createReadControlledFindingPriorityUseCase', () => {
               definition: { schemaVersion: 2 },
             },
             calculation: stored,
+            review: FINDING_PRIORITY_REVIEW_NONE,
           };
         },
       },

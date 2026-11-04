@@ -183,10 +183,7 @@ function toRow(
     componentName: row.componentName,
     componentVersion: row.componentVersion,
     vulnerabilityPublicId: row.vulnerabilityPublicId,
-    humanReview: {
-      status: row.humanReview.status,
-      priorReviewExists: row.humanReview.priorReviewExists,
-    },
+    humanReview: row.humanReview,
   };
   if (section === 'not_calculated' || !('priority' in row)) {
     return identity;

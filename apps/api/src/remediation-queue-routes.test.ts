@@ -34,6 +34,9 @@ function runtime(kind: 'page' | 'stale_cursor' | 'priority_policy_unavailable' |
       async read() {
         return { kind: 'unavailable' };
       },
+      async recordReview() {
+        return { kind: 'unavailable' };
+      },
       async readQueue(input) {
         calls.push(`${input.actor.role}:${input.section}:${input.limit}:${input.cursor ?? ''}`);
         if (

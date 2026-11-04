@@ -2,7 +2,8 @@
  * Current-priority read for one Finding in the actor's organization.
  * The organization comes from the trusted actor. This module does not call
  * the priority engine, assemble facts, or write an audit row.
- * Until priority review is composed, `review` is the closed none value.
+ * `review` is the head of the current calculation. It does not change the
+ * stored priority.
  */
 
 import type { RiskCalculationFactorsV2Json } from '../json-documents.js';
@@ -13,6 +14,11 @@ import {
 } from './admitted-priority-policy.js';
 import { authorizePriorityFindingCommand } from './calculation.js';
 import { PRIORITY_INSPECT_PERMISSION } from './permissions.js';
+import {
+  FINDING_PRIORITY_REVIEW_NONE,
+  type FindingPriorityReview,
+  type FindingPriorityReviewNone,
+} from './priority-review.js';
 import type {
   FindingPriorityCalculationRecord,
   FindingPriorityPublishedBuiltin,
@@ -46,19 +52,15 @@ export type PriorityInputChangeComparison = {
   readonly calculatedAt: Date;
 };
 
-export const FINDING_PRIORITY_REVIEW_NONE = Object.freeze({
-  status: 'none' as const,
-  priorReviewExists: false as const,
-});
-
-export type FindingPriorityReviewNone = typeof FINDING_PRIORITY_REVIEW_NONE;
+export { FINDING_PRIORITY_REVIEW_NONE };
+export type { FindingPriorityReviewNone };
 
 export type FindingPriorityCalculatedView = {
   readonly findingId: string;
   readonly calculation: FindingPriorityCalculationRecord;
   readonly comparability: 'reference' | 'incomparable';
   readonly inputsChanged: PriorityInputChangeReport;
-  readonly review: FindingPriorityReviewNone;
+  readonly review: FindingPriorityReview;
 };
 
 export type ReadControlledFindingPriorityDependencies = {
@@ -187,7 +189,7 @@ async function executeRead(
       calculation: current.calculation,
       comparability: comparable ? 'reference' : 'incomparable',
       inputsChanged,
-      review: FINDING_PRIORITY_REVIEW_NONE,
+      review: current.review,
     },
   };
 }

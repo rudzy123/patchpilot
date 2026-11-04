@@ -27,6 +27,7 @@ import {
 } from './risk-calculation-persistence.js';
 
 export { readRemediationQueuePage } from './remediation-queue-persistence.js';
+export { createPriorityReviewPersistence } from './priority-review-persistence.js';
 import type {
   CurrentRiskCalculationResult,
   FindingPriorityStateResult,
@@ -166,6 +167,7 @@ function mapFindingPriority(result: FindingPriorityStateResult): FindingPriority
         findingId: result.findingId,
         publishedBuiltin: result.publishedBuiltin,
         calculation: result.calculation,
+        review: result.review,
       };
     case 'malformed':
     case 'rejected':

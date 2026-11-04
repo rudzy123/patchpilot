@@ -266,7 +266,7 @@ architecture (`maintainer_reviewed_advisory_architecture_v1`).
   `vulnerability.match_evaluated` audit row is written only when at least one
   new evidence row commits. Finding writes stay zero. Stored outcomes remain
   `affected`, `unaffected`, and `unknown`. This slice adds no migration. The
-  frozen migration count is 27.
+  frozen migration count is 28.
   Suppression authority remains false. New graphs use normalization version
   `2` and preserve distinct observed versions. Historical version `1` graphs
   are not reprocessed.

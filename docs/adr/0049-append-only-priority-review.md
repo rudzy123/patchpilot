@@ -1,18 +1,18 @@
 # ADR 0049: Append-only priority review
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-04
 - Deciders: PatchPilot maintainers. Acceptance confirms no two-person rule and no effect on queue rank.
 - Supersedes: none
 - Superseded by: none
 
-Proposed. Acceptance is a maintainer decision. This ADR admits an append-only
-human review of one immutable RiskCalculation. Acceptance and correction here
-are reviews. They are not RiskAcceptance and they are not priority overrides.
+Accepted on 2026-11-04. This ADR admits an append-only human review of one
+immutable RiskCalculation. Acceptance and correction here are reviews. They
+are not RiskAcceptance and they are not priority overrides.
 
-The implementation session of this ADR is the session that adds migration 28.
-This proposal adds no migration and authorizes no writer while it remains
-Proposed. The frozen migration count stays 27 until that implementation merges.
+Migration 28 `20261104120000_risk_calculation_review` and owner
+`POST /findings/:findingId/priority-reviews` are implemented. The frozen
+migration count is 28.
 
 ## Context
 
@@ -35,7 +35,8 @@ request acceptance. [ADR 0019](0019-local-password-sessions.md) grants
 `risk_acceptance:request` to admin and owner only, and that permission stays
 unrouted.
 
-No `priority:review_controlled` permission and no review table exist.
+`priority:review_controlled` is owner only. `risk_calculation_review` is the
+append-only table.
 [ADR 0042](0042-maintainer-reviewed-advisory-production-composition.md) compares
 canonical `User.id` values for advisory separation of duties. A priority review
 grants no eligibility and changes no authoritative row, so this slice does not
@@ -252,8 +253,7 @@ transitions, or AI text as a review.
 - Positive: human disagreement is durable, ordered, and separate from the score.
 - Negative: the queue can show a corrected band beside a calculated rank that
   disagrees. Operators read both. The rank stays the calculated rank.
-- One migration. The frozen count becomes 28 only when the implementation
-  merges.
+- One migration. The frozen migration count is 28.
 - `risk_acceptance:*` stays unrouted. The member-request sentence in the
   remediation lifecycle doc is not this permission.
 
@@ -282,14 +282,12 @@ priority read, which already requires inspection.
 
 ## Follow-up
 
-- Implement migration 28, the use case, the port, the adapter, the permission,
-  contracts, the route, the Finding section, and the queue marker.
-- Tests: tenant isolation; replay; stale acknowledgement 409; a chain fork
-  rejected by the unique index; UPDATE and DELETE rejected by the trigger; the
-  Finding row unchanged; the RiskCalculation row unchanged; queue order
-  unchanged; no reason text in the audit payload or the logs.
-- Update the [audit model](../architecture/audit-model.md) when the actions are
-  implemented.
-- The implementation pull request sets the frozen migration count to 28 in
-  [current state](../project/current-state.md) and
-  `packages/database/src/integration-database.ts`.
+- Migration 28, the use case, the port, the adapter, the permission, contracts,
+  the route, the Finding section, and the queue marker are implemented.
+- Tests cover tenant isolation, replay, a stale acknowledgement, a chain fork
+  rejected by the unique index, UPDATE and DELETE rejected by the trigger, an
+  unchanged Finding row, an unchanged RiskCalculation row, unchanged queue
+  order, and no reason text in the audit payload.
+- The audit actions are recorded in the [audit model](../architecture/audit-model.md).
+- The frozen migration count is 28 in [current state](../project/current-state.md)
+  and `packages/database/src/integration-database.ts`.

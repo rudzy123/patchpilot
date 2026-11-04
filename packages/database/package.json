@@ -22,6 +22,10 @@
       "types": "./dist/deliberate-product-match-evaluation-persistence.d.ts",
       "import": "./dist/deliberate-product-match-evaluation-persistence.js"
     },
+    "./product-match-candidate-persistence": {
+      "types": "./dist/product-match-candidate-persistence.d.ts",
+      "import": "./dist/product-match-candidate-persistence.js"
+    },
     "./controlled-finding-latest-observation-persistence": {
       "types": "./dist/controlled-finding-latest-observation-persistence.d.ts",
       "import": "./dist/controlled-finding-latest-observation-persistence.js"

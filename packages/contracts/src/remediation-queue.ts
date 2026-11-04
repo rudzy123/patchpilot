@@ -8,18 +8,13 @@ import {
 } from '@patchpilot/domain';
 import { z } from 'zod';
 
+import { priorityReviewMarkerSchema } from './priority-review.js';
+
 const LOWERCASE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA256_HEX = /^[a-f0-9]{64}$/;
 const OBSERVED_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 const lowercaseUuidSchema = z.string().regex(LOWERCASE_UUID);
-
-const humanReviewSchema = z
-  .object({
-    status: z.literal('none'),
-    priorReviewExists: z.literal(false),
-  })
-  .strict();
 
 const inputsChangedSchema = z
   .object({
@@ -50,7 +45,7 @@ const identitySchema = {
   componentName: z.string().min(1).max(512),
   componentVersion: z.string().min(1).max(256),
   vulnerabilityPublicId: z.string().min(1).max(128),
-  humanReview: humanReviewSchema,
+  humanReview: priorityReviewMarkerSchema,
 };
 
 const policySchema = z

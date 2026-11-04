@@ -11,6 +11,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import {
   BUILTIN_PRIORITY_POLICY_KEY,
   BUILTIN_PRIORITY_POLICY_VERSION,
+  projectPriorityReviewMarker,
   type RemediationQueueCalculationFields,
   type RemediationQueueRawRow,
   type RemediationQueueReadQuery,
@@ -21,6 +22,7 @@ import {
 const SHA256_HEX = '^[a-f0-9]{64}$';
 const DECIMAL_TEXT = '^(?:0|[1-9][0-9]{0,8})(?:\\.[0-9]{1,6})?$';
 const UUID_TEXT = '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$';
+const UUID_TEXT_EXACT = new RegExp(UUID_TEXT);
 const UTC_MILLIS = 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"';
 const OBSERVED_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
@@ -84,6 +86,12 @@ type QueueSqlRow = {
   readonly kev_listed: boolean | null;
   readonly severity_text: string | null;
   readonly stored_kev_generation_id: string | null;
+  readonly prior_review_exists: boolean | null;
+  readonly review_id: string | null;
+  readonly review_decision: string | null;
+  readonly review_corrected_band: string | null;
+  readonly review_expires_text: string | null;
+  readonly review_head_count: number | bigint | null;
 };
 
 export async function readRemediationQueuePage(
@@ -206,7 +214,13 @@ async function readInTransaction(
       escalation_recommended,
       kev_listed,
       severity_text,
-      stored_kev_generation_id
+      stored_kev_generation_id,
+      prior_review_exists,
+      review_id,
+      review_decision,
+      review_corrected_band,
+      review_expires_text,
+      review_head_count
     FROM classified
     WHERE NOT malformed
       AND section = ${input.section}
@@ -218,7 +232,7 @@ async function readInTransaction(
   const kept = hasMore ? pageRows.slice(0, input.limit) : pageRows;
   const rows: RemediationQueueRawRow[] = [];
   for (const row of kept) {
-    const mapped = mapQueueRow(row, input.section);
+    const mapped = mapQueueRow(row, input.section, meta.as_of);
     if (mapped === null) {
       return { kind: 'malformed' };
     }
@@ -395,7 +409,23 @@ function classifiedFindings(input: RemediationQueueReadQuery): Prisma.Sql {
             AND (c.factors #>> '{sources,kev,generationId}') ~ ${UUID_TEXT}
           THEN c.factors #>> '{sources,kev,generationId}'
           ELSE NULL
-        END AS stored_kev_generation_id
+        END AS stored_kev_generation_id,
+        EXISTS (
+          SELECT 1
+          FROM "risk_calculation_review" older
+          WHERE older."organization_id" = f."organization_id"
+            AND older."finding_id" = f."id"
+            AND c.id IS NOT NULL
+            AND older."risk_calculation_id" <> c.id::uuid
+        ) AS prior_review_exists,
+        rev.review_id,
+        rev.review_decision,
+        rev.review_corrected_band,
+        to_char(
+          date_trunc('milliseconds', rev.review_expires_at) AT TIME ZONE 'UTC',
+          ${UTC_MILLIS}
+        ) AS review_expires_text,
+        rev.review_head_count
       FROM "finding" f
       LEFT JOIN "asset" a
         ON a."organization_id" = f."organization_id"
@@ -457,6 +487,38 @@ function classifiedFindings(input: RemediationQueueReadQuery): Prisma.Sql {
         WHERE elem->>'factorId' = 'kev_listed'
         LIMIT 1
       ) kev ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT
+          head."id"::text AS review_id,
+          head."decision" AS review_decision,
+          head."corrected_band" AS review_corrected_band,
+          head."expires_at" AS review_expires_at,
+          (
+            SELECT COUNT(*)::int
+            FROM "risk_calculation_review" candidate
+            WHERE candidate."organization_id" = f."organization_id"
+              AND c.id IS NOT NULL
+              AND candidate."risk_calculation_id" = c.id::uuid
+              AND NOT EXISTS (
+                SELECT 1
+                FROM "risk_calculation_review" successor
+                WHERE successor."organization_id" = candidate."organization_id"
+                  AND successor."supersedes_review_id" = candidate."id"
+              )
+          ) AS review_head_count
+        FROM "risk_calculation_review" head
+        WHERE c.id IS NOT NULL
+          AND head."organization_id" = f."organization_id"
+          AND head."risk_calculation_id" = c.id::uuid
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "risk_calculation_review" successor
+            WHERE successor."organization_id" = head."organization_id"
+              AND successor."supersedes_review_id" = head."id"
+          )
+        ORDER BY head."id" DESC
+        LIMIT 1
+      ) rev ON TRUE
       WHERE f."organization_id" = ${input.organizationId}::uuid
     ) base
   `;
@@ -530,6 +592,7 @@ function cursorPredicate(input: RemediationQueueReadQuery): Prisma.Sql | null {
 function mapQueueRow(
   row: QueueSqlRow,
   section: RemediationQueueSection,
+  asOf: string,
 ): RemediationQueueRawRow | null {
   if (row.section !== section || !isText(row.finding_id) || !isText(row.asset_id)) {
     return null;
@@ -553,17 +616,87 @@ function mapQueueRow(
     vulnerabilityPublicId: row.vulnerability_public_id,
     firstObservedAt: row.first_observed_text,
   };
+  const humanReview = projectQueueReview(row, asOf);
+  if (humanReview === null) {
+    return null;
+  }
   if (section === 'not_calculated') {
-    if (row.calculation_id !== null) {
+    if (row.calculation_id !== null || humanReview.status !== 'none') {
       return null;
     }
-    return { ...identity, section, calculation: null };
+    return { ...identity, section, calculation: null, humanReview };
   }
   const calculation = mapCalculation(row);
   if (calculation === null) {
     return null;
   }
-  return { ...identity, section, calculation };
+  return { ...identity, section, calculation, humanReview };
+}
+
+function projectQueueReview(row: QueueSqlRow, asOf: string) {
+  if (!OBSERVED_AT.test(asOf) || typeof row.prior_review_exists !== 'boolean') {
+    return null;
+  }
+  const asOfDate = new Date(asOf);
+  const headCount = readReviewHeadCount(row.review_head_count);
+  if (row.review_id === null) {
+    if (headCount !== 0) {
+      return null;
+    }
+    return projectPriorityReviewMarker({
+      asOf: asOfDate,
+      priorReviewExists: row.prior_review_exists,
+      head: null,
+    });
+  }
+  if (headCount !== 1 || !UUID_TEXT_EXACT.test(row.review_id)) {
+    return null;
+  }
+  const decision = row.review_decision;
+  if (decision !== 'accepted' && decision !== 'corrected' && decision !== 'withdrawn') {
+    return null;
+  }
+  const correctedBand = readQueueBand(row.review_corrected_band);
+  if (correctedBand === 'invalid') {
+    return null;
+  }
+  const expiresAt =
+    row.review_expires_text === null
+      ? null
+      : OBSERVED_AT.test(row.review_expires_text)
+        ? new Date(row.review_expires_text)
+        : 'invalid';
+  if (expiresAt === 'invalid') {
+    return null;
+  }
+  return projectPriorityReviewMarker({
+    asOf: asOfDate,
+    priorReviewExists: row.prior_review_exists,
+    head: {
+      reviewId: row.review_id,
+      decision,
+      correctedBand,
+      expiresAt,
+    },
+  });
+}
+
+function readReviewHeadCount(value: number | bigint | null): number | null {
+  if (value === null) {
+    return 0;
+  }
+  const count = typeof value === 'bigint' ? Number(value) : value;
+  return Number.isInteger(count) && count >= 0 ? count : null;
+}
+
+function readQueueBand(value: string | null): 'P1' | 'P2' | 'P3' | 'P4' | null | 'invalid' {
+  if (value === null) {
+    return null;
+  }
+  if (value === 'P1' || value === 'P2' || value === 'P3' || value === 'P4') {
+    return value;
+  }
+  return 'invalid';
 }
 
 function mapCalculation(row: QueueSqlRow): RemediationQueueCalculationFields | null {

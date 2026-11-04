@@ -569,18 +569,20 @@ describe('seedDevelopmentData builtin priority policy', () => {
 describe('policy engine seed boundary', () => {
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 
-  it('keeps the engine as a database devDependency only', () => {
+  it('declares the engine on the database package and the API', () => {
     const databaseManifest = JSON.parse(
       readFileSync(path.join(repoRoot, 'packages/database/package.json'), 'utf8'),
     ) as {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
     };
-    expect(databaseManifest.dependencies?.['@patchpilot/policy-engine']).toBeUndefined();
-    expect(databaseManifest.devDependencies?.['@patchpilot/policy-engine']).toBe('workspace:*');
+    expect(databaseManifest.dependencies?.['@patchpilot/policy-engine']).toBe('workspace:*');
+    const apiManifest = JSON.parse(
+      readFileSync(path.join(repoRoot, 'apps/api/package.json'), 'utf8'),
+    ) as { dependencies?: Record<string, string> };
+    expect(apiManifest.dependencies?.['@patchpilot/policy-engine']).toBe('workspace:*');
 
     for (const relative of [
-      'apps/api/package.json',
       'apps/web/package.json',
       'apps/worker/package.json',
       'packages/domain/package.json',
@@ -599,12 +601,15 @@ describe('policy engine seed boundary', () => {
     }
   });
 
-  it('imports the engine only from the seed entrypoint', () => {
+  it('imports the engine only from the seed and publication entrypoints', () => {
     const databaseSrc = path.join(repoRoot, 'packages/database/src');
     const offenders: string[] = [];
     for (const filePath of productionSources(databaseSrc)) {
       const relative = path.relative(repoRoot, filePath);
-      if (relative === 'packages/database/src/seed/run.ts') {
+      if (
+        relative === 'packages/database/src/seed/run.ts' ||
+        relative === 'packages/database/src/builtin-priority-policy-publication-command-main.ts'
+      ) {
         continue;
       }
       if (importSpecifiers(readFileSync(filePath, 'utf8')).some(importsPolicyEngine)) {

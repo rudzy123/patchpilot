@@ -1,9 +1,10 @@
 /**
  * Read port for the remediation queue.
- * The adapter orders stored rows. This module does not import Prisma.
+ * The adapter orders stored rows. This module stays free of infrastructure clients.
  */
 
 import type { PriorityPolicyLookup } from './persistence-port.js';
+import type { FindingPriorityReviewMarker } from './priority-review.js';
 import type { RemediationQueueCursor } from './remediation-queue-cursor.js';
 
 export const REMEDIATION_QUEUE_SECTIONS = ['ranked', 'incomparable', 'not_calculated'] as const;
@@ -52,6 +53,7 @@ export type RemediationQueueCalculationFields = {
 export type RemediationQueueRawRow = RemediationQueueIdentity & {
   readonly section: RemediationQueueSection;
   readonly calculation: RemediationQueueCalculationFields | null;
+  readonly humanReview: FindingPriorityReviewMarker;
 };
 
 export type RemediationQueueReadQuery = {

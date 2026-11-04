@@ -26,7 +26,7 @@ allowlist therefore starts empty, and both publication and calculation fail
 closed until a signed `validated` or `validated_with_residuals` entry is mirrored
 into that allowlist.
 
-The frozen migration count is 27. This ADR adds no migration.
+The frozen migration count is 28. This ADR adds no migration.
 
 ## Context
 
@@ -277,8 +277,8 @@ the actor's organization. Those roles can already read
 - `comparability` is `reference` when the stored hash and engine version equal
   the published admitted builtin pair, and `incomparable` otherwise.
 - `review` is the object defined by
-  [ADR 0049](0049-append-only-priority-review.md). Until that ADR is composed,
-  the only value is `{ status: 'none', priorReviewExists: false }`.
+  [ADR 0049](0049-append-only-priority-review.md). The value is the current
+  review head. When no review exists it is `{ status: 'none', priorReviewExists: false }`.
 
 When the Finding is in the organization and no admitted published builtin
 exists, the route returns 503 `priority_policy_unavailable` and does not return
@@ -365,7 +365,7 @@ Recalculation after inputs change is the same owner command. The queue is
 - `@patchpilot/database` takes a runtime dependency on
   `@patchpilot/policy-engine` for the command. `apps/api` takes the same
   dependency to inject the port.
-- No migration. The frozen count stays 27 through this ADR's implementation.
+- No migration. The frozen count stays 28 through this ADR's implementation.
 - The implementation pull request updates the checkpoint. This proposal does
   not compose the route.
 

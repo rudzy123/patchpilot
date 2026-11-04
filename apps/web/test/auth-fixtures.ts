@@ -169,6 +169,16 @@ export function createFakeAuthApi(overrides: Partial<FakeAuthApi> = {}): FakeAut
       items: [membershipOptionFixture],
       nextCursor: null,
     })),
+    listProductMatchCandidates: vi.fn(async () => ({
+      schemaVersion: 'product_match_candidates_v1' as const,
+      assetId: ASSET_ID,
+      ingestionId: null,
+      candidates: [],
+      nextCursor: null,
+    })),
+    evaluateProductMatch: vi.fn(async () => {
+      throw new Error('evaluateProductMatch was not stubbed');
+    }),
     listControlledFindingTargets: vi.fn(async () => ({
       candidates: [],
       oversizedCandidateCount: 0,
@@ -193,6 +203,9 @@ export function createFakeAuthApi(overrides: Partial<FakeAuthApi> = {}): FakeAut
     })),
     calculateFindingPriority: vi.fn(async () => {
       throw new Error('calculateFindingPriority was not stubbed');
+    }),
+    recordFindingPriorityReview: vi.fn(async () => {
+      throw new Error('recordFindingPriorityReview was not stubbed');
     }),
     ...overrides,
   };

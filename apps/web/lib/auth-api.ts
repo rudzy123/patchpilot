@@ -5,6 +5,8 @@ import {
   controlledFindingCreationResponseSchema,
   controlledFindingDiscoveryResponseSchema,
   controlledFindingInspectionResponseSchema,
+  deliberateProductMatchEvaluationResponseSchema,
+  productMatchCandidatesResponseSchema,
   environmentOptionsResponseSchema,
   errorEnvelopeSchema,
   membershipOptionsResponseSchema,
@@ -18,9 +20,12 @@ import {
   type ControlledFindingCreationResponse,
   type ControlledFindingDiscoveryResponse,
   type ControlledFindingInspectionResponse,
+  type DeliberateProductMatchEvaluationResponse,
+  type ProductMatchCandidatesResponse,
   type ControlledFindingLatestObservationResponse,
   type FindingPriorityResponse,
   type FindingRiskCalculationResponse,
+  type PriorityReviewResponse,
   type RemediationQueueResponse,
   type EnvironmentOption,
   type MembershipOption,
@@ -30,7 +35,11 @@ import {
 } from '@patchpilot/contracts';
 
 import { readLatestObservation } from './finding-latest-observation';
-import { readFindingPriority, readFindingRiskCalculation } from './finding-priority';
+import {
+  readFindingPriority,
+  readFindingRiskCalculation,
+  readPriorityReview,
+} from './finding-priority';
 import { QUEUE_UNAVAILABLE, readRemediationQueue } from './remediation-queue';
 import { isCanonicalUuid } from './resource-id';
 
@@ -47,6 +56,9 @@ export const ASSET_ARCHIVED = 'Asset is archived.';
 
 /** Default discovery page size. Matches the API default of 10. */
 export const CONTROLLED_FINDING_TARGET_PAGE_LIMIT = 10;
+
+/** Default product-match candidate page size. Matches the API default of 10. */
+export const PRODUCT_MATCH_CANDIDATE_PAGE_LIMIT = 10;
 
 export const FINDING_SERVICE_UNAVAILABLE = 'The service is temporarily unavailable.';
 
@@ -212,6 +224,50 @@ export function createAuthApi(apiBaseUrl: string) {
       });
     },
 
+    listProductMatchCandidates(
+      assetId: string,
+      query?: { cursor: string },
+    ): Promise<ProductMatchCandidatesResponse> {
+      if (!isCanonicalUuid(assetId)) {
+        return Promise.reject(createAuthRequestError(404, 'not_found', 'Not found.'));
+      }
+      const params: Record<string, string> = {
+        limit: String(PRODUCT_MATCH_CANDIDATE_PAGE_LIMIT),
+      };
+      if (query !== undefined) {
+        params['cursor'] = query.cursor;
+      }
+      return sendJson({
+        baseUrl,
+        path: `/assets/${assetId}/product-match-candidates`,
+        method: 'GET',
+        query: params,
+        parse: (value) => productMatchCandidatesResponseSchema.parse(value),
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+        unavailableMessage: FINDING_SERVICE_UNAVAILABLE,
+      });
+    },
+
+    evaluateProductMatch(
+      assetId: string,
+      body: { advisoryRevisionId: string },
+      csrfToken: string,
+    ): Promise<DeliberateProductMatchEvaluationResponse> {
+      if (!isCanonicalUuid(assetId)) {
+        return Promise.reject(createAuthRequestError(404, 'not_found', 'Not found.'));
+      }
+      return sendJson({
+        baseUrl,
+        path: `/assets/${assetId}/product-match-evaluations`,
+        method: 'POST',
+        body: { advisoryRevisionId: body.advisoryRevisionId },
+        csrfToken,
+        parse: (value) => deliberateProductMatchEvaluationResponseSchema.parse(value),
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+        unavailableMessage: FINDING_SERVICE_UNAVAILABLE,
+      });
+    },
+
     listControlledFindingTargets(
       assetId: string,
       query?: { cursor: string },
@@ -368,6 +424,51 @@ export function createAuthApi(apiBaseUrl: string) {
             );
           }
           return calculation;
+        },
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+        unavailableMessage: FINDING_SERVICE_UNAVAILABLE,
+      });
+    },
+
+    recordFindingPriorityReview(
+      findingId: string,
+      csrfToken: string,
+      body: {
+        riskCalculationId: string;
+        supersedesReviewId: string | null;
+        decision: 'accepted' | 'corrected' | 'withdrawn';
+        correctedBand?: 'P1' | 'P2' | 'P3' | 'P4';
+        expiresAt?: string;
+        reason?: string;
+      },
+    ): Promise<PriorityReviewResponse> {
+      if (!isCanonicalUuid(findingId) || !isCanonicalUuid(body.riskCalculationId)) {
+        return Promise.reject(createAuthRequestError(404, 'not_found', 'Not found.'));
+      }
+      return sendJson({
+        baseUrl,
+        path: `/findings/${findingId}/priority-reviews`,
+        method: 'POST',
+        body: {
+          schemaVersion: 'priority_review_v1',
+          riskCalculationId: body.riskCalculationId,
+          supersedesReviewId: body.supersedesReviewId,
+          decision: body.decision,
+          ...(body.correctedBand === undefined ? {} : { correctedBand: body.correctedBand }),
+          ...(body.expiresAt === undefined ? {} : { expiresAt: body.expiresAt }),
+          ...(body.reason === undefined ? {} : { reason: body.reason }),
+        },
+        csrfToken,
+        parse: (value) => {
+          const review = readPriorityReview(value, findingId, body.riskCalculationId);
+          if (review === null) {
+            throw createAuthRequestError(
+              503,
+              'internal',
+              'Priority review is temporarily unavailable.',
+            );
+          }
+          return review;
         },
         unauthorizedMessage: GENERIC_SESSION_EXPIRED,
         unavailableMessage: FINDING_SERVICE_UNAVAILABLE,

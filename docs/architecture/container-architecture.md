@@ -88,7 +88,7 @@ Redis is not exposed to the browser. PostgreSQL is not exposed to the browser.
 | --- | --- | --- | --- |
 | Apps | `pnpm dev` on the host. `pnpm infrastructure:up` does not start them | `web`, `api`, and `worker` containers, plus one-shot migrate, bootstrap, and private-bucket init | Same three app images, as copies of the same units |
 | Compose project | `patchpilot` | `patchpilot-eval` | Operator-managed. Not a second Compose file |
-| PostgreSQL | Compose service | Compose service. Migrate applies the frozen 27 migrations | Operator-provided PostgreSQL |
+| PostgreSQL | Compose service | Compose service. Migrate applies the frozen 28 migrations | Operator-provided PostgreSQL |
 | Redis | Compose service. Unauthenticated when `PATCHPILOT_REDIS_PASSWORD` is empty | Authenticated when the application env sets the password | Operator-provided authenticated Redis |
 | Object storage | MinIO. Development startup may create the bucket | MinIO. One-shot init creates one private bucket. The worker only calls `HeadBucket` | S3-compatible private store |
 | Development adapters | Allowed only when `deploymentEnvironment` is not `production` **and** `allowDevelopmentAdapters` is true | `PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS=false` | `allowDevelopmentAdapters` must be false and unselectable; `NODE_ENV=production` alone is not sufficient if the typed flag is true |
