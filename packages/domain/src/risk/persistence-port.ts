@@ -106,6 +106,7 @@ export type PersistFindingRiskCalculationResult =
 
 export type PublishOrganizationPriorityOverrideCommand = {
   readonly organizationId: string;
+  readonly actorUserId: string;
   readonly membershipId: string;
   readonly definition: unknown;
   readonly policySchemaVersion: number;

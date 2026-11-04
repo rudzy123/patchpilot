@@ -1054,6 +1054,7 @@ describe('createPublishOrganizationPriorityOverrideUseCase', () => {
     expect(harness.publishCalls).toEqual([
       {
         organizationId: ORG,
+        actorUserId: ACTOR,
         membershipId: MEMBERSHIP,
         definition,
         policySchemaVersion: 2,

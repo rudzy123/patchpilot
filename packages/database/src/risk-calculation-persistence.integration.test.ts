@@ -1594,6 +1594,31 @@ describe('risk calculation persistence', () => {
     expect(await auditCount(foreignOrg.id, 'priority.calculated')).toBe(0);
   });
 
+  it('writes nothing for a non-active membership and does not publish an override', async () => {
+    const prepared = await prepareFinding('revoked-membership');
+    await prisma.membership.update({
+      where: { id: prepared.membershipId },
+      data: { status: 'revoked', revokedAt: new Date('2026-11-03T00:00:00.000Z') },
+    });
+    const calculated = await services.calculate.execute(envelope(prepared));
+    expect(calculated).toEqual({ kind: 'unauthorized' });
+    expect(await calculationCount(prepared.organizationId, prepared.findingId)).toBe(0);
+    expect(await auditCount(prepared.organizationId, 'priority.calculated')).toBe(0);
+
+    const published = await services.publish.execute(
+      publishEnvelope(prepared, weightOverride(35, 25)),
+    );
+    expect(published).toEqual({ kind: 'membership_not_found' });
+    expect(
+      await prisma.riskPolicy.count({
+        where: { organizationId: prepared.organizationId, policyKey: 'patchpilot.builtin.v0' },
+      }),
+    ).toBe(0);
+    expect(await auditCount(prepared.organizationId, 'risk_policy.published')).toBe(0);
+    expect(await calculationCount(prepared.organizationId, prepared.findingId)).toBe(0);
+    expect(await auditCount(prepared.organizationId, 'priority.calculated')).toBe(0);
+  });
+
   it('keeps one row when identical evaluations race', async () => {
     const prepared = await prepareFinding('race');
     const input = envelope(prepared);

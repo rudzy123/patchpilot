@@ -15,7 +15,8 @@
  * transaction. This module does not call `Date.now()`. Eligibility, fact
  * reads, KEV reads, policy selection, the engine call, the fingerprint, and
  * the insert all run inside `executeLockedPriorityCalculation`. The adapter
- * reloads membership in that same transaction.
+ * reloads membership in that same transaction and accepts only an active
+ * membership whose user is the actor.
  */
 
 import { createHash, randomUUID } from 'node:crypto';
@@ -363,6 +364,7 @@ async function executePublish<TValidatedDefinition, TParsedFacts>(
   }
   const published = await dependencies.persistence.publishOrganizationPriorityOverride({
     organizationId: actor.organizationId,
+    actorUserId: actor.userId,
     membershipId: actor.membershipId,
     definition: override.value,
     policySchemaVersion: RISK_POLICY_DEFINITION_SCHEMA_VERSION_V2,

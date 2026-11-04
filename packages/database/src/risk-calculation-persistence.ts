@@ -300,6 +300,7 @@ export type StoredPriorityPolicy = {
 
 export type PublishOrganizationPriorityOverrideInput = {
   readonly organizationId: string;
+  readonly actorUserId: string;
   readonly membershipId: string;
   readonly definition: unknown;
   readonly policySchemaVersion: number;
@@ -539,7 +540,7 @@ export async function runLockedPriorityCalculation<
     return await client.$transaction(
       async (tx): Promise<LockedTransactionResult<TStop>> => {
         await lockTransactionScope(tx, `${organizationId}:${findingId}`);
-        const actor = await loadActor(tx, organizationId, membershipId);
+        const actor = await loadActor(tx, organizationId, membershipId, actorUserId);
         if (actor === null || actor !== actorUserId) {
           return { kind: 'write', result: { kind: 'authority_rejected' } };
         }
@@ -727,7 +728,12 @@ async function persistInTransaction(
   command: NormalizedPersist,
 ): Promise<PersistRiskCalculationResult> {
   await lockTransactionScope(tx, `${command.organizationId}:${command.findingId}`);
-  const actor = await loadActor(tx, command.organizationId, command.membershipId);
+  const actor = await loadActor(
+    tx,
+    command.organizationId,
+    command.membershipId,
+    command.actorUserId,
+  );
   if (actor === null || actor !== command.actorUserId) {
     return { kind: 'authority_rejected' };
   }
@@ -867,14 +873,20 @@ async function publishInTransaction(
   tx: Prisma.TransactionClient,
   command: {
     readonly organizationId: string;
+    readonly actorUserId: string;
     readonly membershipId: string;
     readonly definition: Readonly<Record<string, unknown>>;
     readonly definitionJson: string;
   },
 ): Promise<PublishOrganizationPriorityOverrideResult> {
   await lockTransactionScope(tx, `${command.organizationId}:${BUILTIN_PRIORITY_POLICY_KEY}`);
-  const actor = await loadActor(tx, command.organizationId, command.membershipId);
-  if (actor === null) {
+  const actor = await loadActor(
+    tx,
+    command.organizationId,
+    command.membershipId,
+    command.actorUserId,
+  );
+  if (actor === null || actor !== command.actorUserId) {
     return { kind: 'membership_not_found' };
   }
   const inserted = await tx.$queryRaw<
@@ -1514,22 +1526,35 @@ function readNullableInt(value: unknown): number | null | undefined {
   return parsed === null ? undefined : parsed;
 }
 
+/**
+ * Reloads the actor inside the transaction. The membership must belong to the
+ * trusted organization, be active, and name that actor. Callers pass the
+ * organization from trusted context; this query does not accept a separate
+ * client organization id.
+ */
 async function loadActor(
   tx: Prisma.TransactionClient,
   organizationId: string,
   membershipId: string,
+  actorUserId: string,
 ): Promise<string | null> {
   const rows = await tx.$queryRaw<Array<{ user_id: string }>>`
     SELECT "user_id"::text AS "user_id"
     FROM "membership"
     WHERE "organization_id" = ${organizationId}::uuid
       AND "id" = ${membershipId}::uuid
+      AND "user_id" = ${actorUserId}::uuid
+      AND "status" = 'active'::"membership_status"
   `;
   const userId = rows[0]?.user_id;
   if (rows.length !== 1 || userId === undefined) {
     return null;
   }
-  return normalizeUuid(userId);
+  const normalized = normalizeUuid(userId);
+  if (normalized !== actorUserId) {
+    return null;
+  }
+  return normalized;
 }
 
 async function loadFindingForUpdate(
@@ -1895,6 +1920,7 @@ function normalizeOverrideInput(input: PublishOrganizationPriorityOverrideInput)
       readonly kind: 'ready';
       readonly command: {
         readonly organizationId: string;
+        readonly actorUserId: string;
         readonly membershipId: string;
         readonly definition: Readonly<Record<string, unknown>>;
         readonly definitionJson: string;
@@ -1902,8 +1928,9 @@ function normalizeOverrideInput(input: PublishOrganizationPriorityOverrideInput)
     }
   | { readonly kind: 'rejected'; readonly reason: PublishPriorityOverrideRejection } {
   const organizationId = normalizeUuid(input.organizationId);
+  const actorUserId = normalizeUuid(input.actorUserId);
   const membershipId = normalizeUuid(input.membershipId);
-  if (organizationId === null || membershipId === null) {
+  if (organizationId === null || actorUserId === null || membershipId === null) {
     return { kind: 'rejected', reason: 'malformed_id' };
   }
   if (input.policyKey !== BUILTIN_PRIORITY_POLICY_KEY) {
@@ -1920,7 +1947,10 @@ function normalizeOverrideInput(input: PublishOrganizationPriorityOverrideInput)
   if (definitionJson.length > MAX_POLICY_DEFINITION_JSON_LENGTH) {
     return { kind: 'rejected', reason: 'malformed_definition' };
   }
-  return { kind: 'ready', command: { organizationId, membershipId, definition, definitionJson } };
+  return {
+    kind: 'ready',
+    command: { organizationId, actorUserId, membershipId, definition, definitionJson },
+  };
 }
 
 function readFactors(value: unknown): RiskCalculationFactorsV2Json | null {

@@ -113,7 +113,7 @@ The built-in factor catalog, weights, normalization tables, bands, due-date reco
 
 The earlier illustrative sketch in this section (contribution ideas, "~100 capped", and the two example Findings) is superseded. ADR 0045 adopts the sketch's thresholds and due days, rejects capping in favor of rejection, and reproduces the two example Findings as golden cases: Finding A is priority 80 (P1) and Finding B is priority 50 (P3).
 
-**Weights and thresholds are initial policy proposals, not universal security truth** ([risk register](../security/risk-register.md) R13). They must be validated with operators before production composition and can change only via a new policy version.
+**Weights and thresholds are initial policy proposals, not universal security truth** ([risk register](../security/risk-register.md) R13). They must be validated with operators before production composition and can change only via a new policy version. Session 6 must not activate this capability while adding application containers and bootstrap behavior.
 
 The development seed entrypoint publishes `patchpilot.builtin.v0` version 2 from `BUILTIN_PRIORITY_POLICY_DEFINITION`. Version 1 remains the empty placeholder and fails v2 validation by design. `seedDevelopmentData` skips version 2 unless `builtinPriorityDefinition` and `canonicalJson` are passed. The numbers stay in the engine and in [ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md).
 
