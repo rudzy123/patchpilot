@@ -74,7 +74,7 @@ function assertDirectoryUnchanged(directory, expectedNames) {
  * @param {Record<string, string>} env
  * @param {string} cwd
  * @param {string} home
- * @returns {ReturnType<typeof spawnSync>}
+ * @returns {import('node:child_process').SpawnSyncReturns<string>}
  */
 function runBootstrap(args, env, cwd, home) {
   /** @type {NodeJS.ProcessEnv} */
@@ -202,7 +202,7 @@ test('production bootstrap exits 0 only for the production deployment and writes
       cwd,
       home,
     );
-    assert.equal(succeeded.status, 0, succeeded.stderr);
+    assert.equal(succeeded.status, 0, succeeded.stderr ?? undefined);
     assert.equal(succeeded.stdout, successMessage);
     assert.equal(succeeded.stderr, '');
     assert.equal(
@@ -245,7 +245,7 @@ test('production bootstrap does not read an env file as a grant or a denial', ()
       cwd,
       home,
     );
-    assert.equal(granted.status, 0, granted.stderr);
+    assert.equal(granted.status, 0, granted.stderr ?? undefined);
     assert.equal(granted.stdout, successMessage);
     assert.equal(granted.stderr, '');
     assertDirectoryUnchanged(cwd, ['.env', 'sentinel.txt']);

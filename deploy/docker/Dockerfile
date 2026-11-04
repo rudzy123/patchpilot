@@ -8,6 +8,13 @@ FROM ${NODE_IMAGE} AS base
 
 WORKDIR /src
 
+# Prisma selects the query engine from `openssl version`. bookworm-slim has
+# libssl but not that binary, so generate would fall back to OpenSSL 1.1 and
+# the runtime engine check for debian-openssl-3.0.x would fail.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
 # Shared by the migrate stage, which runs pnpm as the node user.
 ENV COREPACK_HOME=/opt/corepack
 
@@ -138,13 +145,12 @@ function generatePackedClient(root) {
     rmSync(scratch, { recursive: true, force: true });
   }
 
-  const generated = path.resolve(clientPackage, '../../.prisma/client/index.js');
-  const engine = path.resolve(
-    clientPackage,
-    '../../.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node',
-  );
+  const generatedDir = path.resolve(clientPackage, '../../.prisma/client');
+  const generated = path.join(generatedDir, 'index.js');
+  const engine = path.join(generatedDir, 'libquery_engine-debian-openssl-3.0.x.so.node');
   if (!generated.startsWith(`${root}${path.sep}`) || !existsSync(generated) || !existsSync(engine)) {
-    throw new Error(`Prisma client was not generated inside ${root}`);
+    const present = existsSync(generatedDir) ? readdirSync(generatedDir).join(', ') : 'missing directory';
+    throw new Error(`Prisma client was not generated inside ${root} (${present})`);
   }
 }
 
