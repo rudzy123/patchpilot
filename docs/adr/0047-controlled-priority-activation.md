@@ -13,18 +13,20 @@ priority calculation and the current-priority read, and how builtin
 [ADR 0012](0012-explainable-policy-engine.md): the deliberate calculation is
 composed in the API process, and worker injection is reserved for a future
 automatic-recalculation ADR. The routes and the publication command are
-implemented. The production allowlist stays empty while V-0001 is unsigned, so
-publication exits 2 and the routes return 503 until a signed pair is mirrored
-and an operator runs the command. This ADR adds no migration.
+implemented. The production allowlist admits one pair from V-0001, outcome
+`validated_with_residuals`: engine `@patchpilot/policy-engine@1` and definition
+SHA-256 `7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7`.
+Publication of any other pair exits 2 and writes nothing. The routes return 503
+until an operator runs the publication command in that deployment. Admission
+does not publish a row. This ADR adds no migration.
 
 [ADR 0045](0045-deterministic-p1-p4-priority-policy.md) is Accepted and does not
-authorize composition. Operator weight validation
+by itself authorize composition. Operator weight validation
 ([priority weight validation](../security/priority-weight-validation.md), risk
-register R13) is a separate gate. V-0001 is unsigned. No
-(engine version, definition hash) pair is validated. This ADR's production
-allowlist therefore starts empty, and both publication and calculation fail
-closed until a signed `validated` or `validated_with_residuals` entry is mirrored
-into that allowlist.
+register R13) is a separate gate. V-0001 is `validated_with_residuals`. The
+production allowlist mirrors that one pair. Publication and calculation still
+fail closed for any other pair, and calculation fails closed until an operator
+publishes the admitted builtin in that deployment.
 
 The frozen migration count is 28. This ADR adds no migration.
 
@@ -165,9 +167,12 @@ constant that mirrors
 [priority-weight-validation.md](../security/priority-weight-validation.md).
 Only entries with outcome `validated` or `validated_with_residuals` may be
 copied. Each addition cites the entry id. An empty list fails closed. Tests of
-the use case pass an explicit fixture list. The production constant stays empty
-while V-0001 is unsigned, so the composed route returns 503 until that mirror
-lands. The unsigned V-0001 hash is not admitted by this ADR.
+the use case pass an explicit fixture list. Status on 2026-11-05: the production
+constant admits V-0001, outcome `validated_with_residuals`, engine
+`@patchpilot/policy-engine@1`, definition SHA-256
+`7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7`. Any other
+pair fails closed. The composed route returns 503 until an operator publishes
+the builtin in that deployment. Admission does not publish a row.
 
 The KEV read stays a local database read. The transaction performs no network,
 queue, or object-storage I/O.
@@ -240,9 +245,10 @@ writes no JSON, and exits 0. Any other flag is `invalid_command`.
 
 This command is the only production builtin writer. The development seed remains
 development-only and is not that writer. The command adds no migration. The
-table already exists. Publication is the operator act that R13 gates. A signed
-validation entry is required before the allowlist can admit the pair, and the
-command still has to be invoked explicitly after that.
+table already exists. Publication remains an explicit operator command after
+admission. A signed validation entry is required before the allowlist can admit
+the pair. V-0001 is admitted. The command still has to be invoked explicitly in
+each deployment, and startup does not invoke it.
 
 ### 5. Current-priority read
 
@@ -360,8 +366,8 @@ Recalculation after inputs change is the same owner command. The queue is
 
 - Positive: one constructor, one publication writer, replay, and a visible
   not-calculated state.
-- Negative: priority stays 503 until R13 is signed and an operator runs the
-  command. Process-local rate limits multiply across API processes.
+- Negative: priority stays 503 in a deployment until an operator publishes the
+  admitted builtin. Process-local rate limits multiply across API processes.
 - `@patchpilot/database` takes a runtime dependency on
   `@patchpilot/policy-engine` for the command. `apps/api` takes the same
   dependency to inject the port.
@@ -379,14 +385,15 @@ The reason text of a review is not part of this ADR. Calculation responses
 carry closed codes and stored numbers. Logs omit the definition body, fact
 payloads, and the canonical redaction list in
 [security rules](../../.cursor/rules/security.mdc). No output claims
-exploitability, compliance, or remediation. A validated policy, once R13 is
-signed, is a validated operator policy proposal with its validation date.
+exploitability, affectedness, compliance, or remediation. V-0001, outcome
+`validated_with_residuals`, is a validated operator policy proposal with
+residuals and its validation date. It is not universal security truth.
 
 ## Operational failure plan
 
-- **Allowlist empty or pair missing.** Publication exits 2. The route returns
-  503. The operator signs a validation entry, mirrors the pair, then runs the
-  command. Historical calculations are not rewritten.
+- **Pair missing from the allowlist.** Publication exits 2 before the database
+  opens. The route returns 503. V-0001 is the admitted pair. Any other pair
+  still fails closed. Historical calculations are not rewritten.
 - **Builtin row missing after admission.** 503. The operator runs the command.
   Exact replay is safe.
 - **Immutable conflict on publication.** Exit 3. The operator does not edit the

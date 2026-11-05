@@ -1,11 +1,17 @@
 /**
  * Built-in priority policy publication. Synthetic rows only.
- * The production allowlist stays empty. This test admits a fixture pair.
+ * The write uses the production admitted pair. An unadmitted pair writes nothing.
+ * This file does not publish into a shared or developer database.
  */
 
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { PrismaClient } from '@prisma/client';
+import {
+  ADMITTED_PRIORITY_POLICY_PAIRS,
+  BUILTIN_PRIORITY_POLICY_KEY,
+  BUILTIN_PRIORITY_POLICY_VERSION,
+} from '@patchpilot/domain';
 import {
   POLICY_ENGINE_VERSION,
   canonicalJson,
@@ -24,19 +30,17 @@ import {
 } from './integration-database.js';
 
 const CORRELATION = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const ADMITTED_DEFINITION_SHA256 =
+  '7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7';
 
-function admittedPairs() {
-  const encoded = canonicalJson(BUILTIN_PRIORITY_POLICY_DEFINITION);
-  if (!encoded.ok) {
-    throw new Error('builtin canonical json failed');
-  }
-  return [
-    {
-      engineVersion: POLICY_ENGINE_VERSION,
-      policyDefinitionSha256: createHash('sha256').update(encoded.value, 'utf8').digest('hex'),
-      validationEntryId: 'fixture',
-    },
-  ];
+function productionRequest(correlationId: string, admittedPairs = ADMITTED_PRIORITY_POLICY_PAIRS) {
+  return {
+    correlationId,
+    definition: BUILTIN_PRIORITY_POLICY_DEFINITION,
+    canonicalJson,
+    admittedPairs,
+    engineVersion: POLICY_ENGINE_VERSION,
+  };
 }
 
 async function openDatabase(scope: string): Promise<{
@@ -66,38 +70,38 @@ describe('builtin priority policy publication', () => {
     await dropEphemeralDatabase(database.admin, database.databaseName);
   });
 
-  it('inserts once, replays without a second audit, and writes nothing while unvalidated', async () => {
-    const pairs = admittedPairs();
-    const inserted = await publishBuiltinPriorityPolicy(prisma, {
-      correlationId: CORRELATION,
-      definition: BUILTIN_PRIORITY_POLICY_DEFINITION,
-      canonicalJson,
-      admittedPairs: pairs,
-      engineVersion: POLICY_ENGINE_VERSION,
-    });
+  it('inserts the admitted version 2 builtin once and writes nothing for an unadmitted pair', async () => {
+    expect(ADMITTED_PRIORITY_POLICY_PAIRS).toEqual([
+      {
+        engineVersion: '@patchpilot/policy-engine@1',
+        policyDefinitionSha256: ADMITTED_DEFINITION_SHA256,
+        validationEntryId: 'V-0001',
+      },
+    ]);
+    expect(POLICY_ENGINE_VERSION).toBe('@patchpilot/policy-engine@1');
+    const inserted = await publishBuiltinPriorityPolicy(prisma, productionRequest(CORRELATION));
     expect(inserted).toEqual({
       outcome: 'inserted',
       riskPolicyId: BUILTIN_PRIORITY_POLICY_PUBLICATION_ID,
     });
-    const replay = await publishBuiltinPriorityPolicy(prisma, {
-      correlationId: randomUUID(),
-      definition: BUILTIN_PRIORITY_POLICY_DEFINITION,
-      canonicalJson,
-      admittedPairs: pairs,
-      engineVersion: POLICY_ENGINE_VERSION,
-    });
+    const replay = await publishBuiltinPriorityPolicy(prisma, productionRequest(randomUUID()));
     expect(replay).toEqual({
       outcome: 'already_applied',
       riskPolicyId: BUILTIN_PRIORITY_POLICY_PUBLICATION_ID,
     });
-    const refused = await publishBuiltinPriorityPolicy(prisma, {
-      correlationId: CORRELATION,
-      definition: BUILTIN_PRIORITY_POLICY_DEFINITION,
-      canonicalJson,
-      admittedPairs: [],
-      engineVersion: POLICY_ENGINE_VERSION,
-    });
+    const refused = await publishBuiltinPriorityPolicy(prisma, productionRequest(CORRELATION, []));
+    const wrongHash = await publishBuiltinPriorityPolicy(
+      prisma,
+      productionRequest(CORRELATION, [
+        {
+          engineVersion: '@patchpilot/policy-engine@1',
+          policyDefinitionSha256: '0'.repeat(64),
+          validationEntryId: 'V-0001',
+        },
+      ]),
+    );
     expect(refused).toEqual({ outcome: 'unvalidated' });
+    expect(wrongHash).toEqual({ outcome: 'unvalidated' });
     expect(await prisma.riskPolicy.count()).toBe(1);
     const audits = await prisma.auditEvent.findMany({ where: { action: 'risk_policy.published' } });
     expect(audits).toHaveLength(1);
@@ -113,6 +117,12 @@ describe('builtin priority policy publication', () => {
     const stored = await prisma.riskPolicy.findUniqueOrThrow({
       where: { id: BUILTIN_PRIORITY_POLICY_PUBLICATION_ID },
     });
+    expect(stored.organizationId).toBeNull();
+    expect(stored.scope).toBe('builtin');
+    expect(stored.policyKey).toBe(BUILTIN_PRIORITY_POLICY_KEY);
+    expect(stored.version).toBe(BUILTIN_PRIORITY_POLICY_VERSION);
+    expect(stored.version).toBe(2);
+    expect(stored.status).toBe('published');
     expect(stored.publishedAt?.toISOString()).not.toBe('2026-01-01T00:00:00.000Z');
     expect(JSON.stringify(audits[0]?.payload)).not.toContain('definition');
   });
@@ -148,13 +158,7 @@ describe('builtin priority policy publication conflict', () => {
   });
 
   it('does not update a stored definition that differs', async () => {
-    const result = await publishBuiltinPriorityPolicy(prisma, {
-      correlationId: CORRELATION,
-      definition: BUILTIN_PRIORITY_POLICY_DEFINITION,
-      canonicalJson,
-      admittedPairs: admittedPairs(),
-      engineVersion: POLICY_ENGINE_VERSION,
-    });
+    const result = await publishBuiltinPriorityPolicy(prisma, productionRequest(CORRELATION));
     expect(result).toEqual({ outcome: 'immutable_conflict' });
     expect(await prisma.auditEvent.count({ where: { action: 'risk_policy.published' } })).toBe(0);
     const stored = await prisma.riskPolicy.findUniqueOrThrow({

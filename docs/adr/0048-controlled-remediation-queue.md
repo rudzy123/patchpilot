@@ -14,9 +14,9 @@ any Finding list. The list is not a RemediationTask list. Acceptance lifts ADR
 0038's no-list limit only for this route and this page. Target discovery still
 returns no Finding id.
 
-The route and the page are implemented. The production allowlist is empty
-while V-0001 is unsigned, so the route returns 503 until a signed pair is
-mirrored and an operator publishes the builtin. The review marker comes from
+The route and the page are implemented. The production allowlist admits V-0001.
+The route returns 503 until an operator publishes that builtin in the
+deployment. Admission does not publish a row. The review marker comes from
 [ADR 0049](0049-append-only-priority-review.md) and does not change order. It depends on the reference policy
 from [ADR 0047](0047-controlled-priority-activation.md). It adds no migration.
 The frozen migration count stays 28.
@@ -89,8 +89,8 @@ database read time, UTC), the three section counts, and the page for the
 requested section. The three counts add up to the organization's Finding count.
 
 When no admitted published builtin exists, the route returns 503
-`priority_policy_unavailable`, including the rule in ADR 0047: the production
-allowlist is empty until a signed R13 entry is mirrored. A 503 body has no
+`priority_policy_unavailable`. V-0001 is admitted. The route still returns 503
+until an operator publishes that builtin in the deployment. A 503 body has no
 Finding rows.
 
 ### 2. Reference policy and section membership

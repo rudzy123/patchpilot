@@ -6,7 +6,7 @@
 - Supersedes: none
 - Superseded by: none
 
-Further amended on 2026-11-04 by [ADR 0047](0047-controlled-priority-activation.md): the deliberate calculation is composed in the API process, and worker injection is reserved for a future automatic-recalculation ADR. ADR 0047 is Accepted. The production allowlist is empty while V-0001 is unsigned.
+Further amended on 2026-11-04 by [ADR 0047](0047-controlled-priority-activation.md): the deliberate calculation is composed in the API process, and worker injection is reserved for a future automatic-recalculation ADR. ADR 0047 is Accepted. On 2026-11-05 the production allowlist admits V-0001, outcome `validated_with_residuals`. A deployment still has no priority row until an operator publishes that builtin. Automatic recalculation stays unavailable.
 
 ## Context
 

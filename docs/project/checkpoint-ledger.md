@@ -109,3 +109,9 @@ On 2026-10-06 the governance session accepted ADR 0032 from the committed review
 Current checkpoint authority: [current-state.md](current-state.md).
 
 On 2026-11-02 Session 2 implemented the [ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md) engine in `packages/policy-engine` while ADR 0045 remained Proposed. The engine covers definition and override validation, closed fact parsing, centipoint evaluation with the two KEV rules, counterfactual decisive status, closed explanation codes, queue ordering, canonical JSON, and the frozen built-in definition. At this checkpoint the package unit suite reported 14 files and 330 tests passing. The package has zero runtime dependencies and no app or package depends on it. No domain port, seed, adapter, worker job, route, or web UI was added. No RiskCalculation is written. No migration was added. The frozen count remains 26. Prioritization remains unavailable. The ADR 0044 implementation remains the named next slice. The risk-policy sketch was replaced by an ADR reference and R13 was updated. This ledger is not the current repository authority.
+
+## Priority validation closure — Session 7G
+
+Current checkpoint authority: [current-state.md](current-state.md).
+
+On 2026-11-05 V-0001 was recorded as `validated_with_residuals` for `@patchpilot/policy-engine@1` and definition SHA-256 `7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7`. The production allowlist admits that one pair. The calculation routes, remediation queue, priority review, and deployment-local publication command stay composed. A deployment still has no priority row until an operator runs the publication command there. Automatic recalculation, RemediationTask, and verification stay unavailable. No migration was added. The frozen count remains 28. This ledger is not the current repository authority.

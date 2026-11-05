@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { Prisma, PrismaClient } from '@prisma/client';
 import {
+  ADMITTED_PRIORITY_POLICY_PAIRS,
   BUILTIN_PRIORITY_POLICY_KEY,
   BUILTIN_PRIORITY_POLICY_VERSION,
   JSON_SCHEMA_VERSION_V1,
@@ -113,19 +114,23 @@ describe('remediation queue persistence', () => {
 
   it('keeps each organization in its own partition and orders ranked rows with the engine', async () => {
     expect(POLICY_ENGINE_VERSION).toBe(PRIORITY_CALCULATION_ENGINE_VERSION);
+    const admittedPair = ADMITTED_PRIORITY_POLICY_PAIRS[0];
+    if (admittedPair === undefined) {
+      throw new Error('production priority pair is missing');
+    }
+    expect(admittedPair).toEqual({
+      engineVersion: '@patchpilot/policy-engine@1',
+      policyDefinitionSha256: '7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7',
+      validationEntryId: 'V-0001',
+    });
     const hash = hashDefinition(BUILTIN_PRIORITY_POLICY_DEFINITION);
-    const admitted = [
-      {
-        engineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
-        policyDefinitionSha256: hash,
-        validationEntryId: 'V-test',
-      },
-    ];
+    expect(hash).toBe(admittedPair.policyDefinitionSha256);
+    expect(PRIORITY_CALCULATION_ENGINE_VERSION).toBe(admittedPair.engineVersion);
     const published = await publishBuiltinPriorityPolicy(prisma, {
       correlationId: randomUUID(),
       definition: BUILTIN_PRIORITY_POLICY_DEFINITION,
       canonicalJson,
-      admittedPairs: admitted,
+      admittedPairs: ADMITTED_PRIORITY_POLICY_PAIRS,
       engineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
     });
     expect(published.outcome === 'inserted' || published.outcome === 'already_applied').toBe(true);
@@ -175,6 +180,13 @@ describe('remediation queue persistence', () => {
       homeComponent.id,
       vulnerability.id,
     );
+    await delay(30);
+    const otherEngine = await insertFinding(
+      home.id,
+      'queue engine',
+      homeComponent.id,
+      vulnerability.id,
+    );
     const missing = await insertFinding(
       home.id,
       'queue missing',
@@ -191,6 +203,13 @@ describe('remediation queue persistence', () => {
     await insertCalculation(later, equal, hash, published.riskPolicyId);
     await insertCalculation(highest, high, hash, published.riskPolicyId);
     await insertCalculation(otherPolicy, equal, 'b'.repeat(64), published.riskPolicyId);
+    await insertCalculation(
+      otherEngine,
+      equal,
+      hash,
+      published.riskPolicyId,
+      '@patchpilot/policy-engine@0',
+    );
     await insertCalculation(outside, high, hash, published.riskPolicyId);
 
     const read = await readRemediationQueuePage(prisma, {
@@ -205,8 +224,8 @@ describe('remediation queue persistence', () => {
     if (read.kind !== 'page') {
       return;
     }
-    expect(read.counts).toEqual({ ranked: 3, incomparable: 1, not_calculated: 1 });
-    expect(read.findingCount).toBe(5);
+    expect(read.counts).toEqual({ ranked: 3, incomparable: 2, not_calculated: 1 });
+    expect(read.findingCount).toBe(6);
     const evaluations = new Map<string, PriorityEvaluation>([
       [early.id, equal],
       [later.id, equal],
@@ -255,6 +274,7 @@ describe('remediation queue persistence', () => {
     expect(read.rows.map((row) => row.findingId)).not.toContain(outside.id);
     expect(read.rows.map((row) => row.findingId)).not.toContain(missing.id);
     expect(read.rows.map((row) => row.findingId)).not.toContain(otherPolicy.id);
+    expect(read.rows.map((row) => row.findingId)).not.toContain(otherEngine.id);
     expect(read.rows[0]?.componentName).toBe('reviewed-npm-widget');
     expect(read.rows[0]?.componentVersion).toBe('1.1.0');
     expect(read.rows.find((row) => row.findingId === early.id)?.assetName).toBe('queue <asset>');
@@ -271,7 +291,7 @@ describe('remediation queue persistence', () => {
           }).findPublishedBuiltinPriorityPolicy(),
         readRemediationQueue: (query) => readRemediationQueuePage(prisma, query),
       },
-      admittedPairs: admitted,
+      admittedPairs: ADMITTED_PRIORITY_POLICY_PAIRS,
       referenceEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
       hashPolicyDefinition: hashDefinition,
     });
@@ -332,10 +352,14 @@ describe('remediation queue persistence', () => {
     expect(incomparable.kind).toBe('page');
     expect(notCalculated.kind).toBe('page');
     if (incomparable.kind === 'page') {
-      expect(incomparable.page.rows.map((row) => row.findingId)).toEqual([otherPolicy.id]);
-      expect(incomparable.page.rows[0]).toEqual(
+      expect(incomparable.page.rows.map((row) => row.findingId)).toEqual([
+        otherPolicy.id,
+        otherEngine.id,
+      ]);
+      expect(incomparable.page.rows).toEqual([
         expect.objectContaining({ comparisonMessage: 'recalculation required for comparison' }),
-      );
+        expect.objectContaining({ comparisonMessage: 'recalculation required for comparison' }),
+      ]);
     }
     if (notCalculated.kind === 'page') {
       expect(notCalculated.page.rows).toEqual([expect.objectContaining({ findingId: missing.id })]);
@@ -374,6 +398,7 @@ describe('remediation queue persistence', () => {
     evaluation: PriorityEvaluation,
     policyHash: string,
     riskPolicyId: string,
+    engineVersion: string = PRIORITY_CALCULATION_ENGINE_VERSION,
   ): Promise<void> {
     await prisma.riskCalculation.create({
       data: {
@@ -391,7 +416,7 @@ describe('remediation queue persistence', () => {
           dueDateRecommendationDays: evaluation.dueDateRecommendationDays,
           escalationRecommendation: evaluation.escalation.recommended,
         },
-        calculationEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+        calculationEngineVersion: engineVersion,
         calculationReason: 'initial',
         inputFingerprint: createHash('sha256').update(finding.id).digest('hex'),
       },
