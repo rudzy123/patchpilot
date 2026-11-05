@@ -107,7 +107,7 @@ Operators upload a newer SBOM. Compare rules in [finding lifecycle](finding-life
 
 ## Exports
 
-Exports include task history, acceptance records, policy version, and observation results, labeled as PatchPilot outputs.
+[ADR 0051](../adr/0051-remediation-queue-export.md) accepts one remediation-queue export. That decision is the remediation queue only. Task, acceptance, and observation exports stay unauthorized. The route is not implemented.
 
 ## Related documents
 

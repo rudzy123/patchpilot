@@ -136,11 +136,7 @@ PostgreSQL uniqueness and retry state remain authority. BullMQ delayed jobs are 
 
 ## 13. Export
 
-1. Authorize export. Rate-limit.
-2. Build a snapshot labeled as a PatchPilot output, not a certification.
-3. Store **Evidence** `export_snapshot` metadata (not a duplicate of raw SBOMs unless the operator requested included hashes only).
-4. **AuditEvent** `export.created`.
-5. Exports include policy version, factors, observation results, and acceptance records so a reviewer can see facts versus conclusions.
+[ADR 0051](../adr/0051-remediation-queue-export.md) accepts one remediation-queue export at `POST /remediation-queue/export`. That route is not implemented. Owner and admin authorization, the existing queue rate limits, and one `REPEATABLE READ` snapshot of the ranked, incomparable, and not-calculated sections are the decision. The snapshot does not write Evidence kind `export_snapshot`. Response bytes are sent only after one `export.created` audit row commits. Task, acceptance, and observation exports stay unauthorized. The file is a PatchPilot output, not a certification.
 
 ## Intelligence refresh (not user-initiated)
 
