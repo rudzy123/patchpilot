@@ -19,8 +19,8 @@ production allowlist admits that one pair. A deployment still has no priority ro
 until an operator runs the publication command there. The decision itself adds no permission, domain port,
 PostgreSQL adapter, seed, route, web UI, worker, queue, scheduler, Outbox row,
 migration, or dependency. It writes no **RiskCalculation**, sets no
-`Finding.currentRiskCalculationId`, and never sets `Finding.dueAt`. Prioritization
-stays unavailable. The frozen migration count was 26 when this ADR was proposed. That
+`Finding.currentRiskCalculationId`, and never sets `Finding.dueAt`. Automatic
+recalculation stays unavailable. The frozen migration count was 26 when this ADR was proposed. That
 count is historical; see the implementation status below.
 
 ## Implementation status
