@@ -85,6 +85,9 @@ describe('patchpilot queue worker lock and router', () => {
     await expect(handler({ name: 'other.job', id: '3', data: {} })).rejects.toBeInstanceOf(
       UnrecoverableError,
     );
+    await expect(
+      handler({ name: 'finding.recalculate', id: '4', data: {} }),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
     expect(routed).toEqual(['sbom', 'intelligence']);
     await worker.stop();
   });
