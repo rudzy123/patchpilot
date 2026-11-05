@@ -50,6 +50,7 @@ import type { AuthRuntime } from './auth-runtime.js';
 import type { DatabaseReadyCheck } from './app.js';
 import type { FindingOrganizationRateLimiter } from './finding-rate-limit.js';
 import { denyFindingOperatorRuntime, type FindingOperatorRuntime } from './finding-runtime.js';
+import type { ControlledPriorityRuntime } from './priority-runtime.js';
 import type { MaintainerReviewedAdvisoryRuntime } from './maintainer-reviewed-advisory-runtime.js';
 import {
   denyFindingDiscoveryRuntime,
@@ -59,6 +60,10 @@ import {
   denyProductMatchEvaluationRuntime,
   type ProductMatchEvaluationRuntime,
 } from './product-match-evaluation-runtime.js';
+import {
+  denyProductMatchCandidateRuntime,
+  type ProductMatchCandidateRuntime,
+} from './product-match-candidate-runtime.js';
 import { createIntelligenceRuntime, type IntelligenceRuntime } from './intelligence-runtime.js';
 import type { SbomRuntime } from './sbom-runtime.js';
 
@@ -100,6 +105,7 @@ export async function buildTestApi(options?: {
   sboms?: SbomRuntime;
   intelligence?: IntelligenceRuntime;
   findings?: FindingOperatorRuntime;
+  priority?: ControlledPriorityRuntime;
   advisories?: MaintainerReviewedAdvisoryRuntime;
   submissionPeerKey?: (request: FastifyRequest) => string;
   approvalPeerKey?: (request: FastifyRequest) => string;
@@ -109,6 +115,8 @@ export async function buildTestApi(options?: {
   discoveryOrganizationLimiter?: FindingOrganizationRateLimiter;
   productMatchEvaluation?: ProductMatchEvaluationRuntime;
   productMatchEvaluationOrganizationLimiter?: FindingOrganizationRateLimiter;
+  productMatchCandidates?: ProductMatchCandidateRuntime;
+  productMatchCandidateOrganizationLimiter?: FindingOrganizationRateLimiter;
 }) {
   const harness = options?.harness ?? createAuthTestHarness(options);
   const app = await buildApi({
@@ -121,6 +129,7 @@ export async function buildTestApi(options?: {
     intelligence:
       options?.intelligence ?? emptyIntelligenceRuntime(options?.config ?? harness.config),
     findings: options?.findings ?? denyFindingOperatorRuntime(),
+    ...(options?.priority === undefined ? {} : { priority: options.priority }),
     ...(options?.advisories === undefined ? {} : { advisories: options.advisories }),
     ...(options?.submissionPeerKey === undefined
       ? {}
@@ -146,6 +155,15 @@ export async function buildTestApi(options?: {
       : {
           productMatchEvaluationOrganizationLimiter:
             options.productMatchEvaluationOrganizationLimiter,
+        }),
+    ...(options?.productMatchCandidates === undefined
+      ? { productMatchCandidates: denyProductMatchCandidateRuntime() }
+      : { productMatchCandidates: options.productMatchCandidates }),
+    ...(options?.productMatchCandidateOrganizationLimiter === undefined
+      ? {}
+      : {
+          productMatchCandidateOrganizationLimiter:
+            options.productMatchCandidateOrganizationLimiter,
         }),
     ...(options?.now === undefined ? {} : { now: options.now }),
     ...(options?.generateId === undefined ? {} : { generateId: options.generateId }),

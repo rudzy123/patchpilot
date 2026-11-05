@@ -1,5 +1,5 @@
 /**
- * Uncomposed priority permissions.
+ * Priority permissions. Production registration is the API process.
  * Finding, policy, and product-match grants are not these grants.
  */
 
@@ -10,6 +10,7 @@ import {
   PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
   PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION,
   PRIORITY_INSPECT_PERMISSION,
+  PRIORITY_REVIEW_CONTROLLED_PERMISSION,
   priorityPermissionsForRole,
   roleGrantsPriorityPermission,
 } from './permissions.js';
@@ -29,12 +30,13 @@ const OTHER_PERMISSIONS = [
   'intelligence:read',
 ] as const;
 
-describe('uncomposed priority permissions', () => {
+describe('priority permissions', () => {
   it('grants priority:calculate_controlled to the owner only', () => {
     expect(PRIORITY_CALCULATE_CONTROLLED_PERMISSION).toBe('priority:calculate_controlled');
     expect(priorityPermissionsForRole('owner')).toEqual([
       PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
       PRIORITY_INSPECT_PERMISSION,
+      PRIORITY_REVIEW_CONTROLLED_PERMISSION,
     ]);
     expect(priorityPermissionsForRole('admin')).toEqual([PRIORITY_INSPECT_PERMISSION]);
     expect(priorityPermissionsForRole('member')).toEqual([]);
@@ -55,14 +57,23 @@ describe('uncomposed priority permissions', () => {
     }
   });
 
+  it('grants priority:review_controlled to the owner only', () => {
+    expect(PRIORITY_REVIEW_CONTROLLED_PERMISSION).toBe('priority:review_controlled');
+    for (const role of ROLES) {
+      expect(roleGrantsPriorityPermission(role, PRIORITY_REVIEW_CONTROLLED_PERMISSION)).toBe(
+        role === 'owner',
+      );
+    }
+  });
+
   it('does not reuse finding, policy, or product-match permissions', () => {
     expect(PRIORITY_CALCULATE_CONTROLLED_PERMISSION).not.toBe(PRIORITY_INSPECT_PERMISSION);
     expect(OTHER_PERMISSIONS).not.toContain(PRIORITY_CALCULATE_CONTROLLED_PERMISSION);
     expect(OTHER_PERMISSIONS).not.toContain(PRIORITY_INSPECT_PERMISSION);
   });
 
-  it('stays uncomposed', () => {
-    expect(PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION).toBe('absent');
+  it('registers production composition in the API process', () => {
+    expect(PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION).toBe('api_process');
   });
 
   it('rejects an unexpected membership role', () => {

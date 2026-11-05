@@ -3,7 +3,12 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { navigationMocks } from '../test/router-mock';
-import { createFakeAuthApi, sessionFixture, unauthorizedError } from '../test/auth-fixtures';
+import {
+  createFakeAuthApi,
+  ownerOrganizationFixture,
+  sessionFixture,
+  unauthorizedError,
+} from '../test/auth-fixtures';
 import { renderWithAuth } from '../test/render-with-auth';
 
 import { SignedInShell } from './signed-in-shell';
@@ -29,6 +34,7 @@ describe('SignedInShell', () => {
       'href',
       '/organizations',
     );
+    expect(screen.queryByRole('link', { name: 'Remediation queue' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => {
@@ -37,6 +43,22 @@ describe('SignedInShell', () => {
     expect(authApi.logout).toHaveBeenCalledTimes(1);
     expect(window.localStorage).toHaveLength(0);
     expect(window.sessionStorage).toHaveLength(0);
+  });
+
+  it('shows the remediation queue to an owner', async () => {
+    const authApi = createFakeAuthApi({
+      readSession: vi.fn(async () => sessionFixture({ organization: ownerOrganizationFixture })),
+    });
+    renderWithAuth(
+      <SignedInShell>
+        <p>shell-child</p>
+      </SignedInShell>,
+      { authApi },
+    );
+    expect(await screen.findByRole('link', { name: 'Remediation queue' })).toHaveAttribute(
+      'href',
+      '/remediation-queue',
+    );
   });
 
   it('still clears local state when logout fails', async () => {

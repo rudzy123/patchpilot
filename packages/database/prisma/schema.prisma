@@ -1019,6 +1019,7 @@ model Organization {
   findingObservations            FindingObservation[]
   riskPolicies                   RiskPolicy[]
   riskCalculations               RiskCalculation[]
+  riskCalculationReviews         RiskCalculationReview[]
   remediationTasks               RemediationTask[]
   riskAcceptances                RiskAcceptance[]
   evidence                       Evidence[]
@@ -1052,6 +1053,7 @@ model User {
   sessions                        Session[]
   auditEvents                     AuditEvent[]                      @relation("AuditActorUser")
   instanceAdvisoryAuthorityGrants InstanceAdvisoryAuthorityGrant[]
+  priorityReviews                 RiskCalculationReview[]           @relation("RiskCalculationReviewActorUser")
 
   @@index([status], map: "user_status_idx")
   @@map("user")
@@ -1138,7 +1140,8 @@ model Membership {
   approvedRiskAcceptances     RiskAcceptance[]     @relation("RiskAcceptanceApproverMembership")
   submittedEvidence           Evidence[]           @relation("EvidenceSubmittedByMembership")
   auditEvents                 AuditEvent[]         @relation("AuditActorMembership")
-  createdRiskPolicies         RiskPolicy[]         @relation("RiskPolicyCreatedByMembership")
+  createdRiskPolicies         RiskPolicy[]              @relation("RiskPolicyCreatedByMembership")
+  priorityReviews             RiskCalculationReview[]   @relation("RiskCalculationReviewActorMembership")
 
   @@unique([organizationId, id], map: "membership_org_id_key")
   @@unique([organizationId, userId], map: "membership_org_user_key")
@@ -1618,6 +1621,7 @@ model Finding {
   creationEvidenceLinks  FindingCreationEvidenceLink[]
   repeatedObservationEvidenceLinks FindingRepeatedObservationEvidenceLink[]
   calculations           RiskCalculation[]             @relation("FindingCalculations")
+  priorityReviews         RiskCalculationReview[]
   remediationTasks       RemediationTask[]
   riskAcceptances        RiskAcceptance[]
   evidence               Evidence[]
@@ -1784,12 +1788,46 @@ model RiskCalculation {
   finding           Finding        @relation("FindingCalculations", fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict)
   riskPolicy        RiskPolicy     @relation(fields: [riskPolicyId], references: [id], onDelete: Restrict)
   sbomIngestion     SbomIngestion? @relation(fields: [organizationId, sbomIngestionId], references: [organizationId, id], onDelete: Restrict)
-  currentForFinding Finding[]      @relation("FindingCurrentCalculation")
+  currentForFinding Finding[]                 @relation("FindingCurrentCalculation")
+  reviews           RiskCalculationReview[]
 
   @@unique([organizationId, id], map: "risk_calculation_org_id_key")
   @@unique([organizationId, findingId, inputFingerprint], map: "risk_calculation_replay_key")
   @@index([organizationId, findingId, calculatedAt], map: "risk_calculation_finding_time_idx")
   @@map("risk_calculation")
+}
+
+/// Append-only human review of one RiskCalculation.
+/// A review does not change the calculation, the Finding, or queue order.
+/// Partial unique indexes that keep one chain head live only in SQL.
+model RiskCalculationReview {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
+  findingId          String    @map("finding_id") @db.Uuid
+  riskCalculationId  String    @map("risk_calculation_id") @db.Uuid
+  supersedesReviewId String?   @map("supersedes_review_id") @db.Uuid
+  decision           String
+  correctedBand      String?   @map("corrected_band")
+  expiresAt          DateTime? @map("expires_at") @db.Timestamptz(6)
+  reason             String?   @db.VarChar(2000)
+  reasonSha256       String?   @map("reason_sha256") @db.Char(64)
+  actorUserId        String    @map("actor_user_id") @db.Uuid
+  actorMembershipId  String    @map("actor_membership_id") @db.Uuid
+  correlationId      String    @map("correlation_id") @db.Uuid
+  createdAt          DateTime  @default(dbgenerated("CURRENT_TIMESTAMP")) @map("created_at") @db.Timestamptz(6)
+
+  organization    Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict, map: "risk_calculation_review_organization_fkey")
+  finding         Finding                 @relation(fields: [organizationId, findingId], references: [organizationId, id], onDelete: Restrict, map: "risk_calculation_review_finding_fkey")
+  riskCalculation RiskCalculation         @relation(fields: [organizationId, riskCalculationId], references: [organizationId, id], onDelete: Restrict, map: "risk_calculation_review_calculation_fkey")
+  supersedes      RiskCalculationReview?  @relation("RiskCalculationReviewSupersession", fields: [organizationId, supersedesReviewId], references: [organizationId, id], onDelete: Restrict, map: "risk_calculation_review_supersedes_fkey")
+  successors      RiskCalculationReview[] @relation("RiskCalculationReviewSupersession")
+  actorUser       User                    @relation("RiskCalculationReviewActorUser", fields: [actorUserId], references: [id], onDelete: Restrict, map: "risk_calculation_review_actor_user_fkey")
+  actorMembership Membership              @relation("RiskCalculationReviewActorMembership", fields: [organizationId, actorMembershipId], references: [organizationId, id], onDelete: Restrict, map: "risk_calculation_review_actor_membership_fkey")
+
+  @@unique([organizationId, id], map: "risk_calculation_review_org_id_key")
+  @@index([organizationId, riskCalculationId], map: "risk_calculation_review_calculation_idx")
+  @@index([organizationId, findingId], map: "risk_calculation_review_finding_idx")
+  @@map("risk_calculation_review")
 }
 
 model RemediationTask {

@@ -21,6 +21,12 @@ import type { AssetRuntime } from './asset-runtime.js';
 import { registerAuthRoutes } from './auth-routes.js';
 import type { AuthRuntime } from './auth-runtime.js';
 import { registerFindingRoutes } from './finding-routes.js';
+import { registerFindingPriorityRoutes } from './finding-priority-routes.js';
+import { registerRemediationQueueRoutes } from './remediation-queue-routes.js';
+import {
+  denyControlledPriorityRuntime,
+  type ControlledPriorityRuntime,
+} from './priority-runtime.js';
 import type { FindingOperatorRuntime } from './finding-runtime.js';
 import { registerFindingDiscoveryRoutes } from './finding-discovery-routes.js';
 import { denyFindingDiscoveryRuntime } from './finding-discovery-runtime.js';
@@ -38,6 +44,11 @@ import {
   denyProductMatchEvaluationRuntime,
   type ProductMatchEvaluationRuntime,
 } from './product-match-evaluation-runtime.js';
+import { registerProductMatchCandidateRoutes } from './product-match-candidate-routes.js';
+import {
+  denyProductMatchCandidateRuntime,
+  type ProductMatchCandidateRuntime,
+} from './product-match-candidate-runtime.js';
 import { registerSbomRoutes } from './sbom-routes.js';
 import type { SbomRuntime } from './sbom-runtime.js';
 import { readSingleHeader } from './headers.js';
@@ -55,6 +66,7 @@ export type ApiDependencies = {
   sboms: SbomRuntime;
   intelligence: IntelligenceRuntime;
   findings: FindingOperatorRuntime;
+  priority?: ControlledPriorityRuntime;
   advisories?: MaintainerReviewedAdvisoryRuntime;
   submissionPeerKey?: (request: FastifyRequest) => string;
   approvalPeerKey?: (request: FastifyRequest) => string;
@@ -64,6 +76,8 @@ export type ApiDependencies = {
   discoveryOrganizationLimiter?: FindingOrganizationRateLimiter;
   productMatchEvaluation?: ProductMatchEvaluationRuntime;
   productMatchEvaluationOrganizationLimiter?: FindingOrganizationRateLimiter;
+  productMatchCandidates?: ProductMatchCandidateRuntime;
+  productMatchCandidateOrganizationLimiter?: FindingOrganizationRateLimiter;
   now?: () => string;
   generateId?: () => string;
 };
@@ -253,6 +267,20 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       : { approvalPeerKey: dependencies.approvalPeerKey }),
   });
 
+  const priority = dependencies.priority ?? denyControlledPriorityRuntime();
+  await registerFindingPriorityRoutes(app, {
+    config: dependencies.config,
+    logger: dependencies.logger,
+    auth: dependencies.auth,
+    priority,
+  });
+  await registerRemediationQueueRoutes(app, {
+    config: dependencies.config,
+    logger: dependencies.logger,
+    auth: dependencies.auth,
+    priority,
+  });
+
   await registerFindingRoutes(app, {
     config: dependencies.config,
     logger: dependencies.logger,
@@ -287,6 +315,20 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       : {
           productMatchEvaluationOrganizationLimiter:
             dependencies.productMatchEvaluationOrganizationLimiter,
+        }),
+  });
+
+  await registerProductMatchCandidateRoutes(app, {
+    config: dependencies.config,
+    logger: dependencies.logger,
+    auth: dependencies.auth,
+    productMatchCandidates:
+      dependencies.productMatchCandidates ?? denyProductMatchCandidateRuntime(),
+    ...(dependencies.productMatchCandidateOrganizationLimiter === undefined
+      ? {}
+      : {
+          productMatchCandidateOrganizationLimiter:
+            dependencies.productMatchCandidateOrganizationLimiter,
         }),
   });
 

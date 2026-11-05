@@ -1,6 +1,7 @@
 /**
  * Domain owns the priority port. It does not import the policy engine.
- * Apps, the worker, and the database barrel do not import it either.
+ * The API composition files and the builtin publication command may import it.
+ * The web, the worker, and the database barrel do not.
  */
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -80,7 +81,8 @@ describe('priority contract boundary', () => {
       'priority:calculate_controlled',
     );
     expect(domainPublic.PRIORITY_INSPECT_PERMISSION).toBe('priority:inspect');
-    expect(domainPublic.PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION).toBe('absent');
+    expect(domainPublic.PRIORITY_REVIEW_CONTROLLED_PERMISSION).toBe('priority:review_controlled');
+    expect(domainPublic.PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION).toBe('api_process');
   });
 
   it('does not depend on the policy engine', () => {
@@ -101,16 +103,28 @@ describe('priority contract boundary', () => {
     expect(declared).not.toContain('@patchpilot/policy-engine');
   });
 
-  it('keeps the engine import out of domain, apps, and the database barrel', () => {
+  it('keeps the engine import out of domain, the web, the worker, and the database barrel', () => {
+    const allowed = new Set([
+      path.join(repoRoot, 'apps/api/src/priority-engine.ts'),
+      path.join(repoRoot, 'apps/api/src/priority-policy-hash.ts'),
+      path.join(
+        repoRoot,
+        'packages/database/src/builtin-priority-policy-publication-command-main.ts',
+      ),
+      path.join(repoRoot, 'packages/database/src/seed/run.ts'),
+    ]);
     const files = [
       ...walk(path.join(repoRoot, 'packages/domain/src')),
       ...walk(path.join(repoRoot, 'apps/api')),
       ...walk(path.join(repoRoot, 'apps/web')),
       ...walk(path.join(repoRoot, 'apps/worker')),
-      path.join(repoRoot, 'packages/database/src/index.ts'),
+      ...walk(path.join(repoRoot, 'packages/database/src')),
     ];
     const offenders: string[] = [];
     for (const filePath of files) {
+      if (allowed.has(filePath) || filePath.endsWith('.test.ts')) {
+        continue;
+      }
       const specifiers = importSpecifiers(readFileSync(filePath, 'utf8'));
       if (specifiers.some(importsPolicyEngine)) {
         offenders.push(path.relative(repoRoot, filePath));

@@ -16,7 +16,7 @@ operator acquisition mode. It does not supersede
 
 The command and script are implemented and production uncomposed. This ADR remains Proposed. Migration 27 is
 `packages/database/prisma/migrations/20261102120000_offline_npm_osv_import/migration.sql`.
-The frozen migration count is 27. This ADR adds no route, web action, worker job,
+The frozen migration count is 28. This ADR adds no route, web action, worker job,
 seed, Outbox row, Finding, Product Match Evidence row, or RiskCalculation.
 Production OSV acquisition stays disabled.
 
@@ -622,7 +622,7 @@ The operator procedure is
 ## Follow-up
 
 - Migration 27 is implemented. The command and script are implemented and
-  production uncomposed. Production OSV acquisition stays disabled. The frozen migration count is 27.
+  production uncomposed. Production OSV acquisition stays disabled. The frozen migration count is 28.
   [ADR 0044](0044-deliberate-product-match-evidence-evaluation.md) remains the
   unimplemented product-match slice.
 - Independent verification by an agent that did not write the implementation.

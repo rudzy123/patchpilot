@@ -37,4 +37,4 @@ A failed request leaves the last committed revision unchanged. Do not repair a s
 
 ## What these routes do not do
 
-They do not mint a capability for the caller, list advisories, return the advisory document, evaluate a component, or enqueue work. The deployment-local grant command remains the only grant writer. The frozen migration count is 27.
+They do not mint a capability for the caller, list advisories, return the advisory document, evaluate a component, or enqueue work. The deployment-local grant command remains the only grant writer. The frozen migration count is 28.

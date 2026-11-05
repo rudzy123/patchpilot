@@ -57,11 +57,18 @@ describe('AssetDetailPageClient', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/SBOM/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/vulnerabilit/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/remediation/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Remediation queue' })).toHaveAttribute(
+      'href',
+      '/remediation-queue',
+    );
     const targets = screen.getByRole('link', { name: 'Review controlled Finding targets' });
     expect(targets).toHaveAttribute('href', `/assets/${ASSET_ID}/findings/targets`);
     expect(targets.getAttribute('href')).not.toContain('<script>');
+    expect(
+      screen.queryByRole('link', { name: 'Evaluate product match evidence' }),
+    ).not.toBeInTheDocument();
     expect(authApi.listControlledFindingTargets).not.toHaveBeenCalled();
+    expect(authApi.listProductMatchCandidates).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: /Create Finding/i })).not.toBeInTheDocument();
   });
 
@@ -239,6 +246,10 @@ describe('AssetDetailPageClient', () => {
     expect(
       screen.queryByRole('link', { name: 'Review controlled Finding targets' }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Evaluate product match evidence' }),
+    ).not.toBeInTheDocument();
+    expect(authApi.listProductMatchCandidates).not.toHaveBeenCalled();
   });
 
   it('shows the controlled Finding target link to an owner without loading targets', async () => {
@@ -254,7 +265,10 @@ describe('AssetDetailPageClient', () => {
     const targets = await screen.findByRole('link', { name: 'Review controlled Finding targets' });
     expect(targets).toHaveAttribute('href', `/assets/${ASSET_ID}/findings/targets`);
     expect(targets.getAttribute('href')).not.toContain('Payments');
+    const productMatch = screen.getByRole('link', { name: 'Evaluate product match evidence' });
+    expect(productMatch).toHaveAttribute('href', `/assets/${ASSET_ID}/product-match-evaluations`);
     expect(authApi.listControlledFindingTargets).not.toHaveBeenCalled();
+    expect(authApi.listProductMatchCandidates).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: /Create Finding/i })).not.toBeInTheDocument();
   });
 });

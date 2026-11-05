@@ -27,7 +27,7 @@ describe('deliberate product match evaluation persistence boundary', () => {
     const migrations = readdirSync(join(packageRoot, 'prisma/migrations')).filter((name) =>
       /^\d/.test(name),
     );
-    expect(migrations).toHaveLength(27);
+    expect(migrations).toHaveLength(28);
   });
 
   it('locks one asset and does not write Findings or call a provider', () => {

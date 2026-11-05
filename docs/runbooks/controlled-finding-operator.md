@@ -38,7 +38,7 @@ The limiters are process-local. Restarting the API process clears them. There is
 
 ## What this route does not do
 
-Publishing `POST /findings` or `GET /findings/:findingId` does not authorize another component to call them. Web startup, workers, schedulers, queues, upload processing, evaluator processing, provider synchronization, seeds, and migrations do not construct creation or inspection. There is no Finding list, bulk creation, or lifecycle route.
+Publishing `POST /findings` or `GET /findings/:findingId` does not authorize another component to call them. Web startup, workers, schedulers, queues, upload processing, evaluator processing, provider synchronization, seeds, and migrations do not construct creation or inspection. The only Finding list is owner and admin `GET /remediation-queue`. There is no generic Finding list, bulk creation, or lifecycle route.
 
 ## Discovery
 

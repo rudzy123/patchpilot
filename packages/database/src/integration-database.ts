@@ -142,6 +142,10 @@ export const FROZEN_MIGRATIONS = [
     directory: '20261102120000_offline_npm_osv_import',
     sha256: '74e2a319b7402f9b9650fd8694356fafaadc3bd859eaa2ebea1d6abefecc46d1',
   },
+  {
+    directory: '20261104120000_risk_calculation_review',
+    sha256: 'a7e9693f83f3c740db786f3b18f1e7f3dc9211b734155f8d139b88de066772e3',
+  },
 ] as const;
 
 export const SESSION_7_ASSET_INVENTORY_CONSTRAINTS =
@@ -200,6 +204,8 @@ export const INSTANCE_ADVISORY_AUTHORITY_GRANT =
 
 export const OFFLINE_NPM_OSV_IMPORT = '20261102120000_offline_npm_osv_import' as const;
 
+export const RISK_CALCULATION_REVIEW = '20261104120000_risk_calculation_review' as const;
+
 export const EXPECTED_APPLIED_MIGRATIONS = [
   '20260826120000_schema_foundation',
   '20260827120000_tenant_model',
@@ -228,6 +234,7 @@ export const EXPECTED_APPLIED_MIGRATIONS = [
   CONTROLLED_FINDING_REPEATED_OBSERVATION,
   INSTANCE_ADVISORY_AUTHORITY_GRANT,
   OFFLINE_NPM_OSV_IMPORT,
+  RISK_CALCULATION_REVIEW,
 ] as const;
 
 export function frozenMigrationFile(directory: string): string {
@@ -588,4 +595,9 @@ export async function applyThroughInstanceAdvisoryAuthorityGrant(
   await applyThroughControlledFindingCreation(databaseUrl);
   await applyMigrationSqlAndResolve(databaseUrl, CONTROLLED_FINDING_REPEATED_OBSERVATION);
   await applyMigrationSqlAndResolve(databaseUrl, INSTANCE_ADVISORY_AUTHORITY_GRANT);
+}
+
+export async function applyThroughOfflineNpmOsvImport(databaseUrl: string): Promise<void> {
+  await applyThroughInstanceAdvisoryAuthorityGrant(databaseUrl);
+  await applyMigrationSqlAndResolve(databaseUrl, OFFLINE_NPM_OSV_IMPORT);
 }

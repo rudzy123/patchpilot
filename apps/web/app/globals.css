@@ -106,11 +106,13 @@ nav[aria-label='Account'] {
 
 .finding-candidate,
 .finding-latest-observation,
+.finding-priority,
 .asset-dialog {
   overflow-wrap: anywhere;
 }
 
-.finding-latest-observation {
+.finding-latest-observation,
+.finding-priority {
   border: 1px solid currentColor;
   margin: 1rem 0;
   padding: 1rem;
@@ -125,7 +127,8 @@ nav[aria-label='Account'] {
 @media (prefers-reduced-motion: reduce) {
   .asset-dialog,
   .finding-candidate,
-  .finding-latest-observation {
+  .finding-latest-observation,
+  .finding-priority {
     animation: none;
     scroll-behavior: auto;
     transition: none;

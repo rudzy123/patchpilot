@@ -1193,15 +1193,21 @@ export {
   type ControlledFindingOperatorPermission,
 } from './findings/controlled-operator/permissions.js';
 
+export type { ControlledFindingOperatorActor } from './findings/controlled-operator/actor.js';
+
 export {
   FINDING_DISCOVER_CONTROLLED_PERMISSION,
   controlledFindingDiscoveryPermissionsForRole,
 } from './findings/controlled-discovery/permissions.js';
 
 export {
+  PRODUCT_MATCH_DISCOVER_CONTROLLED_PERMISSION,
   PRODUCT_MATCH_EVALUATE_CONTROLLED_PERMISSION,
+  productMatchDiscoveryPermissionsForRole,
   productMatchEvaluationPermissionsForRole,
+  roleGrantsProductMatchDiscovery,
   roleGrantsProductMatchEvaluation,
+  type ProductMatchDiscoveryPermission,
   type ProductMatchEvaluationPermission,
 } from './product-match/permissions.js';
 
@@ -1295,9 +1301,16 @@ export {
 } from './risk/index.js';
 
 export {
+  ADMITTED_PRIORITY_POLICY_PAIRS,
+  isAdmittedPriorityPolicyPair,
+  type AdmittedPriorityPolicyPair,
+} from './risk/index.js';
+
+export {
   PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
   PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION,
   PRIORITY_INSPECT_PERMISSION,
+  PRIORITY_REVIEW_CONTROLLED_PERMISSION,
   priorityPermissionsForRole,
   roleGrantsPriorityPermission,
   type PriorityPermission,
@@ -1305,6 +1318,7 @@ export {
 
 export {
   ORGANIZATION_PRIORITY_OVERRIDE_PERMISSION,
+  authorizePriorityFindingCommand,
   createCalculateFindingRiskUseCase,
   createPublishOrganizationPriorityOverrideUseCase,
   createReadCurrentFindingRiskUseCase,
@@ -1317,10 +1331,77 @@ export {
 } from './risk/index.js';
 
 export {
+  FINDING_PRIORITY_REVIEW_NONE,
+  PRIORITY_INPUT_CHANGE_SIGNALS,
+  classifyPriorityInputChanges,
+  createReadControlledFindingPriorityUseCase,
+  type FindingPriorityCalculatedView,
+  type FindingPriorityReviewNone,
+  type PriorityInputChangeComparison,
+  type PriorityInputChangeReport,
+  type PriorityInputChangeSignal,
+  type ReadControlledFindingPriorityDependencies,
+  type ReadControlledFindingPriorityResult,
+} from './risk/index.js';
+
+export {
+  PRIORITY_REVIEW_AUDIT_ACTIONS,
+  PRIORITY_REVIEW_DECISIONS,
+  PRIORITY_REVIEW_SUBJECT_TYPE,
+  createRecordPriorityReviewUseCase,
+  normalizePriorityReviewReason,
+  priorityReviewAuditAction,
+  priorityReviewAuditPayload,
+  projectFindingPriorityReview,
+  projectPriorityReviewMarker,
+  type FindingPriorityReview,
+  type FindingPriorityReviewMarker,
+  type PriorityReviewAuditPayload,
+  type PriorityReviewDecision,
+  type PriorityReviewPersistencePort,
+  type RecordPriorityReviewCommand,
+  type RecordPriorityReviewPersistenceResult,
+  type RecordPriorityReviewResult,
+} from './risk/index.js';
+
+export {
+  REMEDIATION_QUEUE_COMPARISON_MESSAGE,
+  REMEDIATION_QUEUE_DEFAULT_LIMIT,
+  REMEDIATION_QUEUE_MAX_CURSOR_LENGTH,
+  REMEDIATION_QUEUE_MAX_LIMIT,
+  REMEDIATION_QUEUE_READ_PERMISSION,
+  REMEDIATION_QUEUE_SECTIONS,
+  compareStoredRemediationRank,
+  createReadRemediationQueueUseCase,
+  remediationQueuePermissionsForRole,
+  roleGrantsRemediationQueueRead,
+  storedKevListed,
+  type ReadRemediationQueueDependencies,
+  type ReadRemediationQueueResult,
+  type RemediationQueueCalculationFields,
+  type RemediationQueueCounts,
+  type RemediationQueueIncomparableRow,
+  type RemediationQueueNotCalculatedRow,
+  type RemediationQueuePage,
+  type RemediationQueuePermission,
+  type RemediationQueuePersistencePort,
+  type RemediationQueueRankedRow,
+  type RemediationQueueRawRow,
+  type RemediationQueueReadQuery,
+  type RemediationQueueReadResult,
+  type RemediationQueueReference,
+  type RemediationQueueSection,
+  type StoredRemediationRankKey,
+} from './risk/index.js';
+
+export {
   BUILTIN_PRIORITY_POLICY_KEY,
   BUILTIN_PRIORITY_POLICY_VERSION,
   PERSISTED_RISK_CALCULATION_REASONS,
   type CurrentRiskCalculationRead,
+  type FindingPriorityCalculationRecord,
+  type FindingPriorityPublishedBuiltin,
+  type FindingPriorityRead,
   type LockedPriorityCalculationContext,
   type LockedPriorityCalculationDecision,
   type LockedPriorityCalculationOutcome,

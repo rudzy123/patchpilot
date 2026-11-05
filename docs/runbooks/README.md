@@ -12,7 +12,7 @@ They do not include exploit payloads. They do not claim compliance.
 
 | Runbook | When to use |
 | --- | --- |
-| [Self-hosted deployment](self-hosted-deployment.md) | Build and run the application profile on project `patchpilot-eval`. Not local `pnpm dev`. No first user. Priority stays uncomposed. Login still needs operator HTTPS |
+| [Self-hosted deployment](self-hosted-deployment.md) | Build and run the application profile on project `patchpilot-eval`. Not local `pnpm dev`. No first user. Priority routes are composed with an empty allowlist. Login still needs operator HTTPS |
 | [SBOM ingestion failure](sbom-ingestion-failure.md) | Upload, parse, quarantine, or orphan-object problems |
 | [Vulnerability sync failure](vulnerability-sync-failure.md) | OSV or CISA KEV refresh stale, rate-limited, or inconsistent |
 | [OSV first-provider canary procedures](osv-canary.md) | Session 13 Batch 3C executed one listing-only real-provider canary; Session 13 Batch 3D executed one separately authorized one-page protected-evidence listing (`protected_evidence_listing_canary_one_page_persisted`; 1000 encrypted observations; halt restored; lease released; commands remain production-unregistered; do not retry; do not request a second page; Session 13 Batch 3D-R independently reviewed; selection unauthorized; Batch 4-P blocked) |
@@ -24,9 +24,11 @@ They do not include exploit payloads. They do not claim compliance.
 | [Audit integrity failure](audit-integrity-failure.md) | Missing, altered, or cascade-deleted audit or evidence |
 | [Authentication failure](authentication-failure.md) | Login, session, CSRF, cookie, or login-limiter problems |
 | [Instance advisory authority command](instance-advisory-authority-command.md) | Explicit deployment-local grant, revoke, disable, and enable operations |
+| [Built-in priority policy publication](builtin-priority-policy-publication.md) | Explicit deployment-local publication of builtin `patchpilot.builtin.v0` version 2. The unsigned V-0001 pair exits 2 and writes nothing |
+| [Priority review](priority-review.md) | Owner append-only review of one RiskCalculation. A review does not change the calculated priority or the queue order |
 | [Offline npm OSV import](offline-npm-osv-import.md) | Explicit deployment-local npm GHSA directory import. Production uncomposed. Migration 27 is implemented and seeds no rows. Production OSV acquisition stays disabled |
 | [Maintainer-reviewed advisory API](maintainer-reviewed-advisory-api.md) | Authenticated local advisory submission and independent approval through the API |
-| [Deliberate Product Match Evidence evaluation](deliberate-product-match-evidence-evaluation.md) | Owner evaluation of one approved npm revision against one asset. API only. This slice adds no migration. The frozen migration count is 27 |
+| [Deliberate Product Match Evidence evaluation](deliberate-product-match-evidence-evaluation.md) | Owner evaluation of one approved npm revision against one asset, and the owner candidate page. This slice adds no migration. The frozen migration count is 28 |
 | [Controlled Finding operator](controlled-finding-operator.md) | Owner creation, owner or admin inspection, and owner or admin target discovery through the API |
 | [Controlled Finding web workflow](controlled-finding-web-workflow.md) | Nested target review and direct Finding inspection in the web application |
 | [CI failure](ci-failure.md) | GitHub Actions or local quality gates fail |

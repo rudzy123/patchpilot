@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { ReactElement, ReactNode } from 'react';
 
+import { canPresentRemediationQueue } from '../lib/finding-permissions';
+
 import { useAuth } from './auth-provider';
 
 export function SignedInShell({ children }: { children: ReactNode }): ReactElement {
@@ -30,6 +32,9 @@ export function SignedInShell({ children }: { children: ReactNode }): ReactEleme
         <nav aria-label="Primary">
           <a href="/home">Home</a>
           <Link href="/assets">Assets</Link>
+          {canPresentRemediationQueue(organization?.role) ? (
+            <Link href="/remediation-queue">Remediation queue</Link>
+          ) : null}
         </nav>
         <nav aria-label="Account">
           <a href="/organizations">Change organization</a>

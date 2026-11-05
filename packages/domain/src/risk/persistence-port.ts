@@ -13,6 +13,7 @@ import type { Result } from '../result.js';
 import type { ActiveKevMembership } from '../vulnerability/kev-membership.js';
 import type { FindingRiskSourceSnapshot } from './fact-assembly.js';
 import { PRIORITY_CALCULATION_ENGINE_VERSION } from './catalog.js';
+import type { FindingPriorityReview } from './priority-review.js';
 
 export const BUILTIN_PRIORITY_POLICY_KEY = 'patchpilot.builtin.v0' as const;
 
@@ -77,6 +78,55 @@ export type PriorityPolicyLookup =
 export type CurrentRiskCalculationRead =
   | { readonly kind: 'found'; readonly calculation: StoredRiskCalculation }
   | { readonly kind: 'not_found' }
+  | { readonly kind: 'unavailable' };
+
+export type FindingPriorityPublishedBuiltin = {
+  readonly id: string;
+  readonly policyKey: typeof BUILTIN_PRIORITY_POLICY_KEY;
+  readonly version: number;
+  readonly definition: Readonly<Record<string, unknown>>;
+};
+
+/**
+ * One stored calculation plus the identifiers the read compares.
+ * `calculationEngineVersion` is the stored string. It is not limited to the
+ * current engine constant, so a later engine can be reported as changed.
+ */
+export type FindingPriorityCalculationRecord = {
+  readonly id: string;
+  readonly riskPolicyId: string;
+  readonly policyKey: string;
+  readonly policyVersion: number;
+  readonly policyDefinitionSha256: string;
+  readonly calculatedAt: Date;
+  readonly calculationEngineVersion: string;
+  readonly calculationReason: PersistedRiskCalculationReason;
+  readonly factors: RiskCalculationFactorsV2Json;
+  readonly result: RiskCalculationResultV1Json;
+  readonly lastObservedAt: Date;
+  readonly assetUpdatedAt: Date;
+  readonly activeKevGenerationId: string | null;
+};
+
+/**
+ * One tenant-scoped read. `finding_absent` covers a missing Finding and a
+ * Finding owned by another organization. `not_calculated` is only returned
+ * after the Finding is in the actor's organization.
+ */
+export type FindingPriorityRead =
+  | { readonly kind: 'finding_absent' }
+  | {
+      readonly kind: 'not_calculated';
+      readonly findingId: string;
+      readonly publishedBuiltin: FindingPriorityPublishedBuiltin | null;
+    }
+  | {
+      readonly kind: 'calculated';
+      readonly findingId: string;
+      readonly publishedBuiltin: FindingPriorityPublishedBuiltin | null;
+      readonly calculation: FindingPriorityCalculationRecord;
+      readonly review: FindingPriorityReview;
+    }
   | { readonly kind: 'unavailable' };
 
 export type PersistFindingRiskCalculationCommand = {
@@ -171,6 +221,7 @@ export type RiskCalculationPersistencePort = {
   readonly findCurrentRiskCalculation: (
     input: RiskCalculationScope,
   ) => Promise<CurrentRiskCalculationRead>;
+  readonly readFindingPriority: (input: RiskCalculationScope) => Promise<FindingPriorityRead>;
   readonly persistRiskCalculation: (
     input: PersistFindingRiskCalculationCommand,
   ) => Promise<PersistFindingRiskCalculationResult>;

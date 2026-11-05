@@ -478,13 +478,16 @@ No backend change is required. The workflow uses the current API limits:
   response, or an id the operator already had.
 
 A later change to those limits requires another architecture review. This ADR does
-not authorize that change.
+not authorize that change. [ADR 0048](0048-controlled-remediation-queue.md) later
+accepts one exception: `GET /remediation-queue` and the page `/remediation-queue`.
+That lift does not authorize `GET /findings`, search, export, or any other list.
 
 ### 25. Explicit deferrals
 
 The following remain unavailable:
 
-- Finding list;
+- Finding list, except the one read-only queue later accepted by
+  [ADR 0048](0048-controlled-remediation-queue.md);
 - global search;
 - cross-asset discovery;
 - create-all;

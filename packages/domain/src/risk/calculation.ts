@@ -1,8 +1,8 @@
 /**
- * Uncomposed priority calculation for one controlled Finding.
+ * Priority calculation for one controlled Finding.
  * Organization comes from the trusted actor. The command must not carry
- * `organizationId`. Production registration stays absent: no route, worker,
- * or Outbox event is constructed here.
+ * `organizationId`. The API process is the only production constructor.
+ * This module does not construct a route, a worker, or an Outbox event.
  *
  * `inputFingerprint` is the SHA-256 of `canonicalJson` of
  * `{ engineVersion, policyDefinitionSha256, facts }`. `facts` is the object
@@ -94,6 +94,10 @@ import {
   type StoredRiskCalculation,
 } from './persistence-port.js';
 import {
+  isAdmittedPriorityPolicyPair,
+  type AdmittedPriorityPolicyPair,
+} from './admitted-priority-policy.js';
+import {
   PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
   PRIORITY_INSPECT_PERMISSION,
   roleGrantsPriorityPermission,
@@ -172,6 +176,7 @@ export type CalculateFindingRiskDependencies<TValidatedDefinition, TParsedFacts>
   readonly engine: PriorityEnginePort<TValidatedDefinition, TParsedFacts>;
   readonly persistence: Pick<RiskCalculationPersistencePort, 'executeLockedPriorityCalculation'>;
   readonly builtinDefinition: unknown;
+  readonly admittedPairs: readonly AdmittedPriorityPolicyPair[];
   readonly createCorrelationId?: () => string;
 };
 
@@ -194,6 +199,10 @@ export type CalculateFindingRiskResult =
       readonly reason: 'absent' | 'mismatch' | 'invalid' | 'unreadable' | 'version';
     }
   | { readonly kind: 'override_rejected'; readonly reason: 'invalid' | 'unreadable' }
+  | {
+      readonly kind: 'priority_policy_unavailable';
+      readonly reason: 'unvalidated' | 'override_present';
+    }
   | { readonly kind: 'facts_rejected'; readonly code: FindingRiskFactAssemblyFailureCode }
   | { readonly kind: 'fact_input_rejected' }
   | { readonly kind: 'canonical_json_rejected' }
@@ -303,7 +312,7 @@ async function executeRead(
   dependencies: ReadCurrentFindingRiskDependencies,
   input: unknown,
 ): Promise<ReadCurrentFindingRiskResult> {
-  const authorized = authorizeFinding(input, PRIORITY_INSPECT_PERMISSION);
+  const authorized = authorizePriorityFindingCommand(input, PRIORITY_INSPECT_PERMISSION);
   if (!authorized.ok) {
     return { kind: authorized.kind };
   }
@@ -391,7 +400,10 @@ async function executeCalculation<TValidatedDefinition, TParsedFacts>(
   createCorrelationId: () => string,
   input: unknown,
 ): Promise<CalculateFindingRiskResult> {
-  const authorized = authorizeFinding(input, PRIORITY_CALCULATE_CONTROLLED_PERMISSION);
+  const authorized = authorizePriorityFindingCommand(
+    input,
+    PRIORITY_CALCULATE_CONTROLLED_PERMISSION,
+  );
   if (!authorized.ok) {
     return { kind: authorized.kind };
   }
@@ -524,7 +536,7 @@ function mapPersistedCalculation(
   }
 }
 
-function authorizeFinding(
+export function authorizePriorityFindingCommand(
   input: unknown,
   permission: PriorityPermission,
 ): AuthorizedFinding | { readonly ok: false; readonly kind: 'unauthorized' | 'invalid_command' } {
@@ -759,31 +771,37 @@ function selectPolicy<TValidatedDefinition, TParsedFacts>(
   if (override.kind === 'unavailable') {
     return { ok: false, failure: { kind: 'override_rejected', reason: 'unreadable' } };
   }
-  if (override.kind === 'not_found') {
+  if (override.kind === 'found') {
     return {
-      ok: true,
-      policy: {
-        definition: validatedBuiltin.definition,
-        riskPolicyId: validatedBuiltin.policy.id,
-      },
+      ok: false,
+      failure: { kind: 'priority_policy_unavailable', reason: 'override_present' },
     };
   }
-  if (override.kind !== 'found') {
+  if (override.kind !== 'not_found') {
     return assertNever(override);
   }
-  if (!publishedBuiltinKey(override.policy)) {
-    return { ok: false, failure: { kind: 'override_rejected', reason: 'unreadable' } };
+  const encoded = dependencies.engine.canonicalJson(validatedBuiltin.definition);
+  if (!encoded.ok) {
+    return { ok: false, failure: { kind: 'canonical_json_rejected' } };
   }
-  const validated = dependencies.engine.validatePolicyOverride(
-    validatedBuiltin.definition,
-    override.policy.definition,
-  );
-  if (!validated.ok) {
-    return { ok: false, failure: { kind: 'override_rejected', reason: 'invalid' } };
+  if (
+    !isAdmittedPriorityPolicyPair(
+      dependencies.admittedPairs,
+      PRIORITY_CALCULATION_ENGINE_VERSION,
+      sha256Hex(encoded.value),
+    )
+  ) {
+    return {
+      ok: false,
+      failure: { kind: 'priority_policy_unavailable', reason: 'unvalidated' },
+    };
   }
   return {
     ok: true,
-    policy: { definition: validated.value, riskPolicyId: override.policy.id },
+    policy: {
+      definition: validatedBuiltin.definition,
+      riskPolicyId: validatedBuiltin.policy.id,
+    },
   };
 }
 
@@ -829,14 +847,6 @@ function validateBuiltinPolicy<TValidatedDefinition, TParsedFacts>(
     definition: validated.value,
     policy: builtin.policy,
   };
-}
-
-function publishedBuiltinKey(policy: StoredPriorityPolicyView): boolean {
-  return (
-    policy.policyKey === BUILTIN_PRIORITY_POLICY_KEY &&
-    Number.isSafeInteger(policy.version) &&
-    policy.version >= 1
-  );
 }
 
 /**

@@ -17,6 +17,7 @@ import {
   createCalculateFindingRiskUseCase,
   createPublishOrganizationPriorityOverrideUseCase,
   createQueryActiveKevMembershipUseCase,
+  PRIORITY_CALCULATION_ENGINE_VERSION,
   createReadCurrentFindingRiskUseCase,
   type StoredRiskCalculation,
 } from '@patchpilot/domain';
@@ -78,7 +79,12 @@ import {
 } from './intelligence-test-fixture.js';
 import { createProductMatchEvaluationPersistence } from './product-match-evaluation-persistence.js';
 import { createRiskCalculationApplicationPersistence } from './risk-calculation-application-persistence.js';
-import { createRiskCalculationPersistence } from './risk-calculation-persistence.js';
+import { createPriorityReviewPersistence } from './priority-review-persistence.js';
+import { readRemediationQueuePage } from './remediation-queue-persistence.js';
+import {
+  createRiskCalculationPersistence,
+  readFindingPriorityState,
+} from './risk-calculation-persistence.js';
 import { createApprovalCapabilityHarness } from './reviewer-capability-approval-harness.js';
 import {
   developmentSeedIds,
@@ -110,6 +116,20 @@ const EMPTY_BUILTIN_V1 = {
   weights: {},
 };
 const TIE_ID = 'ffffffff-ffff-8fff-bfff-ffffffffffff';
+function admittedBuiltinPairs() {
+  const encoded = canonicalJson(BUILTIN_PRIORITY_POLICY_DEFINITION);
+  if (!encoded.ok) {
+    throw new Error('builtin canonical json failed');
+  }
+  return [
+    {
+      engineVersion: POLICY_ENGINE_VERSION,
+      policyDefinitionSha256: createHash('sha256').update(encoded.value, 'utf8').digest('hex'),
+      validationEntryId: 'fixture',
+    },
+  ];
+}
+
 const SESSION_ID = 'risk-calculation-session';
 
 type VersionRequest = {
@@ -1052,6 +1072,7 @@ beforeAll(async () => {
       engine,
       persistence,
       builtinDefinition: BUILTIN_PRIORITY_POLICY_DEFINITION,
+      admittedPairs: admittedBuiltinPairs(),
     }),
     read: createReadCurrentFindingRiskUseCase({ persistence }),
     publish: createPublishOrganizationPriorityOverrideUseCase({
@@ -1492,7 +1513,7 @@ describe('risk calculation persistence', () => {
     await expectFindingUntouched(prepared.organizationId, prepared.findingId);
   });
 
-  it('appends a policy_change row for a valid override and rejects an out-of-bounds override', async () => {
+  it('rejects an out-of-bounds override and refuses calculation while a valid override is present', async () => {
     const prepared = await prepareFinding('policy');
     const first = await services.calculate.execute(envelope(prepared));
     expect(first.kind).toBe('calculated');
@@ -1528,23 +1549,10 @@ describe('risk calculation persistence', () => {
     expect(published.policy.version).toBe(1);
     expect(await auditCount(prepared.organizationId, 'risk_policy.published')).toBe(1);
     const second = await services.calculate.execute(envelope(prepared));
-    expect(second.kind).toBe('calculated');
-    if (second.kind !== 'calculated') {
-      return;
-    }
-    expect(second.calculation.calculationReason).toBe('policy_change');
-    expect(second.calculation.riskPolicyId).toBe(published.policy.id);
-    expect(second.calculation.policyVersion).toBe(1);
+    expect(second).toEqual({ kind: 'priority_policy_unavailable', reason: 'override_present' });
+    expect(await calculationCount(prepared.organizationId, prepared.findingId)).toBe(1);
+    expect(await auditCount(prepared.organizationId, 'priority.calculated')).toBe(1);
     expect(await rowSnapshot(first.calculation.id)).toEqual(before);
-    assertMatchesEngine(
-      second.calculation,
-      checked.value,
-      await factsFor(
-        second.calculation,
-        { state: 'unavailable', reason: 'no_canonical_cve' },
-        'unknown',
-      ),
-    );
     expect(seedCanonical(BUILTIN_PRIORITY_POLICY_DEFINITION)).toBe(
       seedCanonical(validatedBuiltin()),
     );
@@ -1942,4 +1950,271 @@ function inspectionBundle(riskCalculationCount: number) {
     ],
     links,
   };
+}
+
+const REVIEW_REASON = 'priority-review-reason-token';
+
+describe('priority review persistence', () => {
+  it('keeps the finding, calculation, and queue order unchanged', async () => {
+    const prepared = await prepareFinding('priority-review');
+    const other = await prepareFinding('priority-review-other');
+    const calculated = await services.calculate.execute(envelope(prepared));
+    const otherCalculated = await services.calculate.execute(envelope(other));
+    expect(calculated.kind).toBe('calculated');
+    expect(otherCalculated.kind).toBe('calculated');
+    if (calculated.kind !== 'calculated' || otherCalculated.kind !== 'calculated') {
+      return;
+    }
+    const calculation = calculated.calculation;
+    const beforeRow = await rowSnapshot(calculation.id);
+    const beforeQueue = await queueRows(prepared.organizationId);
+    const correctedBand: 'P1' | 'P2' = calculation.result.priorityBand === 'P1' ? 'P2' : 'P1';
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    expiresAt.setUTCMilliseconds(0);
+    const reviews = createPriorityReviewPersistence(prisma);
+    const command = {
+      organizationId: prepared.organizationId,
+      actorUserId: prepared.userId,
+      membershipId: prepared.membershipId,
+      findingId: prepared.findingId,
+      riskCalculationId: calculation.id,
+      supersedesReviewId: null,
+      decision: 'corrected' as const,
+      correctedBand,
+      expiresAt,
+      reason: REVIEW_REASON,
+      correlationId: randomUUID(),
+    };
+    const recorded = await reviews.recordPriorityReview(command);
+    expect(recorded.kind).toBe('recorded');
+    if (recorded.kind !== 'recorded') {
+      return;
+    }
+    expect(await reviews.recordPriorityReview(command)).toMatchObject({
+      kind: 'already_applied',
+      reviewId: recorded.reviewId,
+    });
+    const audits = await prisma.auditEvent.findMany({
+      where: {
+        organizationId: prepared.organizationId,
+        action: 'priority.review_corrected',
+        subjectId: recorded.reviewId,
+      },
+    });
+    expect(audits).toHaveLength(1);
+    const payload = audits[0]?.payload;
+    expect(payload).toMatchObject({
+      schemaVersion: 1,
+      reviewId: recorded.reviewId,
+      findingId: prepared.findingId,
+      riskCalculationId: calculation.id,
+      decision: 'corrected',
+      correctedBand,
+      supersedesReviewId: null,
+      reasonLength: REVIEW_REASON.length,
+    });
+    expect(JSON.stringify(payload)).not.toContain(REVIEW_REASON);
+    expect(Object.keys(payload ?? {})).not.toContain('reason');
+    await expectFindingUntouched(prepared.organizationId, prepared.findingId);
+    expect(await rowSnapshot(calculation.id)).toEqual(beforeRow);
+    const afterQueue = await queueRows(prepared.organizationId);
+    expect(afterQueue.map((row) => `${row.findingId}:${String(row.priority)}`)).toEqual(
+      beforeQueue.map((row) => `${row.findingId}:${String(row.priority)}`),
+    );
+    expect(
+      afterQueue.find((row) => row.findingId === prepared.findingId)?.humanReview,
+    ).toMatchObject({ status: 'corrected', correctedBand });
+
+    expect(
+      await reviews.recordPriorityReview({
+        ...command,
+        decision: 'accepted',
+        correctedBand: null,
+        expiresAt: null,
+        reason: null,
+        correlationId: randomUUID(),
+      }),
+    ).toEqual({ kind: 'review_not_current' });
+    expect(
+      await reviews.recordPriorityReview({
+        ...command,
+        organizationId: other.organizationId,
+        actorUserId: other.userId,
+        membershipId: other.membershipId,
+        correlationId: randomUUID(),
+      }),
+    ).toEqual({ kind: 'not_found' });
+    expect(
+      await reviews.recordPriorityReview({
+        ...command,
+        organizationId: other.organizationId,
+        actorUserId: other.userId,
+        membershipId: other.membershipId,
+        findingId: other.findingId,
+        riskCalculationId: otherCalculated.calculation.id,
+        supersedesReviewId: recorded.reviewId,
+        decision: 'withdrawn',
+        correctedBand: null,
+        expiresAt: null,
+        reason: 'foreign review',
+        correlationId: randomUUID(),
+      }),
+    ).toEqual({ kind: 'not_found' });
+
+    await expect(
+      prisma.$executeRaw`
+        UPDATE "risk_calculation_review"
+        SET "decision" = 'accepted'
+        WHERE "id" = ${recorded.reviewId}::uuid
+      `,
+    ).rejects.toThrow(/append-only/);
+    await expect(
+      prisma.$executeRaw`
+        DELETE FROM "risk_calculation_review"
+        WHERE "id" = ${recorded.reviewId}::uuid
+      `,
+    ).rejects.toThrow(/append-only/);
+    await expect(
+      prisma.$executeRaw`
+        INSERT INTO "risk_calculation_review" (
+          "organization_id",
+          "finding_id",
+          "risk_calculation_id",
+          "supersedes_review_id",
+          "decision",
+          "corrected_band",
+          "expires_at",
+          "reason",
+          "reason_sha256",
+          "actor_user_id",
+          "actor_membership_id",
+          "correlation_id",
+          "created_at"
+        )
+        SELECT
+          "organization_id",
+          "finding_id",
+          "risk_calculation_id",
+          "id",
+          'corrected',
+          ${calculation.result.priorityBand},
+          "expires_at",
+          "reason",
+          "reason_sha256",
+          "actor_user_id",
+          "actor_membership_id",
+          gen_random_uuid(),
+          CURRENT_TIMESTAMP
+        FROM "risk_calculation_review"
+        WHERE "id" = ${recorded.reviewId}::uuid
+      `,
+    ).rejects.toThrow(/band unchanged/);
+
+    const later = await createRiskCalculationPersistence(prisma).persist({
+      organizationId: prepared.organizationId,
+      actorUserId: prepared.userId,
+      membershipId: prepared.membershipId,
+      findingId: prepared.findingId,
+      riskPolicyId: calculation.riskPolicyId,
+      policyDefinitionSha256: calculation.policyDefinitionSha256,
+      inputFingerprint: digest('priority-review-rescan'),
+      calculationReason: 'rescan',
+      factors: calculation.factors,
+      result: calculation.result,
+      correlationId: randomUUID(),
+      calculatedAt: new Date(calculation.calculatedAt.getTime() + 60_000),
+    });
+    expect(later.kind).toBe('persisted');
+    const current = await readFindingPriorityState(prisma, {
+      organizationId: prepared.organizationId,
+      findingId: prepared.findingId,
+    });
+    expect(current.kind).toBe('calculated');
+    if (current.kind === 'calculated') {
+      expect(current.review).toEqual({
+        status: 'none_for_current_calculation',
+        priorReviewExists: true,
+      });
+    }
+    expect(
+      await reviews.recordPriorityReview({
+        ...command,
+        correlationId: randomUUID(),
+      }),
+    ).toEqual({ kind: 'calculation_not_current' });
+    expect(await rowSnapshot(calculation.id)).toEqual(beforeRow);
+  });
+
+  it('rejects a chain fork and keeps one review row', async () => {
+    const prepared = await prepareFinding('priority-review-fork');
+    const calculated = await services.calculate.execute(envelope(prepared));
+    expect(calculated.kind).toBe('calculated');
+    if (calculated.kind !== 'calculated') {
+      return;
+    }
+    const reviews = createPriorityReviewPersistence(prisma);
+    const base = {
+      organizationId: prepared.organizationId,
+      actorUserId: prepared.userId,
+      membershipId: prepared.membershipId,
+      findingId: prepared.findingId,
+      riskCalculationId: calculated.calculation.id,
+      supersedesReviewId: null,
+      correctedBand: null,
+      expiresAt: null,
+    };
+    const [first, second] = await Promise.all([
+      reviews.recordPriorityReview({
+        ...base,
+        decision: 'accepted',
+        reason: null,
+        correlationId: randomUUID(),
+      }),
+      reviews.recordPriorityReview({
+        ...base,
+        decision: 'accepted',
+        reason: 'second fork attempt',
+        correlationId: randomUUID(),
+      }),
+    ]);
+    const kinds = [first.kind, second.kind].sort();
+    expect(kinds).toEqual(['recorded', 'review_not_current']);
+    const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM "risk_calculation_review"
+      WHERE "organization_id" = ${prepared.organizationId}::uuid
+        AND "finding_id" = ${prepared.findingId}::uuid
+    `;
+    expect(Number(rows[0]?.count)).toBe(1);
+    await expectFindingUntouched(prepared.organizationId, prepared.findingId);
+  });
+});
+
+async function queueRows(organizationId: string) {
+  const pair = admittedBuiltinPairs()[0];
+  if (pair === undefined) {
+    throw new Error('builtin pair missing');
+  }
+  const rows = [];
+  for (const section of ['ranked', 'incomparable', 'not_calculated'] as const) {
+    const page = await readRemediationQueuePage(prisma, {
+      organizationId,
+      section,
+      referencePolicyDefinitionSha256: pair.policyDefinitionSha256,
+      referenceEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+      limit: 50,
+      cursor: null,
+    });
+    if (page.kind !== 'page') {
+      throw new Error(`queue ${section} was ${page.kind}`);
+    }
+    rows.push(
+      ...page.rows.map((row) => ({
+        findingId: row.findingId,
+        priority: row.calculation?.priority ?? null,
+        humanReview: row.humanReview,
+      })),
+    );
+  }
+  return rows;
 }

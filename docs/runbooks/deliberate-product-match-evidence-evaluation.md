@@ -39,7 +39,7 @@ Evidence rows are immutable. An exact replay inserts nothing. A conflicting body
 - An unauthorized actor does not consume the organization budget
 - `X-Forwarded-For` is not the peer or the tenant
 
-The limiters are process-local. Restarting the API process clears them. There is no rate-limit table and no shared Redis limiter. Each API process keeps its own window, so several API processes multiply the ceiling. That multiplication is an accepted residual for this slice. The evaluation transaction uses a 5000 ms statement timeout, a 2000 ms lock timeout, a 2000 ms interactive wait, and a 10000 ms transaction ceiling. A timeout returns 503 and writes nothing. This slice adds no migration. The frozen migration count is 27.
+The limiters are process-local. Restarting the API process clears them. There is no rate-limit table and no shared Redis limiter. Each API process keeps its own window, so several API processes multiply the ceiling. That multiplication is an accepted residual for this slice. The evaluation transaction uses a 5000 ms statement timeout, a 2000 ms lock timeout, a 2000 ms interactive wait, and a 10000 ms transaction ceiling. A timeout returns 503 and writes nothing. This slice adds no migration. The frozen migration count is 28.
 
 ## Results
 
@@ -69,13 +69,22 @@ Exact replay, rejection, rollback, `no_relevant_occurrence`, `no_evaluable_occur
 
 The command does not insert or update a Finding, an observation, or an evidence link. Finding state stays `open` and Finding version stays `1`. An existing open Finding is left unchanged. After `affected` evidence exists, the owner uses `GET /assets/:assetId/controlled-finding-targets` and `POST /findings`. Discovery and creation revalidate the qualifying set. `unaffected` and `unknown` evidence is not a Finding target.
 
-The route does not write a `RiskCalculation`, call the priority engine, contact a provider, or enqueue work. Web startup, workers, schedulers, queues, upload processing, seeds, and migrations do not construct it. There is no web UI, advisory list, withdrawal writer, or all-asset scan.
+The route does not write a `RiskCalculation`, call the priority engine, contact a provider, or enqueue work. Web startup, workers, schedulers, queues, upload processing, seeds, and migrations do not construct it. The original decision had no web UI. On 2026-11-04, [ADR 0050](../adr/0050-product-match-evaluation-web-workflow.md) admits owner `GET /assets/:assetId/product-match-candidates` and the page `/assets/:assetId/product-match-evaluations`. The page posts `{ advisoryRevisionId }` only. It does not create a Finding. A global advisory catalog, a withdrawal writer, and an all-asset scan remain unavailable.
+
+## Candidate discovery
+
+The read is owner only. Permission `product_match:discover_controlled` does not grant evaluation, and evaluation does not grant the read. Admin, member, and viewer receive 403. A missing asset and an asset in another organization both return 404 `not_found`. The read writes no audit row.
+
+An empty list means there is nothing to evaluate for that asset. It does not mean a product-eligible catalog exists. The real product-eligible evaluation count remains 0.
+
+A cursor bound to an older ingestion returns 409 with message `stale_cursor`. After a POST, if the returned ingestion id differs from the ingestion the page discovered, the page discards the list and does not retry the POST. A result whose commit is uncertain tells the owner to reload before trying again. Reload is a new GET. It is not an automatic POST.
 
 The older single-occurrence evaluation command stays production uncomposed. This route does not call it.
 
 ## Related
 
 - [ADR 0044](../adr/0044-deliberate-product-match-evidence-evaluation.md)
+- [ADR 0050](../adr/0050-product-match-evaluation-web-workflow.md)
 - [ADR 0035](../adr/0035-controlled-finding-creation.md)
 - [Product-evidence provenance](../architecture/product-evidence-provenance.md)
 - [Audit model](../architecture/audit-model.md)

@@ -581,4 +581,54 @@ describe('createAuthApi', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it('lists candidates and posts only the advisory revision id', async () => {
+    const revisionId = '77777777-7777-4777-8777-777777777777';
+    const ingestionId = '66666666-6666-4666-8666-666666666666';
+    const fetchMock = vi.fn(async (input: RequestInfo, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes('/product-match-candidates')) {
+        return jsonResponse(200, {
+          schemaVersion: 'product_match_candidates_v1',
+          assetId: ASSET_ID,
+          ingestionId,
+          candidates: [],
+          nextCursor: null,
+        });
+      }
+      return jsonResponse(201, {
+        schemaVersion: 'deliberate_product_match_evaluation_response_v1',
+        status: 'evaluated',
+        assetId: ASSET_ID,
+        advisoryRevisionId: revisionId,
+        ingestionId,
+        selectedCount: 1,
+        evaluatedCount: 1,
+        insertedCount: 1,
+        replayedCount: 0,
+        skippedCount: 0,
+        skippedByReason: { version_not_known: 0, version_unrepresentable: 0 },
+        outcomeCounts: { affected: 1, unaffected: 0, unknown: 0 },
+        findingCreation: 'unavailable',
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const api = createAuthApi(API_BASE);
+    await api.listProductMatchCandidates(ASSET_ID, { cursor: 'cursor-b' });
+    await api.evaluateProductMatch(
+      ASSET_ID,
+      { advisoryRevisionId: revisionId },
+      CSRF_TOKEN_FIXTURE,
+    );
+    const listCall = fetchCall(fetchMock, 0);
+    const evaluateCall = fetchCall(fetchMock, 1);
+    expect(listCall.url).toBe(
+      `${API_BASE}/assets/${ASSET_ID}/product-match-candidates?limit=10&cursor=cursor-b`,
+    );
+    expect(listCall.init.method).toBe('GET');
+    expect(evaluateCall.url).toBe(`${API_BASE}/assets/${ASSET_ID}/product-match-evaluations`);
+    expect(evaluateCall.init.method).toBe('POST');
+    expect(JSON.parse(String(evaluateCall.init.body))).toEqual({ advisoryRevisionId: revisionId });
+    expect(new Headers(evaluateCall.init.headers).get(CSRF_HEADER_NAME)).toBe(CSRF_TOKEN_FIXTURE);
+  });
 });

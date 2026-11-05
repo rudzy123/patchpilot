@@ -1,6 +1,8 @@
 # Risk policy
 
-This is the canonical design for explainable, versioned **priority** calculation. Engine decision: [ADR 0012](../adr/0012-explainable-policy-engine.md). Numerical policy and engine contract: [ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md) (Proposed) and the Session 2 engine in `packages/policy-engine`. That engine is production uncomposed. The development seed entrypoint publishes builtin `patchpilot.builtin.v0` version 2 from `BUILTIN_PRIORITY_POLICY_DEFINITION`. The uncomposed calculation use case appends **RiskCalculation** rows. Current selection is read-time latest by `calculatedAt`, then `id`. `Finding.currentRiskCalculationId` and `Finding.dueAt` stay null. Prioritization is not a product UI ([current state](../project/current-state.md)).
+**Status.** [ADR 0047](../adr/0047-controlled-priority-activation.md) is Accepted and composed in the API process. [ADR 0048](../adr/0048-controlled-remediation-queue.md) is Accepted and composed as owner and admin `GET /remediation-queue`. [ADR 0049](../adr/0049-append-only-priority-review.md) is Accepted and composed as owner `POST /findings/:findingId/priority-reviews`. Deliberate calculation is an owner API command. The worker diagram below is not that composition. A manual override does not insert a **RiskCalculation**. A priority review is not **RiskAcceptance**, and it does not change queue rank. `manual_override` and `manual_recalc` stay rejected. The production allowlist is empty while R13 is open, so calculation returns 503 until a signed pair is mirrored and an operator publishes the builtin. See [current state](../project/current-state.md).
+
+This is the canonical design for explainable, versioned **priority** calculation. Engine decision: [ADR 0012](../adr/0012-explainable-policy-engine.md). Numerical policy and engine contract: [ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md) (Accepted 2026-11-04) and the Session 2 engine in `packages/policy-engine`. The API process composes that engine through `PriorityEnginePort`. The development seed and the deployment-local publication command can write builtin `patchpilot.builtin.v0` version 2 from `BUILTIN_PRIORITY_POLICY_DEFINITION`. The publication command refuses while the pair is unvalidated. The calculation use case appends **RiskCalculation** rows. Current selection is read-time latest by `calculatedAt`, then `id`. `Finding.currentRiskCalculationId` and `Finding.dueAt` stay null. The independent priority section is on `/findings/:findingId`. The production allowlist is empty, so that section reports policy unavailable until a signed pair is published ([current state](../project/current-state.md)).
 
 Until a later ADR splits the terms, **priority** and **risk score** mean the same stored ranking ([glossary](../product/glossary.md), [OD-7](open-decisions.md)).
 
@@ -30,7 +32,7 @@ Compensating controls are not an engine input. The ADR 0045 fact input rejects a
 
 **Risk acceptance** does not rewrite **RiskCalculation**. It changes finding workflow state and default queue filters.
 
-**Manual priority override** remains later design. An authorized change would record a reason, an expiration, and an audit, and would insert a new **RiskCalculation** rather than edit an old row. The uncomposed calculation writer records `initial`, `rescan`, `intel_refresh`, `policy_change`, and `asset_change`.
+**Manual priority override** is not a **RiskCalculation**. [ADR 0049](../adr/0049-append-only-priority-review.md) records acceptance and correction as append-only reviews of one immutable calculation. A review does not insert a calculation, and the calculation writer continues to reject `manual_override` and `manual_recalc`. The uncomposed calculation writer records `initial`, `rescan`, `intel_refresh`, `policy_change`, and `asset_change`.
 
 ## Vulnerability severity versus remediation priority
 
@@ -66,13 +68,15 @@ The API must be able to compare two findings in the same organization by:
 
 A comparison response is a **calculated** artifact. It cites stored factors; it does not call an LLM.
 
+The remediation queue in [ADR 0048](../adr/0048-controlled-remediation-queue.md) is the caller of `compareForRemediationQueue`. A Finding is ranked only when its latest calculation uses the published validated builtin definition hash and the injected engine version. Any other hash or engine version is `incomparable` and is not placed on the ranked ordering. A Finding with no calculation is not treated as P4 and is not appended below the ranked section. The three sections are paginated separately. A priority review never changes that order.
+
 ## Recalculation without erasure
 
 The uncomposed writer inserts a new **RiskCalculation** in the same database transaction that locks the Finding and reads facts, KEV membership, and the selected policy. On the first row it records `initial`. A later row records `policy_change` when the policy definition hash changes, `intel_refresh` when the KEV fact changes, `asset_change` when only asset context changes, and `rescan` otherwise. The schema enum also contains `manual_recalc` and `manual_override` for later design.
 
 Never UPDATE factor blobs or priority in place. History remains queryable. Users can diff two calculations to see why a score changed. Current selection is read-time: the latest row by `calculated_at`, then `id`. `Finding.currentRiskCalculationId` and `Finding.dueAt` stay null. No migration selects the current row.
 
-The diagram is the later worker composition. The current uncomposed writer is the domain calculation use case. API, worker, and web do not construct it, and it emits no Outbox event.
+The diagram is not the composition [ADR 0047](../adr/0047-controlled-priority-activation.md) proposes. That proposal keeps deliberate calculation in the API process and reserves worker injection for a future automatic-recalculation ADR. The current uncomposed writer is the domain calculation use case. API, worker, and web do not construct it, and it emits no Outbox event.
 
 ```mermaid
 sequenceDiagram
@@ -87,11 +91,11 @@ sequenceDiagram
   W->>PG: Insert RiskCalculation, audit
 ```
 
-If the diagram is not rendered: the later composition writes an outbox event; the worker reloads tenant context; the engine is pure; a new row is inserted. That composition is not the current uncomposed writer.
+If the diagram is not rendered: the figure is the historical worker sketch. [ADR 0047](../adr/0047-controlled-priority-activation.md) proposes the API process instead. The current uncomposed writer inserts a new row and emits no Outbox event.
 
 ## Organization overrides
 
-An organization `admin`/`owner` may publish an override **RiskPolicy** (tenant-owned) that clones the builtin factor catalog and changes weights within validated bounds. ADR 0045 section 8 sets those bounds and lists what cannot be overridden: only weights may change, the sum stays 100, and catalog, normalization, thresholds, due days, and both KEV rules are fixed. `validatePolicyOverride` enforces this. An uncomposed publisher can insert a new organization version when `validatePolicyOverride` accepts a weights-only document. It writes `risk_policy.published` only when that insert commits. API, worker, and web do not construct it. A manual priority override remains later design.
+An organization `admin`/`owner` may publish an override **RiskPolicy** (tenant-owned) that clones the builtin factor catalog and changes weights within validated bounds. ADR 0045 section 8 sets those bounds and lists what cannot be overridden: only weights may change, the sum stays 100, and catalog, normalization, thresholds, due days, and both KEV rules are fixed. `validatePolicyOverride` enforces this. An uncomposed publisher can insert a new organization version when `validatePolicyOverride` accepts a weights-only document. It writes `risk_policy.published` only when that insert commits. API, worker, and web do not construct it. A manual priority override remains outside the engine. [ADR 0049](../adr/0049-append-only-priority-review.md) stores that judgment as a review, not as a **RiskCalculation**.
 
 Rules:
 

@@ -106,6 +106,8 @@ Credentials are the documented development placeholders. They are job-scoped env
 
 Prisma Client is generated before tests. CI does not run `pnpm db:migrate:deploy` against the service database named `patchpilot`. That URL is the PostgreSQL server template. API and worker processes, and database-package tests, create disposable databases and deploy the frozen migration chain into those databases. Local `pnpm test:integration` uses the same contract against Compose. There are no live OSV/KEV calls.
 
+The Integration job timeout is 50 minutes. Database integration files run one at a time, and each file deploys that chain, so the suite no longer fits the previous 35-minute limit.
+
 ## End-to-end testing
 
 Playwright is **not** a repository dependency. `pnpm test:e2e` currently prints that browser journeys are not wired and exits 0. It is kept as a documented local command interface only. GitHub Actions does **not** run it. Do not describe that placeholder as end-to-end validation.

@@ -16,7 +16,8 @@
  * document. It opens its own transaction. When `calculatedAt` is omitted,
  * that transaction reads `CURRENT_TIMESTAMP` once.
  *
- * Nothing in `apps/` or the database barrel constructs this adapter.
+ * The database barrel does not construct this adapter. The API priority
+ * runtime constructs the application wrapper around it.
  */
 
 import { Prisma, type PrismaClient } from '@prisma/client';
@@ -76,6 +77,8 @@ import {
   type RiskCalculationKevSourceV2,
   type RiskCalculationReason,
   type RiskCalculationResultV1Json,
+  projectFindingPriorityReview,
+  type FindingPriorityReview,
 } from '@patchpilot/domain';
 
 import { SHA256_HEX, UUID_PATTERN } from './guards.js';
@@ -120,6 +123,8 @@ const BINDING_CLASSIFICATIONS = [
   'one_cve_alias_evidence',
   'provider_native_without_cve',
 ] as const satisfies readonly FindingRiskBindingClassification[];
+
+const PRINTABLE_TEXT = /^[\u0020-\u007e]+$/;
 
 export const PERSISTABLE_RISK_CALCULATION_REASONS = [
   'initial',
@@ -433,6 +438,9 @@ export function createRiskCalculationPersistence(client: PrismaClient) {
     },
     findCurrentRiskCalculation(input: CurrentRiskCalculationQuery) {
       return findCurrentRiskCalculation(client, input);
+    },
+    readFindingPriority(input: CurrentRiskCalculationQuery) {
+      return readFindingPriorityState(client, input);
     },
     loadPriorityCalculationFactGraph(input: CurrentRiskCalculationQuery) {
       return loadPriorityCalculationFactGraph(client, input);
@@ -2613,6 +2621,424 @@ async function queryCurrentRiskCalculation(
     return { kind: 'malformed' };
   }
   return { kind: 'found', calculation };
+}
+
+export type FindingPriorityStateResult =
+  | { readonly kind: 'finding_absent' }
+  | {
+      readonly kind: 'not_calculated';
+      readonly findingId: string;
+      readonly publishedBuiltin: FindingPriorityBuiltinRow | null;
+    }
+  | {
+      readonly kind: 'calculated';
+      readonly findingId: string;
+      readonly publishedBuiltin: FindingPriorityBuiltinRow | null;
+      readonly calculation: FindingPriorityCalculationRow;
+      readonly review: FindingPriorityReview;
+    }
+  | { readonly kind: 'malformed' }
+  | { readonly kind: 'rejected'; readonly reason: 'malformed_id' }
+  | { readonly kind: 'database_unavailable' }
+  | { readonly kind: 'internal_failure' };
+
+export type FindingPriorityBuiltinRow = {
+  readonly id: string;
+  readonly policyKey: typeof BUILTIN_PRIORITY_POLICY_KEY;
+  readonly version: number;
+  readonly definition: Readonly<Record<string, unknown>>;
+};
+
+export type FindingPriorityCalculationRow = {
+  readonly id: string;
+  readonly riskPolicyId: string;
+  readonly policyKey: string;
+  readonly policyVersion: number;
+  readonly policyDefinitionSha256: string;
+  readonly calculatedAt: Date;
+  readonly calculationEngineVersion: string;
+  readonly calculationReason: PersistableRiskCalculationReason;
+  readonly factors: RiskCalculationFactorsV2Json;
+  readonly result: RiskCalculationResultV1Json;
+  readonly lastObservedAt: Date;
+  readonly assetUpdatedAt: Date;
+  readonly activeKevGenerationId: string | null;
+};
+
+/**
+ * One organization-scoped read of Finding presence, the latest calculation,
+ * the published builtin, and the active KEV generation id.
+ * It does not call the priority engine and does not write.
+ */
+export async function readFindingPriorityState(
+  client: PrismaClient,
+  input: CurrentRiskCalculationQuery,
+): Promise<FindingPriorityStateResult> {
+  const organizationId = normalizeUuid(input.organizationId);
+  const findingId = normalizeUuid(input.findingId);
+  if (organizationId === null || findingId === null) {
+    return { kind: 'rejected', reason: 'malformed_id' };
+  }
+  try {
+    return await queryFindingPriorityState(client, organizationId, findingId);
+  } catch (error) {
+    return mapReadFailure(error);
+  }
+}
+
+type FindingPriorityStateRow = {
+  readonly finding_id: string;
+  readonly organization_id: string;
+  readonly last_observed_at: Date | string;
+  readonly asset_updated_at: Date | string;
+  readonly calculation_id: string | null;
+  readonly risk_policy_id: string | null;
+  readonly policy_key: string | null;
+  readonly policy_version: number | null;
+  readonly policy_row_version: number | null;
+  readonly policy_definition_sha256: string | null;
+  readonly calculated_at: Date | string | null;
+  readonly factors: Prisma.JsonValue | null;
+  readonly result: Prisma.JsonValue | null;
+  readonly calculation_engine_version: string | null;
+  readonly calculation_reason: string | null;
+  readonly published_id: string | null;
+  readonly published_policy_key: string | null;
+  readonly published_version: number | null;
+  readonly published_definition: Prisma.JsonValue | null;
+  readonly kev_generation_id: string | null;
+  readonly review_as_of: Date | string | null;
+  readonly prior_review_exists: boolean | null;
+  readonly review_id: string | null;
+  readonly review_decision: string | null;
+  readonly review_corrected_band: string | null;
+  readonly review_expires_at: Date | string | null;
+  readonly review_reason: string | null;
+  readonly review_head_count: number | bigint | null;
+};
+
+async function queryFindingPriorityState(
+  client: PrioritySqlClient,
+  organizationId: string,
+  findingId: string,
+): Promise<FindingPriorityStateResult> {
+  const rows = await client.$queryRaw<FindingPriorityStateRow[]>`
+    SELECT
+      f."id"::text AS "finding_id",
+      f."organization_id"::text AS "organization_id",
+      f."last_observed_at" AS "last_observed_at",
+      a."updated_at" AS "asset_updated_at",
+      c."id" AS "calculation_id",
+      c."risk_policy_id" AS "risk_policy_id",
+      c."policy_key" AS "policy_key",
+      c."policy_version" AS "policy_version",
+      c."policy_row_version" AS "policy_row_version",
+      c."policy_definition_sha256" AS "policy_definition_sha256",
+      c."calculated_at" AS "calculated_at",
+      c."factors" AS "factors",
+      c."result" AS "result",
+      c."calculation_engine_version" AS "calculation_engine_version",
+      c."calculation_reason" AS "calculation_reason",
+      bp."id" AS "published_id",
+      bp."policy_key" AS "published_policy_key",
+      bp."version" AS "published_version",
+      bp."definition" AS "published_definition",
+      (
+        SELECT s."active_generation_id"::text
+        FROM "intelligence_source" s
+        WHERE s."provider_key" = 'cisa_kev'::"integration_provider_key"
+      ) AS "kev_generation_id",
+      CURRENT_TIMESTAMP AS "review_as_of",
+      EXISTS (
+        SELECT 1
+        FROM "risk_calculation_review" older
+        WHERE older."organization_id" = f."organization_id"
+          AND older."finding_id" = f."id"
+          AND c."id" IS NOT NULL
+          AND older."risk_calculation_id" <> c."id"::uuid
+      ) AS "prior_review_exists",
+      review."id" AS "review_id",
+      review."decision" AS "review_decision",
+      review."corrected_band" AS "review_corrected_band",
+      review."expires_at" AS "review_expires_at",
+      review."reason" AS "review_reason",
+      review."head_count" AS "review_head_count"
+    FROM "finding" f
+    INNER JOIN "asset" a
+      ON a."organization_id" = f."organization_id"
+     AND a."id" = f."asset_id"
+    LEFT JOIN LATERAL (
+      SELECT
+        rc."id"::text AS "id",
+        rc."risk_policy_id"::text AS "risk_policy_id",
+        rp."policy_key" AS "policy_key",
+        rc."policy_version"::int AS "policy_version",
+        rp."version"::int AS "policy_row_version",
+        btrim(rc."policy_definition_sha256") AS "policy_definition_sha256",
+        rc."calculated_at" AS "calculated_at",
+        rc."factors" AS "factors",
+        rc."result" AS "result",
+        rc."calculation_engine_version" AS "calculation_engine_version",
+        rc."calculation_reason"::text AS "calculation_reason"
+      FROM "risk_calculation" rc
+      INNER JOIN "risk_policy" rp ON rp."id" = rc."risk_policy_id"
+      WHERE rc."organization_id" = f."organization_id"
+        AND rc."finding_id" = f."id"
+      ORDER BY rc."calculated_at" DESC, rc."id" DESC
+      LIMIT 1
+    ) c ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        p."id"::text AS "id",
+        p."policy_key" AS "policy_key",
+        p."version"::int AS "version",
+        p."definition" AS "definition"
+      FROM "risk_policy" p
+      WHERE p."organization_id" IS NULL
+        AND p."scope" = 'builtin'::"risk_policy_scope"
+        AND p."policy_key" = ${BUILTIN_PRIORITY_POLICY_KEY}
+        AND p."version" = ${BUILTIN_PRIORITY_POLICY_VERSION}::int
+        AND p."status" = 'published'::"risk_policy_status"
+      LIMIT 1
+    ) bp ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        head."id"::text AS "id",
+        head."decision" AS "decision",
+        head."corrected_band" AS "corrected_band",
+        head."expires_at" AS "expires_at",
+        head."reason" AS "reason",
+        (
+          SELECT COUNT(*)::int
+          FROM "risk_calculation_review" candidate
+          WHERE candidate."organization_id" = f."organization_id"
+            AND c."id" IS NOT NULL
+            AND candidate."risk_calculation_id" = c."id"::uuid
+            AND NOT EXISTS (
+              SELECT 1
+              FROM "risk_calculation_review" successor
+              WHERE successor."organization_id" = candidate."organization_id"
+                AND successor."supersedes_review_id" = candidate."id"
+            )
+        ) AS "head_count"
+      FROM "risk_calculation_review" head
+      WHERE c."id" IS NOT NULL
+        AND head."organization_id" = f."organization_id"
+        AND head."risk_calculation_id" = c."id"::uuid
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "risk_calculation_review" successor
+          WHERE successor."organization_id" = head."organization_id"
+            AND successor."supersedes_review_id" = head."id"
+        )
+      ORDER BY head."id" DESC
+      LIMIT 1
+    ) review ON TRUE
+    WHERE f."organization_id" = ${organizationId}::uuid
+      AND f."id" = ${findingId}::uuid
+  `;
+  const row = rows[0];
+  if (row === undefined) {
+    return { kind: 'finding_absent' };
+  }
+  if (rows.length !== 1 || normalizeUuid(row.organization_id) !== organizationId) {
+    return { kind: 'internal_failure' };
+  }
+  if (normalizeUuid(row.finding_id) !== findingId) {
+    return { kind: 'malformed' };
+  }
+  const publishedBuiltin = readPublishedBuiltin(row);
+  if (publishedBuiltin === 'malformed') {
+    return { kind: 'malformed' };
+  }
+  const activeKevGenerationId = readOptionalUuid(row.kev_generation_id);
+  if (activeKevGenerationId === 'malformed') {
+    return { kind: 'malformed' };
+  }
+  if (row.calculation_id === null) {
+    return { kind: 'not_calculated', findingId, publishedBuiltin };
+  }
+  const calculation = readPriorityCalculation(row, activeKevGenerationId);
+  if (calculation === null) {
+    return { kind: 'malformed' };
+  }
+  const review = readStoredPriorityReview(row);
+  if (review === null) {
+    return { kind: 'malformed' };
+  }
+  return { kind: 'calculated', findingId, publishedBuiltin, calculation, review };
+}
+
+function readPublishedBuiltin(
+  row: FindingPriorityStateRow,
+): FindingPriorityBuiltinRow | null | 'malformed' {
+  if (
+    row.published_id === null &&
+    row.published_policy_key === null &&
+    row.published_version === null &&
+    row.published_definition === null
+  ) {
+    return null;
+  }
+  const id = normalizeUuid(row.published_id);
+  const definition = readStoredDefinition(row.published_definition);
+  const version = readInt(row.published_version);
+  if (
+    id === null ||
+    definition === null ||
+    version !== BUILTIN_PRIORITY_POLICY_VERSION ||
+    row.published_policy_key !== BUILTIN_PRIORITY_POLICY_KEY
+  ) {
+    return 'malformed';
+  }
+  return {
+    id,
+    policyKey: BUILTIN_PRIORITY_POLICY_KEY,
+    version,
+    definition,
+  };
+}
+
+function readOptionalUuid(value: string | null): string | null | 'malformed' {
+  if (value === null) {
+    return null;
+  }
+  const normalized = normalizeUuid(value);
+  return normalized === null ? 'malformed' : normalized;
+}
+
+function readPriorityCalculation(
+  row: FindingPriorityStateRow,
+  activeKevGenerationId: string | null,
+): FindingPriorityCalculationRow | null {
+  const id = normalizeUuid(row.calculation_id);
+  const riskPolicyId = normalizeUuid(row.risk_policy_id);
+  const policyVersion = readInt(row.policy_version);
+  const policyRowVersion = readInt(row.policy_row_version);
+  const policyDefinitionSha256 = readSha256(row.policy_definition_sha256);
+  const calculatedAt = readTimestamp(row.calculated_at);
+  const lastObservedAt = readTimestamp(row.last_observed_at);
+  const assetUpdatedAt = readTimestamp(row.asset_updated_at);
+  const factors = readFactors(row.factors);
+  const result = readResult(row.result);
+  const engineVersion = readStoredEngineVersion(row.calculation_engine_version);
+  const reason = readPersistableReason(row.calculation_reason);
+  if (
+    id === null ||
+    riskPolicyId === null ||
+    policyVersion === null ||
+    policyRowVersion === null ||
+    policyVersion !== policyRowVersion ||
+    policyDefinitionSha256 === null ||
+    calculatedAt === null ||
+    lastObservedAt === null ||
+    assetUpdatedAt === null ||
+    factors === null ||
+    result === null ||
+    engineVersion === null ||
+    reason === null ||
+    row.policy_key === null ||
+    !PRINTABLE_TEXT.test(row.policy_key) ||
+    row.policy_key.length > 128
+  ) {
+    return null;
+  }
+  return {
+    id,
+    riskPolicyId,
+    policyKey: row.policy_key,
+    policyVersion,
+    policyDefinitionSha256,
+    calculatedAt,
+    calculationEngineVersion: engineVersion,
+    calculationReason: reason,
+    factors,
+    result,
+    lastObservedAt,
+    assetUpdatedAt,
+    activeKevGenerationId,
+  };
+}
+
+function readStoredPriorityReview(row: FindingPriorityStateRow): FindingPriorityReview | null {
+  const asOf = readTimestamp(row.review_as_of);
+  if (asOf === null || typeof row.prior_review_exists !== 'boolean') {
+    return null;
+  }
+  const headCount = readHeadCount(row.review_head_count);
+  if (row.review_id === null) {
+    if (headCount !== 0 || row.review_reason !== null) {
+      return null;
+    }
+    return projectFindingPriorityReview({
+      asOf,
+      priorReviewExists: row.prior_review_exists,
+      head: null,
+    });
+  }
+  if (headCount !== 1) {
+    return null;
+  }
+  const reviewId = normalizeUuid(row.review_id);
+  const decision = row.review_decision;
+  if (
+    reviewId === null ||
+    (decision !== 'accepted' && decision !== 'corrected' && decision !== 'withdrawn')
+  ) {
+    return null;
+  }
+  const correctedBand = readReviewBand(row.review_corrected_band);
+  const expiresAt = row.review_expires_at === null ? null : readTimestamp(row.review_expires_at);
+  if (correctedBand === 'invalid' || (expiresAt === null && row.review_expires_at !== null)) {
+    return null;
+  }
+  return projectFindingPriorityReview({
+    asOf,
+    priorReviewExists: row.prior_review_exists,
+    head: {
+      reviewId,
+      decision,
+      correctedBand,
+      expiresAt,
+    },
+    reason: row.review_reason,
+  });
+}
+
+function readHeadCount(value: number | bigint | null): number | null {
+  if (value === null) {
+    return 0;
+  }
+  const count = typeof value === 'bigint' ? Number(value) : value;
+  return Number.isInteger(count) && count >= 0 ? count : null;
+}
+
+function readReviewBand(value: string | null): PriorityBand | null | 'invalid' {
+  if (value === null) {
+    return null;
+  }
+  if (!PRIORITY_BANDS.includes(value as PriorityBand)) {
+    return 'invalid';
+  }
+  return value as PriorityBand;
+}
+
+function readStoredEngineVersion(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > 64 || !PRINTABLE_TEXT.test(trimmed)) {
+    return null;
+  }
+  return trimmed;
+}
+
+function readPersistableReason(value: string | null): PersistableRiskCalculationReason | null {
+  if (!isOneOf(value, PERSISTABLE_RISK_CALCULATION_REASONS)) {
+    return null;
+  }
+  return value;
 }
 
 async function lockTransactionScope(tx: Prisma.TransactionClient, lockKey: string): Promise<void> {

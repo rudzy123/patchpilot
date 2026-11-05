@@ -64,6 +64,46 @@ export const PRODUCT_MATCH_EVALUATION_UNAVAILABLE: AppError = Object.freeze({
   message: 'Product Match Evidence evaluation is temporarily unavailable.',
 });
 
+export const PRODUCT_MATCH_CANDIDATE_UNAVAILABLE: AppError = Object.freeze({
+  code: 'internal',
+  message: 'Product Match candidate discovery is temporarily unavailable.',
+});
+
+export const PRIORITY_POLICY_UNAVAILABLE: AppError = Object.freeze({
+  code: 'internal',
+  message: 'Priority policy is unavailable.',
+});
+
+export const PRIORITY_CALCULATION_UNAVAILABLE: AppError = Object.freeze({
+  code: 'internal',
+  message: 'Priority calculation is temporarily unavailable.',
+});
+
+export const PRIORITY_INSPECTION_UNAVAILABLE: AppError = Object.freeze({
+  code: 'internal',
+  message: 'Priority inspection is temporarily unavailable.',
+});
+
+export const PRIORITY_REVIEW_UNAVAILABLE: AppError = Object.freeze({
+  code: 'internal',
+  message: 'Priority review is temporarily unavailable.',
+});
+
+export const PRIORITY_CALCULATION_NOT_CURRENT: AppError = Object.freeze({
+  code: 'conflict',
+  message: 'calculation_not_current',
+});
+
+export const PRIORITY_REVIEW_NOT_CURRENT: AppError = Object.freeze({
+  code: 'conflict',
+  message: 'review_not_current',
+});
+
+export const REMEDIATION_QUEUE_UNAVAILABLE: AppError = Object.freeze({
+  code: 'internal',
+  message: 'Remediation queue is temporarily unavailable.',
+});
+
 /** Confidential 503 for advisory storage, malformed rows, and internal failure. */
 export const ADVISORY_MUTATION_UNAVAILABLE: AppError = Object.freeze({
   code: 'internal',
@@ -132,7 +172,13 @@ export function httpStatusForError(error: AppError): number {
         error.message === INTELLIGENCE_STATUS_UNAVAILABLE.message ||
         error.message === FINDING_OPERATOR_UNAVAILABLE.message ||
         error.message === ADVISORY_MUTATION_UNAVAILABLE.message ||
-        error.message === PRODUCT_MATCH_EVALUATION_UNAVAILABLE.message
+        error.message === PRODUCT_MATCH_EVALUATION_UNAVAILABLE.message ||
+        error.message === PRODUCT_MATCH_CANDIDATE_UNAVAILABLE.message ||
+        error.message === PRIORITY_POLICY_UNAVAILABLE.message ||
+        error.message === PRIORITY_CALCULATION_UNAVAILABLE.message ||
+        error.message === PRIORITY_INSPECTION_UNAVAILABLE.message ||
+        error.message === PRIORITY_REVIEW_UNAVAILABLE.message ||
+        error.message === REMEDIATION_QUEUE_UNAVAILABLE.message
         ? 503
         : 500;
   }

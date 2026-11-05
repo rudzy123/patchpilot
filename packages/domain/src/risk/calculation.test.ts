@@ -25,6 +25,7 @@ import {
   createListedInActiveKevMembership,
   type ActiveKevMembership,
 } from '../vulnerability/kev-membership.js';
+import type { AdmittedPriorityPolicyPair } from './admitted-priority-policy.js';
 import {
   PRIORITY_CALCULATION_ENGINE_VERSION,
   PRIORITY_ESCALATION_REASONS,
@@ -361,6 +362,7 @@ type HarnessOptions = {
   readonly graph?: RiskCalculationFactGraphRead;
   readonly builtin?: PriorityPolicyLookup;
   readonly builtinDefinition?: unknown;
+  readonly admittedPairs?: readonly AdmittedPriorityPolicyPair[];
   readonly override?: PriorityPolicyLookup;
   readonly overrideInvalid?: boolean;
   readonly current?: CurrentRiskCalculationRead;
@@ -525,10 +527,20 @@ function createHarness(options: HarnessOptions = {}) {
     },
   };
 
+  const definition = options.builtinDefinition ?? BUILTIN;
   const dependencies = {
     engine,
     persistence,
-    builtinDefinition: options.builtinDefinition ?? BUILTIN,
+    builtinDefinition: definition,
+    admittedPairs:
+      options.admittedPairs ??
+      ([
+        {
+          engineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+          policyDefinitionSha256: sha256(stableCanonical(definition)),
+          validationEntryId: 'fixture',
+        },
+      ] as const),
     createCorrelationId: () => CORRELATION,
   };
   return {
@@ -861,7 +873,7 @@ describe('createCalculateFindingRiskUseCase', () => {
     expect(harness.evaluateCalls).toEqual([]);
   });
 
-  it('selects a valid organization override instead of the builtin', async () => {
+  it('writes nothing when an organization override is present', async () => {
     const harness = createHarness({
       override: {
         kind: 'found',
@@ -874,12 +886,20 @@ describe('createCalculateFindingRiskUseCase', () => {
       },
     });
     const result = await harness.calculate.execute(harness.input);
-    expect(result.kind).toBe('calculated');
-    expect(harness.evaluateCalls[0]?.[0]).toBe(OTHER_DEFINITION);
-    expect(harness.persistCalls[0]?.riskPolicyId).toBe(OVERRIDE_ID);
-    expect(harness.persistCalls[0]?.policyDefinitionSha256).toBe(
-      sha256(stableCanonical(OTHER_DEFINITION)),
-    );
+    expect(result).toEqual({
+      kind: 'priority_policy_unavailable',
+      reason: 'override_present',
+    });
+    expect(harness.evaluateCalls).toEqual([]);
+    expect(harness.persistCalls).toEqual([]);
+  });
+
+  it('writes nothing when the builtin pair is not on the allowlist', async () => {
+    const harness = createHarness({ admittedPairs: [] });
+    const result = await harness.calculate.execute(harness.input);
+    expect(result).toEqual({ kind: 'priority_policy_unavailable', reason: 'unvalidated' });
+    expect(harness.evaluateCalls).toEqual([]);
+    expect(harness.persistCalls).toEqual([]);
   });
 
   it('writes nothing when the builtin version 2 row is absent', async () => {
@@ -925,7 +945,7 @@ describe('createCalculateFindingRiskUseCase', () => {
     expect(harness.persistCalls).toEqual([]);
   });
 
-  it('fails closed when the published override is invalid', async () => {
+  it('refuses an invalid organization override before evaluating it', async () => {
     const harness = createHarness({
       overrideInvalid: true,
       override: {
@@ -939,7 +959,10 @@ describe('createCalculateFindingRiskUseCase', () => {
       },
     });
     const result = await harness.calculate.execute(harness.input);
-    expect(result).toEqual({ kind: 'override_rejected', reason: 'invalid' });
+    expect(result).toEqual({
+      kind: 'priority_policy_unavailable',
+      reason: 'override_present',
+    });
     expect(harness.persistCalls).toEqual([]);
     expect(harness.evaluateCalls).toEqual([]);
     expect(harness.publishCalls).toEqual([]);

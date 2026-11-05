@@ -1,6 +1,7 @@
 /**
  * Deterministic P1-P4 priority engine (ADR 0045). Pure and dependency-free:
- * no I/O, clock, randomness, or tenant identifiers. Production uncomposed.
+ * no I/O, clock, randomness, or tenant identifiers. The API process and the
+ * built-in publication command are the only production importers.
  */
 export const packageBoundary = '@patchpilot/policy-engine' as const;
 

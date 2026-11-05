@@ -86,6 +86,9 @@ importers:
       '@patchpilot/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@patchpilot/policy-engine':
+        specifier: workspace:*
+        version: link:../../packages/policy-engine
       '@patchpilot/vulnerability-intelligence':
         specifier: workspace:*
         version: link:../../packages/vulnerability-intelligence
@@ -335,6 +338,9 @@ importers:
       '@patchpilot/domain':
         specifier: workspace:*
         version: link:../domain
+      '@patchpilot/policy-engine':
+        specifier: workspace:*
+        version: link:../policy-engine
       '@patchpilot/vulnerability-intelligence':
         specifier: workspace:*
         version: link:../vulnerability-intelligence
@@ -345,9 +351,6 @@ importers:
       '@patchpilot/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
-      '@patchpilot/policy-engine':
-        specifier: workspace:*
-        version: link:../policy-engine
       '@patchpilot/test-utils':
         specifier: workspace:*
         version: link:../test-utils
@@ -1476,12 +1479,14 @@ packages:
   '@opentelemetry/sdk-trace-base@2.10.0':
     resolution: {integrity: sha512-GuYQQT7QD2EeO8lcZLRQzcbOyhqAzL+6WWTKTU9mSUBYBazkEDl+VrQcXQhbB08OWM9anD1aHleVadzulpOaUQ==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.3.0 <1.10.0'
 
   '@opentelemetry/sdk-trace-node@2.10.0':
     resolution: {integrity: sha512-GZK/G6oZyBLGlH1pUgeDch7D91KoHd2uotUGIkWCPi9GI5T9X0p4L7nNAMDR1BQjkRYoDqo+ddfVx9t5Uhys+Q==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
 
@@ -1640,6 +1645,7 @@ packages:
   '@smithy/core@3.33.3':
     resolution: {integrity: sha512-CsOeKq/9kA3y6VJHt+/+VTCtBaxJ4OTFpgrjIUhPpDIKxBci1k2bJaQASF2h/ELWrulGp+t97DZ0mevfAD8idg==}
     engines: {node: '>=18.0.0'}
+    deprecated: Deprecated due to a bug in custom logger data redaction. See https://github.com/aws/aws-sdk-js-v3/issues/8393.
 
   '@smithy/credential-provider-imds@4.5.2':
     resolution: {integrity: sha512-A9uSdn72ozbRUSit0eib0TW7nXuNPlaeM0zcGkJ+nE6tFcSDbnmtwoxbTCFBukVQcszDAyvsd7+rTduPTXpygg==}

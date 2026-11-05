@@ -6,13 +6,15 @@
 - Supersedes: none
 - Superseded by: none
 
+Further amended on 2026-11-04 by [ADR 0047](0047-controlled-priority-activation.md): the deliberate calculation is composed in the API process, and worker injection is reserved for a future automatic-recalculation ADR. ADR 0047 is Accepted. The production allowlist is empty while V-0001 is unsigned.
+
 ## Context
 
 Scores must be explainable, replayable, and honest. AI must not set authoritative scores. **Priority** and **risk score** remain synonyms until a later ADR ([OD-7](../architecture/open-decisions.md)).
 
 ## Decision
 
-Implement a deterministic **policy engine** in `packages/policy-engine` with **no I/O** and **no import of `packages/domain`**. Domain defines a port; the worker injects the implementation. Each **RiskCalculation** stores policy version, **`policyDefinitionSha256`**, `inputFingerprint`, contributing factors, intel source record ids, **priority**, **priorityBand**, due-date recommendation, and escalation recommendation. Recalculation inserts a new row; history is not erased. Organization overrides publish a new tenant-owned policy version and do not mutate historical results. Distinguish **vulnerability severity** (observed from intel) from **remediation priority** (calculated). Default policy does not auto-score compensating-control prose or task completion.
+Implement a deterministic **policy engine** in `packages/policy-engine` with **no I/O** and **no import of `packages/domain`**. Domain defines a port. The deliberate calculation is composed in the API process, and worker injection is reserved for a future automatic-recalculation ADR ([ADR 0047](0047-controlled-priority-activation.md)). Each **RiskCalculation** stores policy version, **`policyDefinitionSha256`**, `inputFingerprint`, contributing factors, intel source record ids, **priority**, **priorityBand**, due-date recommendation, and escalation recommendation. Recalculation inserts a new row; history is not erased. Organization overrides publish a new tenant-owned policy version and do not mutate historical results. Distinguish **vulnerability severity** (observed from intel) from **remediation priority** (calculated). Default policy does not auto-score compensating-control prose or task completion.
 
 ## Alternatives considered
 

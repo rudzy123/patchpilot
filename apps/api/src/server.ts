@@ -12,6 +12,7 @@ import {
   createSystemClock,
 } from '@patchpilot/auth';
 import { loadServerConfig } from '@patchpilot/config';
+import { ADMITTED_PRIORITY_POLICY_PAIRS } from '@patchpilot/domain';
 import {
   checkDatabaseReady,
   createPrismaUnitOfWork,
@@ -29,9 +30,11 @@ import { startTelemetry } from '@patchpilot/observability';
 import { buildApi } from './app.js';
 import { createAssetRuntime } from './asset-runtime.js';
 import { composeControlledFindingOperatorRuntime } from './finding-runtime.js';
+import { composeControlledPriorityRuntime } from './priority-runtime.js';
 import { composeMaintainerReviewedAdvisoryRuntime } from './maintainer-reviewed-advisory-runtime.js';
 import { composeControlledFindingDiscoveryRuntime } from './finding-discovery-runtime.js';
 import { composeProductMatchEvaluationRuntime } from './product-match-evaluation-runtime.js';
+import { composeProductMatchCandidateRuntime } from './product-match-candidate-runtime.js';
 import { createIntelligenceRuntime } from './intelligence-runtime.js';
 import { createRedisLoginRateLimiter } from './redis-login-rate-limiter.js';
 import { createSbomRuntime } from './sbom-runtime.js';
@@ -143,9 +146,15 @@ async function main(): Promise<void> {
       now: () => clock.now(),
     }),
     findings: composeControlledFindingOperatorRuntime(prisma),
+    priority: composeControlledPriorityRuntime(prisma, {
+      admittedPairs: ADMITTED_PRIORITY_POLICY_PAIRS,
+      kevEnabled: config.intelligence.kevEnabled,
+      kevStaleThresholdSeconds: config.intelligence.kevStaleThresholdSeconds,
+    }),
     advisories: composeMaintainerReviewedAdvisoryRuntime(prisma),
     discovery: composeControlledFindingDiscoveryRuntime(prisma),
     productMatchEvaluation: composeProductMatchEvaluationRuntime(prisma),
+    productMatchCandidates: composeProductMatchCandidateRuntime(prisma),
   });
 
   let shuttingDown = false;
