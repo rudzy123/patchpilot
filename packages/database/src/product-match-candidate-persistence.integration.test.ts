@@ -281,7 +281,7 @@ describe('product match candidate PostgreSQL persistence', () => {
         state: 'completed',
         normalizationVersion: '2',
         completedAt: new Date('2026-10-03T12:00:00.000Z'),
-        graphCompleteness: 'no_dependencies',
+        graphCompleteness: 'empty',
         componentCount: 0,
         dependencyEdgeCount: 0,
         warningCount: 0,
