@@ -3,7 +3,10 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ADMITTED_PRIORITY_POLICY_PAIRS } from '@patchpilot/domain';
+import {
+  ADMITTED_PRIORITY_POLICY_PAIRS,
+  type AdmittedPriorityPolicyPair,
+} from '@patchpilot/domain';
 import {
   BUILTIN_PRIORITY_POLICY_DEFINITION,
   POLICY_ENGINE_VERSION,
@@ -38,33 +41,90 @@ class MemoryStream {
 }
 
 describe('builtin priority policy publication command', () => {
-  it('refuses the unsigned builtin before opening a database', async () => {
-    let opened = false;
-    const result = await runCommand({
-      argv: ['--correlation-id', CORRELATION_ID],
-      loadPublication: loadBuiltinPriorityPolicyPublication,
-      loadDatabaseUrl() {
-        opened = true;
-        return DATABASE_URL;
+  it('admits the validated builtin pair', () => {
+    expect(ADMITTED_PRIORITY_POLICY_PAIRS).toEqual([
+      {
+        engineVersion: '@patchpilot/policy-engine@1',
+        policyDefinitionSha256: '7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7',
+        validationEntryId: 'V-0001',
       },
-      openBoundary() {
-        opened = true;
-        throw new Error('database opened');
-      },
-    });
-    expect(ADMITTED_PRIORITY_POLICY_PAIRS).toEqual([]);
+    ]);
+    expect(Object.isFrozen(ADMITTED_PRIORITY_POLICY_PAIRS)).toBe(true);
+    expect(Object.isFrozen(ADMITTED_PRIORITY_POLICY_PAIRS[0])).toBe(true);
     expect(
       productionPublicationAdmitsCurrentBuiltin(
         canonicalJson,
         BUILTIN_PRIORITY_POLICY_DEFINITION,
         POLICY_ENGINE_VERSION,
       ),
+    ).toBe(true);
+    expect(
+      productionPublicationAdmitsCurrentBuiltin(
+        canonicalJson,
+        BUILTIN_PRIORITY_POLICY_DEFINITION,
+        '@patchpilot/policy-engine@2',
+      ),
     ).toBe(false);
-    expect(opened).toBe(false);
-    expect(result.exitCode).toBe(BUILTIN_PRIORITY_POLICY_PUBLICATION_EXIT.unvalidated);
-    expect(result.stdout).toContain('"outcome":"unvalidated"');
-    expect(result.stdout).not.toContain(DATABASE_URL);
-    expect(result.stdout).not.toMatch(/[a-f0-9]{64}/);
+    expect(
+      productionPublicationAdmitsCurrentBuiltin(
+        canonicalJson,
+        { policyKey: 'not-the-builtin' },
+        POLICY_ENGINE_VERSION,
+      ),
+    ).toBe(false);
+  });
+
+  it('refuses a non-matching allowlist before opening a database', async () => {
+    const nonMatching: readonly (readonly AdmittedPriorityPolicyPair[])[] = [
+      [],
+      [
+        {
+          engineVersion: '@patchpilot/policy-engine@2',
+          policyDefinitionSha256:
+            '7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7',
+          validationEntryId: 'V-0001',
+        },
+      ],
+      [
+        {
+          engineVersion: '@patchpilot/policy-engine@1',
+          policyDefinitionSha256:
+            '0000000000000000000000000000000000000000000000000000000000000000',
+          validationEntryId: 'V-0001',
+        },
+      ],
+      [
+        {
+          engineVersion: '@patchpilot/policy-engine@1',
+          policyDefinitionSha256:
+            '7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7',
+          validationEntryId: '',
+        },
+      ],
+    ];
+    for (const admittedPairs of nonMatching) {
+      let opened = false;
+      const result = await runCommand({
+        argv: ['--correlation-id', CORRELATION_ID],
+        loadPublication() {
+          const publication = loadBuiltinPriorityPolicyPublication();
+          return { ...publication, admittedPairs };
+        },
+        loadDatabaseUrl() {
+          opened = true;
+          return DATABASE_URL;
+        },
+        openBoundary() {
+          opened = true;
+          throw new Error('database opened');
+        },
+      });
+      expect(opened).toBe(false);
+      expect(result.exitCode).toBe(BUILTIN_PRIORITY_POLICY_PUBLICATION_EXIT.unvalidated);
+      expect(result.stdout).toContain('"outcome":"unvalidated"');
+      expect(result.stdout).not.toContain(DATABASE_URL);
+      expect(result.stdout).not.toMatch(/[a-f0-9]{64}/);
+    }
   });
 
   it('writes help to stderr and no JSON', async () => {
