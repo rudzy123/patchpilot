@@ -1,10 +1,10 @@
 # Priority weight validation record
 
-This is the append-only record that discharges [risk register](risk-register.md) R13 for the built-in priority policy decided by [ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md). R13 says the weights are product proposals that operators have not validated. Acceptance of ADR 0045 is not that validation.
+This is the append-only record that discharges [risk register](risk-register.md) R13 for the built-in priority policy decided by [ADR 0045](../adr/0045-deterministic-p1-p4-priority-policy.md). Acceptance of ADR 0045 is not that validation. V-0001 is the signed record, with the residuals listed in the entry.
 
 ## Current status
 
-One entry exists, V-0001, prepared on 2026-11-04. No validator has signed it, and the principal architect has not countersigned it. No outcome is recorded. No (engine version, definition hash) pair is validated. R13 stays open. ADR 0047 is Accepted and composed. The production allowlist is empty, so publication and calculation fail closed.
+V-0001, prepared on 2026-11-04, is signed on 2026-11-05 by Rudolf Musika, repository owner. The outcome is `validated_with_residuals` for `@patchpilot/policy-engine@1` and definition SHA-256 `7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7`. The validator reproduced the corpus at commit `3a70d9e2f39a68921cb49da2ce0fd2b2dc89eaff`. The entry records a separate Cursor corpus execution for that reproduction. The principal architect countersignature is unavailable, pending review before commit. The residuals listed in the entry remain, including owner self-validation and the production-reachable P2 and P4 bands. Only an outcome of `validated` or `validated_with_residuals` may be mirrored into `ADMITTED_PRIORITY_POLICY_PAIRS`. A signed entry alone does not publish a priority row. Publication stays the deployment-local operator command.
 
 ## What validation means
 
@@ -25,7 +25,7 @@ Validators judge whether the built-in policy's outputs on the synthetic corpus b
    - `rejected_new_version_required`. The policy is not used. A new policy version and a new entry follow. The rejected definition is never edited.
 5. **Signers.** At least one named operator reviewer who did not author ADR 0045 and who declares that in the entry. The principal architect countersigns. The validator and the countersigner are different people. Record names only, never email addresses, credentials, or contact details.
 6. **Synthetic evidence only.** The corpus uses closed fact tokens and integers. It contains no real SBOM, customer data, tenant identifier, component name, vulnerability identifier, or credential. Validators must not substitute real tenant data.
-7. **Code mirror.** `ADMITTED_PRIORITY_POLICY_PAIRS` in `packages/domain/src/risk/admitted-priority-policy.ts` mirrors this record. Only entries with outcome `validated` or `validated_with_residuals` may appear on it. Every allowlist change cites its entry ID. The list is empty while V-0001 is unsigned. Composition fails closed for any pair not on it.
+7. **Code mirror.** `ADMITTED_PRIORITY_POLICY_PAIRS` in `packages/domain/src/risk/admitted-priority-policy.ts` mirrors this record. Only entries with outcome `validated` or `validated_with_residuals` may appear on it. Every allowlist change cites its entry ID. A signed entry alone does not publish a priority row. Composition fails closed for any pair not on it.
 
 ## Subject of V-0001
 
@@ -45,7 +45,7 @@ Validators judge whether the built-in policy's outputs on the synthetic corpus b
 
 The definition hash is the lowercase hex SHA-256 of the UTF-8 bytes of `canonicalJson(BUILTIN_PRIORITY_POLICY_DEFINITION)`. This is the same derivation `fingerprintCalculation` uses in `packages/domain/src/risk/calculation.ts`. The policy version number is not part of the hash (ADR 0045 approval item 19). Re-validating a structured clone of the definition, as the writer does with a definition loaded from storage, gives the same hash.
 
-The development seed row ID is listed only to identify the row. The same id is used by the deployment-local publication command. That command writes nothing while this pair is unsigned. The development seed is not the production writer.
+The development seed row ID is listed only to identify the row. The same id is used by the deployment-local publication command. A signed entry alone does not publish a row. That command writes a priority row only after this pair is mirrored and an operator runs the command in that deployment. The development seed is not the production writer.
 
 The built-in numbers under validation, as fixed by ADR 0045:
 
@@ -212,14 +212,21 @@ Each answer of "no" leads either to a listed residual (`validated_with_residuals
 - Definition SHA-256: `7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7`.
 - Fact-assembly commit: `c042c67`.
 - Corpus revision: 1.
-- Reproduced by validator: not yet recorded.
-- Validator: not yet recorded.
-- Validator declares non-authorship of ADR 0045: not yet recorded.
-- Validator sign-off date: not yet recorded.
-- Answers to questions 1 to 7: not yet recorded.
-- Outcome: not yet recorded.
-- Residuals: not yet recorded.
-- Principal architect countersignature: not yet recorded.
-- Countersignature date: not yet recorded.
+- Reproduced by validator: yes, at commit `3a70d9e2f39a68921cb49da2ce0fd2b2dc89eaff`.
+- Validator: Rudolf Musika, repository owner.
+- Validator declares non-authorship of ADR 0045: no. Independent human validation was unavailable.
+- Validator sign-off date: 2026-11-05.
+- Independent verification: Cursor corpus execution in this session reproduced the definition hash and rows S01–S18 and R01–R02, including a repeated evaluation of each row. This line is not a human countersignature.
+- Answers to questions 1 to 7: yes, for this initial operator policy, with the residuals below.
+- Outcome: `validated_with_residuals`.
+- Residuals:
+  - Owner self-validation. Record rule 5's independent non-author and separate countersigner were not available.
+  - Synthetic corpus only. No production tenant data.
+  - Current fact assembly leaves `source_severity` and `fix_available` unavailable, so production-reachable rows are P2 for an observed KEV listing and P4 otherwise. P1 and P3 stay engine-only references (R01, R02).
+  - No claim of universal risk accuracy, exploitability, affectedness, compliance, or remediation.
+  - KEV listing is not affectedness. Stale and disabled-with-history listings still count as listed.
+  - The policy is not claimed to be optimal for every organization. The KEV floor hides asset context. Withdrawal stays informational. Age does not change the reachable band. `Finding.dueAt` is still never written.
+- Principal architect countersignature: unavailable, pending review before commit.
+- Countersignature date: unavailable, pending review before commit.
 
-V-0001 is open and unsigned. Until it carries a validator sign-off, a countersignature, and an outcome of `validated` or `validated_with_residuals`, R13 remains open and no priority calculation may be composed in production.
+V-0001 records outcome `validated_with_residuals`. Only `validated` or `validated_with_residuals` may be mirrored into the production allowlist. A signed entry alone does not publish a priority row. The principal architect countersignature is unavailable, pending review before commit. The residuals in the entry remain.
