@@ -559,6 +559,8 @@ Tenant-owned artifact or structured claim needed to explain a finding later.
 | `metadata` | Non-secret structured fields |
 | `createdAt` | UTC |
 
+`export_snapshot` remains asset-scoped and is not the organization remediation-queue export in [ADR 0051](../adr/0051-remediation-queue-export.md).
+
 ## AuditEvent
 
 Append-only security- or remediation-sensitive record. Never updated or deleted in place. See [audit-model.md](audit-model.md).

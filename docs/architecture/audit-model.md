@@ -82,10 +82,12 @@ At minimum, emit events for:
 | `auth.login_succeeded` / `auth.login_failed` / `auth.logout` / `auth.session_revoked` / `auth.organization_selected` | Authentication ([ADR 0019](../adr/0019-local-password-sessions.md)); no secrets in payload. Anonymous failures use `actorType=anonymous`. Successful login uses instance-level `user`, not `system`. HTTP routes emit `login_succeeded`, `login_failed`, `logout`, and `organization_selected`. |
 | `admin.access` | Instance-operator actions on system integrations |
 | `compensating_control.recorded` | Evidence of a control claim |
-| `export.created` | Exports |
+| `export.created` | Exports. [ADR 0051](../adr/0051-remediation-queue-export.md) defines the queue-export writer. It is not implemented. |
 | `credential.created` / `rotated` / `revoked` / `validation_failed` | **ExternalCredential** |
 | `integration.enabled` / `disabled` / `degraded` | **Integration** |
 | `webhook.accepted` / `webhook.rejected` | Reserved; unused until webhooks exist |
+
+[ADR 0051](../adr/0051-remediation-queue-export.md) is the accepted writer for one `export.created` row on `POST /remediation-queue/export`. That writer is not implemented. `GET /remediation-queue` still writes no audit row. The export transaction is one PostgreSQL `REPEATABLE READ` transaction: resolve the published admitted builtin, classify the organization's Findings, serialize in memory, and insert the audit row. Response bytes are sent only after commit. Any failure before commit rolls back and leaves no `export.created` row and no export body. A unique conflict on `(organization_id, action, subject_id, correlation_id)` writes no second audit row and does not resend bytes. Bytes are not stored. A client disconnect after commit can leave an audit row without a received file. That audit row does not prove client receipt. The payload records purpose, format, counts, reference policy identity, `asOf`, the cap, byte length, and the response SHA-256. It omits names, versions, vulnerability ids, row text, cursors, tokens, and the canonical redaction list. Retention category stays `security`. This decision adds no migration.
 
 Do not log authorization headers or cookies in `payload`.
 

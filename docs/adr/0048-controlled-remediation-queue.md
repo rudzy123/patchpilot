@@ -6,6 +6,12 @@
 - Supersedes: none
 - Superseded by: none
 
+On 2026-11-05, [ADR 0051](0051-remediation-queue-export.md) partially supersedes
+only the no-export sentences in the Decision opening and in section 7. Status
+stays Accepted. Superseded by stays none. All other queue semantics remain in
+force, including permission, pagination, section partition, comparator,
+unaudited reads, and that a review does not change order.
+
 Accepted on 2026-11-04. Acceptance confirms that a review never changes queue
 order. This ADR admits one read-only Finding list, `GET /remediation-queue`,
 and the page `/remediation-queue`. It is the architecture review
@@ -52,6 +58,8 @@ binding changes.
 
 PatchPilot adopts one read-only remediation queue. It is the only Finding list.
 There is no generic `GET /findings`, no search, no filter, and no export.
+[ADR 0051](0051-remediation-queue-export.md) partially supersedes only the
+export prohibition in this sentence.
 
 ```mermaid
 flowchart LR
@@ -180,12 +188,13 @@ No assignment, due date, Finding state, or RemediationTask field appears.
 ### 7. Still unauthorized
 
 No generic Finding list, search, filter, export, create-all, or cross-asset
-discovery beyond this queue. Target discovery still returns no Finding id. No
-priority index. No worker. No recalculation on read. No RemediationTask and no
-RiskAcceptance. A review does not change rank. That split is the acceptance
-choice of this proposal; a later ADR would be required before a review could
-affect order, and that later ADR would have to do it through a versioned
-policy.
+discovery beyond this queue. [ADR 0051](0051-remediation-queue-export.md)
+partially supersedes only the export prohibition in this sentence. Target
+discovery still returns no Finding id. No priority index. No worker. No
+recalculation on read. No RemediationTask and no RiskAcceptance. A review does
+not change rank. That split is the acceptance choice of this proposal; a later
+ADR would be required before a review could affect order, and that later ADR
+would have to do it through a versioned policy.
 
 ## Alternatives considered
 
