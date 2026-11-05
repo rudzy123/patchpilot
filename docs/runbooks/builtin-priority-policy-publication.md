@@ -2,7 +2,7 @@
 
 The deployment-local command is the only production writer for builtin `patchpilot.builtin.v0` version 2. It is explicit. API startup, the web, the worker, the scheduler, the queue, the development seed, and migration startup do not invoke it.
 
-[ADR 0047](../adr/0047-controlled-priority-activation.md) is Accepted. The production allowlist is empty while V-0001 in [priority weight validation](../security/priority-weight-validation.md) is unsigned. The command then exits 2 and writes nothing. Owner `POST /findings/:findingId/risk-calculations` and `GET /findings/:findingId/priority` return 503 until a signed `validated` or `validated_with_residuals` pair is mirrored into `ADMITTED_PRIORITY_POLICY_PAIRS` and an operator runs this command.
+[ADR 0047](../adr/0047-controlled-priority-activation.md) is Accepted. [V-0001](../security/priority-weight-validation.md) is `validated_with_residuals`, and `ADMITTED_PRIORITY_POLICY_PAIRS` admits that one pair: `@patchpilot/policy-engine@1` and definition SHA-256 `7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7`. The command writes the builtin row only when an operator runs it in that deployment. It exits 2 and writes nothing for any other pair. Owner `POST /findings/:findingId/risk-calculations` and `GET /findings/:findingId/priority` return 503 until that publication. API, web, worker, seed, and migration startup do not run this command. This repository does not publish a deployment database.
 
 The command does not accept a definition, a hash, or an allowlist override. It does not set `Finding.dueAt` or `Finding.currentRiskCalculationId`. It does not create a Finding, a RemediationTask, or a priority review.
 
@@ -10,7 +10,7 @@ Build `@patchpilot/database` before the first invocation. The script runs `packa
 
 ## Invocation
 
-The command uses the same server configuration as the API, including `DATABASE_URL`. It does not print that location. A missing or malformed database setting is a persistence failure. The allowlist is checked before the database is opened, so an unsigned pair does not require a reachable database.
+The command uses the same server configuration as the API, including `DATABASE_URL`. It does not print that location. A missing or malformed database setting is a persistence failure. The allowlist is checked before the database is opened, so a pair that is not admitted does not require a reachable database. The admitted V-0001 pair continues to the database.
 
 ```text
 pnpm publish-builtin-priority-policy -- --correlation-id <correlation-id>

@@ -4,7 +4,7 @@ This is the append-only record that discharges [risk register](risk-register.md)
 
 ## Current status
 
-V-0001, prepared on 2026-11-04, is signed on 2026-11-05 by Rudolf Musika, repository owner. The outcome is `validated_with_residuals` for `@patchpilot/policy-engine@1` and definition SHA-256 `7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7`. The validator reproduced the corpus at commit `3a70d9e2f39a68921cb49da2ce0fd2b2dc89eaff`. The entry records a separate Cursor corpus execution for that reproduction. The principal architect countersignature is unavailable, pending review before commit. The residuals listed in the entry remain, including owner self-validation and the production-reachable P2 and P4 bands. Only an outcome of `validated` or `validated_with_residuals` may be mirrored into `ADMITTED_PRIORITY_POLICY_PAIRS`. A signed entry alone does not publish a priority row. Publication stays the deployment-local operator command.
+V-0001, prepared on 2026-11-04, is signed on 2026-11-05 by Rudolf Musika, repository owner. The outcome is `validated_with_residuals` for `@patchpilot/policy-engine@1` and definition SHA-256 `7c1815d456ff6dcf9e19c218bcd5eaba73c265abc911027c3f50df41bb8504f7`. The validator reproduced the corpus at commit `3a70d9e2f39a68921cb49da2ce0fd2b2dc89eaff`. The entry records a separate Cursor corpus execution for that reproduction. The principal architect countersignature is unavailable, pending review before commit. The residuals listed in the entry remain, including owner self-validation and the production-reachable P2 and P4 bands. That one pair is mirrored into `ADMITTED_PRIORITY_POLICY_PAIRS`. Only an outcome of `validated` or `validated_with_residuals` may be mirrored. A signed entry alone does not publish a priority row. Publication stays the deployment-local operator command. A deployment still has no priority row until an operator runs that command there.
 
 ## What validation means
 
@@ -12,7 +12,7 @@ Validators judge whether the built-in policy's outputs on the synthetic corpus b
 
 - Validation does not make priority security truth. It does not establish exploitability, affectedness, compliance, or remediation. Product copy may describe a validated policy only as a "validated operator policy proposal" with its validation date.
 - Validation never changes a weight, normalization table, band, or rule. A desired change needs a new policy version and a new entry.
-- Validation alone does not admit a pair. [ADR 0047](../adr/0047-controlled-priority-activation.md) is Accepted and chooses the composition root and the built-in publication command. The code allowlist stays empty until a signed `validated` or `validated_with_residuals` entry is mirrored.
+- Validation alone does not admit a pair. [ADR 0047](../adr/0047-controlled-priority-activation.md) is Accepted and chooses the composition root and the built-in publication command. `ADMITTED_PRIORITY_POLICY_PAIRS` mirrors V-0001 as one pair. A signed entry alone does not publish a priority row. A deployment still has no priority row until an operator runs the publication command there. Any other pair fails closed.
 
 ## Record rules
 
@@ -229,4 +229,4 @@ Each answer of "no" leads either to a listed residual (`validated_with_residuals
 - Principal architect countersignature: unavailable, pending review before commit.
 - Countersignature date: unavailable, pending review before commit.
 
-V-0001 records outcome `validated_with_residuals`. Only `validated` or `validated_with_residuals` may be mirrored into the production allowlist. A signed entry alone does not publish a priority row. The principal architect countersignature is unavailable, pending review before commit. The residuals in the entry remain.
+V-0001 records outcome `validated_with_residuals` and is mirrored as the one production allowlist pair. Only `validated` or `validated_with_residuals` may be mirrored into the production allowlist. A signed entry alone does not publish a priority row. A deployment still has no priority row until an operator runs the publication command there. The principal architect countersignature is unavailable, pending review before commit. The residuals in the entry remain.

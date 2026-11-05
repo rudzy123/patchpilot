@@ -11,9 +11,12 @@
 Accepted. The principal architect approved every item in the approval checklist
 below on 2026-11-04. This ADR decides the numerical priority policy and the contract
 of the pure engine in `packages/policy-engine`. It does not compose the engine, and
-acceptance does not authorize production composition. Composition stays blocked by
-operator weight validation ([risk register](../security/risk-register.md) R13) and
-needs a separate ADR. The decision itself adds no permission, domain port,
+acceptance does not by itself authorize production composition. Composition is
+[ADR 0047](0047-controlled-priority-activation.md). Operator weight validation is
+V-0001, outcome `validated_with_residuals`
+([priority weight validation](../security/priority-weight-validation.md)). The
+production allowlist admits that one pair. A deployment still has no priority row
+until an operator runs the publication command there. The decision itself adds no permission, domain port,
 PostgreSQL adapter, seed, route, web UI, worker, queue, scheduler, Outbox row,
 migration, or dependency. It writes no **RiskCalculation**, sets no
 `Finding.currentRiskCalculationId`, and never sets `Finding.dueAt`. Prioritization
@@ -34,7 +37,7 @@ Current checkpoint: [current-state.md](../project/current-state.md).
 - **Engine.** Implemented in `packages/policy-engine` with the section 10 golden,
   property, determinism, and package-boundary tests. `POLICY_ENGINE_VERSION` is
   `@patchpilot/policy-engine@1`. The package has zero runtime dependencies.
-- **Persistence slice.** Implemented and production uncomposed. The context section's
+- **Persistence slice.** Implemented and composed by the API priority runtime. The context section's
   statements that no domain port, adapter, or seed exists are historical. The slice
   contains the v2 document types (`RiskPolicyDefinitionV2Json`,
   `RiskCalculationFactorsV2Json`), `PriorityEnginePort`,
@@ -44,16 +47,16 @@ Current checkpoint: [current-state.md](../project/current-state.md).
   (owner and admin), and one `priority.calculated` audit row per new calculation.
   `PRIORITY_CONTROLLED_PRODUCTION_REGISTRATION` is `api_process`. API startup
   constructs the use case. The web, worker, and migration startup do not. The
-  production allowlist is empty, so a production calculation writes nothing until
-  a signed pair is mirrored.
+  production allowlist admits one pair, V-0001. A production calculation writes
+  nothing until an operator publishes the builtin in that deployment.
 - **Built-in version (checklist item 19).** The persistence session chose version 2.
   Builtin `patchpilot.builtin.v0` version 2 has the fixed id
   `55555555-5555-4555-8555-555555555502` and stores
   `BUILTIN_PRIORITY_POLICY_DEFINITION`. The development seed can publish it. The
-  deployment-local publication command is the production writer and writes nothing
-  while the pair is unsigned.
-  Production seeding is refused, and the production bootstrap writes nothing. No
-  production publication path exists.
+  deployment-local publication command is the production writer. V-0001 is
+  admitted. The command writes a row only when an operator runs it in that
+  deployment. Production seeding is refused, and the production bootstrap writes
+  nothing.
 - **Input fingerprint.** The implementation matches section 9:
   `inputFingerprint` is the SHA-256 of `canonicalJson` of
   `{ engineVersion, policyDefinitionSha256, facts }`, where `facts` is the parsed
@@ -73,8 +76,8 @@ Current checkpoint: [current-state.md](../project/current-state.md).
   [ADR 0047](0047-controlled-priority-activation.md) is that choice:
   deliberate calculation in the API process, and a deployment-local builtin
   publication command. On 2026-11-04 ADR 0047 was accepted and composed. The
-  production allowlist stays empty while V-0001 is unsigned, so the routes
-  return 503 until a signed pair is mirrored. The checklist items above are
+  production allowlist admits V-0001. The routes return 503 until an operator
+  publishes the builtin in that deployment. The checklist items above are
   unchanged. See the follow-up section.
 
 ## Context
@@ -678,25 +681,27 @@ Amended on 2026-11-04. Completed items are kept for the record.
 
 - Done. Implement the engine in `packages/policy-engine` (catalog, definition and
   override validation, fact parsing, evaluation, ordering, canonical JSON, deep
-  freeze, and the built-in definition) with the tests in section 10. Production stays
-  uncomposed.
+  freeze, and the built-in definition) with the tests in section 10. Production stayed
+  uncomposed when this item closed.
 - Done. Persistence session: v2 TypeScript document types, the domain port, the
   built-in seed version (2), the `current_risk_calculation_id` decision (read-time
-  derivation), and calculation audit. Production stays uncomposed.
+  derivation), and calculation audit. Production stayed uncomposed when this item closed.
 - Replaced. The original persistence item also named "worker composition through the
   transactional Outbox". That item is withdrawn. Production composition, the
-  composition root, and production publication of the built-in policy are proposed by
-  [ADR 0047](0047-controlled-priority-activation.md). Until that ADR is accepted, no
-  composition root is in force. `finding.recalculate`, worker scoring, and automatic
-  recalculation stay unauthorized.
+  composition root, and production publication of the built-in policy were proposed by
+  [ADR 0047](0047-controlled-priority-activation.md). That ADR is Accepted and composed.
+  `finding.recalculate`, worker scoring, and automatic recalculation stay unauthorized.
+  Publication in a deployment remains the operator command.
 - Done. Replace the illustrative sketch in [risk policy](../architecture/risk-policy.md)
   with a reference to this ADR, update the R13 residual in the
   [risk register](../security/risk-register.md), and update
   [current state](../project/current-state.md).
-- Open. Operator validation of weights (R13) before any production composition.
-  Validation binds to `POLICY_ENGINE_VERSION` and the exact `policyDefinitionSha256`
-  of the built-in definition. A change to either needs a new validation. Acceptance of
-  this ADR is not that validation.
+- Done on 2026-11-05. Operator validation of the built-in weights is V-0001,
+  outcome `validated_with_residuals`. Validation binds to `POLICY_ENGINE_VERSION`
+  and the exact `policyDefinitionSha256` of the built-in definition. A change to
+  either needs a new validation. The production allowlist admits that one pair.
+  Publication in a deployment remains the operator command. Acceptance of this ADR
+  is not that validation. Residuals remain in the validation entry.
 
 ## Approval checklist
 
