@@ -86,7 +86,7 @@ The job runs `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit
 
 `pnpm test:unit` runs `pnpm db:generate` before Turbo starts package unit tests. Package unit tests wait for `@patchpilot/database#build`. The database unit-test script does not run `prisma generate` again. A parallel generate deletes `.prisma/client` while API tests import it. Cached database build logs can replay an earlier generate without writing the client on a fresh runner, so the unit-test command generates it immediately before tests.
 
-It does **not** run `pnpm test:e2e`. That command is a local placeholder only (see [End-to-end testing](#end-to-end-testing)).
+It does **not** run `pnpm test:e2e`. The one release smoke runs in the Integration job.
 
 ## Integration testing
 
@@ -106,13 +106,13 @@ Credentials are the documented development placeholders. They are job-scoped env
 
 Prisma Client is generated before tests. CI does not run `pnpm db:migrate:deploy` against the service database named `patchpilot`. That URL is the PostgreSQL server template. API and worker processes, and database-package tests, create disposable databases and deploy the frozen migration chain into those databases. Local `pnpm test:integration` uses the same contract against Compose. There are no live OSV/KEV calls.
 
-The Integration job timeout is 50 minutes. Database integration files run one at a time, and each file deploys that chain, so the suite no longer fits the previous 35-minute limit.
+The Integration job timeout is 60 minutes. Database integration files run one at a time, and each file deploys that chain, so the suite no longer fits the previous 35-minute limit. The extra ten minutes cover one Chromium install and the single release smoke. After `pnpm test:integration`, the job installs Chromium and runs `pnpm test:e2e` with `INTELLIGENCE_KEV_ENABLED=false` and `INTELLIGENCE_OSV_ENABLED=false`. The smoke stays on the existing protected check `Integration / Integration`. It does not add `.github/workflows/e2e.yml` or a separate required-check name, and it does not upload traces, screenshots, or video.
 
 ## End-to-end testing
 
-Playwright is **not** a repository dependency. `pnpm test:e2e` currently prints that browser journeys are not wired and exits 0. It is kept as a documented local command interface only. GitHub Actions does **not** run it. Do not describe that placeholder as end-to-end validation.
+`@playwright/test` is a root devDependency. `pnpm test:e2e` runs the one Chromium release smoke. The Integration job installs Chromium and runs that command after the integration suite. The Quality job does not. The smoke does not upload traces. `.github/workflows/e2e.yml` remains forbidden.
 
-Landing copy, `/health`, and Session 6 authentication UI remain unit-tested. GitHub-hosted E2E coverage is deferred until actual Playwright tests exist ([CI-DEFER-1](#deferred-ci-work)).
+Landing copy, `/health`, and Session 6 authentication UI remain unit-tested. The one release smoke runs inside Integration. A separate E2E workflow stays deferred ([CI-DEFER-1](#ci-defer-1--separate-github-hosted-playwright-workflow)).
 
 ## CodeQL
 
@@ -196,11 +196,11 @@ Third-party actions are pinned to full commit SHAs with a trailing version comme
 
 These items are tracked so they are not forgotten and so they are **not** treated as present required checks.
 
-### CI-DEFER-1 — GitHub-hosted Playwright E2E
+### CI-DEFER-1 — Separate GitHub-hosted Playwright workflow
 
-Introduce a real E2E workflow only after Playwright tests exist in the repository. Until then, do not create or advertise an E2E / End-to-end required check, and do not upload Playwright artifacts.
+One Playwright release smoke exists and runs inside the existing Integration job. Do not create or advertise a separate E2E / End-to-end required check, and do not upload Playwright artifacts. `.github/workflows/e2e.yml` stays forbidden in `scripts/lint-workflows.mjs`.
 
-When that workflow is added it must:
+A later separate workflow, if one is accepted, must:
 
 - Use health-based application startup (not unbounded `sleep`)
 - Use bounded timeouts
@@ -214,7 +214,7 @@ When that workflow is added it must:
 
 Closed. Reviewed runtime targets `api`, `worker`, `web`, and `migrate` live in `deploy/docker/Dockerfile`. `.github/workflows/container-build.yml` builds them with BuildKit, does not push images, does not log registry credentials, fails when a tracked Dockerfile is not that reviewed file, and is no longer on the forbidden list in `scripts/lint-workflows.mjs`.
 
-Do not add a second container-build workflow. Do not fold a registry push or a fake always-green job into CI. E2E remains [CI-DEFER-1](#ci-defer-1--github-hosted-playwright-e2e).
+Do not add a second container-build workflow. Do not fold a registry push or a fake always-green job into CI. A separate E2E workflow remains [CI-DEFER-1](#ci-defer-1--separate-github-hosted-playwright-workflow).
 
 ## Related documents
 

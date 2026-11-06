@@ -15,6 +15,13 @@ export const REMEDIATION_QUEUE_DEFAULT_LIMIT = 20;
 
 export const REMEDIATION_QUEUE_MAX_LIMIT = 50;
 
+/** ADR 0051. Three queue sections times the page cap. This is not the page size. */
+export const REMEDIATION_QUEUE_EXPORT_CAP = 150;
+
+export const REMEDIATION_QUEUE_EXPORT_FORMATS = ['json', 'csv'] as const;
+
+export type RemediationQueueExportFormat = (typeof REMEDIATION_QUEUE_EXPORT_FORMATS)[number];
+
 export type RemediationQueueCounts = {
   readonly ranked: number;
   readonly incomparable: number;
@@ -88,4 +95,63 @@ export type RemediationQueuePersistencePort = {
   readonly readRemediationQueue: (
     input: RemediationQueueReadQuery,
   ) => Promise<RemediationQueueReadResult>;
+};
+
+export type RemediationQueueExportQuery = {
+  readonly organizationId: string;
+  readonly actorUserId: string;
+  readonly membershipId: string;
+  readonly correlationId: string;
+  readonly format: RemediationQueueExportFormat;
+  readonly referenceEngineVersion: string;
+};
+
+export type RemediationQueueExportRawSnapshot = {
+  readonly asOf: string;
+  readonly publishedDefinition: unknown;
+  readonly referencePolicyDefinitionSha256: string;
+  readonly referenceEngineVersion: string;
+  readonly activeKevGenerationId: string | null;
+  readonly counts: RemediationQueueCounts;
+  readonly findingCount: number;
+  readonly ranked: readonly RemediationQueueRawRow[];
+  readonly incomparable: readonly RemediationQueueRawRow[];
+  readonly not_calculated: readonly RemediationQueueRawRow[];
+};
+
+export type RemediationQueueExportAdmit =
+  { readonly ok: true; readonly hash: string } | { readonly ok: false };
+
+/**
+ * Both hooks run inside the export transaction and must not perform I/O.
+ * `complete` returns the exact response bytes, or null when the snapshot is malformed.
+ */
+export type RemediationQueueExportHooks = {
+  readonly admit: (definition: unknown) => RemediationQueueExportAdmit;
+  readonly complete: (snapshot: RemediationQueueExportRawSnapshot) => Uint8Array | null;
+};
+
+export type RemediationQueueExportPersistenceResult =
+  | {
+      readonly kind: 'exported';
+      readonly body: Uint8Array;
+      readonly sha256: string;
+      readonly byteLength: number;
+      readonly asOf: string;
+      readonly counts: RemediationQueueCounts;
+      readonly findingCount: number;
+      readonly referencePolicyDefinitionSha256: string;
+    }
+  | { readonly kind: 'policy_absent' }
+  | { readonly kind: 'policy_rejected' }
+  | { readonly kind: 'malformed' }
+  | { readonly kind: 'cap_exceeded' }
+  | { readonly kind: 'correlation_conflict' }
+  | { readonly kind: 'unavailable' };
+
+export type RemediationQueueExportPersistencePort = {
+  readonly exportRemediationQueue: (
+    input: RemediationQueueExportQuery,
+    hooks: RemediationQueueExportHooks,
+  ) => Promise<RemediationQueueExportPersistenceResult>;
 };

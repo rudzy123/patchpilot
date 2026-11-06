@@ -5,6 +5,8 @@ import {
   PRIORITY_CALCULATION_ENGINE_VERSION,
   PRIORITY_INPUT_CHANGE_SIGNALS,
   REMEDIATION_QUEUE_COMPARISON_MESSAGE,
+  REMEDIATION_QUEUE_EXPORT_CAP,
+  REMEDIATION_QUEUE_EXPORT_FORMATS,
 } from '@patchpilot/domain';
 import { z } from 'zod';
 
@@ -127,3 +129,51 @@ export const remediationQueueResponseSchema = z.discriminatedUnion('section', [
 ]);
 
 export type RemediationQueueResponse = z.infer<typeof remediationQueueResponseSchema>;
+
+export const remediationQueueExportRequestSchema = z
+  .object({
+    format: z.enum(REMEDIATION_QUEUE_EXPORT_FORMATS),
+  })
+  .strict();
+
+const exportSectionsSchema = z
+  .object({
+    ranked: z.array(rankedRowSchema),
+    incomparable: z.array(incomparableRowSchema),
+    not_calculated: z.array(notCalculatedRowSchema),
+  })
+  .strict();
+
+export const remediationQueueExportResponseSchema = z
+  .object({
+    schemaVersion: z.literal('remediation_queue_export_v1'),
+    format: z.enum(REMEDIATION_QUEUE_EXPORT_FORMATS),
+    asOf: z.string().regex(OBSERVED_AT),
+    reference: referenceSchema,
+    counts: countsSchema,
+    rowCount: z.number().int().nonnegative().max(REMEDIATION_QUEUE_EXPORT_CAP),
+    cap: z.literal(REMEDIATION_QUEUE_EXPORT_CAP),
+    sections: exportSectionsSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.rowCount > value.cap) {
+      context.addIssue({ code: 'custom', message: 'row count', path: ['rowCount'] });
+    }
+    if (
+      value.counts.ranked + value.counts.incomparable + value.counts.not_calculated !==
+      value.rowCount
+    ) {
+      context.addIssue({ code: 'custom', message: 'count partition', path: ['counts'] });
+    }
+    if (
+      value.sections.ranked.length !== value.counts.ranked ||
+      value.sections.incomparable.length !== value.counts.incomparable ||
+      value.sections.not_calculated.length !== value.counts.not_calculated
+    ) {
+      context.addIssue({ code: 'custom', message: 'section length', path: ['sections'] });
+    }
+  });
+
+export type RemediationQueueExportRequest = z.infer<typeof remediationQueueExportRequestSchema>;
+export type RemediationQueueExportResponse = z.infer<typeof remediationQueueExportResponseSchema>;

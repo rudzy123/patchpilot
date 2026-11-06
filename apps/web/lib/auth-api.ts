@@ -40,7 +40,12 @@ import {
   readFindingRiskCalculation,
   readPriorityReview,
 } from './finding-priority';
-import { QUEUE_UNAVAILABLE, readRemediationQueue } from './remediation-queue';
+import {
+  QUEUE_EXPORT_CSV_FILENAME,
+  QUEUE_EXPORT_JSON_FILENAME,
+  QUEUE_UNAVAILABLE,
+  readRemediationQueue,
+} from './remediation-queue';
 import { isCanonicalUuid } from './resource-id';
 
 /** Synchronizer token header. Must match `AUTH_CSRF_HEADER_NAME` / ADR 0019. */
@@ -401,6 +406,38 @@ export function createAuthApi(apiBaseUrl: string) {
       });
     },
 
+    exportRemediationQueue(
+      format: 'json' | 'csv',
+      csrfToken: string,
+    ): Promise<{
+      format: 'json' | 'csv';
+      mediaType: string;
+      filename: string;
+      bytes: Uint8Array;
+    }> {
+      const filename = format === 'json' ? QUEUE_EXPORT_JSON_FILENAME : QUEUE_EXPORT_CSV_FILENAME;
+      const mediaType =
+        format === 'json' ? 'application/json; charset=utf-8' : 'text/csv; charset=utf-8';
+      return sendResponseBody({
+        baseUrl,
+        path: '/remediation-queue/export',
+        method: 'POST',
+        body: { format },
+        csrfToken,
+        unauthorizedMessage: GENERIC_SESSION_EXPIRED,
+        unavailableMessage: QUEUE_UNAVAILABLE,
+      }).then((response) => {
+        if (
+          response.mediaType !== mediaType ||
+          response.disposition !== `attachment; filename="${filename}"` ||
+          response.bytes.byteLength === 0
+        ) {
+          throw createAuthRequestError(503, 'internal', QUEUE_UNAVAILABLE);
+        }
+        return { format, mediaType, filename, bytes: response.bytes };
+      });
+    },
+
     calculateFindingPriority(
       findingId: string,
       csrfToken: string,
@@ -533,6 +570,47 @@ async function sendJson<T>(input: {
   }
 
   return input.parse(payload);
+}
+
+async function sendResponseBody(input: {
+  baseUrl: string;
+  path: string;
+  method: 'POST';
+  body: unknown;
+  csrfToken: string;
+  unauthorizedMessage?: string;
+  unavailableMessage?: string;
+}): Promise<{ mediaType: string; disposition: string | null; bytes: Uint8Array }> {
+  const headers = new Headers();
+  headers.set('content-type', 'application/json');
+  if (input.csrfToken.length > 0) {
+    headers.set(CSRF_HEADER_NAME, input.csrfToken);
+  }
+  let response: Response;
+  try {
+    response = await fetch(`${input.baseUrl}${input.path}`, {
+      method: input.method,
+      credentials: 'include',
+      cache: 'no-store',
+      headers,
+      body: JSON.stringify(input.body),
+    });
+  } catch {
+    throw createAuthRequestError(0, 'internal', GENERIC_UNAVAILABLE);
+  }
+  if (!response.ok) {
+    throw mapErrorEnvelope(
+      await readJson(response),
+      response.status,
+      input.unauthorizedMessage,
+      input.unavailableMessage,
+    );
+  }
+  return {
+    mediaType: response.headers.get('content-type') ?? '',
+    disposition: response.headers.get('content-disposition'),
+    bytes: new Uint8Array(await response.arrayBuffer()),
+  };
 }
 
 async function readJson(response: Response): Promise<unknown> {

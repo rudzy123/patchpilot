@@ -2,7 +2,7 @@
 
 Tests are part of the definition of done for significant features, not a follow-up wish. Unit and integration tests use **Vitest**. Browser end-to-end tests use **Playwright**. Rules: [testing.mdc](../../.cursor/rules/testing.mdc).
 
-This strategy is for v0.1 architecture. Session 4 wires GitHub Actions for unit tests, integration tests, and static analysis. Playwright browser journeys are still not implemented, and there is no GitHub-hosted E2E workflow until real Playwright tests exist ([CI-DEFER-1](../development/ci.md#deferred-ci-work)). Authors run the equivalent local commands and report actual results when hosted jobs have not finished.
+This strategy is for v0.1 architecture. Session 4 wires GitHub Actions for unit tests, integration tests, and static analysis. One Playwright release smoke is implemented and runs inside the Integration job. There is no separate GitHub-hosted E2E workflow ([CI-DEFER-1](../development/ci.md#ci-defer-1--separate-github-hosted-playwright-workflow)). Authors run the equivalent local commands and report actual results when hosted jobs have not finished.
 
 ## Layers
 

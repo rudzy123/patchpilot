@@ -196,6 +196,9 @@ export function createFakeAuthApi(overrides: Partial<FakeAuthApi> = {}): FakeAut
     readRemediationQueue: vi.fn(async () => {
       throw new Error('readRemediationQueue was not stubbed');
     }),
+    exportRemediationQueue: vi.fn(async () => {
+      throw new Error('exportRemediationQueue was not stubbed');
+    }),
     readFindingPriority: vi.fn(async (findingId: string) => ({
       schemaVersion: 'finding_priority_v1' as const,
       status: 'not_calculated' as const,

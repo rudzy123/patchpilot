@@ -48,7 +48,7 @@ Do **not** require:
 - Scorecard (does not run on pull requests; not a PR gate)
 - SBOM (does not run on pull requests; not a PR gate)
 - Release dry run (manual `workflow_dispatch` only)
-- E2E (no workflow until real Playwright tests exist)
+- E2E (no separate workflow; the one release smoke runs inside Integration)
 - Container build. The workflow exists and does not push images. The intended name is `Container build / Build`. Do not require it until that hosted name is confirmed. A built image is not a product-readiness gate
 
 Do not require checks that do not exist.

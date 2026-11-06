@@ -76,6 +76,9 @@ function runtime(result?: Partial<ControlledPriorityRuntime>): {
       async readQueue() {
         return { kind: 'unavailable' };
       },
+      async exportQueue() {
+        return { kind: 'unavailable' };
+      },
       async recordReview(input) {
         calls.push(`review:${input.actor.role}:${input.findingId}`);
         return { kind: 'not_found' };

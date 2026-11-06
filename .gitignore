@@ -47,6 +47,7 @@ patchpilot-sbom.cdx.json
 playwright-report/
 playwright/.cache/
 test-results/
+apps/web/e2e/.state.json
 blob-report/
 vitest.config.ts.timestamp-*
 

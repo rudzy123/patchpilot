@@ -35,5 +35,6 @@ They do not include exploit payloads. They do not claim compliance.
 | [Dependency alert](dependency-alert.md) | Dependabot or Dependency Review flags a package |
 | [Secret exposure](secret-exposure.md) | Credential in git, logs, or artifacts |
 | [Code scanning finding](code-scanning-finding.md) | CodeQL or Scorecard alert |
+| [Remediation-queue export](remediation-queue-export.md) | Export the current queue as JSON or CSV |
 
 Related architecture: [reliability](../architecture/reliability-model.md), [tenant isolation](../architecture/tenant-isolation.md), [audit](../architecture/audit-model.md).

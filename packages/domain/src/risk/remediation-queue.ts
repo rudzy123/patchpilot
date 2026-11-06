@@ -1,7 +1,9 @@
 /**
- * Remediation queue read for the actor's organization.
+ * Remediation queue read and export for the actor's organization.
  * The organization comes from the trusted actor. This module does not call
- * the priority engine, assemble facts, or write an audit row.
+ * the priority engine or assemble facts.
+ * The read writes no audit row. The export asks the adapter to insert one
+ * export.created row inside the same snapshot transaction.
  * Section order is the adapter's stored-field order.
  * humanReview is a marker. It does not change section order or stored priority.
  */
@@ -31,10 +33,16 @@ import {
   type RemediationQueueCursor,
 } from './remediation-queue-cursor.js';
 import {
+  REMEDIATION_QUEUE_EXPORT_CAP,
+  REMEDIATION_QUEUE_EXPORT_FORMATS,
   REMEDIATION_QUEUE_MAX_LIMIT,
   REMEDIATION_QUEUE_SECTIONS,
   type RemediationQueueCalculationFields,
   type RemediationQueueCounts,
+  type RemediationQueueExportFormat,
+  type RemediationQueueExportPersistencePort,
+  type RemediationQueueExportPersistenceResult,
+  type RemediationQueueExportRawSnapshot,
   type RemediationQueuePersistencePort,
   type RemediationQueueRawRow,
   type RemediationQueueSection,
@@ -51,6 +59,10 @@ const UUID_LOWER = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 const ENVELOPE_KEYS = ['actor', 'command'] as const;
 
 const COMMAND_KEYS = ['section', 'limit', 'cursor'] as const;
+
+const EXPORT_COMMAND_KEYS = ['format', 'correlationId'] as const;
+
+const CORRELATION_ID = /^[A-Za-z0-9._-]{1,128}$/;
 
 const ENVELOPE_AUTHORITY_KEYS = [
   'organizationId',
@@ -150,11 +162,65 @@ export type ReadRemediationQueueResult =
   | { readonly kind: 'unavailable' }
   | { readonly kind: 'internal_failure' };
 
+export const REMEDIATION_QUEUE_EXPORT_AUDIT_ACTION = 'export.created' as const;
+
+export type RemediationQueueExportDocument = {
+  readonly format: RemediationQueueExportFormat;
+  readonly asOf: string;
+  readonly reference: RemediationQueueReference;
+  readonly counts: RemediationQueueCounts;
+  readonly rowCount: number;
+  readonly cap: typeof REMEDIATION_QUEUE_EXPORT_CAP;
+  readonly sections: {
+    readonly ranked: readonly RemediationQueueRankedRow[];
+    readonly incomparable: readonly RemediationQueueIncomparableRow[];
+    readonly not_calculated: readonly RemediationQueueNotCalculatedRow[];
+  };
+};
+
+export type ExportRemediationQueueDependencies = {
+  readonly persistence: RemediationQueueExportPersistencePort;
+  readonly admittedPairs: readonly AdmittedPriorityPolicyPair[];
+  readonly referenceEngineVersion: string;
+  readonly hashPolicyDefinition: (definition: unknown) => string | null;
+  readonly serializeExport: (document: RemediationQueueExportDocument) => Uint8Array;
+};
+
+export type ExportRemediationQueueResult =
+  | {
+      readonly kind: 'exported';
+      readonly body: Uint8Array;
+      readonly sha256: string;
+      readonly byteLength: number;
+      readonly document: RemediationQueueExportDocument;
+    }
+  | { readonly kind: 'priority_policy_unavailable' }
+  | { readonly kind: 'cap_exceeded' }
+  | { readonly kind: 'correlation_conflict' }
+  | { readonly kind: 'unauthorized' }
+  | { readonly kind: 'invalid_command' }
+  | { readonly kind: 'unavailable' }
+  | { readonly kind: 'internal_failure' };
+
 export function createReadRemediationQueueUseCase(dependencies: ReadRemediationQueueDependencies) {
   return {
     async execute(input: unknown): Promise<ReadRemediationQueueResult> {
       try {
         return await executeRead(dependencies, input);
+      } catch {
+        return { kind: 'internal_failure' };
+      }
+    },
+  };
+}
+
+export function createExportRemediationQueueUseCase(
+  dependencies: ExportRemediationQueueDependencies,
+) {
+  return {
+    async execute(input: unknown): Promise<ExportRemediationQueueResult> {
+      try {
+        return await executeExport(dependencies, input);
       } catch {
         return { kind: 'internal_failure' };
       }
@@ -325,7 +391,10 @@ function authorize(input: unknown):
 }
 
 function admit(
-  dependencies: ReadRemediationQueueDependencies,
+  dependencies: Pick<
+    ReadRemediationQueueDependencies,
+    'admittedPairs' | 'referenceEngineVersion' | 'hashPolicyDefinition'
+  >,
   definition: unknown,
 ): { readonly ok: true; readonly hash: string } | { readonly ok: false } {
   let hash: string | null;
@@ -374,7 +443,7 @@ function mapRows(
   rows: readonly RemediationQueueRawRow[],
   section: RemediationQueueSection,
   hash: string,
-  dependencies: ReadRemediationQueueDependencies,
+  dependencies: Pick<ReadRemediationQueueDependencies, 'referenceEngineVersion'>,
   activeKevGenerationId: string | null,
 ): {
   readonly rows: readonly RemediationQueuePage['rows'][number][];
@@ -518,7 +587,7 @@ function calculationMatches(
   calculation: RemediationQueueCalculationFields,
   section: RemediationQueueSection,
   hash: string,
-  dependencies: ReadRemediationQueueDependencies,
+  dependencies: Pick<ReadRemediationQueueDependencies, 'referenceEngineVersion'>,
 ): boolean {
   const comparable =
     calculation.policyKey === BUILTIN_PRIORITY_POLICY_KEY &&
@@ -573,6 +642,265 @@ function countsPartition(counts: RemediationQueueCounts, findingCount: number): 
 function isSection(value: unknown): value is RemediationQueueSection {
   return (
     typeof value === 'string' && (REMEDIATION_QUEUE_SECTIONS as readonly string[]).includes(value)
+  );
+}
+
+async function executeExport(
+  dependencies: ExportRemediationQueueDependencies,
+  input: unknown,
+): Promise<ExportRemediationQueueResult> {
+  const command = authorizeExport(input);
+  if (!command.ok) {
+    return { kind: command.kind };
+  }
+  if (
+    typeof dependencies.persistence.exportRemediationQueue !== 'function' ||
+    typeof dependencies.hashPolicyDefinition !== 'function' ||
+    typeof dependencies.serializeExport !== 'function' ||
+    dependencies.referenceEngineVersion.length === 0
+  ) {
+    return { kind: 'internal_failure' };
+  }
+  let document: RemediationQueueExportDocument | null = null;
+  const result = await dependencies.persistence.exportRemediationQueue(
+    {
+      organizationId: command.organizationId,
+      actorUserId: command.actorUserId,
+      membershipId: command.membershipId,
+      correlationId: command.correlationId,
+      format: command.format,
+      referenceEngineVersion: dependencies.referenceEngineVersion,
+    },
+    {
+      admit: (definition) => admit(dependencies, definition),
+      complete: (snapshot) => {
+        const built = buildExportDocument(dependencies, command.format, snapshot);
+        if (built === null) {
+          return null;
+        }
+        document = built;
+        const body = dependencies.serializeExport(built);
+        if (!(body instanceof Uint8Array) || body.byteLength === 0) {
+          return null;
+        }
+        return body;
+      },
+    },
+  );
+  return mapExportResult(result, document);
+}
+
+function authorizeExport(input: unknown):
+  | {
+      readonly ok: true;
+      readonly organizationId: string;
+      readonly actorUserId: string;
+      readonly membershipId: string;
+      readonly correlationId: string;
+      readonly format: RemediationQueueExportFormat;
+    }
+  | { readonly ok: false; readonly kind: 'unauthorized' | 'invalid_command' } {
+  if (recordHasAmbientKey(input, ENVELOPE_AUTHORITY_KEYS)) {
+    return { ok: false, kind: 'unauthorized' };
+  }
+  const envelope = closedRecord(input, ENVELOPE_KEYS);
+  if (envelope === null) {
+    return { ok: false, kind: 'invalid_command' };
+  }
+  const actor = parseControlledFindingOperatorActor(envelope.get('actor'));
+  if (
+    actor === null ||
+    !roleGrantsRemediationQueueRead(actor.role) ||
+    !roleGrantsPriorityPermission(actor.role, PRIORITY_INSPECT_PERMISSION)
+  ) {
+    return { ok: false, kind: 'unauthorized' };
+  }
+  const commandRecord = envelope.get('command');
+  if (!isPlainObject(commandRecord)) {
+    return { ok: false, kind: 'invalid_command' };
+  }
+  if (recordHasAmbientKey(commandRecord, COMMAND_AUTHORITY_KEYS)) {
+    return { ok: false, kind: 'unauthorized' };
+  }
+  const command = closedRecord(commandRecord, EXPORT_COMMAND_KEYS);
+  if (command === null) {
+    return { ok: false, kind: 'invalid_command' };
+  }
+  const format = command.get('format');
+  const correlationId = command.get('correlationId');
+  if (
+    !isExportFormat(format) ||
+    typeof correlationId !== 'string' ||
+    !CORRELATION_ID.test(correlationId)
+  ) {
+    return { ok: false, kind: 'invalid_command' };
+  }
+  return {
+    ok: true,
+    organizationId: actor.organizationId,
+    actorUserId: actor.userId,
+    membershipId: actor.membershipId,
+    correlationId,
+    format,
+  };
+}
+
+function buildExportDocument(
+  dependencies: ExportRemediationQueueDependencies,
+  format: RemediationQueueExportFormat,
+  snapshot: RemediationQueueExportRawSnapshot,
+): RemediationQueueExportDocument | null {
+  const confirmed = admit(dependencies, snapshot.publishedDefinition);
+  if (
+    !confirmed.ok ||
+    confirmed.hash !== snapshot.referencePolicyDefinitionSha256 ||
+    snapshot.referenceEngineVersion !== dependencies.referenceEngineVersion ||
+    !TIMESTAMP.test(snapshot.asOf) ||
+    !countsPartition(snapshot.counts, snapshot.findingCount) ||
+    snapshot.findingCount > REMEDIATION_QUEUE_EXPORT_CAP
+  ) {
+    return null;
+  }
+  const ranked = mapRows(
+    snapshot.ranked,
+    'ranked',
+    confirmed.hash,
+    dependencies,
+    snapshot.activeKevGenerationId,
+  );
+  const incomparable = mapRows(
+    snapshot.incomparable,
+    'incomparable',
+    confirmed.hash,
+    dependencies,
+    snapshot.activeKevGenerationId,
+  );
+  const notCalculated = mapRows(
+    snapshot.not_calculated,
+    'not_calculated',
+    confirmed.hash,
+    dependencies,
+    snapshot.activeKevGenerationId,
+  );
+  if (ranked === null || incomparable === null || notCalculated === null) {
+    return null;
+  }
+  const rankedRows = takeRanked(ranked.rows);
+  const incomparableRows = takeIncomparable(incomparable.rows);
+  const notCalculatedRows = takeNotCalculated(notCalculated.rows);
+  if (
+    rankedRows === null ||
+    incomparableRows === null ||
+    notCalculatedRows === null ||
+    rankedRows.length !== snapshot.counts.ranked ||
+    incomparableRows.length !== snapshot.counts.incomparable ||
+    notCalculatedRows.length !== snapshot.counts.not_calculated
+  ) {
+    return null;
+  }
+  return {
+    format,
+    asOf: snapshot.asOf,
+    reference: {
+      policyKey: BUILTIN_PRIORITY_POLICY_KEY,
+      policyVersion: BUILTIN_PRIORITY_POLICY_VERSION,
+      policyDefinitionSha256: confirmed.hash,
+      engineVersion: dependencies.referenceEngineVersion,
+    },
+    counts: snapshot.counts,
+    rowCount: snapshot.findingCount,
+    cap: REMEDIATION_QUEUE_EXPORT_CAP,
+    sections: {
+      ranked: rankedRows,
+      incomparable: incomparableRows,
+      not_calculated: notCalculatedRows,
+    },
+  };
+}
+
+function mapExportResult(
+  result: RemediationQueueExportPersistenceResult,
+  document: RemediationQueueExportDocument | null,
+): ExportRemediationQueueResult {
+  switch (result.kind) {
+    case 'exported':
+      if (
+        document === null ||
+        document.asOf !== result.asOf ||
+        document.rowCount !== result.findingCount ||
+        document.reference.policyDefinitionSha256 !== result.referencePolicyDefinitionSha256 ||
+        result.byteLength !== result.body.byteLength
+      ) {
+        return { kind: 'unavailable' };
+      }
+      return {
+        kind: 'exported',
+        body: result.body,
+        sha256: result.sha256,
+        byteLength: result.byteLength,
+        document,
+      };
+    case 'policy_absent':
+    case 'policy_rejected':
+      return { kind: 'priority_policy_unavailable' };
+    case 'cap_exceeded':
+      return { kind: 'cap_exceeded' };
+    case 'correlation_conflict':
+      return { kind: 'correlation_conflict' };
+    case 'malformed':
+    case 'unavailable':
+      return { kind: 'unavailable' };
+    default:
+      return assertNever(result);
+  }
+}
+
+function takeRanked(
+  rows: readonly RemediationQueuePage['rows'][number][],
+): RemediationQueueRankedRow[] | null {
+  const ranked: RemediationQueueRankedRow[] = [];
+  for (const row of rows) {
+    if (!('priority' in row) || 'comparisonMessage' in row) {
+      return null;
+    }
+    ranked.push(row);
+  }
+  return ranked;
+}
+
+function takeIncomparable(
+  rows: readonly RemediationQueuePage['rows'][number][],
+): RemediationQueueIncomparableRow[] | null {
+  const incomparable: RemediationQueueIncomparableRow[] = [];
+  for (const row of rows) {
+    if (!('comparisonMessage' in row)) {
+      return null;
+    }
+    incomparable.push(row);
+  }
+  return incomparable;
+}
+
+function takeNotCalculated(
+  rows: readonly RemediationQueuePage['rows'][number][],
+): RemediationQueueNotCalculatedRow[] | null {
+  const absent: RemediationQueueNotCalculatedRow[] = [];
+  for (const row of rows) {
+    if ('priority' in row || 'comparisonMessage' in row) {
+      return null;
+    }
+    if (row.humanReview.status !== 'none' || row.humanReview.priorReviewExists) {
+      return null;
+    }
+    absent.push(row);
+  }
+  return absent;
+}
+
+function isExportFormat(value: unknown): value is RemediationQueueExportFormat {
+  return (
+    typeof value === 'string' &&
+    (REMEDIATION_QUEUE_EXPORT_FORMATS as readonly string[]).includes(value)
   );
 }
 

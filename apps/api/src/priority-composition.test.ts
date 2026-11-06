@@ -11,6 +11,7 @@ describe('controlled priority composition', () => {
   it('constructs the calculation and queue use cases only in the API priority runtime', () => {
     const needles = [
       'createCalculateFindingRiskUseCase',
+      'createExportRemediationQueueUseCase',
       'createReadRemediationQueueUseCase',
       'createRecordPriorityReviewUseCase',
     ];
@@ -41,8 +42,12 @@ describe('controlled priority composition', () => {
     const server = readFileSync(path.join(here, 'server.ts'), 'utf8');
     expect(runtime).toContain('createReadControlledFindingPriorityUseCase');
     expect(runtime).toContain('createReadRemediationQueueUseCase');
+    expect(runtime).toContain('createExportRemediationQueueUseCase');
+    expect(runtime).toContain('serializeRemediationQueueExport');
+    expect(runtime).toContain('exportRemediationQueueSnapshot');
     expect(server).toContain('composeControlledPriorityRuntime');
     expect(server).not.toContain('createCalculateFindingRiskUseCase');
+    expect(server).not.toContain('createExportRemediationQueueUseCase');
     expect(server).not.toContain('createReadRemediationQueueUseCase');
     expect(server).not.toContain('createRecordPriorityReviewUseCase');
     expect(runtime).toContain('createRecordPriorityReviewUseCase');

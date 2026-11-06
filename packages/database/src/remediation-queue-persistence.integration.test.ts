@@ -9,6 +9,8 @@ import {
   PRIORITY_CALCULATION_ENGINE_VERSION,
   RISK_CALCULATION_FACTORS_SCHEMA_VERSION_V2,
   compareStoredRemediationRank,
+  REMEDIATION_QUEUE_EXPORT_CAP,
+  createExportRemediationQueueUseCase,
   createReadRemediationQueueUseCase,
 } from '@patchpilot/domain';
 import {
@@ -31,7 +33,10 @@ import {
   deployMigrations,
   dropEphemeralDatabase,
 } from './integration-database.js';
-import { readRemediationQueuePage } from './remediation-queue-persistence.js';
+import {
+  exportRemediationQueueSnapshot,
+  readRemediationQueuePage,
+} from './remediation-queue-persistence.js';
 import { createRiskCalculationApplicationPersistence } from './risk-calculation-application-persistence.js';
 import { createAsset, createOrg } from './sbom-test-fixture.js';
 
@@ -110,6 +115,31 @@ describe('remediation queue persistence', () => {
     if (admin !== undefined && databaseName !== undefined) {
       await dropEphemeralDatabase(admin, databaseName);
     }
+  });
+
+  it('returns policy absence before any export audit row', async () => {
+    const organizationId = '11111111-1111-4111-8111-111111111111';
+    const result = await exportRemediationQueueSnapshot(
+      prisma,
+      {
+        organizationId,
+        actorUserId: '22222222-2222-4222-8222-222222222222',
+        membershipId: '33333333-3333-4333-8333-333333333333',
+        correlationId: 'export-before-policy',
+        format: 'json',
+        referenceEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+      },
+      {
+        admit: () => {
+          throw new Error('export must not admit a missing policy');
+        },
+        complete: () => {
+          throw new Error('export must not serialize a missing policy');
+        },
+      },
+    );
+    expect(result).toEqual({ kind: 'policy_absent' });
+    expect(await exportAuditCount(prisma)).toBe(0);
   });
 
   it('keeps each organization in its own partition and orders ranked rows with the engine', async () => {
@@ -422,7 +452,289 @@ describe('remediation queue persistence', () => {
       },
     });
   }
+
+  it('exports one snapshot, one audit row, and no stored file replay', async () => {
+    const hash = hashDefinition(BUILTIN_PRIORITY_POLICY_DEFINITION);
+    const published = await publishBuiltinPriorityPolicy(prisma, {
+      correlationId: randomUUID(),
+      definition: BUILTIN_PRIORITY_POLICY_DEFINITION,
+      canonicalJson,
+      admittedPairs: ADMITTED_PRIORITY_POLICY_PAIRS,
+      engineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+    });
+    expect(published.outcome === 'inserted' || published.outcome === 'already_applied').toBe(true);
+    if (published.outcome !== 'inserted' && published.outcome !== 'already_applied') {
+      return;
+    }
+    const home = await createOrg(prisma, `export-home-${randomUUID().slice(0, 8)}`);
+    const foreign = await createOrg(prisma, `export-foreign-${randomUUID().slice(0, 8)}`);
+    const vulnerability = await prisma.vulnerability.create({
+      data: { osvId: `EXPORT-${randomUUID()}` },
+    });
+    const homeComponent = await prisma.component.create({
+      data: {
+        organizationId: home.id,
+        identityKey: `npm|export-home-${randomUUID()}`,
+        ecosystem: 'npm',
+        name: 'export-home',
+      },
+    });
+    const foreignComponent = await prisma.component.create({
+      data: {
+        organizationId: foreign.id,
+        identityKey: `npm|export-foreign-${randomUUID()}`,
+        ecosystem: 'npm',
+        name: 'export-foreign',
+      },
+    });
+    const low = evaluate({
+      kev_listed: { state: 'observed', value: 'listed_catalog_current' },
+    });
+    const high = evaluate({
+      source_severity: { state: 'observed', values: ['critical'] },
+      kev_listed: { state: 'observed', value: 'listed_catalog_current' },
+      environment_sensitivity: { state: 'observed', value: 'non_production' },
+      internet_exposure: { state: 'observed', value: 'internal' },
+      business_criticality: { state: 'observed', value: 'critical' },
+    });
+    const early = await insertFinding(home.id, 'export early', homeComponent.id, vulnerability.id);
+    const later = await insertFinding(home.id, 'export later', homeComponent.id, vulnerability.id);
+    const other = await insertFinding(home.id, 'export other', homeComponent.id, vulnerability.id);
+    const missing = await insertFinding(
+      home.id,
+      'export missing',
+      homeComponent.id,
+      vulnerability.id,
+    );
+    const outside = await insertFinding(
+      foreign.id,
+      'export foreign',
+      foreignComponent.id,
+      vulnerability.id,
+    );
+    await insertCalculation(early, low, hash, published.riskPolicyId);
+    await insertCalculation(later, high, hash, published.riskPolicyId);
+    await insertCalculation(other, low, 'b'.repeat(64), published.riskPolicyId);
+    await insertCalculation(outside, high, hash, published.riskPolicyId);
+    const actor = await createExportActor(home.id);
+    const before = await populationCounts(home.id);
+    const policyCount = await prisma.riskPolicy.count();
+    const useCase = exportUseCase();
+    const correlationId = `export-${randomUUID()}`;
+    const result = await useCase.execute({
+      actor: actor.actor,
+      command: { format: 'json', correlationId },
+    });
+    expect(result.kind).toBe('exported');
+    if (result.kind !== 'exported') {
+      return;
+    }
+    expect(result.document.counts).toEqual({ ranked: 2, incomparable: 1, not_calculated: 1 });
+    expect(result.document.rowCount).toBe(4);
+    expect(result.document.sections.not_calculated.map((row) => row.findingId)).toEqual([
+      missing.id,
+    ]);
+    expect(result.document.sections.not_calculated[0]).not.toHaveProperty('priorityBand');
+    expect(result.document.sections.incomparable.map((row) => row.findingId)).toEqual([other.id]);
+    expect(result.document.sections.ranked.map((row) => row.findingId)).not.toContain(outside.id);
+    const page = await readRemediationQueuePage(prisma, {
+      organizationId: home.id,
+      section: 'ranked',
+      referencePolicyDefinitionSha256: hash,
+      referenceEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+      limit: 50,
+      cursor: null,
+    });
+    expect(page.kind).toBe('page');
+    if (page.kind === 'page') {
+      expect(result.document.sections.ranked.map((row) => row.findingId)).toEqual(
+        page.rows.map((row) => row.findingId),
+      );
+    }
+    expect(createHash('sha256').update(result.body).digest('hex')).toBe(result.sha256);
+    const audit = await prisma.auditEvent.findFirstOrThrow({
+      where: { organizationId: home.id, action: 'export.created', correlationId },
+    });
+    const payload = audit.payload;
+    expect(payload).toMatchObject({
+      schemaVersion: 1,
+      purpose: 'remediation_queue_export',
+      format: 'json',
+      rowCount: 4,
+      cap: REMEDIATION_QUEUE_EXPORT_CAP,
+      sha256: result.sha256,
+      byteLength: result.byteLength,
+    });
+    expect(JSON.stringify(payload)).not.toContain(early.id);
+    expect(JSON.stringify(payload)).not.toContain('export early');
+    expect(await populationCounts(home.id)).toEqual(before);
+    expect(await prisma.riskPolicy.count()).toBe(policyCount);
+    expect(
+      await prisma.evidence.count({ where: { organizationId: home.id, kind: 'export_snapshot' } }),
+    ).toBe(0);
+
+    const replay = await useCase.execute({
+      actor: actor.actor,
+      command: { format: 'csv', correlationId },
+    });
+    expect(replay).toEqual({ kind: 'correlation_conflict' });
+    expect(
+      await prisma.auditEvent.count({
+        where: { organizationId: home.id, action: 'export.created' },
+      }),
+    ).toBe(1);
+
+    const failed = await exportRemediationQueueSnapshot(
+      prisma,
+      {
+        organizationId: home.id,
+        actorUserId: actor.actor.userId,
+        membershipId: actor.actor.membershipId,
+        correlationId: `export-fail-${randomUUID()}`,
+        format: 'json',
+        referenceEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+      },
+      {
+        admit: (definition) => {
+          const admitted = hashDefinition(definition);
+          return admitted.length === 64 ? { ok: true, hash: admitted } : { ok: false };
+        },
+        complete: () => {
+          throw new Error('export serialization failed');
+        },
+      },
+    );
+    expect(failed).toEqual({ kind: 'unavailable' });
+    expect(
+      await prisma.auditEvent.count({
+        where: { organizationId: home.id, action: 'export.created' },
+      }),
+    ).toBe(1);
+
+    await prisma.asset.update({ where: { id: missing.assetId }, data: { name: '' } });
+    const malformed = await useCase.execute({
+      actor: actor.actor,
+      command: { format: 'json', correlationId: `export-malformed-${randomUUID()}` },
+    });
+    expect(malformed).toEqual({ kind: 'unavailable' });
+    expect(
+      await prisma.auditEvent.count({
+        where: { organizationId: home.id, action: 'export.created' },
+      }),
+    ).toBe(1);
+  }, 120_000);
+
+  it('exports 150 findings and writes no audit row at 151', async () => {
+    const published = await publishBuiltinPriorityPolicy(prisma, {
+      correlationId: randomUUID(),
+      definition: BUILTIN_PRIORITY_POLICY_DEFINITION,
+      canonicalJson,
+      admittedPairs: ADMITTED_PRIORITY_POLICY_PAIRS,
+      engineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+    });
+    expect(published.outcome === 'inserted' || published.outcome === 'already_applied').toBe(true);
+    if (published.outcome !== 'inserted' && published.outcome !== 'already_applied') {
+      return;
+    }
+    const home = await createOrg(prisma, `export-cap-${randomUUID().slice(0, 8)}`);
+    const component = await prisma.component.create({
+      data: {
+        organizationId: home.id,
+        identityKey: `npm|export-cap-${randomUUID()}`,
+        ecosystem: 'npm',
+        name: 'export-cap',
+      },
+    });
+    const actor = await createExportActor(home.id);
+    for (let index = 0; index < REMEDIATION_QUEUE_EXPORT_CAP; index += 1) {
+      const vulnerability = await prisma.vulnerability.create({
+        data: { osvId: `EXPORT-CAP-${randomUUID()}` },
+      });
+      await insertFinding(home.id, `cap ${index}`, component.id, vulnerability.id);
+    }
+    const useCase = exportUseCase();
+    const success = await useCase.execute({
+      actor: actor.actor,
+      command: { format: 'csv', correlationId: `export-cap-${randomUUID()}` },
+    });
+    expect(success.kind).toBe('exported');
+    if (success.kind !== 'exported') {
+      return;
+    }
+    expect(success.document.rowCount).toBe(REMEDIATION_QUEUE_EXPORT_CAP);
+    expect(success.document.counts).toEqual({
+      ranked: 0,
+      incomparable: 0,
+      not_calculated: REMEDIATION_QUEUE_EXPORT_CAP,
+    });
+    const overflowVulnerability = await prisma.vulnerability.create({
+      data: { osvId: `EXPORT-CAP-OVERFLOW-${randomUUID()}` },
+    });
+    await insertFinding(home.id, 'cap overflow', component.id, overflowVulnerability.id);
+    const overflow = await useCase.execute({
+      actor: actor.actor,
+      command: { format: 'json', correlationId: `export-cap-overflow-${randomUUID()}` },
+    });
+    expect(overflow).toEqual({ kind: 'cap_exceeded' });
+    expect(
+      await prisma.auditEvent.count({
+        where: { organizationId: home.id, action: 'export.created' },
+      }),
+    ).toBe(1);
+    expect(await prisma.finding.count({ where: { organizationId: home.id } })).toBe(
+      REMEDIATION_QUEUE_EXPORT_CAP + 1,
+    );
+  }, 300_000);
+
+  function exportUseCase() {
+    return createExportRemediationQueueUseCase({
+      persistence: {
+        exportRemediationQueue: (query, hooks) =>
+          exportRemediationQueueSnapshot(prisma, query, hooks),
+      },
+      admittedPairs: ADMITTED_PRIORITY_POLICY_PAIRS,
+      referenceEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+      hashPolicyDefinition: hashDefinition,
+      serializeExport: (document) => Buffer.from(JSON.stringify(document), 'utf8'),
+    });
+  }
+
+  async function createExportActor(organizationId: string) {
+    const user = await prisma.user.create({
+      data: {
+        email: `export-${randomUUID()}@synthetic.patchpilot.test`,
+        displayName: 'Export owner',
+      },
+    });
+    const membership = await prisma.membership.create({
+      data: { organizationId, userId: user.id, role: 'owner' },
+    });
+    return {
+      actor: {
+        userId: user.id,
+        sessionId: 'export-session',
+        organizationId,
+        membershipId: membership.id,
+        role: 'owner' as const,
+      },
+    };
+  }
+
+  async function populationCounts(organizationId: string) {
+    const [findings, calculations, reviews, evidence, productMatch] = await Promise.all([
+      prisma.finding.count({ where: { organizationId } }),
+      prisma.riskCalculation.count({ where: { organizationId } }),
+      prisma.riskCalculationReview.count({ where: { organizationId } }),
+      prisma.evidence.count({ where: { organizationId } }),
+      prisma.productMatchEvaluationEvidence.count({ where: { organizationId } }),
+    ]);
+    return { findings, calculations, reviews, evidence, productMatch };
+  }
 });
+
+function exportAuditCount(client: PrismaClient): Promise<number> {
+  return client.auditEvent.count({ where: { action: 'export.created' } });
+}
 
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => {

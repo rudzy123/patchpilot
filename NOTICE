@@ -1,0 +1,25 @@
+PatchPilot
+Copyright 2026 PatchPilot contributors
+
+This product is licensed under the Apache License, Version 2.0.
+You may obtain a copy of the License in the LICENSE file.
+
+This NOTICE records attributions required or retained with the
+distribution. It is not a legal opinion.
+
+caniuse-lite is licensed under CC-BY-4.0. Its data is derived from
+caniuse.com. See https://github.com/browserslist/caniuse-lite for the
+package and its attribution requirements.
+
+Vendored CycloneDX JSON schemas under
+packages/sbom/vendor/cyclonedx-json-schema/ are Apache-2.0 and keep
+their upstream notices.
+
+Vendored OSV schema files keep their upstream Apache-2.0 notices.
+
+The vendored CISA Known Exploited Vulnerabilities schema is CC0-1.0.
+
+Optional package @img/sharp-libvips-linux-x64 is LGPL-3.0-or-later.
+It is reached through the optional sharp dependency of next. The web
+application does not import next/image. Removing the optional package
+was not part of this release record.

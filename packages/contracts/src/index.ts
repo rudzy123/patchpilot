@@ -152,7 +152,11 @@ export {
   type FindingRiskCalculationResponse,
 } from './finding-priority.js';
 export {
+  remediationQueueExportRequestSchema,
+  remediationQueueExportResponseSchema,
   remediationQueueResponseSchema,
+  type RemediationQueueExportRequest,
+  type RemediationQueueExportResponse,
   type RemediationQueueResponse,
 } from './remediation-queue.js';
 export {

@@ -11,27 +11,32 @@ import { createActiveKevMembershipPersistence } from '@patchpilot/database';
 import {
   createPriorityReviewPersistence,
   createRiskCalculationApplicationPersistence,
+  exportRemediationQueueSnapshot,
   readRemediationQueuePage,
 } from '@patchpilot/database/risk-calculation-application-persistence';
 import {
   PRIORITY_CALCULATION_ENGINE_VERSION,
   type ControlledFindingOperatorActor,
   createCalculateFindingRiskUseCase,
+  createExportRemediationQueueUseCase,
   createQueryActiveKevMembershipUseCase,
   createReadControlledFindingPriorityUseCase,
   createReadRemediationQueueUseCase,
   createRecordPriorityReviewUseCase,
   type AdmittedPriorityPolicyPair,
   type CalculateFindingRiskResult,
+  type ExportRemediationQueueResult,
   type PriorityReviewDecision,
   type ReadControlledFindingPriorityResult,
   type ReadRemediationQueueResult,
   type RecordPriorityReviewResult,
+  type RemediationQueueExportFormat,
   type RemediationQueueSection,
 } from '@patchpilot/domain';
 
 import { BUILTIN_PRIORITY_POLICY_DEFINITION, createPriorityEnginePort } from './priority-engine.js';
 import { hashPriorityPolicyDefinition } from './priority-policy-hash.js';
+import { serializeRemediationQueueExport } from './remediation-queue-http.js';
 
 const LOWERCASE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -67,10 +72,17 @@ export type ControlledPriorityReviewInput = {
   };
 };
 
+export type ControlledRemediationQueueExportInput = {
+  readonly actor: ControlledFindingOperatorActor;
+  readonly format: RemediationQueueExportFormat;
+  readonly correlationId: string;
+};
+
 export type ControlledPriorityRuntime = {
   calculate(input: ControlledPriorityCalculationInput): Promise<CalculateFindingRiskResult>;
   read(input: ControlledPriorityReadInput): Promise<ReadControlledFindingPriorityResult>;
   readQueue(input: ControlledRemediationQueueInput): Promise<ReadRemediationQueueResult>;
+  exportQueue(input: ControlledRemediationQueueExportInput): Promise<ExportRemediationQueueResult>;
   recordReview(input: ControlledPriorityReviewInput): Promise<RecordPriorityReviewResult>;
 };
 
@@ -110,6 +122,16 @@ export function composeControlledPriorityRuntime(
     referenceEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
     hashPolicyDefinition: hashPriorityPolicyDefinition,
   });
+  const queueExport = createExportRemediationQueueUseCase({
+    persistence: {
+      exportRemediationQueue: (query, hooks) =>
+        exportRemediationQueueSnapshot(client, query, hooks),
+    },
+    admittedPairs: options.admittedPairs,
+    referenceEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+    hashPolicyDefinition: hashPriorityPolicyDefinition,
+    serializeExport: serializeRemediationQueueExport,
+  });
   return {
     async calculate(input) {
       const correlationId = LOWERCASE_UUID.test(input.correlationId)
@@ -140,6 +162,15 @@ export function composeControlledPriorityRuntime(
           section: input.section,
           limit: input.limit,
           cursor: input.cursor,
+        },
+      });
+    },
+    exportQueue(input) {
+      return queueExport.execute({
+        actor: input.actor,
+        command: {
+          format: input.format,
+          correlationId: input.correlationId,
         },
       });
     },
@@ -176,6 +207,9 @@ export function denyControlledPriorityRuntime(): ControlledPriorityRuntime {
       return { kind: 'unavailable' };
     },
     async readQueue() {
+      return { kind: 'unavailable' };
+    },
+    async exportQueue() {
       return { kind: 'unavailable' };
     },
     async recordReview() {

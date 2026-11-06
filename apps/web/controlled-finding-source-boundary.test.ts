@@ -67,6 +67,17 @@ describe('controlled Finding web source boundary', () => {
     }
   });
 
+  it('does not build a remediation-queue export in the browser', () => {
+    const source = readFileSync(
+      path.join(webRoot, 'app/remediation-queue/remediation-queue-page-client.tsx'),
+      'utf8',
+    );
+    expect(source).toContain('exportRemediationQueue');
+    expect(source).not.toContain('calculateFindingPriority');
+    expect(source).not.toContain('section,findingId');
+    expect(source).not.toContain('organizationId');
+  });
+
   it('does not add a Finding list route', () => {
     const findingsDir = path.join(webRoot, 'app/findings');
     const names = readdirSync(findingsDir);

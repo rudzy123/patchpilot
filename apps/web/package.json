@@ -17,7 +17,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test:unit": "vitest run --config vitest.config.ts",
-    "test:e2e": "node ../../scripts/report-e2e-not-wired.mjs",
+    "test:e2e": "pnpm exec playwright test --config ../../playwright.config.ts",
     "clean": "node -e \"require('node:fs').rmSync('.next',{recursive:true,force:true})\""
   },
   "dependencies": {
