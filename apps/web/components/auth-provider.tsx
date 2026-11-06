@@ -59,6 +59,10 @@ export function AuthProvider({
 }): ReactElement {
   const api = useMemo(() => authApi ?? createAuthApi(apiBaseUrl), [apiBaseUrl, authApi]);
   const csrfTokenRef = useRef<string | null>(null);
+  const sessionReadRef = useRef<{
+    api: AuthApi;
+    promise: ReturnType<AuthApi['readSession']>;
+  } | null>(null);
   const loginInFlightRef = useRef(false);
   const selectInFlightRef = useRef(false);
   const [status, setStatus] = useState<AuthStatus>('bootstrapping');
@@ -109,9 +113,18 @@ export function AuthProvider({
 
   useEffect(() => {
     let cancelled = false;
+    if (sessionReadRef.current === null || sessionReadRef.current.api !== api) {
+      const promise = api.readSession().finally(() => {
+        if (sessionReadRef.current?.promise === promise) {
+          sessionReadRef.current = null;
+        }
+      });
+      sessionReadRef.current = { api, promise };
+    }
+    const pending = sessionReadRef.current.promise;
     void (async () => {
       try {
-        const session = await api.readSession();
+        const session = await pending;
         if (cancelled) {
           return;
         }

@@ -631,4 +631,47 @@ describe('createAuthApi', () => {
     expect(JSON.parse(String(evaluateCall.init.body))).toEqual({ advisoryRevisionId: revisionId });
     expect(new Headers(evaluateCall.init.headers).get(CSRF_HEADER_NAME)).toBe(CSRF_TOKEN_FIXTURE);
   });
+
+  it('posts the remediation-queue export body and keeps the server bytes', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response('section,findingId\n', {
+          status: 200,
+          headers: {
+            'content-type': 'text/csv; charset=utf-8',
+            'content-disposition': 'attachment; filename="remediation-queue.csv"',
+          },
+        }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = createAuthApi(API_BASE);
+    const file = await api.exportRemediationQueue('csv', CSRF_TOKEN_FIXTURE);
+    const call = fetchCall(fetchMock, 0);
+    expect(call.url).toBe(`${API_BASE}/remediation-queue/export`);
+    expect(call.init.method).toBe('POST');
+    expect(call.init.credentials).toBe('include');
+    expect(JSON.parse(String(call.init.body))).toEqual({ format: 'csv' });
+    expect(String(call.init.body)).not.toContain('organizationId');
+    expect(new Headers(call.init.headers).get(CSRF_HEADER_NAME)).toBe(CSRF_TOKEN_FIXTURE);
+    expect(file.filename).toBe('remediation-queue.csv');
+    expect(Buffer.from(file.bytes).toString('utf8')).toBe('section,findingId\n');
+  });
+
+  it('preserves the export cap message from the API', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        errorEnvelope(409, 'conflict', 'Remediation queue export exceeds 150 findings.'),
+      ),
+    );
+    const api = createAuthApi(API_BASE);
+    const error = await api
+      .exportRemediationQueue('json', CSRF_TOKEN_FIXTURE)
+      .catch((caught: unknown) => caught);
+    expect(error).toMatchObject({
+      status: 409,
+      code: 'conflict',
+      message: 'Remediation queue export exceeds 150 findings.',
+    });
+  });
 });

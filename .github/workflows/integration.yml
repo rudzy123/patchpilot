@@ -22,8 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     # Database integration files run one at a time, and each file deploys the
     # frozen migration chain. That suite was still executing when the 35-minute
-    # limit cancelled the 2026-11-05 run. Fifty minutes covers that overrun.
-    timeout-minutes: 50
+    # limit cancelled the 2026-11-05 run. The extra ten minutes covers one
+    # Chromium install and the single release smoke that follows the suite.
+    timeout-minutes: 60
     env:
       PATCHPILOT_DEPLOYMENT_ENVIRONMENT: test
       PATCHPILOT_ALLOW_DEVELOPMENT_ADAPTERS: 'true'
@@ -101,6 +102,15 @@ jobs:
 
       - name: Run integration tests
         run: pnpm test:integration
+
+      - name: Install the release-smoke browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run the release smoke
+        env:
+          INTELLIGENCE_KEV_ENABLED: 'false'
+          INTELLIGENCE_OSV_ENABLED: 'false'
+        run: pnpm test:e2e
 
       - name: Stop MinIO
         if: always()

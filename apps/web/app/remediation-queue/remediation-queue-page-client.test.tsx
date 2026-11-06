@@ -4,8 +4,16 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { isAuthRequestError } from '../../lib/auth-api';
-import { QUEUE_COMPARISON_MESSAGE, QUEUE_POLICY_UNAVAILABLE } from '../../lib/remediation-queue';
 import {
+  QUEUE_COMPARISON_MESSAGE,
+  QUEUE_EXPORT_CAP,
+  QUEUE_EXPORT_CSV,
+  QUEUE_EXPORT_JSON,
+  QUEUE_FORBIDDEN,
+  QUEUE_POLICY_UNAVAILABLE,
+} from '../../lib/remediation-queue';
+import {
+  CSRF_TOKEN_FIXTURE,
   createFakeAuthApi,
   ownerOrganizationFixture,
   sessionFixture,
@@ -158,5 +166,59 @@ describe('remediation queue page', () => {
       expect(calls.filter((call) => call === 'ranked:').length).toBe(2);
     });
     expect(isAuthRequestError({ status: 409, code: 'conflict', message: 'stale' })).toBe(true);
+  });
+
+  it('posts a server export from the keyboard and does not calculate priority', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:queue-export');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const authApi = createFakeAuthApi({
+      readSession: vi.fn(async () => sessionFixture({ organization: ownerOrganizationFixture })),
+      readRemediationQueue: vi.fn(async (query: { section: RemediationQueueResponse['section'] }) =>
+        page(query.section, `OSV-${query.section}`),
+      ),
+      exportRemediationQueue: vi.fn(async (format: 'json' | 'csv') => ({
+        format,
+        mediaType: 'application/json; charset=utf-8',
+        filename: 'remediation-queue.json',
+        bytes: new TextEncoder().encode('{"schemaVersion":"remediation_queue_export_v1"}'),
+      })),
+    });
+    renderWithAuth(<RemediationQueuePageClient />, { authApi });
+    const button = await screen.findByRole('button', { name: QUEUE_EXPORT_JSON });
+    expect(screen.getByRole('button', { name: QUEUE_EXPORT_CSV })).toBeInTheDocument();
+    button.focus();
+    await user.keyboard('{Enter}');
+    await waitFor(() => {
+      expect(authApi.exportRemediationQueue).toHaveBeenCalledWith('json', CSRF_TOKEN_FIXTURE);
+    });
+    expect(authApi.calculateFindingPriority).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it('announces export failure without offering export to a member', async () => {
+    const user = userEvent.setup();
+    const owner = createFakeAuthApi({
+      readSession: vi.fn(async () => sessionFixture({ organization: ownerOrganizationFixture })),
+      readRemediationQueue: vi.fn(async (query: { section: RemediationQueueResponse['section'] }) =>
+        page(query.section, 'OSV-1'),
+      ),
+      exportRemediationQueue: vi.fn(async () => {
+        throw { status: 409, code: 'conflict', message: QUEUE_EXPORT_CAP };
+      }),
+    });
+    const ownerView = renderWithAuth(<RemediationQueuePageClient />, { authApi: owner });
+    await user.click(await screen.findByRole('button', { name: QUEUE_EXPORT_CSV }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(QUEUE_EXPORT_CAP);
+    expect(owner.calculateFindingPriority).not.toHaveBeenCalled();
+    ownerView.unmount();
+    const member = createFakeAuthApi({
+      readSession: vi.fn(async () => sessionFixture()),
+    });
+    renderWithAuth(<RemediationQueuePageClient />, { authApi: member });
+    expect(await screen.findByText(QUEUE_FORBIDDEN)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: QUEUE_EXPORT_JSON })).not.toBeInTheDocument();
+    expect(member.exportRemediationQueue).not.toHaveBeenCalled();
   });
 });

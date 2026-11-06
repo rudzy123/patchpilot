@@ -1,18 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 
 import type { RemediationQueueResponse } from '@patchpilot/contracts';
 
 import { useAuth } from '../../components/auth-provider';
 import { RequireAuth } from '../../components/require-auth';
 import { SignedInShell } from '../../components/signed-in-shell';
-import { isAuthRequestError } from '../../lib/auth-api';
+import { GENERIC_SESSION_EXPIRED, isAuthRequestError } from '../../lib/auth-api';
 import { canPresentRemediationQueue } from '../../lib/finding-permissions';
 import { priorityReviewMarkerLabel } from '../../lib/finding-priority';
 import {
   QUEUE_COMPARISON_MESSAGE,
+  QUEUE_EXPORT_CAP,
+  QUEUE_EXPORT_CSV,
+  QUEUE_EXPORT_HEADING,
+  QUEUE_EXPORT_JSON,
+  QUEUE_EXPORT_NOT_RECORDED,
+  QUEUE_EXPORTING,
   QUEUE_FORBIDDEN,
   QUEUE_HEADING,
   QUEUE_INCOMPARABLE_HEADING,
@@ -67,8 +73,11 @@ function QueueOrganization(): ReactElement {
 }
 
 function QueuePanels(): ReactElement {
-  const { organization, api } = useAuth();
+  const { organization, api, getCsrfToken } = useAuth();
   const [view, setView] = useState<QueueView>({ status: 'loading' });
+  const [exporting, setExporting] = useState<'json' | 'csv' | null>(null);
+  const exportUrlRef = useRef<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const canRead = organization !== null && canPresentRemediationQueue(organization.role);
 
   useEffect(() => {
@@ -165,10 +174,56 @@ function QueuePanels(): ReactElement {
     }
   }
 
+  async function exportQueue(format: 'json' | 'csv'): Promise<void> {
+    if (!canRead || exporting !== null) {
+      return;
+    }
+    const csrfToken = getCsrfToken();
+    if (csrfToken === null) {
+      setExportError(GENERIC_SESSION_EXPIRED);
+      return;
+    }
+    setExporting(format);
+    setExportError(null);
+    try {
+      const file = await api.exportRemediationQueue(format, csrfToken);
+      exportUrlRef.current = saveServerExport(file, exportUrlRef.current);
+    } catch (error) {
+      setExportError(exportMessage(error));
+    } finally {
+      setExporting(null);
+    }
+  }
+
   return (
     <main>
       <h1>{QUEUE_HEADING}</h1>
       <p>{QUEUE_NOT_A_SNAPSHOT}</p>
+      {canRead ? (
+        <section
+          className="asset-fieldset"
+          aria-labelledby="remediation-queue-export"
+          aria-busy={exporting !== null}
+        >
+          <h2 id="remediation-queue-export">{QUEUE_EXPORT_HEADING}</h2>
+          <button
+            type="button"
+            onClick={() => void exportQueue('json')}
+            disabled={exporting !== null}
+          >
+            {QUEUE_EXPORT_JSON}
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportQueue('csv')}
+            disabled={exporting !== null}
+          >
+            {QUEUE_EXPORT_CSV}
+          </button>
+          {exporting !== null ? <p role="status">{QUEUE_EXPORTING}</p> : null}
+          {exportError !== null ? <p role="alert">{exportError}</p> : null}
+        </section>
+      ) : null}
       {view.status === 'loading' ? <p role="status">{QUEUE_LOADING}</p> : null}
       {view.status === 'denied' ? <p role="status">{QUEUE_FORBIDDEN}</p> : null}
       {view.status === 'policy_unavailable' ? (
@@ -287,6 +342,49 @@ function panelError(
       [section]: { ...current.panels[section], loadingMore: false, error: message },
     },
   };
+}
+
+function saveServerExport(
+  file: { filename: string; mediaType: string; bytes: Uint8Array },
+  previousUrl: string | null,
+): string {
+  if (previousUrl !== null) {
+    URL.revokeObjectURL(previousUrl);
+  }
+  const body = new ArrayBuffer(file.bytes.byteLength);
+  new Uint8Array(body).set(file.bytes);
+  const blob = new Blob([body], { type: file.mediaType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = file.filename;
+  anchor.rel = 'noopener';
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  return url;
+}
+
+function exportMessage(error: unknown): string {
+  if (!isAuthRequestError(error)) {
+    return QUEUE_UNAVAILABLE;
+  }
+  if (error.status === 403) {
+    return QUEUE_FORBIDDEN;
+  }
+  if (error.status === 429 || error.code === 'rate_limited') {
+    return QUEUE_RATE_LIMITED;
+  }
+  if (error.message === QUEUE_POLICY_UNAVAILABLE) {
+    return QUEUE_POLICY_UNAVAILABLE;
+  }
+  if (error.message === QUEUE_EXPORT_CAP) {
+    return QUEUE_EXPORT_CAP;
+  }
+  if (error.message === QUEUE_EXPORT_NOT_RECORDED) {
+    return QUEUE_EXPORT_NOT_RECORDED;
+  }
+  return QUEUE_UNAVAILABLE;
 }
 
 function isPolicy(error: unknown): boolean {

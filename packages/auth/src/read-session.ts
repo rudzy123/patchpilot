@@ -17,7 +17,7 @@ import {
   type PublicAuthOrganization,
   type PublicAuthUser,
 } from './session-view.js';
-import { digestCsrfToken } from './token-digests.js';
+import { digestCsrfToken, digestSessionToken } from './token-digests.js';
 import type { TrustedActor } from './trusted-actor.js';
 
 export type ReadSessionInput = {
@@ -46,31 +46,62 @@ export type ReadSessionDependencies = {
 
 export function createReadSessionUseCase(dependencies: ReadSessionDependencies) {
   const resolveSession = createResolveSessionUseCase(dependencies);
+  const runForSession = createSessionTurnstile();
 
   return {
-    async execute(input: ReadSessionInput): Promise<Result<ReadSessionResult>> {
-      const resolved = await resolveSession.execute({ sessionToken: input.sessionToken });
-      if (!resolved.ok) {
-        return err(AUTHENTICATION_REQUIRED);
-      }
-
-      const csrfToken = dependencies.tokens.generate(SESSION_TOKEN_BYTES);
-      const replaced = await dependencies.sessions.replaceCsrfToken({
-        tokenHash: resolved.value.session.tokenHash,
-        nextCsrfTokenHash: digestCsrfToken(csrfToken),
-      });
-      if (replaced === undefined) {
-        return err(AUTHENTICATION_REQUIRED);
-      }
-
-      return ok({
-        actor: resolved.value.actor,
-        session: replaced,
-        user: resolved.value.user,
-        organization: resolved.value.organization,
-        csrfToken,
-        expiresAt: sessionExpiresAt(replaced),
-      });
+    execute(input: ReadSessionInput): Promise<Result<ReadSessionResult>> {
+      return runForSession(digestSessionToken(input.sessionToken), () => readOnce(input));
     },
+  };
+
+  async function readOnce(input: ReadSessionInput): Promise<Result<ReadSessionResult>> {
+    const resolved = await resolveSession.execute({ sessionToken: input.sessionToken });
+    if (!resolved.ok) {
+      return err(AUTHENTICATION_REQUIRED);
+    }
+
+    const csrfToken = dependencies.tokens.generate(SESSION_TOKEN_BYTES);
+    const replaced = await dependencies.sessions.replaceCsrfToken({
+      tokenHash: resolved.value.session.tokenHash,
+      nextCsrfTokenHash: digestCsrfToken(csrfToken),
+    });
+    if (replaced === undefined) {
+      return err(AUTHENTICATION_REQUIRED);
+    }
+
+    return ok({
+      actor: resolved.value.actor,
+      session: replaced,
+      user: resolved.value.user,
+      organization: resolved.value.organization,
+      csrfToken,
+      expiresAt: sessionExpiresAt(replaced),
+    });
+  }
+}
+
+function createSessionTurnstile(): <T>(key: string, work: () => Promise<T>) => Promise<T> {
+  const tails = new Map<string, Promise<void>>();
+
+  return async function run<T>(key: string, work: () => Promise<T>): Promise<T> {
+    const previous = tails.get(key) ?? Promise.resolve();
+    let release = (): void => undefined;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.then(
+      () => current,
+      () => current,
+    );
+    tails.set(key, tail);
+    await previous.catch(() => undefined);
+    try {
+      return await work();
+    } finally {
+      release();
+      if (tails.get(key) === tail) {
+        tails.delete(key);
+      }
+    }
   };
 }

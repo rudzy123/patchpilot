@@ -5,16 +5,26 @@
 
 import { PERMISSION_DENIED } from '@patchpilot/auth';
 import {
+  remediationQueueExportRequestSchema,
+  remediationQueueExportResponseSchema,
   remediationQueueResponseSchema,
+  type RemediationQueueExportRequest,
   type RemediationQueueResponse,
 } from '@patchpilot/contracts';
 import {
   REMEDIATION_QUEUE_DEFAULT_LIMIT,
+  REMEDIATION_QUEUE_EXPORT_CAP,
   REMEDIATION_QUEUE_MAX_CURSOR_LENGTH,
   assertNever,
   type AppError,
+  type ExportRemediationQueueResult,
+  type FindingPriorityReviewMarker,
   type ReadRemediationQueueResult,
+  type RemediationQueueExportDocument,
+  type RemediationQueueIncomparableRow,
+  type RemediationQueueNotCalculatedRow,
   type RemediationQueuePage,
+  type RemediationQueueRankedRow,
   type RemediationQueueSection,
 } from '@patchpilot/domain';
 
@@ -25,16 +35,60 @@ import {
 } from './http-errors.js';
 
 export const REMEDIATION_QUEUE_ROUTE = '/remediation-queue';
+export const REMEDIATION_QUEUE_EXPORT_ROUTE = '/remediation-queue/export';
 
 export const REMEDIATION_QUEUE_STALE_CURSOR: AppError = Object.freeze({
   code: 'conflict',
   message: 'The page cursor is no longer current.',
 });
 
+export const REMEDIATION_QUEUE_EXPORT_CAP_EXCEEDED: AppError = Object.freeze({
+  code: 'conflict',
+  message: `Remediation queue export exceeds ${REMEDIATION_QUEUE_EXPORT_CAP} findings.`,
+});
+
+export const REMEDIATION_QUEUE_EXPORT_NOT_RECORDED: AppError = Object.freeze({
+  code: 'conflict',
+  message: 'The export was not recorded.',
+});
+
+export const REMEDIATION_QUEUE_EXPORT_JSON_TYPE = 'application/json; charset=utf-8';
+export const REMEDIATION_QUEUE_EXPORT_CSV_TYPE = 'text/csv; charset=utf-8';
+export const REMEDIATION_QUEUE_EXPORT_JSON_DISPOSITION =
+  'attachment; filename="remediation-queue.json"';
+export const REMEDIATION_QUEUE_EXPORT_CSV_DISPOSITION =
+  'attachment; filename="remediation-queue.csv"';
+
+export const REMEDIATION_QUEUE_EXPORT_CSV_HEADER = [
+  'section',
+  'findingId',
+  'assetId',
+  'assetName',
+  'componentName',
+  'componentVersion',
+  'vulnerabilityPublicId',
+  'humanReviewStatus',
+  'humanReviewPriorReviewExists',
+  'humanReviewId',
+  'humanReviewCorrectedBand',
+  'humanReviewExpiresAt',
+  'priorityBand',
+  'priority',
+  'riskPolicyId',
+  'policyKey',
+  'policyVersion',
+  'policyDefinitionSha256',
+  'calculatedAt',
+  'inputsChangedStatus',
+  'inputsChangedSignals',
+  'comparisonMessage',
+].join(',');
+
 const SECTIONS = new Set<RemediationQueueSection>(['ranked', 'incomparable', 'not_calculated']);
 
 export type RemediationQueuePublicOutcome =
   | 'page'
+  | 'exported'
   | 'validation'
   | 'unauthorized'
   | 'forbidden'
@@ -207,4 +261,209 @@ function toRow(
 
 function isSection(value: string): value is RemediationQueueSection {
   return SECTIONS.has(value as RemediationQueueSection);
+}
+
+export function parseRemediationQueueExportBody(
+  body: unknown,
+):
+  | { readonly ok: true; readonly format: RemediationQueueExportRequest['format'] }
+  | { readonly ok: false } {
+  const parsed = remediationQueueExportRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return { ok: false };
+  }
+  return { ok: true, format: parsed.data.format };
+}
+
+export function translateRemediationQueueExport(result: ExportRemediationQueueResult):
+  | {
+      readonly ok: true;
+      readonly statusCode: 200;
+      readonly contentType: string;
+      readonly contentDisposition: string;
+      readonly body: Uint8Array;
+    }
+  | { readonly ok: false; readonly error: AppError } {
+  switch (result.kind) {
+    case 'exported':
+      return {
+        ok: true,
+        statusCode: 200,
+        contentType:
+          result.document.format === 'json'
+            ? REMEDIATION_QUEUE_EXPORT_JSON_TYPE
+            : REMEDIATION_QUEUE_EXPORT_CSV_TYPE,
+        contentDisposition:
+          result.document.format === 'json'
+            ? REMEDIATION_QUEUE_EXPORT_JSON_DISPOSITION
+            : REMEDIATION_QUEUE_EXPORT_CSV_DISPOSITION,
+        body: result.body,
+      };
+    case 'priority_policy_unavailable':
+      return { ok: false, error: PRIORITY_POLICY_UNAVAILABLE };
+    case 'cap_exceeded':
+      return { ok: false, error: REMEDIATION_QUEUE_EXPORT_CAP_EXCEEDED };
+    case 'correlation_conflict':
+      return { ok: false, error: REMEDIATION_QUEUE_EXPORT_NOT_RECORDED };
+    case 'unauthorized':
+      return { ok: false, error: PERMISSION_DENIED };
+    case 'invalid_command':
+      return { ok: false, error: INVALID_REQUEST };
+    case 'unavailable':
+    case 'internal_failure':
+      return { ok: false, error: REMEDIATION_QUEUE_UNAVAILABLE };
+    default:
+      return assertNever(result);
+  }
+}
+
+export function serializeRemediationQueueExport(
+  document: RemediationQueueExportDocument,
+): Uint8Array {
+  if (document.format === 'json') {
+    return encodeUtf8(serializeExportJson(document));
+  }
+  return encodeUtf8(serializeExportCsv(document));
+}
+
+function serializeExportJson(document: RemediationQueueExportDocument): string {
+  const body = {
+    schemaVersion: 'remediation_queue_export_v1' as const,
+    format: 'json' as const,
+    asOf: document.asOf,
+    reference: {
+      policyKey: document.reference.policyKey,
+      policyVersion: document.reference.policyVersion,
+      policyDefinitionSha256: document.reference.policyDefinitionSha256,
+      engineVersion: document.reference.engineVersion,
+    },
+    counts: {
+      ranked: document.counts.ranked,
+      incomparable: document.counts.incomparable,
+      not_calculated: document.counts.not_calculated,
+    },
+    rowCount: document.rowCount,
+    cap: document.cap,
+    sections: {
+      ranked: document.sections.ranked.map((row) => toRow('ranked', row)),
+      incomparable: document.sections.incomparable.map((row) => toRow('incomparable', row)),
+      not_calculated: document.sections.not_calculated.map((row) => toRow('not_calculated', row)),
+    },
+  };
+  if (document.format !== 'json' || !remediationQueueExportResponseSchema.safeParse(body).success) {
+    throw new Error('remediation queue export serialization failed');
+  }
+  return JSON.stringify(body);
+}
+
+function serializeExportCsv(document: RemediationQueueExportDocument): string {
+  if (!remediationQueueExportResponseSchema.safeParse(exportJsonCandidate(document)).success) {
+    throw new Error('remediation queue export serialization failed');
+  }
+  const lines = [REMEDIATION_QUEUE_EXPORT_CSV_HEADER];
+  for (const row of document.sections.ranked) {
+    lines.push(csvLine('ranked', row));
+  }
+  for (const row of document.sections.incomparable) {
+    lines.push(csvLine('incomparable', row));
+  }
+  for (const row of document.sections.not_calculated) {
+    lines.push(csvLine('not_calculated', row));
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function exportJsonCandidate(document: RemediationQueueExportDocument): unknown {
+  return {
+    schemaVersion: 'remediation_queue_export_v1',
+    format: document.format,
+    asOf: document.asOf,
+    reference: document.reference,
+    counts: document.counts,
+    rowCount: document.rowCount,
+    cap: document.cap,
+    sections: {
+      ranked: document.sections.ranked.map((row) => toRow('ranked', row)),
+      incomparable: document.sections.incomparable.map((row) => toRow('incomparable', row)),
+      not_calculated: document.sections.not_calculated.map((row) => toRow('not_calculated', row)),
+    },
+  };
+}
+
+type ExportRow =
+  RemediationQueueRankedRow | RemediationQueueIncomparableRow | RemediationQueueNotCalculatedRow;
+
+function csvLine(section: RemediationQueueSection, row: ExportRow): string {
+  const review = reviewCells(row.humanReview);
+  const calculated = calculatedCells(row);
+  const comparison = 'comparisonMessage' in row ? row.comparisonMessage : '';
+  return [
+    csvText(section),
+    csvText(row.findingId),
+    csvText(row.assetId),
+    csvText(row.assetName),
+    csvText(row.componentName),
+    csvText(row.componentVersion),
+    csvText(row.vulnerabilityPublicId),
+    ...review,
+    ...calculated,
+    csvText(comparison),
+  ].join(',');
+}
+
+function reviewCells(marker: FindingPriorityReviewMarker): readonly string[] {
+  return [
+    csvText(marker.status),
+    csvText(marker.priorReviewExists ? 'true' : 'false'),
+    csvText('reviewId' in marker ? marker.reviewId : ''),
+    csvText('correctedBand' in marker ? marker.correctedBand : ''),
+    csvText('expiresAt' in marker ? marker.expiresAt : ''),
+  ];
+}
+
+function calculatedCells(row: ExportRow): readonly string[] {
+  if (!('priority' in row)) {
+    return ['', '', '', '', '', '', '', '', ''];
+  }
+  return [
+    csvText(row.priorityBand),
+    csvNumber(row.priority),
+    csvText(row.policy.riskPolicyId),
+    csvText(row.policy.policyKey),
+    csvNumber(row.policy.policyVersion),
+    csvText(row.policy.policyDefinitionSha256),
+    csvText(row.calculatedAt),
+    csvText(row.inputsChanged.status),
+    csvText(row.inputsChanged.signals.join(',')),
+  ];
+}
+
+function csvText(value: string): string {
+  if (value.length === 0) {
+    return '';
+  }
+  const neutralized = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return quoteCsv(neutralized);
+}
+
+function csvNumber(value: number): string {
+  if (!Number.isFinite(value)) {
+    throw new Error('remediation queue export serialization failed');
+  }
+  return quoteCsv(JSON.stringify(value));
+}
+
+function quoteCsv(value: string): string {
+  if (/[",\n\r]/.test(value)) {
+    return `"${value.replaceAll('"', '""')}"`;
+  }
+  return value;
+}
+
+function encodeUtf8(value: string): Uint8Array {
+  const encoded = Buffer.from(value, 'utf8');
+  if (encoded.length >= 3 && encoded[0] === 0xef && encoded[1] === 0xbb && encoded[2] === 0xbf) {
+    throw new Error('remediation queue export serialization failed');
+  }
+  return encoded;
 }

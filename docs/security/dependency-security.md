@@ -179,10 +179,44 @@ Next review trigger: a new critical or high result from `pnpm audit`; a Prisma r
 
 This table is a snapshot of the 2026-10-06 commands after the review resolutions. It is not a claim that the tree is free of advisories the audit database did not return. Do not treat this prose as a substitute for a fresh `pnpm audit`.
 
+## Session 8B review on 2026-11-06
+
+Commands run against the working tree after adding the root devDependency `@playwright/test@1.64.1`:
+
+- `pnpm licenses list --json`
+- `pnpm audit --json` exited 1
+- `pnpm audit --prod --json` exited 1
+
+No `pnpm audit --fix` was run. No production dependency was upgraded.
+
+Full-audit metadata: 328 production dependencies, 343 development dependencies, 132 optional dependencies, 716 total. Advisories returned: 2 critical, 8 high, 16 moderate, 6 low.
+
+Production-audit metadata: 254 production dependencies, 119 optional dependencies, 373 total. Advisories returned: 2 critical, 3 high, 6 moderate, 5 low.
+
+### New or still-returned high and critical results
+
+| Advisory | Package | Severity | Path class | Decision |
+| --- | --- | --- | --- | --- |
+| [GHSA-2464-fhr4-w9xw](https://github.com/advisories/GHSA-2464-fhr4-w9xw) | `next@16.3.8`, patched `>=16.4.1` | critical | Production web dependency. Image Optimization API remote code execution when SVG files are used. | Residual for this slice. The web app does not import `next/image` and does not set `images.remotePatterns`. A Next upgrade from 16.3.8 to 16.4.1 is a production framework change and was not applied here. |
+| [GHSA-673q-mjm6-r5xr](https://github.com/advisories/GHSA-673q-mjm6-r5xr) | `next@16.3.8`, patched `>=16.4.1` | critical | Production web dependency. Remote code execution in `use cache` functions that return typed arrays. | Residual for this slice. The web app does not use `use cache`. The same Next upgrade was not applied. |
+| [GHSA-p3m5-59mp-jv5r](https://github.com/advisories/GHSA-p3m5-59mp-jv5r) | `next@16.3.8`, patched `>=16.4.1` | high | Production web dependency. App Router Server Actions denial of service. | Residual with the two Next criticals. |
+| [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) | `zod@4.4.3`, patched `>=4.6.6` | high | Direct production dependency of `@patchpilot/config`, `@patchpilot/contracts`, and `@patchpilot/sbom`. Memory exhaustion while validating oversized constrained collections. A second path is the web lint stack. | Residual. Request bodies already have route limits. A Zod upgrade changes the shared parser and was not applied in this slice. |
+| [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx) | `deepmerge-ts@7.1.5`, patched `>=8.0.0` | high | Same Prisma `@prisma/config` path recorded on 2026-10-06. | Still residual. No Prisma upgrade. |
+| [GHSA-xjj6-f33q-929c](https://github.com/advisories/GHSA-xjj6-f33q-929c), [GHSA-4w7w-5xrc-9h26](https://github.com/advisories/GHSA-4w7w-5xrc-9h26), [GHSA-2m5v-pch6-74hx](https://github.com/advisories/GHSA-2m5v-pch6-74hx), [GHSA-qrxm-fqhp-jwvm](https://github.com/advisories/GHSA-qrxm-fqhp-jwvm) | `undici@8.11.2`, patched `>=8.12.2` | high | Development only, through Vitest and jsdom. Absent from `pnpm audit --prod`. | Residual. No Vitest or jsdom upgrade. |
+| [GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm) | `vite@8.2.2`, patched `>=8.2.4` | high | Development only, through Vitest. Absent from `pnpm audit --prod`. | Residual. No Vite upgrade. |
+
+`braces@3.0.3` is still resolved from the web lint stack. The 2026-11-06 audit did not return [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm). That absence is an audit-database result, not proof the package is safe. The 2026-10-06 residual stays in the history above.
+
+`@playwright/test@1.64.1`, `playwright@1.64.1`, and `playwright-core@1.64.1` are Apache-2.0 root development dependencies. They pull `axe-core@4.13.0` (MPL-2.0) on the development graph only. No Playwright package was added to a production dependency.
+
+License snapshot from `pnpm licenses list --json`: MIT 451, Apache-2.0 73, ISC 18, BSD-2-Clause 10, BSD-3-Clause 7, MPL-2.0 3, BlueOak-1.0.0 2, CC0-1.0 2, MIT-0 2, and one each of 0BSD, CC-BY-4.0, LGPL-3.0-or-later, and Python-2.0. The LGPL package is optional `@img/sharp-libvips-linux-x64@1.3.4`, reached through optional `sharp` of `next`. The web app does not import `next/image`. The CC-BY-4.0 package is `caniuse-lite@1.0.30001810`. Vendored CycloneDX and OSV schemas remain Apache-2.0. The vendored CISA KEV schema remains CC0. This review does not claim legal certainty.
+
+Next review trigger: a Next.js release decision for `>=16.4.1`, a Zod release decision for `>=4.6.6`, a Prisma release whose `@prisma/config` depends on `deepmerge-ts>=8.0.0`, or the next production dependency upgrade.
+
 ## Review process for dependency pull requests
 
 1. Confirm the update is from Dependabot or a known maintainer, not an unexpected lockfile rewrite.
-2. Require the normal CI, Integration, CodeQL, and Dependency review checks. Do not auto-merge. Do not wait on E2E; that workflow is deferred. Container build is a non-pushing image build and is not a required check until branch protection says so.
+2. Require the normal CI, Integration, CodeQL, and Dependency review checks. Do not auto-merge. Do not wait on a separate E2E workflow; the one release smoke runs inside Integration. Container build is a non-pushing image build and is not a required check until branch protection says so.
 3. For high/critical advisories, prefer upgrading or replacing the package over ignoring.
 4. Do not add `continue-on-error` to hide a review failure.
 5. Licensing questions that are not obvious from SPDX identifiers need qualified review.

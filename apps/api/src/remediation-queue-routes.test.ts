@@ -1,7 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
-import { PRIORITY_CALCULATION_ENGINE_VERSION } from '@patchpilot/domain';
+import {
+  BUILTIN_PRIORITY_POLICY_KEY,
+  BUILTIN_PRIORITY_POLICY_VERSION,
+  PRIORITY_CALCULATION_ENGINE_VERSION,
+  REMEDIATION_QUEUE_EXPORT_CAP,
+  type RemediationQueueExportDocument,
+} from '@patchpilot/domain';
 
 import {
   TEST_ORIGIN,
@@ -10,6 +16,10 @@ import {
   createAuthTestHarness,
 } from './auth-test-harness.js';
 import type { ControlledPriorityRuntime } from './priority-runtime.js';
+import {
+  REMEDIATION_QUEUE_EXPORT_CSV_HEADER,
+  serializeRemediationQueueExport,
+} from './remediation-queue-http.js';
 import { REMEDIATION_QUEUE_ORGANIZATION_LIMIT } from './remediation-queue-routes.js';
 
 const FINDING = 'abababab-abab-4bab-8bab-abababababab';
@@ -36,6 +46,9 @@ function runtime(kind: 'page' | 'stale_cursor' | 'priority_policy_unavailable' |
       },
       async recordReview() {
         return { kind: 'unavailable' };
+      },
+      async exportQueue() {
+        return { kind: 'unavailable' as const };
       },
       async readQueue(input) {
         calls.push(`${input.actor.role}:${input.section}:${input.limit}:${input.cursor ?? ''}`);
@@ -196,7 +209,240 @@ describe('remediation queue route', () => {
     expect(statuses[20]).toBe(429);
     await app.close();
   });
+
+  it('exports JSON and CSV for owners and admins without calculating priority', async () => {
+    const owner = exportRuntime();
+    const ownerApp = await boot('owner', owner.runtime);
+    const json = await postExport(
+      ownerApp.app,
+      ownerApp.session,
+      { format: 'json' },
+      {
+        correlationId: 'export-json-1',
+      },
+    );
+    expect(json.statusCode).toBe(200);
+    expect(json.headers['content-type']).toBe('application/json; charset=utf-8');
+    expect(json.headers['content-disposition']).toBe(
+      'attachment; filename="remediation-queue.json"',
+    );
+    expect(json.headers['cache-control']).toBe('private, no-store');
+    expect(json.body).toBe(
+      Buffer.from(serializeRemediationQueueExport(exportDocument('json'))).toString('utf8'),
+    );
+    expect(
+      json.body.startsWith('{"schemaVersion":"remediation_queue_export_v1","format":"json"'),
+    ).toBe(true);
+    expect(json.body).not.toContain(' :');
+    expect(owner.calls).toEqual([
+      `owner:${ownerApp.harness.organizations[0]?.id}:json:export-json-1`,
+    ]);
+    expect(ownerApp.harness.logs()).not.toContain('queue <asset>');
+    expect(ownerApp.harness.logs()).not.toContain('OSV-1');
+    const admin = exportRuntime();
+    const adminApp = await boot('admin', admin.runtime);
+    const csv = await postExport(
+      adminApp.app,
+      adminApp.session,
+      { format: 'csv' },
+      {
+        correlationId: 'export-csv-1',
+      },
+    );
+    expect(csv.statusCode).toBe(200);
+    expect(csv.headers['content-type']).toBe('text/csv; charset=utf-8');
+    expect(csv.headers['content-disposition']).toBe('attachment; filename="remediation-queue.csv"');
+    expect(csv.body.startsWith(`${REMEDIATION_QUEUE_EXPORT_CSV_HEADER}\n`)).toBe(true);
+    expect(admin.calls).toEqual([
+      `admin:${adminApp.harness.organizations[0]?.id}:csv:export-csv-1`,
+    ]);
+    expect(admin.calls.some((call) => call.startsWith('calculate'))).toBe(false);
+    await closeAll(ownerApp, adminApp);
+  });
+
+  it('denies members, viewers, and unauthenticated export requests before the snapshot', async () => {
+    const member = exportRuntime();
+    const memberApp = await boot('member', member.runtime);
+    const memberDenied = await postExport(memberApp.app, memberApp.session, { format: 'json' });
+    expect(memberDenied.statusCode).toBe(403);
+    const viewer = exportRuntime();
+    const viewerApp = await boot('viewer', viewer.runtime);
+    const viewerDenied = await postExport(viewerApp.app, viewerApp.session, { format: 'csv' });
+    expect(viewerDenied.statusCode).toBe(403);
+    const anonymous = exportRuntime();
+    const anonymousApp = await boot('owner', anonymous.runtime);
+    const unauthenticated = await anonymousApp.app.inject({
+      method: 'POST',
+      url: '/remediation-queue/export',
+      remoteAddress: '198.51.100.22',
+      headers: { origin: TEST_ORIGIN, 'content-type': 'application/json' },
+      payload: { format: 'json' },
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+    expect(member.calls).toEqual([]);
+    expect(viewer.calls).toEqual([]);
+    expect(anonymous.calls).toEqual([]);
+    await closeAll(memberApp, viewerApp, anonymousApp);
+  });
+
+  it('rejects client authority, a bad body, CSRF, and Origin before export', async () => {
+    const script = exportRuntime();
+    const { app, session, harness } = await boot('owner', script.runtime);
+    const foreignOrganizationId = harness.organizations[1]?.id ?? ASSET;
+    const cases = [
+      postExport(app, session, { format: 'json', organizationId: foreignOrganizationId }),
+      postExport(app, session, { format: 'xml' }),
+      postExport(app, session, { format: 'json', extra: true }),
+      postExport(app, session, {}),
+      app.inject({
+        method: 'POST',
+        url: `/remediation-queue/export?organizationId=${foreignOrganizationId}`,
+        remoteAddress: '198.51.100.23',
+        headers: {
+          origin: TEST_ORIGIN,
+          'content-type': 'application/json',
+          cookie: session.cookie,
+          'x-csrf-token': session.csrf,
+        },
+        payload: { format: 'json' },
+      }),
+      app.inject({
+        method: 'POST',
+        url: '/remediation-queue/export',
+        remoteAddress: '198.51.100.24',
+        headers: {
+          origin: TEST_ORIGIN,
+          'content-type': 'application/json',
+          cookie: session.cookie,
+          'x-csrf-token': session.csrf,
+          'x-organization-id': foreignOrganizationId,
+        },
+        payload: { format: 'json' },
+      }),
+      postExport(app, session, { format: 'json' }, { csrf: false }),
+      postExport(app, session, { format: 'json' }, { origin: 'https://evil.example' }),
+    ];
+    const responses = await Promise.all(cases);
+    expect(responses.map((response) => response.statusCode)).toEqual([
+      400, 400, 400, 400, 400, 400, 401, 403,
+    ]);
+    expect(script.calls).toEqual([]);
+    await app.close();
+  });
+
+  it('maps policy, cap, and correlation failures without a file', async () => {
+    const policy = exportRuntime('priority_policy_unavailable');
+    const policyApp = await boot('owner', policy.runtime);
+    const policyResponse = await postExport(policyApp.app, policyApp.session, { format: 'json' });
+    expect(policyResponse.statusCode).toBe(503);
+    expect(policyResponse.json().error.message).toBe('Priority policy is unavailable.');
+    const cap = exportRuntime('cap_exceeded');
+    const capApp = await boot('admin', cap.runtime);
+    const capResponse = await postExport(capApp.app, capApp.session, { format: 'csv' });
+    expect(capResponse.statusCode).toBe(409);
+    expect(capResponse.json().error.message).toBe('Remediation queue export exceeds 150 findings.');
+    expect(capResponse.headers['content-disposition']).toBeUndefined();
+    const conflict = exportRuntime('correlation_conflict');
+    const conflictApp = await boot('owner', conflict.runtime);
+    const conflictResponse = await postExport(conflictApp.app, conflictApp.session, {
+      format: 'json',
+    });
+    expect(conflictResponse.statusCode).toBe(409);
+    expect(conflictResponse.json().error.message).toBe('The export was not recorded.');
+    await closeAll(policyApp, capApp, conflictApp);
+  });
 });
+
+function exportRuntime(
+  kind:
+    | 'exported'
+    | 'priority_policy_unavailable'
+    | 'cap_exceeded'
+    | 'correlation_conflict'
+    | 'unavailable' = 'exported',
+): { runtime: ControlledPriorityRuntime; calls: string[] } {
+  const calls: string[] = [];
+  return {
+    calls,
+    runtime: {
+      async calculate() {
+        calls.push('calculate');
+        return { kind: 'internal_failure' };
+      },
+      async read() {
+        calls.push('read');
+        return { kind: 'unavailable' };
+      },
+      async readQueue() {
+        calls.push('readQueue');
+        return { kind: 'unavailable' };
+      },
+      async recordReview() {
+        calls.push('review');
+        return { kind: 'unavailable' };
+      },
+      async exportQueue(input) {
+        calls.push(
+          `${input.actor.role}:${input.actor.organizationId}:${input.format}:${input.correlationId}`,
+        );
+        if (kind !== 'exported') {
+          return { kind };
+        }
+        const document = exportDocument(input.format);
+        const body = serializeRemediationQueueExport(document);
+        return {
+          kind: 'exported',
+          body,
+          sha256: HASH,
+          byteLength: body.byteLength,
+          document,
+        };
+      },
+    },
+  };
+}
+
+function exportDocument(format: 'json' | 'csv'): RemediationQueueExportDocument {
+  return {
+    format,
+    asOf: AT,
+    reference: reference(),
+    counts: { ranked: 1, incomparable: 0, not_calculated: 0 },
+    rowCount: 1,
+    cap: REMEDIATION_QUEUE_EXPORT_CAP,
+    sections: {
+      ranked: [
+        {
+          findingId: FINDING,
+          assetId: ASSET,
+          assetName: 'queue <asset>',
+          componentName: 'reviewed-npm-widget',
+          componentVersion: '1.1.0',
+          vulnerabilityPublicId: 'OSV-1',
+          priorityBand: 'P2',
+          priority: 68,
+          policy: {
+            riskPolicyId: POLICY,
+            policyKey: BUILTIN_PRIORITY_POLICY_KEY,
+            policyVersion: BUILTIN_PRIORITY_POLICY_VERSION,
+            policyDefinitionSha256: HASH,
+          },
+          calculatedAt: AT,
+          inputsChanged: { status: 'none_detected', signals: [] },
+          humanReview: {
+            status: 'corrected',
+            priorReviewExists: true,
+            reviewId: FINDING,
+            correctedBand: 'P4',
+            expiresAt: AT,
+          },
+        },
+      ],
+      incomparable: [],
+      not_calculated: [],
+    },
+  };
+}
 
 async function boot(role: RoleName, priority: ControlledPriorityRuntime) {
   const harness = createAuthTestHarness({ membershipCount: 1, primaryRole: role });
@@ -209,7 +455,34 @@ async function boot(role: RoleName, priority: ControlledPriorityRuntime) {
     payload: { email: harness.user.email, password: VALID_PASSWORD },
   });
   expect(loggedIn.statusCode).toBe(200);
-  return { app: built.app, session: sessionFrom(loggedIn, harness.config.auth.cookieName) };
+  return {
+    app: built.app,
+    harness,
+    session: sessionFrom(loggedIn, harness.config.auth.cookieName),
+  };
+}
+
+async function postExport(
+  app: FastifyInstance,
+  session: { cookie: string; csrf: string },
+  payload: { format?: string; organizationId?: string; extra?: boolean },
+  options?: { csrf?: boolean; origin?: string; correlationId?: string },
+) {
+  return app.inject({
+    method: 'POST',
+    url: '/remediation-queue/export',
+    remoteAddress: '198.51.100.21',
+    headers: {
+      origin: options?.origin ?? TEST_ORIGIN,
+      'content-type': 'application/json',
+      cookie: session.cookie,
+      ...(options?.csrf === false ? {} : { 'x-csrf-token': session.csrf }),
+      ...(options?.correlationId === undefined
+        ? {}
+        : { 'x-correlation-id': options.correlationId }),
+    },
+    payload,
+  });
 }
 
 async function get(app: FastifyInstance, session: { cookie: string }, query: string) {
@@ -224,7 +497,7 @@ async function get(app: FastifyInstance, session: { cookie: string }, query: str
 function sessionFrom(
   response: { headers: { [key: string]: unknown }; json: () => unknown },
   cookieName: string,
-): { cookie: string } {
+): { cookie: string; csrf: string } {
   const header = response.headers['set-cookie'];
   const setCookie =
     typeof header === 'string' ? header : Array.isArray(header) ? header[0] : undefined;
@@ -236,7 +509,11 @@ function sessionFrom(
   if (part === undefined || !part.startsWith(prefix)) {
     throw new Error('cookie name mismatch');
   }
-  return { cookie: `${cookieName}=${part.slice(prefix.length)}` };
+  const body = response.json() as { csrfToken?: string };
+  if (typeof body.csrfToken !== 'string') {
+    throw new Error('expected csrf');
+  }
+  return { cookie: `${cookieName}=${part.slice(prefix.length)}`, csrf: body.csrfToken };
 }
 
 async function closeAll(...sessions: { app: FastifyInstance }[]): Promise<void> {

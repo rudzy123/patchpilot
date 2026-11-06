@@ -20,6 +20,14 @@ export const QUEUE_INCOMPARABLE_NOTE =
   'These stored results use another policy. They are not on the ranked scale.';
 export const QUEUE_COMPARISON_MESSAGE = 'recalculation required for comparison';
 export const QUEUE_LOAD_MORE = 'Load more';
+export const QUEUE_EXPORT_HEADING = 'Export';
+export const QUEUE_EXPORT_JSON = 'Export JSON';
+export const QUEUE_EXPORT_CSV = 'Export CSV';
+export const QUEUE_EXPORTING = 'Exporting the remediation queue.';
+export const QUEUE_EXPORT_CAP = 'Remediation queue export exceeds 150 findings.';
+export const QUEUE_EXPORT_NOT_RECORDED = 'The export was not recorded.';
+export const QUEUE_EXPORT_JSON_FILENAME = 'remediation-queue.json';
+export const QUEUE_EXPORT_CSV_FILENAME = 'remediation-queue.csv';
 
 export type RemediationQueueSection = RemediationQueueResponse['section'];
 

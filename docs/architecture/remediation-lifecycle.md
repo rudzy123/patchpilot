@@ -107,7 +107,7 @@ Operators upload a newer SBOM. Compare rules in [finding lifecycle](finding-life
 
 ## Exports
 
-[ADR 0051](../adr/0051-remediation-queue-export.md) accepts one remediation-queue export. That decision is the remediation queue only. Task, acceptance, and observation exports stay unauthorized. The route is not implemented.
+[ADR 0051](../adr/0051-remediation-queue-export.md) is implemented as owner and admin `POST /remediation-queue/export`. That route is the remediation queue only. Task, acceptance, and observation exports stay unauthorized. The cap is 150 Findings. The operation adds no migration.
 
 ## Related documents
 

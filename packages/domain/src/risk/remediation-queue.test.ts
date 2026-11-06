@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -7,10 +9,17 @@ import {
 import { PRIORITY_CALCULATION_ENGINE_VERSION } from './catalog.js';
 import { encodeRemediationQueueCursor } from './remediation-queue-cursor.js';
 import {
+  createExportRemediationQueueUseCase,
   createReadRemediationQueueUseCase,
+  type ExportRemediationQueueDependencies,
   type ReadRemediationQueueDependencies,
+  type RemediationQueueExportDocument,
 } from './remediation-queue.js';
 import type {
+  RemediationQueueExportHooks,
+  RemediationQueueExportPersistenceResult,
+  RemediationQueueExportQuery,
+  RemediationQueueExportRawSnapshot,
   RemediationQueuePersistencePort,
   RemediationQueueRawRow,
   RemediationQueueReadResult,
@@ -300,3 +309,228 @@ describe('read remediation queue', () => {
     }
   });
 });
+
+describe('export remediation queue', () => {
+  it('keeps the three sections and does not call the priority engine', async () => {
+    const source = readFileSync(new URL('./remediation-queue.ts', import.meta.url), 'utf8');
+    expect(source).not.toContain('compareForRemediationQueue');
+    expect(source).not.toContain('@patchpilot/policy-engine');
+    const { dependencies: deps, exportQueue, serialize } = exportDependencies();
+    const result = await createExportRemediationQueueUseCase(deps).execute(exportCommand('owner'));
+    expect(result.kind).toBe('exported');
+    if (result.kind !== 'exported') {
+      return;
+    }
+    expect(result.document.sections.ranked.map((row) => row.findingId)).toEqual([FINDING]);
+    expect(result.document.sections.incomparable[0]?.comparisonMessage).toBe(
+      'recalculation required for comparison',
+    );
+    expect(result.document.sections.not_calculated[0]).toEqual({
+      findingId: '55555555-5555-4555-8555-555555555552',
+      assetId: ASSET,
+      assetName: 'queue <asset>',
+      componentName: 'reviewed-npm-widget',
+      componentVersion: '1.1.0',
+      vulnerabilityPublicId: 'OSV-1',
+      humanReview: { status: 'none', priorReviewExists: false },
+    });
+    expect(result.document.sections.not_calculated[0]).not.toHaveProperty('priority');
+    expect(result.document.sections.not_calculated[0]).not.toHaveProperty('priorityBand');
+    expect(result.document.rowCount).toBe(3);
+    expect(result.document.cap).toBe(150);
+    expect(result.byteLength).toBe(result.body.byteLength);
+    expect(exportQueue).toHaveBeenCalledTimes(1);
+    expect(serialize).toHaveBeenCalledTimes(1);
+    const query = exportQueue.mock.calls[0]?.[0];
+    expect(query?.organizationId).toBe(ORG);
+    expect(query).not.toHaveProperty('section');
+  });
+
+  it('denies members and viewers and ignores a caller organization', async () => {
+    const { dependencies: deps, exportQueue } = exportDependencies();
+    const member = await createExportRemediationQueueUseCase(deps).execute(exportCommand('member'));
+    const viewer = await createExportRemediationQueueUseCase(deps).execute(exportCommand('viewer'));
+    const crossed = await createExportRemediationQueueUseCase(deps).execute({
+      ...exportCommand('admin'),
+      organizationId: '99999999-9999-4999-8999-999999999999',
+    });
+    const commandOrg = await createExportRemediationQueueUseCase(deps).execute(
+      exportCommand('owner', { organizationId: ORG }),
+    );
+    expect(member).toEqual({ kind: 'unauthorized' });
+    expect(viewer).toEqual({ kind: 'unauthorized' });
+    expect(crossed).toEqual({ kind: 'unauthorized' });
+    expect(commandOrg).toEqual({ kind: 'unauthorized' });
+    expect(exportQueue).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed correlation id before the snapshot', async () => {
+    const { dependencies: deps, exportQueue } = exportDependencies();
+    const result = await createExportRemediationQueueUseCase(deps).execute(
+      exportCommand('owner', { correlationId: 'not a correlation' }),
+    );
+    expect(result).toEqual({ kind: 'invalid_command' });
+    expect(exportQueue).not.toHaveBeenCalled();
+  });
+
+  it('does not serialize when the policy is rejected or the population exceeds the cap', async () => {
+    const rejected = exportDependencies(async () => ({ kind: 'policy_rejected' }));
+    const unavailable = await createExportRemediationQueueUseCase(rejected.dependencies).execute(
+      exportCommand('owner'),
+    );
+    expect(unavailable).toEqual({ kind: 'priority_policy_unavailable' });
+    expect(rejected.serialize).not.toHaveBeenCalled();
+
+    const capped = exportDependencies(async () => ({ kind: 'cap_exceeded' }));
+    const overflow = await createExportRemediationQueueUseCase(capped.dependencies).execute(
+      exportCommand('owner'),
+    );
+    expect(overflow).toEqual({ kind: 'cap_exceeded' });
+    expect(capped.serialize).not.toHaveBeenCalled();
+  });
+
+  it('returns no second body for a duplicate correlation id', async () => {
+    const { dependencies: deps, serialize } = exportDependencies(async () => ({
+      kind: 'correlation_conflict',
+    }));
+    const result = await createExportRemediationQueueUseCase(deps).execute(exportCommand('admin'));
+    expect(result).toEqual({ kind: 'correlation_conflict' });
+    expect(serialize).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when a stored row is malformed', async () => {
+    const { dependencies: deps } = exportDependencies(async (_input, hooks) => {
+      const admitted = hooks.admit({ schemaVersion: 2 });
+      if (!admitted.ok) {
+        return { kind: 'policy_rejected' };
+      }
+      const body = hooks.complete({
+        ...exportSnapshot(admitted.hash),
+        not_calculated: [
+          {
+            ...notCalculatedRow(),
+            humanReview: { status: 'accepted', priorReviewExists: true, reviewId: FINDING },
+          },
+        ],
+      });
+      if (body === null) {
+        return { kind: 'malformed' };
+      }
+      return exported(body, admitted.hash);
+    });
+    const result = await createExportRemediationQueueUseCase(deps).execute(exportCommand('owner'));
+    expect(result).toEqual({ kind: 'unavailable' });
+  });
+});
+
+function exportCommand(
+  role: 'owner' | 'admin' | 'member' | 'viewer',
+  commandOverrides: Record<string, unknown> = {},
+) {
+  return {
+    actor: actor(role),
+    command: {
+      format: 'json',
+      correlationId: 'export-correlation-1',
+      ...commandOverrides,
+    },
+  };
+}
+
+function notCalculatedRow(): RemediationQueueRawRow {
+  return {
+    ...rankedRow(),
+    findingId: '55555555-5555-4555-8555-555555555552',
+    section: 'not_calculated',
+    calculation: null,
+    humanReview: { status: 'none', priorReviewExists: false },
+  };
+}
+
+function incomparableRow(): RemediationQueueRawRow {
+  const base = rankedRow({
+    findingId: '55555555-5555-4555-8555-555555555553',
+    section: 'incomparable',
+  });
+  if (base.calculation === null) {
+    throw new Error('incomparable fixture includes a calculation');
+  }
+  return {
+    ...base,
+    calculation: { ...base.calculation, policyDefinitionSha256: OTHER_HASH },
+  };
+}
+
+function exportSnapshot(hash: string): RemediationQueueExportRawSnapshot {
+  return {
+    asOf: AT,
+    publishedDefinition: { schemaVersion: 2 },
+    referencePolicyDefinitionSha256: hash,
+    referenceEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+    activeKevGenerationId: null,
+    counts: { ranked: 1, incomparable: 1, not_calculated: 1 },
+    findingCount: 3,
+    ranked: [rankedRow()],
+    incomparable: [incomparableRow()],
+    not_calculated: [notCalculatedRow()],
+  };
+}
+
+function exported(body: Uint8Array, hash: string): RemediationQueueExportPersistenceResult {
+  return {
+    kind: 'exported',
+    body,
+    sha256: 'cd'.repeat(32),
+    byteLength: body.byteLength,
+    asOf: AT,
+    counts: { ranked: 1, incomparable: 1, not_calculated: 1 },
+    findingCount: 3,
+    referencePolicyDefinitionSha256: hash,
+  };
+}
+
+function exportDependencies(
+  respond?: (
+    input: RemediationQueueExportQuery,
+    hooks: RemediationQueueExportHooks,
+  ) => Promise<RemediationQueueExportPersistenceResult>,
+): {
+  dependencies: ExportRemediationQueueDependencies;
+  exportQueue: ReturnType<typeof vi.fn>;
+  serialize: ReturnType<typeof vi.fn>;
+} {
+  const exportQueue = vi.fn(
+    respond ??
+      (async (input: RemediationQueueExportQuery, hooks: RemediationQueueExportHooks) => {
+        const admitted = hooks.admit({ schemaVersion: 2 });
+        if (!admitted.ok) {
+          return { kind: 'policy_rejected' as const };
+        }
+        const body = hooks.complete(exportSnapshot(admitted.hash));
+        if (body === null) {
+          return { kind: 'malformed' as const };
+        }
+        return exported(body, admitted.hash);
+      }),
+  );
+  const serialize = vi.fn((document: RemediationQueueExportDocument) =>
+    Buffer.from(JSON.stringify(document), 'utf8'),
+  );
+  return {
+    exportQueue,
+    serialize,
+    dependencies: {
+      persistence: { exportRemediationQueue: exportQueue },
+      admittedPairs: [
+        {
+          engineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+          policyDefinitionSha256: HASH,
+          validationEntryId: 'V-test',
+        },
+      ],
+      referenceEngineVersion: PRIORITY_CALCULATION_ENGINE_VERSION,
+      hashPolicyDefinition: () => HASH,
+      serializeExport: serialize,
+    },
+  };
+}

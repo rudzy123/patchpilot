@@ -1,6 +1,6 @@
 # Testing
 
-Vitest is the unit and integration runner. Playwright is **not** wired in this foundation; the landing page, health contract, and Session 6 authentication UI are covered by unit and component tests. Browser journeys belong to a later milestone when product UI exists. GitHub-hosted E2E testing is deferred until actual Playwright tests exist; see [CI-DEFER-1](ci.md#deferred-ci-work). Do not treat the local `pnpm test:e2e` placeholder as end-to-end validation.
+Vitest is the unit and integration runner. One Playwright release smoke lives at `apps/web/e2e/release-smoke.spec.ts`. `pnpm test:e2e` runs `pnpm exec playwright test`. The smoke signs in, opens a prepared asset and product-match page, reads the Finding explanation, calculates priority, opens the remediation queue, and downloads one server JSON export. It does not upload an SBOM in the browser and it does not start the worker. It runs inside the Integration job. A separate E2E workflow remains [CI-DEFER-1](ci.md#ci-defer-1--separate-github-hosted-playwright-workflow).
 
 ## Labels
 
@@ -8,7 +8,7 @@ Vitest is the unit and integration runner. Playwright is **not** wired in this f
 | --- | --- | --- |
 | Unit | `*.test.ts` excluding `*.integration.test.ts` | None. Fakes, inject-without-listen, and in-memory doubles. |
 | Integration | `*.integration.test.ts` | Local Compose: PostgreSQL, Redis, MinIO. |
-| End-to-end | not present | Would use Playwright against the web app. |
+| End-to-end | `apps/web/e2e/release-smoke.spec.ts` | Playwright Chromium against loopback web and API. PostgreSQL is required. The fixture prepares the organization, Finding, and published builtin. |
 
 ## Commands
 
@@ -21,7 +21,7 @@ pnpm test:e2e
 pnpm infrastructure:down
 ```
 
-`pnpm test` is an alias for `pnpm test:unit`. `pnpm test:integration` is the parallel integration command. `pnpm test:integration:serial` runs the same package tasks one at a time for diagnosis. `pnpm test:e2e` is reserved and currently prints that Playwright is not wired; it exits 0 because there are no browser tests to execute. Do not treat that as a Playwright pass. GitHub Actions does not run the e2e command. Keep it locally only to preserve the documented command interface. GitHub Actions runs `pnpm test:integration`.
+`pnpm test` is an alias for `pnpm test:unit`. `pnpm test:integration` is the parallel integration command. `pnpm test:integration:serial` runs the same package tasks one at a time for diagnosis. `pnpm test:e2e` runs the one Playwright release smoke. It needs PostgreSQL at the documented loopback template and Chromium from `pnpm exec playwright install chromium`. GitHub Actions runs `pnpm test:integration` and then `pnpm test:e2e` in the Integration job. The Quality job does not run the smoke.
 
 ## What unit tests cover in this foundation
 

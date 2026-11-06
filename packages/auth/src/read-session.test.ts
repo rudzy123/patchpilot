@@ -68,6 +68,66 @@ describe('read session use case', () => {
     });
   });
 
+  it('finishes an in-flight CSRF rotation before starting another', async () => {
+    const user = createUserRecord({});
+    const organization = createOrganizationRecord({ slug: 'readable', name: 'Readable' });
+    const membership = createMembershipRecord(organization, user, { role: 'owner' });
+    const tokenHash = digestSessionToken(RAW_SESSION_TOKEN);
+    const sessions = createMemorySessionRepository([
+      createSessionRecord(user, {
+        tokenHash,
+        csrfTokenHash: digestCsrfToken(RAW_CSRF_TOKEN),
+        activeOrganizationId: organization.id,
+      }),
+    ]);
+    let replacements = 0;
+    let releaseFirst: () => void = () => undefined;
+    const firstEntered = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let releaseReplacement: () => void = () => undefined;
+    const replacementGate = new Promise<void>((resolve) => {
+      releaseReplacement = resolve;
+    });
+    const readSession = createReadSessionUseCase({
+      users: createMemoryUserRepository([user]),
+      localCredentials: createMemoryCredentialRepository([createCredentialRecord(user)]),
+      sessions: {
+        ...sessions,
+        async replaceCsrfToken(input) {
+          replacements += 1;
+          if (replacements === 1) {
+            releaseFirst();
+            await replacementGate;
+          }
+          return sessions.replaceCsrfToken(input);
+        },
+      },
+      memberships: createMemoryMembershipRepository([{ organization, membership }]),
+      tokens: createQueuedTokenGenerator([ROTATED_CSRF_TOKEN, 'second-rotated-csrf-token']),
+      clock: createAdjustableClock(),
+      auth: createTestAuthConfig(),
+      logger: createCollectingLogger().logger,
+    });
+
+    const first = readSession.execute({ sessionToken: RAW_SESSION_TOKEN });
+    await firstEntered;
+    const second = readSession.execute({ sessionToken: RAW_SESSION_TOKEN });
+    await Promise.resolve();
+    expect(replacements).toBe(1);
+    releaseReplacement();
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    expect(firstResult.ok && secondResult.ok).toBe(true);
+    if (!firstResult.ok || !secondResult.ok) {
+      return;
+    }
+    expect(firstResult.value.csrfToken).toBe(ROTATED_CSRF_TOKEN);
+    expect(secondResult.value.csrfToken).toBe('second-rotated-csrf-token');
+    expect(await sessions.findByTokenHash(tokenHash)).toMatchObject({
+      csrfTokenHash: digestCsrfToken('second-rotated-csrf-token'),
+    });
+  });
+
   it('rejects a missing Session', async () => {
     const readSession = createReadSessionUseCase({
       users: createMemoryUserRepository(),

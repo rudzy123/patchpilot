@@ -140,6 +140,9 @@ describe('authentication routes', () => {
     expect(String(allowed.headers['access-control-allow-headers']).toLowerCase()).toContain(
       'x-csrf-token',
     );
+    expect(String(allowed.headers['access-control-expose-headers']).toLowerCase()).toContain(
+      'content-disposition',
+    );
 
     const denied = await app.inject({
       method: 'OPTIONS',

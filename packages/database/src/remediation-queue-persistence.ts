@@ -1,18 +1,29 @@
 /**
- * Read-only remediation queue pages.
+ * Remediation queue pages and one organization export snapshot.
  * Order is priority descending, escalation recommended first, KEV listed
  * first, source-severity percent descending, then first observation and
  * Finding id ascending. This module does not call the priority engine.
  * A missing or malformed stored row fails the page so the three sections
  * still partition the organization's Findings.
+ * The export reuses that classification inside one repeatable-read
+ * transaction and inserts one export.created audit row. It does not write
+ * Evidence.
  */
+
+import { createHash } from 'node:crypto';
 
 import { Prisma, type PrismaClient } from '@prisma/client';
 import {
   BUILTIN_PRIORITY_POLICY_KEY,
   BUILTIN_PRIORITY_POLICY_VERSION,
+  REMEDIATION_QUEUE_EXPORT_CAP,
   projectPriorityReviewMarker,
   type RemediationQueueCalculationFields,
+  type RemediationQueueCounts,
+  type RemediationQueueExportHooks,
+  type RemediationQueueExportPersistenceResult,
+  type RemediationQueueExportQuery,
+  type RemediationQueueExportRawSnapshot,
   type RemediationQueueRawRow,
   type RemediationQueueReadQuery,
   type RemediationQueueReadResult,
@@ -188,8 +199,328 @@ async function readInTransaction(
         ? INCOMPARABLE_ORDER
         : NOT_CALCULATED_ORDER;
   const pageRows = await client.$queryRaw<QueueSqlRow[]>(Prisma.sql`
+    ${classifiedSectionSql(input, input.section, predicate, order)}
+    LIMIT ${input.limit + 1}::int
+  `);
+  const hasMore = pageRows.length > input.limit;
+  const kept = hasMore ? pageRows.slice(0, input.limit) : pageRows;
+  const rows: RemediationQueueRawRow[] = [];
+  for (const row of kept) {
+    const mapped = mapQueueRow(row, input.section, meta.as_of);
+    if (mapped === null) {
+      return { kind: 'malformed' };
+    }
+    rows.push(mapped);
+  }
+  return {
+    kind: 'page',
+    asOf: meta.as_of,
+    publishedPolicyId: policy.id,
+    publishedPolicyKey: BUILTIN_PRIORITY_POLICY_KEY,
+    publishedPolicyVersion: BUILTIN_PRIORITY_POLICY_VERSION,
+    publishedDefinition: policy.definition,
+    activeKevGenerationId,
+    counts: { ranked, incomparable, not_calculated: notCalculated },
+    findingCount,
+    rows,
+    hasMore,
+  };
+}
+
+type QueueClassificationScope = {
+  readonly organizationId: string;
+  readonly referencePolicyDefinitionSha256: string;
+  readonly referenceEngineVersion: string;
+};
+
+const EXPORT_CORRELATION_ID = /^[A-Za-z0-9._-]{1,128}$/;
+
+export async function exportRemediationQueueSnapshot(
+  client: PrismaClient,
+  input: RemediationQueueExportQuery,
+  hooks: RemediationQueueExportHooks,
+): Promise<RemediationQueueExportPersistenceResult> {
+  if (
+    !isExportQuery(input) ||
+    typeof hooks.admit !== 'function' ||
+    typeof hooks.complete !== 'function'
+  ) {
+    return { kind: 'unavailable' };
+  }
+  try {
+    return await client.$transaction((tx) => exportInTransaction(tx, input, hooks), {
+      isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return { kind: 'correlation_conflict' };
+    }
+    return { kind: 'unavailable' };
+  }
+}
+
+async function exportInTransaction(
+  client: Prisma.TransactionClient,
+  input: RemediationQueueExportQuery,
+  hooks: RemediationQueueExportHooks,
+): Promise<RemediationQueueExportPersistenceResult> {
+  const policies = await client.$queryRaw<PolicySqlRow[]>(publishedBuiltinSql());
+  if (policies.length === 0) {
+    return { kind: 'policy_absent' };
+  }
+  const policy = policies[0];
+  if (policies.length !== 1 || policy === undefined || !isPublishedPolicy(policy)) {
+    return { kind: 'unavailable' };
+  }
+  const admitted = hooks.admit(policy.definition);
+  if (!admitted.ok || !SHA256_PATTERN.test(admitted.hash)) {
+    return { kind: 'policy_rejected' };
+  }
+  const scope: QueueClassificationScope = {
+    organizationId: input.organizationId,
+    referencePolicyDefinitionSha256: admitted.hash,
+    referenceEngineVersion: input.referenceEngineVersion,
+  };
+  const meta = await readQueueMeta(client, scope);
+  if (meta.kind === 'malformed') {
+    return { kind: 'malformed' };
+  }
+  if (meta.findingCount > REMEDIATION_QUEUE_EXPORT_CAP) {
+    return { kind: 'cap_exceeded' };
+  }
+  const ranked = await readSection(client, scope, 'ranked', meta.asOf);
+  const incomparable = await readSection(client, scope, 'incomparable', meta.asOf);
+  const notCalculated = await readSection(client, scope, 'not_calculated', meta.asOf);
+  if (ranked === null || incomparable === null || notCalculated === null) {
+    return { kind: 'malformed' };
+  }
+  if (
+    ranked.length !== meta.counts.ranked ||
+    incomparable.length !== meta.counts.incomparable ||
+    notCalculated.length !== meta.counts.not_calculated
+  ) {
+    return { kind: 'malformed' };
+  }
+  const snapshot: RemediationQueueExportRawSnapshot = {
+    asOf: meta.asOf,
+    publishedDefinition: policy.definition,
+    referencePolicyDefinitionSha256: admitted.hash,
+    referenceEngineVersion: input.referenceEngineVersion,
+    activeKevGenerationId: meta.activeKevGenerationId,
+    counts: meta.counts,
+    findingCount: meta.findingCount,
+    ranked,
+    incomparable,
+    not_calculated: notCalculated,
+  };
+  const body = hooks.complete(snapshot);
+  if (body === null || body.byteLength === 0) {
+    return { kind: 'malformed' };
+  }
+  const actor = await loadExportActor(
+    client,
+    input.organizationId,
+    input.membershipId,
+    input.actorUserId,
+  );
+  if (actor === null) {
+    return { kind: 'unavailable' };
+  }
+  const sha256 = createHash('sha256').update(body).digest('hex');
+  const payload = {
+    schemaVersion: 1,
+    purpose: 'remediation_queue_export',
+    format: input.format,
+    rowCount: meta.findingCount,
+    counts: meta.counts,
+    reference: {
+      policyKey: BUILTIN_PRIORITY_POLICY_KEY,
+      policyVersion: BUILTIN_PRIORITY_POLICY_VERSION,
+      policyDefinitionSha256: admitted.hash,
+      engineVersion: input.referenceEngineVersion,
+    },
+    asOf: meta.asOf,
+    cap: REMEDIATION_QUEUE_EXPORT_CAP,
+    byteLength: body.byteLength,
+    sha256,
+  };
+  await client.$executeRaw`
+    INSERT INTO "audit_event" (
+      "organization_id",
+      "actor_user_id",
+      "actor_membership_id",
+      "actor_type",
+      "action",
+      "subject_type",
+      "subject_id",
+      "correlation_id",
+      "payload",
+      "schema_version",
+      "retention_category"
+    )
+    VALUES (
+      ${input.organizationId}::uuid,
+      ${input.actorUserId}::uuid,
+      ${input.membershipId}::uuid,
+      'user'::"audit_actor_type",
+      'export.created',
+      'organization',
+      ${input.organizationId}::uuid,
+      ${input.correlationId},
+      ${JSON.stringify(payload)}::jsonb,
+      1::int,
+      'security'::"audit_retention_category"
+    )
+  `;
+  return {
+    kind: 'exported',
+    body,
+    sha256,
+    byteLength: body.byteLength,
+    asOf: meta.asOf,
+    counts: meta.counts,
+    findingCount: meta.findingCount,
+    referencePolicyDefinitionSha256: admitted.hash,
+  };
+}
+
+function publishedBuiltinSql(): Prisma.Sql {
+  return Prisma.sql`
+    SELECT
+      p."id"::text AS id,
+      p."policy_key" AS policy_key,
+      p."version"::int AS version,
+      p."definition" AS definition
+    FROM "risk_policy" p
+    WHERE p."organization_id" IS NULL
+      AND p."scope" = 'builtin'::"risk_policy_scope"
+      AND p."policy_key" = ${BUILTIN_PRIORITY_POLICY_KEY}
+      AND p."version" = ${BUILTIN_PRIORITY_POLICY_VERSION}::int
+      AND p."status" = 'published'::"risk_policy_status"
+  `;
+}
+
+async function readQueueMeta(
+  client: Prisma.TransactionClient,
+  scope: QueueClassificationScope,
+): Promise<
+  | { readonly kind: 'malformed' }
+  | {
+      readonly kind: 'meta';
+      readonly asOf: string;
+      readonly findingCount: number;
+      readonly counts: RemediationQueueCounts;
+      readonly activeKevGenerationId: string | null;
+    }
+> {
+  const metaRows = await client.$queryRaw<MetaSqlRow[]>(Prisma.sql`
     WITH classified AS (
-      ${classifiedFindings(input)}
+      ${classifiedFindings(scope)}
+    )
+    SELECT
+      to_char(
+        date_trunc('milliseconds', clock_timestamp()) AT TIME ZONE 'UTC',
+        ${UTC_MILLIS}
+      ) AS as_of,
+      COUNT(*)::int AS finding_count,
+      COUNT(*) FILTER (WHERE malformed)::int AS malformed_count,
+      COUNT(*) FILTER (WHERE NOT malformed AND section = 'ranked')::int AS ranked_count,
+      COUNT(*) FILTER (WHERE NOT malformed AND section = 'incomparable')::int AS incomparable_count,
+      COUNT(*) FILTER (WHERE NOT malformed AND section = 'not_calculated')::int AS not_calculated_count,
+      (
+        SELECT s."active_generation_id"::text
+        FROM "intelligence_source" s
+        WHERE s."provider_key" = 'cisa_kev'::"integration_provider_key"
+      ) AS kev_generation_id
+    FROM classified
+  `);
+  const meta = metaRows[0];
+  if (metaRows.length !== 1 || meta === undefined || !OBSERVED_AT.test(meta.as_of)) {
+    return { kind: 'malformed' };
+  }
+  const findingCount = readCount(meta.finding_count);
+  const malformedCount = readCount(meta.malformed_count);
+  const ranked = readCount(meta.ranked_count);
+  const incomparable = readCount(meta.incomparable_count);
+  const notCalculated = readCount(meta.not_calculated_count);
+  const activeKevGenerationId = readOptionalUuid(meta.kev_generation_id);
+  if (
+    findingCount === null ||
+    malformedCount === null ||
+    ranked === null ||
+    incomparable === null ||
+    notCalculated === null ||
+    activeKevGenerationId === 'malformed' ||
+    malformedCount > 0 ||
+    ranked + incomparable + notCalculated !== findingCount
+  ) {
+    return { kind: 'malformed' };
+  }
+  return {
+    kind: 'meta',
+    asOf: meta.as_of,
+    findingCount,
+    counts: { ranked, incomparable, not_calculated: notCalculated },
+    activeKevGenerationId,
+  };
+}
+
+async function readSection(
+  client: Prisma.TransactionClient,
+  scope: QueueClassificationScope,
+  section: RemediationQueueSection,
+  asOf: string,
+): Promise<RemediationQueueRawRow[] | null> {
+  const order =
+    section === 'ranked'
+      ? RANKED_ORDER
+      : section === 'incomparable'
+        ? INCOMPARABLE_ORDER
+        : NOT_CALCULATED_ORDER;
+  const rows = await client.$queryRaw<QueueSqlRow[]>(
+    classifiedSectionSql(scope, section, Prisma.sql`TRUE`, order),
+  );
+  const mapped: RemediationQueueRawRow[] = [];
+  for (const row of rows) {
+    const queueRow = mapQueueRow(row, section, asOf);
+    if (queueRow === null) {
+      return null;
+    }
+    mapped.push(queueRow);
+  }
+  return mapped;
+}
+
+async function loadExportActor(
+  client: Prisma.TransactionClient,
+  organizationId: string,
+  membershipId: string,
+  actorUserId: string,
+): Promise<string | null> {
+  const rows = await client.$queryRaw<Array<{ user_id: string }>>`
+    SELECT "user_id"::text AS "user_id"
+    FROM "membership"
+    WHERE "organization_id" = ${organizationId}::uuid
+      AND "id" = ${membershipId}::uuid
+      AND "user_id" = ${actorUserId}::uuid
+      AND "status" = 'active'::"membership_status"
+  `;
+  const userId = rows[0]?.user_id;
+  if (rows.length !== 1 || userId !== actorUserId) {
+    return null;
+  }
+  return userId;
+}
+
+function classifiedSectionSql(
+  scope: QueueClassificationScope,
+  section: RemediationQueueSection,
+  predicate: Prisma.Sql,
+  order: Prisma.Sql,
+): Prisma.Sql {
+  return Prisma.sql`
+    WITH classified AS (
+      ${classifiedFindings(scope)}
     )
     SELECT
       finding_id,
@@ -223,37 +554,52 @@ async function readInTransaction(
       review_head_count
     FROM classified
     WHERE NOT malformed
-      AND section = ${input.section}
+      AND section = ${section}
       AND ${predicate}
     ORDER BY ${order}
-    LIMIT ${input.limit + 1}::int
-  `);
-  const hasMore = pageRows.length > input.limit;
-  const kept = hasMore ? pageRows.slice(0, input.limit) : pageRows;
-  const rows: RemediationQueueRawRow[] = [];
-  for (const row of kept) {
-    const mapped = mapQueueRow(row, input.section, meta.as_of);
-    if (mapped === null) {
-      return { kind: 'malformed' };
-    }
-    rows.push(mapped);
-  }
-  return {
-    kind: 'page',
-    asOf: meta.as_of,
-    publishedPolicyId: policy.id,
-    publishedPolicyKey: BUILTIN_PRIORITY_POLICY_KEY,
-    publishedPolicyVersion: BUILTIN_PRIORITY_POLICY_VERSION,
-    publishedDefinition: policy.definition,
-    activeKevGenerationId,
-    counts: { ranked, incomparable, not_calculated: notCalculated },
-    findingCount,
-    rows,
-    hasMore,
-  };
+  `;
 }
 
-function classifiedFindings(input: RemediationQueueReadQuery): Prisma.Sql {
+function isExportQuery(input: RemediationQueueExportQuery): boolean {
+  return (
+    UUID_TEXT_PATTERN.test(input.organizationId) &&
+    UUID_TEXT_PATTERN.test(input.actorUserId) &&
+    UUID_TEXT_PATTERN.test(input.membershipId) &&
+    EXPORT_CORRELATION_ID.test(input.correlationId) &&
+    (input.format === 'json' || input.format === 'csv') &&
+    input.referenceEngineVersion.length > 0 &&
+    input.referenceEngineVersion.length <= 64
+  );
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    exportSqlState(error) === '23505' ||
+    (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')
+  );
+}
+
+function exportSqlState(error: unknown): string | null {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const metaCode = error.meta?.['code'];
+    return typeof metaCode === 'string' ? metaCode : null;
+  }
+  if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+    const match = /code: "([0-9A-Z]{5})"/.exec(error.message);
+    return match?.[1] ?? null;
+  }
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    return /^[0-9A-Z]{5}$/.test(error.code) ? error.code : null;
+  }
+  return null;
+}
+
+function classifiedFindings(input: QueueClassificationScope): Prisma.Sql {
   return Prisma.sql`
     SELECT
       base.*,

@@ -131,6 +131,7 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       dependencies.config.auth.csrfHeaderName,
       SBOM_IDEMPOTENCY_KEY_HEADER_NAME,
     ],
+    exposedHeaders: ['content-disposition'],
   });
 
   app.addHook('onRequest', async (request, reply) => {
