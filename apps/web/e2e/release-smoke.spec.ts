@@ -57,7 +57,17 @@ test('signs in, calculates prepared priority, and downloads the queue export', a
   await page.goto('/remediation-queue');
   await expect(page.getByRole('link', { name: state.vulnerabilityPublicId })).toBeVisible();
   const downloadPromise = page.waitForEvent('download');
+  const exportResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/remediation-queue/export') &&
+      response.request().method() === 'POST',
+  );
   await page.getByRole('button', { name: 'Export JSON' }).click();
+  const response = await exportResponse;
+  expect(response.status(), await response.text()).toBe(200);
+  expect(response.headers()['content-disposition']).toBe(
+    'attachment; filename="remediation-queue.json"',
+  );
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('remediation-queue.json');
   const downloadPath = await download.path();

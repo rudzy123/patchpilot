@@ -355,7 +355,9 @@ function saveServerExport(file: { filename: string; mediaType: string; bytes: Ui
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 1_000);
 }
 
 function exportMessage(error: unknown): string {
