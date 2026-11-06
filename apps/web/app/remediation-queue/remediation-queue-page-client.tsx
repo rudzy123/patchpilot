@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 
 import type { RemediationQueueResponse } from '@patchpilot/contracts';
 
@@ -76,6 +76,7 @@ function QueuePanels(): ReactElement {
   const { organization, api, getCsrfToken } = useAuth();
   const [view, setView] = useState<QueueView>({ status: 'loading' });
   const [exporting, setExporting] = useState<'json' | 'csv' | null>(null);
+  const exportUrlRef = useRef<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const canRead = organization !== null && canPresentRemediationQueue(organization.role);
 
@@ -186,7 +187,7 @@ function QueuePanels(): ReactElement {
     setExportError(null);
     try {
       const file = await api.exportRemediationQueue(format, csrfToken);
-      saveServerExport(file);
+      exportUrlRef.current = saveServerExport(file, exportUrlRef.current);
     } catch (error) {
       setExportError(exportMessage(error));
     } finally {
@@ -343,7 +344,13 @@ function panelError(
   };
 }
 
-function saveServerExport(file: { filename: string; mediaType: string; bytes: Uint8Array }): void {
+function saveServerExport(
+  file: { filename: string; mediaType: string; bytes: Uint8Array },
+  previousUrl: string | null,
+): string {
+  if (previousUrl !== null) {
+    URL.revokeObjectURL(previousUrl);
+  }
   const body = new ArrayBuffer(file.bytes.byteLength);
   new Uint8Array(body).set(file.bytes);
   const blob = new Blob([body], { type: file.mediaType });
@@ -355,7 +362,7 @@ function saveServerExport(file: { filename: string; mediaType: string; bytes: Ui
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  return url;
 }
 
 function exportMessage(error: unknown): string {

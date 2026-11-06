@@ -1,7 +1,7 @@
+import { StrictMode, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactElement } from 'react';
 
 import {
   GENERIC_ACCESS_DENIED,
@@ -18,7 +18,7 @@ import {
 } from '../test/auth-fixtures';
 import { renderWithAuth } from '../test/render-with-auth';
 
-import { useAuth } from './auth-provider';
+import { AuthProvider, useAuth } from './auth-provider';
 
 function AuthProbe(): ReactElement {
   const value = useAuth();
@@ -66,6 +66,33 @@ describe('AuthProvider', () => {
     expect(screen.getByTestId('auth-json').textContent).not.toContain(CSRF_TOKEN_FIXTURE);
     expect(window.localStorage).toHaveLength(0);
     expect(window.sessionStorage).toHaveLength(0);
+  });
+
+  it('reads the session once when setup runs twice', async () => {
+    let finishRead: ((session: ReturnType<typeof sessionFixture>) => void) | undefined;
+    const readSession = vi.fn(
+      () =>
+        new Promise<ReturnType<typeof sessionFixture>>((resolve) => {
+          finishRead = resolve;
+        }),
+    );
+    const authApi = createFakeAuthApi({ readSession });
+    render(
+      <StrictMode>
+        <AuthProvider apiBaseUrl="http://127.0.0.1:3001" authApi={authApi}>
+          <AuthProbe />
+        </AuthProvider>
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(readSession).toHaveBeenCalledTimes(1);
+    });
+    finishRead?.(sessionFixture());
+    await waitFor(() => {
+      expect(screen.getByText('status:authenticated')).toBeInTheDocument();
+    });
+    expect(readSession).toHaveBeenCalledTimes(1);
   });
 
   it('prevents duplicate in-flight login submissions', async () => {
