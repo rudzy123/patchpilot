@@ -32,7 +32,7 @@
       "outputs": []
     },
     "test:integration": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@patchpilot/database#build"],
       "cache": false,
       "outputs": [],
       "env": ["DATABASE_URL"]
