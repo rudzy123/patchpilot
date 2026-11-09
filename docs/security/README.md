@@ -7,6 +7,7 @@ PatchPilot can support an organization's vulnerability-management process. These
 | Document | Purpose |
 | --- | --- |
 | [Threat model](threat-model.md) | Actors, assets, attack surfaces, and mitigations for v0.1 |
+| [AI and ML threat model](ai-ml-threat-model.md) | Future model-assistance threats. No model is composed. [ADR 0052](../adr/0052-patchpilot-intelligence-boundary.md) is Proposed |
 | [Security controls](security-controls.md) | Control catalog mapped to architecture |
 | [Privacy model](privacy-model.md) | Data handling for a self-hosted deployment |
 | [Secure development plan](secure-development-plan.md) | How we design, review, and test security-sensitive change |

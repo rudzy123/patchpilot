@@ -97,11 +97,13 @@ Closer implementation notes may add detail. They must not silently weaken accept
 | [0030](0030-first-ecosystem-matching-architecture.md) | First ecosystem matching architecture (npm selected; in-memory evaluator uncomposed) | Proposed |
 | [0031](0031-product-evidence-provenance-architecture.md) | Product-evidence provenance architecture | Proposed |
 | [0046](0046-offline-npm-osv-import.md) | Offline npm OSV import | Proposed |
+| [0052](0052-patchpilot-intelligence-boundary.md) | PatchPilot intelligence boundary | Proposed |
 
 ## Implementation status
 
 [Current state](../project/current-state.md) is the checkpoint authority. Header status matches the index above.
 
+- [ADR 0052](0052-patchpilot-intelligence-boundary.md) is **Proposed**. It records the intelligence boundary. The maintainer created the independent repository `patchpilot-intelligence-evals`. This ADR does not adopt that repository and does not authorize a model, an experiment, shadow mode, or production composition. It does not supersede [ADR 0017](0017-optional-ai-user-credentials.md). It adds no migration. The frozen migration count stays 28.
 - [ADR 0027](0027-osv-acquisition-persistence-and-catalog-activation.md) remains **Proposed**. OSV acquisition persistence is implemented and production uncomposed. Production OSV acquisition is disabled.
 - [ADR 0030](0030-first-ecosystem-matching-architecture.md) remains **Proposed**. The npm evaluator and synthetic immutable match-evaluation persistence are implemented and production uncomposed. Real product-eligible match evidence is unavailable. Finding creation is unavailable.
 - [ADR 0031](0031-product-evidence-provenance-architecture.md) remains **Proposed**. Immutable advisory revisions and reviewed Vulnerability bindings are implemented and production uncomposed. Product-evidence eligibility composition is implemented and production uncomposed. It produces no eligible record, invokes no product evaluator in the accepted zero-eligibility state, and writes no product match row. Real product-eligible evaluation count remains 0.
