@@ -33,7 +33,7 @@
     "@patchpilot/observability": "workspace:*",
     "@patchpilot/policy-engine": "workspace:*",
     "@patchpilot/vulnerability-intelligence": "workspace:*",
-    "fastify": "5.12.5",
+    "fastify": "5.12.8",
     "ioredis": "^5.8.2"
   },
   "devDependencies": {
